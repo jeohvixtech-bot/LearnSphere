@@ -1,0 +1,6 @@
+{
+  "name": "LearnSphere",
+  "description": "A comprehensive tutor-matching platform ecosystem featuring parental tracking, customized profiling, intelligent scheduling, counter-proposals, lessons reporting, billing, real-time messaging, and admin operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
