@@ -1,0 +1,155 @@
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
+      <a href="#!/parent/students" class="nav-item">👤 Setup Student Profile</a>
+      <a href="#!/parent/search" class="nav-item active">🔍 Find Tutors Catalog</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    </nav>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <!-- Tutor Listing -->
+    <div ng-if="!vm.selectedTutor">
+      <div class="card">
+        <div class="search-bar-row">
+          <input type="text" ng-model="vm.searchQuery" placeholder="Search by name, subject..." class="search-input" />
+        </div>
+        <div class="filter-row">
+          <label>Subjects:</label>
+          <select ng-model="vm.selectedSubject">
+            <option value="All">All Subjects</option>
+            <option value="Mathematics">Mathematics</option>
+            <option value="Additional Mathematics">Additional Mathematics</option>
+            <option value="Chemistry">Chemistry</option>
+            <option value="Physics">Physics</option>
+            <option value="Science">Science</option>
+          </select>
+          <label>Mode:</label>
+          <select ng-model="vm.selectedMode">
+            <option value="All">All Modes</option>
+            <option value="Online">Online</option>
+            <option value="Home Visit">Home Visit</option>
+            <option value="Tutor Place">Tutor Place</option>
+          </select>
+          <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+        </div>
+      </div>
+
+      <div class="tutor-grid">
+        <div class="tutor-card" ng-repeat="t in vm.filteredTutors()">
+          <div class="tutor-card-header">
+            <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+            <div>
+              <h4>{{ t.name }}
+                <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
+              </h4>
+              <div class="subject-list">
+                <button ng-repeat="s in t.subjects" ng-click="vm.selectedSubject = s" class="subject-chip">{{ s }}</button>
+              </div>
+              <small>{{ t.experienceYears }} Yrs Exp • {{ t.modes.join(' / ') }}</small>
+            </div>
+            <span class="rating-badge">⭐ {{ t.rating }}</span>
+          </div>
+          <p class="tutor-bio">"{{ t.bio }}"</p>
+          <div class="qual-tags">
+            <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:2">{{ q }}</span>
+          </div>
+          <div class="tutor-card-footer">
+            <div>
+              <small>TRIAL RATE</small>
+              <strong class="price">${{ t.pricePerSession }}/hr</strong>
+            </div>
+            <button class="btn-primary" ng-click="vm.selectTutor(t)">View Profile & Book</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Booking Form Detail View -->
+    <div class="card max-w-lg" ng-if="vm.selectedTutor">
+      <button class="btn-link" ng-click="vm.clearSelectedTutor()">← Return to Tutor Listing</button>
+
+      <!-- Booking Success -->
+      <div class="alert-success large" ng-if="vm.bookingSuccess">
+        ✓ Booking Request Dispatched!<br/>
+        <small>Connecting you with {{ vm.selectedTutor.name }}. Redirecting...</small>
+      </div>
+
+      <div ng-if="!vm.bookingSuccess" class="booking-grid">
+        <!-- Tutor Info -->
+        <div class="tutor-info-col">
+          <div class="tutor-profile-card">
+            <img ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-avatar-lg" />
+            <h4>{{ vm.selectedTutor.name }}</h4>
+            <small>{{ vm.selectedTutor.subjects[0] }}</small>
+            <p class="rating">⭐ {{ vm.selectedTutor.rating }} ({{ vm.selectedTutor.reviewCount }} reviews)</p>
+          </div>
+          <div class="qual-section">
+            <h5>Credentials</h5>
+            <div class="qual-item" ng-repeat="q in vm.selectedTutor.qualifications">
+              ✓ {{ q }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Booking Form -->
+        <div class="booking-form-col">
+          <span class="label-tag">Pre-Booking Appointment Form</span>
+          <h3>Request Tutorial Session</h3>
+          <p class="text-muted">Rate: ${{ vm.selectedTutor.pricePerSession }}/session</p>
+
+          <form ng-submit="vm.submitBooking()">
+            <div class="form-group">
+              <label>Select Student</label>
+              <select ng-model="vm.bookingForm.studentId">
+                <option ng-repeat="s in vm.students" value="{{ s.id }}">{{ s.name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Subject Module</label>
+              <div class="subject-chips">
+                <button type="button" ng-repeat="s in vm.selectedTutor.subjects"
+                  ng-click="vm.bookingForm.subject = s"
+                  ng-class="{selected: vm.bookingForm.subject === s}"
+                  class="subject-chip-select">{{ s }}</button>
+              </div>
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Date</label>
+                <input type="date" ng-model="vm.bookingForm.date" required />
+              </div>
+              <div class="form-group">
+                <label>Start Time</label>
+                <input type="text" ng-model="vm.bookingForm.startTime" placeholder="04:00 PM" />
+              </div>
+              <div class="form-group">
+                <label>End Time</label>
+                <input type="text" ng-model="vm.bookingForm.endTime" placeholder="05:00 PM" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Message / Guidelines (Optional)</label>
+              <textarea ng-model="vm.bookingForm.message" rows="2"
+                placeholder="e.g. Please focus on quadratic equation formulas."></textarea>
+            </div>
+            <div class="price-summary">
+              <span>Total Price</span>
+              <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.duration }}.00 for {{ vm.bookingForm.duration }} hour(s)</strong>
+            </div>
+            <button type="submit" class="btn-primary full-width">Dispatch Booking Request</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>

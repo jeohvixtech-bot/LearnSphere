@@ -1,0 +1,80 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="brand-center">
+      <div class="brand-icon large">📚</div>
+      <h1>LearnSphere</h1>
+      <p>Singapore & Malaysia's Premier Tutor Matching Platform</p>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="tab-group">
+      <button class="tab" ng-class="{active: auth.mode === 'login'}" ng-click="auth.mode = 'login'">Sign In</button>
+      <button class="tab" ng-class="{active: auth.mode === 'register'}" ng-click="auth.mode = 'register'">Register</button>
+    </div>
+
+    <!-- Error Message -->
+    <div class="alert-error" ng-if="auth.errorMsg">{{ auth.errorMsg }}</div>
+
+    <!-- Login Form -->
+    <form ng-if="auth.mode === 'login'" ng-submit="auth.login()">
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" ng-model="auth.loginData.password" required placeholder="••••••••" />
+      </div>
+      <button type="submit" class="btn-primary full-width" ng-disabled="auth.loading">
+        <span ng-if="!auth.loading">Sign In</span>
+        <span ng-if="auth.loading">Authenticating...</span>
+      </button>
+    </form>
+
+    <!-- Register Form -->
+    <form ng-if="auth.mode === 'register'" ng-submit="auth.register()">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" ng-model="auth.registerData.name" required placeholder="e.g. Sarah Tan" />
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" ng-model="auth.registerData.email" required placeholder="you@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" />
+      </div>
+      <div class="form-group">
+        <label>Account Type</label>
+        <select ng-model="auth.registerData.role">
+          <option value="parent">Parent / Student</option>
+          <option value="tutor">Tutor / Teacher</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary full-width" ng-disabled="auth.loading">
+        <span ng-if="!auth.loading">Create Account</span>
+        <span ng-if="auth.loading">Creating...</span>
+      </button>
+    </form>
+
+    <!-- Demo Credentials -->
+    <div class="demo-creds">
+      <p class="demo-title">Demo Credentials</p>
+      <div class="demo-grid">
+        <div>
+          <strong>Parent:</strong><br/>
+          sarah.tan@example.com / Parent@123
+        </div>
+        <div>
+          <strong>Tutor:</strong><br/>
+          lim.ws@example.com / Tutor@123
+        </div>
+        <div>
+          <strong>Admin:</strong><br/>
+          admin@learnsphere.sg / Admin@123
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

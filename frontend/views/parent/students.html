@@ -1,0 +1,128 @@
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
+      <a href="#!/parent/students" class="nav-item active">👤 Setup Student Profile</a>
+      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    </nav>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="grid-col-7-5">
+
+      <!-- Add Student Form -->
+      <div class="card">
+        <span class="label-tag blue">Profiling System</span>
+        <h2>Add Child / Student Profile</h2>
+        <p class="text-muted">Customize their education tier, school, and subjects to match with NIE teachers.</p>
+
+        <div class="alert-success" ng-if="vm.studentSuccess">
+          ✓ New student profile has been created successfully!
+        </div>
+
+        <form ng-submit="vm.createStudent()" class="form-stack">
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Child Full Name</label>
+              <input type="text" ng-model="vm.studentForm.name" required placeholder="e.g. Jessica Tan" />
+            </div>
+          </div>
+
+          <!-- School search -->
+          <div class="form-group" style="position:relative">
+            <label>Current Education Institution</label>
+            <input type="text" ng-model="vm.schoolSearch"
+              ng-change="vm.searchSchools()"
+              ng-focus="vm.openSchoolDropdown()"
+              ng-blur="vm.closeSchoolDropdown()"
+              placeholder="Search or select school in SG/MY..." />
+            <div class="school-dropdown" ng-if="vm.schoolDropdownOpen">
+              <div class="school-filters">
+                <button type="button" ng-repeat="c in ['All','Singapore','Malaysia']"
+                  ng-click="vm.countryFilter = c; vm.searchSchools()"
+                  ng-class="{active: vm.countryFilter === c}" class="filter-chip">
+                  {{ c === 'Singapore' ? 'SG 🇸🇬' : c === 'Malaysia' ? 'MY 🇲🇾' : 'All' }}
+                </button>
+              </div>
+              <select ng-model="vm.typeFilter" ng-change="vm.searchSchools()" class="filter-select">
+                <option value="All">All Types</option>
+                <option value="Primary">Primary</option>
+                <option value="Secondary">Secondary</option>
+                <option value="Junior College">Junior College</option>
+                <option value="Polytechnic/Vocational">Polytechnic/Vocational</option>
+                <option value="University/Tertiary">University/Tertiary</option>
+              </select>
+              <div class="school-list">
+                <button type="button" class="school-option"
+                  ng-repeat="inst in vm.institutions"
+                  ng-click="vm.selectSchool(inst.name)">
+                  <span>{{ inst.name }}</span>
+                  <div>
+                    <span class="badge-country">{{ inst.country === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}</span>
+                    <span class="badge-type">{{ inst.type }}</span>
+                  </div>
+                </button>
+                <p ng-if="!vm.institutions.length" class="empty-state">No matching institutions found.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Education Level</label>
+              <select ng-model="vm.studentForm.educationLevel">
+                <option>Primary 5-6</option>
+                <option>Secondary 1</option>
+                <option>Secondary 2</option>
+                <option>Secondary 3</option>
+                <option>Secondary 4</option>
+                <option>Junior College (JC)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Learning Milestones & Goals (Optional)</label>
+            <textarea ng-model="vm.studentForm.learningGoal" rows="3"
+              placeholder="e.g. Improve algebra speed, prepare for national exams..."></textarea>
+          </div>
+
+          <button type="submit" class="btn-primary full-width">Save Student Profile</button>
+        </form>
+      </div>
+
+      <!-- Active Students List -->
+      <div class="card overflow-auto" style="max-height:640px">
+        <span class="label-tag purple">Registry Records</span>
+        <h3>Active Student Files</h3>
+
+        <div class="student-record" ng-repeat="s in vm.students"
+          ng-class="{'newly-added': s.id === vm.newlyAddedStudentId}">
+          <div ng-if="s.id === vm.newlyAddedStudentId" class="new-badge">★ NEWLY ADDED</div>
+          <div class="student-record-header">
+            <div class="avatar-circle">{{ s.name[0] }}</div>
+            <div>
+              <strong>{{ s.name }}</strong>
+              <p class="text-muted">{{ s.educationLevel }}</p>
+              <span class="badge-school">🏫 {{ s.school }}</span>
+            </div>
+          </div>
+          <div class="goal-box" ng-if="s.learningGoal">
+            <small class="label-tag">Target Milestones</small>
+            <p>"{{ s.learningGoal }}"</p>
+          </div>
+        </div>
+
+        <p ng-if="!vm.students.length" class="empty-state">No student profiles added yet.</p>
+      </div>
+
+    </div>
+  </main>
+</div>

@@ -1,0 +1,258 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-indigo">
+    <div class="sidebar-user">
+      <div class="avatar-circle indigo">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/tutor/overview" class="nav-item active">📋 Overview & Schedules</a>
+      <a href="#!/tutor/chat" class="nav-item">💬 Direct Messages</a>
+    </nav>
+    <div class="status-live">Status: <span class="dot-green">● LIVE ON DUTY</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <!-- Tutor Stats Banner -->
+    <div class="tutor-banner" ng-if="vm.tutor">
+      <div class="tutor-banner-left">
+        <img ng-src="{{ vm.tutor.imageUrl }}" class="avatar-lg" alt="{{ vm.tutor.name }}" />
+        <div>
+          <h2>{{ vm.tutor.name }} <span class="badge-gold">🏆 Gold Teacher</span></h2>
+          <p>{{ vm.tutor.experienceYears }} Years Active MOE Teacher</p>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <small>COMPLETED</small>
+          <strong class="green">{{ vm.completedClasses().length }} sessions</strong>
+        </div>
+        <div class="stat-card">
+          <small>SATISFACTION</small>
+          <strong class="amber">⭐ {{ vm.tutor.rating }}</strong>
+        </div>
+        <div class="stat-card">
+          <small>COMPLETION RATE</small>
+          <strong>98.5%</strong>
+        </div>
+        <div class="stat-card">
+          <small>READY BALANCE</small>
+          <strong>$1,200.00</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Booking Requests -->
+    <div class="card" ng-if="vm.pendingRequests().length">
+      <h3><span class="dot-amber"></span> Parents Booking Requests ({{ vm.pendingRequests().length }})</h3>
+      <div class="request-list">
+        <div class="request-item" ng-repeat="b in vm.pendingRequests()">
+          <div>
+            <span class="badge-subject">{{ b.subject }}</span>
+            <strong>{{ b.studentName }}</strong>
+            <p>{{ b.date }} • {{ b.time }} ({{ b.durationHours }}h)</p>
+            <em ng-if="b.message">"{{ b.message }}"</em>
+          </div>
+          <div class="btn-row">
+            <button class="btn-outline" ng-click="vm.startCounter(b)">Counter Propose Time</button>
+            <button class="btn-success" ng-click="vm.confirmBooking(b)">Confirm Class</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Counter Proposal Form -->
+    <div class="card max-w-md" ng-if="vm.counterBooking">
+      <button class="btn-link" ng-click="vm.cancelCounter()">← Cancel</button>
+      <div class="alert-success" ng-if="vm.counterSuccess">
+        ✓ Counter-proposal dispatched. Waiting for parent approval.
+      </div>
+      <div ng-if="!vm.counterSuccess">
+        <span class="label-tag">Time Rescheduling</span>
+        <h3>Counter Propose Booking Slot</h3>
+        <p class="text-muted">For: {{ vm.counterBooking.subject }}</p>
+        <form ng-submit="vm.submitCounter()">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Proposed Date</label>
+              <input type="date" ng-model="vm.counterForm.date" required />
+            </div>
+            <div class="form-group">
+              <label>Proposed Time</label>
+              <input type="text" ng-model="vm.counterForm.time" placeholder="05:00 PM" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Explanation to Parent</label>
+            <textarea ng-model="vm.counterForm.message" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn-primary full-width">Dispatch Counter Proposal</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
+      <div class="card-header">
+        <span class="label-tag indigo">TUTOR MONTHLY SCHEDULER</span>
+        <h3>Calendar & Payout Coordinator</h3>
+        <span class="badge-month">📆 June 2026</span>
+      </div>
+      <div class="cal-stats-row">
+        <div class="cal-stat amber">
+          <small>Pending Confirmation</small>
+          <strong>{{ vm.pendingRequests().length }} Session(s)</strong>
+          <span ng-if="vm.pendingRequests().length" class="pulse-badge">⏳ Action Required</span>
+          <span ng-if="!vm.pendingRequests().length" class="ok-badge">✓ All Clear</span>
+        </div>
+        <div class="cal-stat indigo">
+          <small>Sessions on June {{ vm.selectedCalDay }}</small>
+          <strong>{{ vm.confirmedOnDay(vm.selectedCalDay).length }} Lesson(s)</strong>
+        </div>
+      </div>
+
+      <!-- Calendar Grid -->
+      <div class="cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+      <div class="cal-grid">
+        <button class="cal-day" ng-repeat="d in [].constructor(30) track by $index"
+          ng-click="vm.selectedCalDay = $index + 1"
+          ng-class="{
+            'selected': vm.selectedCalDay === $index + 1,
+            'has-paid': vm.isPaid(vm.bookingsOnDay($index + 1)[0] && vm.bookingsOnDay($index + 1)[0].id),
+            'has-unpaid': !vm.isPaid(vm.bookingsOnDay($index + 1)[0] && vm.bookingsOnDay($index + 1)[0].id) && vm.bookingsOnDay($index + 1).length > 0
+          }">
+          <span class="day-num">{{ $index + 1 }}</span>
+          <span class="day-label" ng-if="vm.bookingsOnDay($index + 1).length">
+            {{ vm.isPaid(vm.bookingsOnDay($index + 1)[0].id) ? '🟢' : '🔒' }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Selected Day Detail -->
+      <div class="day-detail" ng-if="vm.selectedCalDay">
+        <h4>📅 Scheduled Classes for June {{ vm.selectedCalDay }}, 2026</h4>
+        <p ng-if="!vm.bookingsOnDay(vm.selectedCalDay).length" class="empty-state">No lessons on this day.</p>
+        <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(vm.selectedCalDay)">
+          <div class="booking-detail-header">
+            <span class="badge-subject">{{ b.subject }}</span>
+            <strong>Student: {{ b.studentName }}</strong>
+            <p>{{ b.time }} ({{ b.durationHours }}h) • ${{ b.totalPrice }}.00</p>
+          </div>
+          <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
+          <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmed Classes -->
+    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
+      <h3>Confirmed Classes Checklist</h3>
+      <p ng-if="!vm.confirmedClasses().length" class="empty-state">No active class appointments.</p>
+      <div class="session-item" ng-repeat="b in vm.confirmedClasses()">
+        <div>
+          <span class="badge-subject">{{ b.subject }}</span>
+          <strong>Student: {{ b.studentName }}</strong>
+          <p>{{ b.date }} • {{ b.time }}</p>
+        </div>
+        <span class="status-badge confirmed">STARTING SOON</span>
+      </div>
+    </div>
+
+    <!-- Class Reports Portal -->
+    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
+      <h3>Class Reports Portal</h3>
+
+      <!-- Needs reports -->
+      <div ng-if="vm.needsReport().length">
+        <div class="report-needed" ng-repeat="b in vm.needsReport()">
+          <div>
+            <span class="badge-amber">REPORT REQUIRED</span>
+            <strong>{{ b.subject }} on {{ b.date }}</strong>
+            <p>Student: {{ b.studentName }}</p>
+          </div>
+          <button class="btn-indigo" ng-click="vm.startReport(b)">Submit Lesson Report</button>
+        </div>
+      </div>
+
+      <!-- Published reports -->
+      <div ng-if="vm.hasReport().length">
+        <h5 class="section-label">Published Reports Log</h5>
+        <div class="report-row" ng-repeat="b in vm.hasReport()">
+          <div>
+            <strong>{{ b.subject }} Report</strong>
+            <small>Published {{ b.lessonReport.submitDate }}</small>
+          </div>
+          <button class="btn-link indigo" ng-click="vm.startEdit(b)">✏️ Edit Report</button>
+        </div>
+      </div>
+
+      <p ng-if="!vm.needsReport().length && !vm.hasReport().length" class="empty-state">
+        No class reports yet. Complete sessions will appear here.
+      </p>
+    </div>
+
+    <!-- Submit Report Form -->
+    <div class="card max-w-lg" ng-if="vm.reportBooking">
+      <button class="btn-link" ng-click="vm.cancelReport()">← Cancel</button>
+      <div class="alert-success" ng-if="vm.reportSuccess">
+        ✓ Lesson report published and shared with parent.
+      </div>
+      <div ng-if="!vm.reportSuccess">
+        <span class="label-tag">Lesson Evaluation Form</span>
+        <h3>Compile Report for {{ vm.reportBooking.studentName }}</h3>
+        <p class="text-muted">Class: {{ vm.reportBooking.subject }} on {{ vm.reportBooking.date }}</p>
+        <form ng-submit="vm.submitReport()">
+          <div class="form-group">
+            <label>Syllabus Covered & Focus Areas</label>
+            <textarea ng-model="vm.reportForm.covered" rows="3" required
+              placeholder="e.g. Solving simultaneous quadratic equations..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Student Performance & Classroom Alignment</label>
+            <textarea ng-model="vm.reportForm.performance" rows="3" required
+              placeholder="e.g. Excellent focus. Solved algebraic tasks correctly..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Homework Instructions</label>
+            <input type="text" ng-model="vm.reportForm.homework" required
+              placeholder="e.g. Worksheet 4 (Q1-10). Due next Friday." />
+          </div>
+          <button type="submit" class="btn-indigo full-width">Publish Lesson Report</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Report Form -->
+    <div class="card max-w-lg" ng-if="vm.editBooking">
+      <button class="btn-link" ng-click="vm.cancelEdit()">← Dismiss</button>
+      <div class="alert-success" ng-if="vm.editSuccess">
+        ✓ Report modifications saved to audit ledger.
+      </div>
+      <div ng-if="!vm.editSuccess">
+        <span class="label-tag amber">Incident Audit Log Active</span>
+        <h3>Modify Published Report</h3>
+        <form ng-submit="vm.submitEdit()">
+          <div class="form-group">
+            <label>Syllabus Covered</label>
+            <textarea ng-model="vm.editForm.covered" rows="2" required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Student Performance</label>
+            <textarea ng-model="vm.editForm.performance" rows="2" required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Homework</label>
+            <input type="text" ng-model="vm.editForm.homework" required />
+          </div>
+          <div class="form-group audit-reason">
+            <label>Reason for Modification (Public audit log)</label>
+            <input type="text" ng-model="vm.editForm.changesMade" required
+              placeholder="e.g. Corrected typo in worksheet reference." />
+          </div>
+          <button type="submit" class="btn-amber full-width">Commit to Audit Ledger</button>
+        </form>
+      </div>
+    </div>
+
+  </main>
+</div>

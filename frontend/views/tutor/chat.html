@@ -1,0 +1,53 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-indigo">
+    <div class="sidebar-user">
+      <div class="avatar-circle indigo">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/tutor/overview" class="nav-item">📋 Overview & Schedules</a>
+      <a href="#!/tutor/chat" class="nav-item active">💬 Direct Messages</a>
+    </nav>
+    <div class="status-live">Status: <span class="dot-green">● LIVE ON DUTY</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="card chat-container">
+      <div class="chat-header">
+        <div>
+          <strong>Sarah Tan</strong>
+          <p class="online-status">● Mother of Jessica Tan • Online</p>
+        </div>
+        <small>Direct Parent-Teacher Line</small>
+      </div>
+
+      <div class="chat-messages">
+        <div ng-repeat="msg in vm.chatMessages"
+          class="chat-message-wrap"
+          ng-class="{
+            'right': msg.sender === 'tutor',
+            'center': msg.sender === 'system',
+            'left': msg.sender === 'parent'
+          }">
+          <div ng-if="msg.sender === 'system'" class="system-msg">
+            ⚠️ LearnSphere: {{ msg.text }}
+          </div>
+          <div ng-if="msg.sender !== 'system'"
+            class="chat-bubble"
+            ng-class="{'bubble-tutor': msg.sender === 'tutor', 'bubble-parent': msg.sender === 'parent'}">
+            <p>{{ msg.text }}</p>
+            <small>{{ msg.timestamp }}</small>
+          </div>
+        </div>
+        <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet.</p>
+      </div>
+
+      <form class="chat-input-row" ng-submit="vm.sendMessage()">
+        <input type="text" ng-model="vm.chatText"
+          placeholder="Draft a response to the parent..."
+          class="chat-input" />
+        <button type="submit" class="btn-indigo">Reply 📤</button>
+      </form>
+    </div>
+  </main>
+</div>

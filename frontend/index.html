@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="learnSphereApp">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LearnSphere – Tutor Matching Platform</title>
+
+  <!-- AngularJS 1.x + ngRoute -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular-route.min.js"></script>
+
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+
+  <!-- App Shell: Header + Route View -->
+  <div ng-controller="AppCtrl as app">
+
+    <!-- Main Header -->
+    <header class="main-header" ng-if="app.isLoggedIn()">
+      <div class="header-inner">
+        <div class="brand">
+          <div class="brand-icon">📚</div>
+          <div>
+            <h1 class="brand-name">LearnSphere <span class="badge-demo">Demo Workspace</span></h1>
+            <p class="brand-tagline">Learn Continuously, Grow Confidently.</p>
+          </div>
+        </div>
+
+        <nav class="header-nav">
+          <span class="user-info">
+            <strong>{{ app.currentUser.name }}</strong>
+            <em class="role-badge role-{{ app.currentUser.role }}">{{ app.currentUser.role }}</em>
+          </span>
+
+          <button class="notif-btn" ng-click="app.toggleNotifDrawer()">
+            🔔
+            <span class="notif-count" ng-if="app.unreadCount > 0">{{ app.unreadCount }}</span>
+          </button>
+
+          <button class="btn-outline" ng-click="app.logout()">Sign Out</button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Notifications Drawer -->
+    <div class="notif-overlay" ng-if="app.notifDrawerOpen" ng-click="app.toggleNotifDrawer()"></div>
+    <aside class="notif-drawer" ng-if="app.notifDrawerOpen">
+      <div class="notif-drawer-header">
+        <span>🔔 Notifications Registry</span>
+        <button ng-click="app.toggleNotifDrawer()">✕</button>
+      </div>
+      <div class="notif-list">
+        <div class="notif-item" ng-repeat="n in app.notifications" ng-class="{'unread': !n.isRead}">
+          <span class="notif-dot"></span>
+          <div>
+            <h4>{{ n.title }}</h4>
+            <p>{{ n.message }}</p>
+            <small>{{ n.timestamp }}</small>
+          </div>
+        </div>
+        <p ng-if="!app.notifications.length" class="empty-state">No notifications yet.</p>
+      </div>
+      <button class="btn-primary full-width" ng-click="app.markAllRead()">Mark all as read</button>
+    </aside>
+
+    <!-- Route view -->
+    <main class="main-content">
+      <div ng-view></div>
+    </main>
+
+  </div>
+
+  <!-- App Scripts -->
+  <script src="app/app.js"></script>
+  <script src="app/services/auth.service.js"></script>
+  <script src="app/services/tutor.service.js"></script>
+  <script src="app/services/student.service.js"></script>
+  <script src="app/services/booking.service.js"></script>
+  <script src="app/services/chat.service.js"></script>
+  <script src="app/services/notification.service.js"></script>
+  <script src="app/services/invoice.service.js"></script>
+  <script src="app/services/admin.service.js"></script>
+  <script src="app/controllers/app.controller.js"></script>
+  <script src="app/controllers/auth.controller.js"></script>
+  <script src="app/controllers/parent.controller.js"></script>
+  <script src="app/controllers/tutor.controller.js"></script>
+  <script src="app/controllers/admin.controller.js"></script>
+
+</body>
+</html>

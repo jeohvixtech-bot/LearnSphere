@@ -1,0 +1,56 @@
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
+      <a href="#!/parent/students" class="nav-item">👤 Setup Student Profile</a>
+      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/chat" class="nav-item active">💬 Direct Messages</a>
+    </nav>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="card chat-container">
+      <div class="chat-header">
+        <div>
+          <strong>Mr. Lim Wei Sheng</strong>
+          <p class="online-status">● Tutor • Online</p>
+        </div>
+        <small>Direct Parent-Teacher Line</small>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div ng-repeat="msg in vm.chatMessages"
+          class="chat-message-wrap"
+          ng-class="{
+            'right': msg.sender === 'parent',
+            'center': msg.sender === 'system',
+            'left': msg.sender === 'tutor'
+          }">
+          <div ng-if="msg.sender === 'system'" class="system-msg">
+            ⚠️ LearnSphere: {{ msg.text }}
+          </div>
+          <div ng-if="msg.sender !== 'system'"
+            class="chat-bubble"
+            ng-class="{'bubble-parent': msg.sender === 'parent', 'bubble-tutor': msg.sender === 'tutor'}">
+            <p>{{ msg.text }}</p>
+            <small>{{ msg.timestamp }}</small>
+          </div>
+        </div>
+        <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet. Start the conversation!</p>
+      </div>
+
+      <form class="chat-input-row" ng-submit="vm.sendMessage()">
+        <input type="text" ng-model="vm.chatText"
+          placeholder="Type a message to the tutor..."
+          class="chat-input" />
+        <button type="submit" class="btn-primary">Send 📤</button>
+      </form>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,77 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item active">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+    <!-- Metrics Banner -->
+    <div class="metrics-grid" ng-if="vm.stats">
+      <div class="metric-card indigo">
+        <small>TOTAL PARENTS</small>
+        <strong>{{ vm.stats.totalParents | number }} users</strong>
+        <span>+12% this month</span>
+      </div>
+      <div class="metric-card blue">
+        <small>VERIFIED TUTORS</small>
+        <strong>{{ vm.stats.totalVerifiedTutors | number }} vetted</strong>
+        <span>99.4% passing filter</span>
+      </div>
+      <div class="metric-card green">
+        <small>SESSIONS DISPATCHED</small>
+        <strong>{{ vm.stats.totalSessions | number }} completed</strong>
+        <span>0.04% flag rate</span>
+      </div>
+      <div class="metric-card purple">
+        <small>GROSS REVENUE</small>
+        <strong>${{ vm.stats.grossRevenue | number:2 }}</strong>
+        <span>+18.5% year-to-year</span>
+      </div>
+    </div>
+
+    <!-- System Logs -->
+    <div class="card">
+      <h3>Operations System Log Tracker</h3>
+      <div class="log-list">
+        <div class="log-item" ng-repeat="log in vm.systemLogs">
+          <span>⚡ {{ log }}</span>
+          <span class="online-badge">ONLINE</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Vetting Queue Summary -->
+      <div class="card">
+        <h4>Vetting Queue</h4>
+        <p class="text-muted">Applicants awaiting NIEC certification audits:</p>
+        <div class="queue-item" ng-repeat="t in vm.unverifiedTutors">
+          <span>{{ t.name }}</span>
+          <a href="#!/admin/vetting" class="link-sm">Vet applicant →</a>
+        </div>
+        <p ng-if="!vm.unverifiedTutors.length" class="empty-state">✓ Vetting queue is clear.</p>
+      </div>
+
+      <!-- Disputes Summary -->
+      <div class="card">
+        <h4>Disputes Desk</h4>
+        <p class="text-muted">Ongoing claims from parent portals:</p>
+        <div ng-if="!vm.disputes.length" class="alert-success">
+          ✔️ No unresolved disputes on queue.
+        </div>
+        <div class="dispute-item" ng-repeat="d in vm.disputes">
+          <span class="mono">Dispute #{{ d.id }}</span>
+          <a href="#!/admin/disputes" class="link-danger">Open resolution →</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

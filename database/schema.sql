@@ -1,0 +1,204 @@
+-- LearnSphere MySQL Schema
+-- Run this to create the database manually (EF Core migrations handle it automatically)
+
+CREATE DATABASE IF NOT EXISTS learnsphere_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE learnsphere_db;
+
+-- Users
+CREATE TABLE IF NOT EXISTS Users (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Email VARCHAR(255) NOT NULL UNIQUE,
+    PasswordHash VARCHAR(255) NOT NULL,
+    Role VARCHAR(20) NOT NULL DEFAULT 'parent',
+    Name VARCHAR(255) NOT NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tutors
+CREATE TABLE IF NOT EXISTS Tutors (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    UserId INT NOT NULL UNIQUE,
+    ImageUrl TEXT,
+    Rating DOUBLE NOT NULL DEFAULT 0,
+    ReviewCount INT NOT NULL DEFAULT 0,
+    PricePerSession DECIMAL(10,2) NOT NULL DEFAULT 0,
+    ExperienceYears INT NOT NULL DEFAULT 0,
+    Bio TEXT,
+    IsVerified TINYINT(1) NOT NULL DEFAULT 0,
+    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- Tutor Subjects
+CREATE TABLE IF NOT EXISTS TutorSubjects (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Subject VARCHAR(100) NOT NULL,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Tutor Levels
+CREATE TABLE IF NOT EXISTS TutorLevels (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Level VARCHAR(100) NOT NULL,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Tutor Modes
+CREATE TABLE IF NOT EXISTS TutorModes (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Mode VARCHAR(50) NOT NULL,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Tutor Qualifications
+CREATE TABLE IF NOT EXISTS TutorQualifications (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Qualification VARCHAR(255) NOT NULL,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Tutor Reviews
+CREATE TABLE IF NOT EXISTS TutorReviews (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Author VARCHAR(150) NOT NULL,
+    Text TEXT NOT NULL,
+    Rating INT NOT NULL DEFAULT 5,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Tutor TimeSlots
+CREATE TABLE IF NOT EXISTS TutorTimeSlots (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Day VARCHAR(20) NOT NULL,
+    Time VARCHAR(50) NOT NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'Available',
+    BookingId INT,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Students
+CREATE TABLE IF NOT EXISTS Students (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    ParentUserId INT NOT NULL,
+    Name VARCHAR(255) NOT NULL,
+    BirthDate VARCHAR(20),
+    School VARCHAR(255),
+    EducationLevel VARCHAR(100),
+    SubjectSelect VARCHAR(100),
+    LearningGoal TEXT,
+    PhotoUrl TEXT,
+    FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- Bookings
+CREATE TABLE IF NOT EXISTS Bookings (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    StudentId INT NOT NULL,
+    Subject VARCHAR(255) NOT NULL,
+    Mode VARCHAR(50) NOT NULL,
+    Date VARCHAR(20) NOT NULL,
+    Time VARCHAR(50) NOT NULL,
+    DurationHours INT NOT NULL DEFAULT 1,
+    Message TEXT,
+    TotalPrice DECIMAL(10,2) NOT NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    SlotId INT,
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id),
+    FOREIGN KEY (StudentId) REFERENCES Students(Id)
+);
+
+-- Counter Proposals
+CREATE TABLE IF NOT EXISTS CounterProposals (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId INT NOT NULL UNIQUE,
+    Date VARCHAR(20) NOT NULL,
+    Time VARCHAR(50) NOT NULL,
+    Message TEXT,
+    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- Lesson Reports
+CREATE TABLE IF NOT EXISTS LessonReports (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId INT NOT NULL UNIQUE,
+    Covered TEXT NOT NULL,
+    Performance TEXT NOT NULL,
+    Homework TEXT NOT NULL,
+    SubmitDate VARCHAR(50) NOT NULL,
+    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- Lesson Report Edit History
+CREATE TABLE IF NOT EXISTS LessonReportEdits (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    LessonReportId INT NOT NULL,
+    Date VARCHAR(50) NOT NULL,
+    Changes TEXT NOT NULL,
+    FOREIGN KEY (LessonReportId) REFERENCES LessonReports(Id) ON DELETE CASCADE
+);
+
+-- Issue Reports
+CREATE TABLE IF NOT EXISTS IssueReports (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId INT NOT NULL UNIQUE,
+    IssueType VARCHAR(150) NOT NULL,
+    Details TEXT NOT NULL,
+    Timestamp VARCHAR(50) NOT NULL,
+    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- Chat Messages
+CREATE TABLE IF NOT EXISTS ChatMessages (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Sender VARCHAR(20) NOT NULL,
+    Text TEXT NOT NULL,
+    Timestamp VARCHAR(50) NOT NULL
+);
+
+-- Notifications
+CREATE TABLE IF NOT EXISTS Notifications (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    UserId INT NOT NULL,
+    Title VARCHAR(255) NOT NULL,
+    Message TEXT NOT NULL,
+    Timestamp VARCHAR(50) NOT NULL,
+    Type VARCHAR(30) NOT NULL DEFAULT 'system',
+    IsRead TINYINT(1) NOT NULL DEFAULT 0,
+    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- Invoices
+CREATE TABLE IF NOT EXISTS Invoices (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId INT NOT NULL UNIQUE,
+    Date VARCHAR(20) NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'Unpaid',
+    Subject VARCHAR(255),
+    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- Payouts
+CREATE TABLE IF NOT EXISTS Payouts (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId INT NOT NULL,
+    Date VARCHAR(20) NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'Processing',
+    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- Institutions
+CREATE TABLE IF NOT EXISTS Institutions (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Name VARCHAR(255) NOT NULL,
+    Country VARCHAR(50) NOT NULL,
+    Type VARCHAR(100) NOT NULL
+);

@@ -1,0 +1,47 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item active">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="card">
+      <span class="label-tag indigo">SECURITY VERIFICATION ENGINE</span>
+      <h3>Applicant Verification Queue</h3>
+      <p class="text-muted">Validate diplomas, certificates, and NIE credentials on the LearnSphere registry.</p>
+
+      <div class="empty-state-box" ng-if="!vm.unverifiedTutors.length">
+        ✓ All tutor applicants have been verified.
+      </div>
+
+      <div class="vetting-list">
+        <div class="vetting-item" ng-repeat="t in vm.unverifiedTutors">
+          <div class="vetting-info">
+            <img ng-src="{{ t.imageUrl }}" class="avatar" alt="{{ t.name }}" />
+            <div>
+              <strong>{{ t.name }}</strong>
+              <p>{{ t.subjects.join(' / ') }} • {{ t.experienceYears }} Years Exp</p>
+              <div class="qual-tags">
+                <span class="qual-tag" ng-repeat="q in t.qualifications">{{ q }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-outline">Deny Registry</button>
+            <button class="btn-success" ng-click="vm.verifyTutor(t)">
+              ✓ Validate Credentials & Verify
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

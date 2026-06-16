@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# .NET build artifacts
+backend/**/bin/
+backend/**/obj/
+
+# Local dev secrets (keep password out of git)
+backend/**/appsettings.Development.json

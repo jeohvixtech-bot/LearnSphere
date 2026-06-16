@@ -1,0 +1,49 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item active">⚠️ Resolution Disputes</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="card">
+      <span class="label-tag red">Incident Disputes Auditor</span>
+      <h3>Resolution Disputes Log</h3>
+      <p class="text-muted">Audit conflict reports and check attendance before issuing credit resolutions.</p>
+
+      <div class="empty-state-box large" ng-if="!vm.disputes.length">
+        ✔️ No outstanding parent claims or billing disputes on record.
+      </div>
+
+      <div class="dispute-card" ng-repeat="d in vm.disputes">
+        <div class="dispute-card-header">
+          <div>
+            <strong class="text-danger">CLAIM DISPATCHED #{{ d.id }}</strong>
+            <p>Subject: {{ d.subject }}</p>
+          </div>
+          <span class="status-badge pending">PENDING_AUDIT</span>
+        </div>
+        <div class="dispute-details">
+          <p><strong>Tutor:</strong> {{ d.tutorName }}</p>
+          <p><strong>Student:</strong> {{ d.studentName }}</p>
+          <p><strong>Issue Type:</strong> {{ d.issueReport && d.issueReport.issueType }}</p>
+          <p><strong>Details:</strong> "{{ d.issueReport && d.issueReport.details }}"</p>
+          <small class="mono">Incident Stamp: {{ d.issueReport && d.issueReport.timestamp }}</small>
+        </div>
+        <div class="dispute-actions">
+          <button class="btn-outline">Contact Parent</button>
+          <button class="btn-danger" ng-click="vm.resolveDispute(d)">
+            ✓ Verify Dispute & Resolve Case
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,116 @@
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
+      <a href="#!/parent/students" class="nav-item">👤 Setup Student Profile</a>
+      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
+      <a href="#!/parent/sessions" class="nav-item active">📅 Sessions & Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    </nav>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <!-- Issue Report Success -->
+    <div class="alert-success" ng-if="vm.issueSuccess">
+      ✓ Your incident dispatch has been logged successfully. Administration is investigating.
+      <button class="btn-link" ng-click="vm.issueSuccess = false; vm.issueForm.bookingId = null">Dismiss</button>
+    </div>
+
+    <!-- Report Issue Form -->
+    <div class="card max-w-md" ng-if="vm.issueForm.bookingId && !vm.issueSuccess">
+      <h3 class="text-danger">⚠️ Report Class Conflict</h3>
+      <p class="text-muted">Booking ID: #{{ vm.issueForm.bookingId }}</p>
+      <form ng-submit="vm.submitIssue()">
+        <div class="form-group">
+          <label>Incident Issue Type</label>
+          <select ng-model="vm.issueForm.issueType">
+            <option>Tutor was absent (No show)</option>
+            <option>Tutor was late ( > 20 mins)</option>
+            <option>Other scheduling dispute</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>What happened?</label>
+          <textarea ng-model="vm.issueForm.details" rows="3" required
+            placeholder="Provide details about wait times, response, or other issues..."></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn-outline" ng-click="vm.issueForm.bookingId = null">Cancel</button>
+          <button type="submit" class="btn-danger">Submit Report</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Bookings Table -->
+    <div class="card" ng-if="!vm.issueForm.bookingId || vm.issueSuccess">
+      <div class="card-header">
+        <h3>Sessions & Activity Log</h3>
+        <a href="#!/parent/search" class="btn-primary sm">+ New Booking</a>
+      </div>
+
+      <div class="empty-state-box" ng-if="!vm.bookings.length">
+        <p>No bookings found. Start by finding a tutor!</p>
+      </div>
+
+      <div class="table-wrap" ng-if="vm.bookings.length">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>Tutor</th>
+              <th>Student</th>
+              <th>Date / Time</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="b in vm.bookings">
+              <td><span class="badge-subject">{{ b.subject }}</span></td>
+              <td>{{ b.tutorName }}</td>
+              <td>{{ b.studentName }}</td>
+              <td>{{ b.date }}<br/><small>{{ b.time }}</small></td>
+              <td>${{ b.totalPrice }}.00</td>
+              <td>
+                <span class="status-badge" ng-class="b.status">{{ b.status | uppercase }}</span>
+              </td>
+              <td>
+                <button class="btn-sm btn-outline" ng-if="b.status === 'confirmed'"
+                  ng-click="vm.payInvoice(vm.getInvoiceForBooking(b.id).id)"
+                  ng-show="vm.getInvoiceForBooking(b.id) && vm.getInvoiceForBooking(b.id).status === 'Unpaid'">
+                  💳 Pay
+                </button>
+                <button class="btn-sm btn-outline" ng-if="b.status === 'countered'"
+                  ng-click="vm.acceptCounterProposal(b)">
+                  ✓ Accept Counter
+                </button>
+                <div ng-if="b.counterProposal && b.status === 'countered'" class="counter-details">
+                  <small>Proposed: {{ b.counterProposal.date }} at {{ b.counterProposal.time }}</small><br/>
+                  <small class="text-muted">"{{ b.counterProposal.message }}"</small>
+                </div>
+                <button class="btn-sm btn-danger" ng-if="b.status === 'confirmed'"
+                  ng-click="vm.startReportIssue(b.id)">
+                  ⚠️ Report Issue
+                </button>
+                <div ng-if="b.lessonReport" class="lesson-report-view">
+                  <span class="label-tag green">📋 Report Available</span>
+                  <p><strong>Covered:</strong> {{ b.lessonReport.covered }}</p>
+                  <p><strong>Performance:</strong> {{ b.lessonReport.performance }}</p>
+                  <p><strong>Homework:</strong> {{ b.lessonReport.homework }}</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
