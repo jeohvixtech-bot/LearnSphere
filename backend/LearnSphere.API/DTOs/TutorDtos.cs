@@ -1,5 +1,20 @@
 namespace LearnSphere.API.DTOs;
 
+public class TutorOfferingDto
+{
+    public string Subject { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public string Mode { get; set; } = string.Empty;
+    public string Qualification { get; set; } = string.Empty;
+    public decimal Price { get; set; }
+}
+
+public class SubjectDetailDto
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal? Price { get; set; }
+}
+
 public class TutorDto
 {
     public int Id { get; set; }
@@ -9,6 +24,7 @@ public class TutorDto
     public double Rating { get; set; }
     public int ReviewCount { get; set; }
     public List<string> Subjects { get; set; } = new();
+    public List<SubjectDetailDto> SubjectDetails { get; set; } = new();
     public List<string> Levels { get; set; } = new();
     public List<string> Modes { get; set; } = new();
     public decimal PricePerSession { get; set; }
@@ -18,6 +34,7 @@ public class TutorDto
     public bool IsVerified { get; set; }
     public List<ReviewDto> Reviews { get; set; } = new();
     public List<TimeSlotDto> Timetable { get; set; } = new();
+    public List<TutorOfferingDto> Offerings { get; set; } = new();
 }
 
 public class ReviewDto
@@ -47,10 +64,11 @@ public class UpdateTutorDto
     public string? Bio { get; set; }
     public decimal? PricePerSession { get; set; }
     public int? ExperienceYears { get; set; }
-    public List<string>? Subjects { get; set; }
+    public List<SubjectDetailDto>? Subjects { get; set; }
     public List<string>? Levels { get; set; }
     public List<string>? Modes { get; set; }
     public List<string>? Qualifications { get; set; }
+    public List<TutorOfferingDto>? Offerings { get; set; }
 }
 
 public class AddTimeSlotDto

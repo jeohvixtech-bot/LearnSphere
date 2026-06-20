@@ -3,6 +3,7 @@ using LearnSphere.API.Data;
 using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -39,7 +40,11 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:5500", "http://localhost:5500", "null")
+        policy.SetIsOriginAllowed(origin =>
+        {
+            var host = new Uri(origin).Host;
+            return host == "localhost" || host == "127.0.0.1";
+        })
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
@@ -74,6 +79,24 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try {
+        await context.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE `TutorSubjects` ADD COLUMN `Price` DECIMAL(10,2) NULL;");
+    } catch { }
+    try {
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS `TutorOfferings` (
+                `Id` INT NOT NULL AUTO_INCREMENT,
+                `TutorId` INT NOT NULL,
+                `Subject` VARCHAR(200) NOT NULL DEFAULT '',
+                `Level` VARCHAR(200) NOT NULL DEFAULT '',
+                `Mode` VARCHAR(200) NOT NULL DEFAULT '',
+                `Qualification` VARCHAR(200) NOT NULL DEFAULT '',
+                `Price` DECIMAL(10,2) NOT NULL DEFAULT 0,
+                PRIMARY KEY (`Id`),
+                CONSTRAINT `FK_TutorOfferings_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+            );");
+    } catch { }
     await DbSeeder.SeedAsync(context);
 }
 
@@ -81,6 +104,14 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowFrontend");
+
+var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(wwwrootPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(wwwrootPath),
+    RequestPath = ""
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

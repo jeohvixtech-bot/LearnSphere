@@ -19,6 +19,7 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
   self.searchQuery = '';
   self.selectedSubject = 'All';
   self.selectedMode = 'All';
+  self.minRating = 0;
 
   // Booking form
   self.bookingForm = {
@@ -83,7 +84,8 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
         t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; });
       var matchSub = self.selectedSubject === 'All' || t.subjects.indexOf(self.selectedSubject) >= 0;
       var matchMode = self.selectedMode === 'All' || t.modes.indexOf(self.selectedMode) >= 0;
-      return matchQuery && matchSub && matchMode;
+      var matchRating = !self.minRating || t.rating >= self.minRating;
+      return matchQuery && matchSub && matchMode && matchRating;
     });
   };
 

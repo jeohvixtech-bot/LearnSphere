@@ -12,6 +12,16 @@ function ($location, $timeout, AuthService, TutorService, BookingService, ChatSe
   self.invoices = [];
   self.chatMessages = [];
 
+  // Tab state
+  self.activeTab = 'overview';
+
+  // Edit profile form
+  self.profileForm = {};
+  self.profileSuccess = false;
+  self.profileError = '';
+  self.uploading = false;
+  self.newOffering = { subject: '', level: '', mode: '', qualification: '', price: null };
+
   // Report forms
   self.reportBooking = null;
   self.reportForm = { covered: '', performance: '', homework: '' };
@@ -31,6 +41,16 @@ function ($location, $timeout, AuthService, TutorService, BookingService, ChatSe
   function init() {
     TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
+      self.profileForm = {
+        imageUrl: res.data.imageUrl,
+        bio: res.data.bio,
+        experienceYears: res.data.experienceYears,
+        offerings: res.data.offerings && res.data.offerings.length
+          ? res.data.offerings.map(function(o) {
+              return { subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
+            })
+          : []
+      };
     });
     BookingService.getAll().then(function (res) { self.bookings = res.data; });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
@@ -174,6 +194,56 @@ function ($location, $timeout, AuthService, TutorService, BookingService, ChatSe
   };
 
   self.cancelEdit = function () { self.editBooking = null; };
+
+  // Edit profile offerings
+  self.addOffering = function () {
+    if (!self.newOffering.subject || !self.newOffering.level || !self.newOffering.mode || !self.newOffering.qualification) return;
+    self.profileForm.offerings.push({
+      subject: self.newOffering.subject,
+      level: self.newOffering.level,
+      mode: self.newOffering.mode,
+      qualification: self.newOffering.qualification,
+      price: parseFloat(self.newOffering.price) || 0
+    });
+    self.newOffering = { subject: '', level: '', mode: '', qualification: '', price: null };
+  };
+
+  self.removeOffering = function (index) {
+    self.profileForm.offerings.splice(index, 1);
+  };
+
+  self.onFileSelect = function (element) {
+    var file = element.files[0];
+    if (!file) return;
+    self.uploading = true;
+    self.profileError = '';
+    TutorService.uploadImage(file).then(function (res) {
+      self.profileForm.imageUrl = res.data.url;
+      self.uploading = false;
+    }, function () {
+      self.profileError = 'Image upload failed. Please try again.';
+      self.uploading = false;
+    });
+  };
+
+  self.saveProfile = function () {
+    if (!self.tutor) return;
+    self.profileSuccess = false;
+    self.profileError = '';
+    var payload = {
+      imageUrl: self.profileForm.imageUrl,
+      bio: self.profileForm.bio,
+      experienceYears: self.profileForm.experienceYears,
+      offerings: self.profileForm.offerings
+    };
+    TutorService.update(self.tutor.id, payload).then(function (res) {
+      self.tutor = res.data;
+      self.profileSuccess = true;
+      $timeout(function () { self.profileSuccess = false; }, 3000);
+    }, function () {
+      self.profileError = 'Failed to save. Please try again.';
+    });
+  };
 
   // Chat
   self.sendMessage = function () {

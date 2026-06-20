@@ -13,6 +13,15 @@
 
   <main class="dashboard-main">
 
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'overview'}" ng-click="vm.activeTab = 'overview'">📋 Overview & Schedules</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'profile'}" ng-click="vm.activeTab = 'profile'">✏️ Edit Profile</button>
+    </div>
+
+    <!-- ===== OVERVIEW TAB ===== -->
+    <div ng-if="vm.activeTab === 'overview'">
+
     <!-- Tutor Stats Banner -->
     <div class="tutor-banner" ng-if="vm.tutor">
       <div class="tutor-banner-left">
@@ -253,6 +262,180 @@
         </form>
       </div>
     </div>
+
+    </div><!-- end overview tab -->
+
+    <!-- ===== EDIT PROFILE TAB ===== -->
+    <div ng-if="vm.activeTab === 'profile'" class="card max-w-lg">
+      <span class="label-tag indigo">TUTOR PROFILE MANAGEMENT</span>
+      <h3>Edit Profile Details</h3>
+
+      <div class="alert-success" ng-if="vm.profileSuccess">✓ Profile updated successfully.</div>
+      <div class="alert-error" ng-if="vm.profileError">{{ vm.profileError }}</div>
+
+      <form ng-submit="vm.saveProfile()" class="profile-form">
+
+        <div class="form-group">
+          <label>Profile Photo</label>
+          <div class="photo-upload-row">
+            <img ng-if="vm.profileForm.imageUrl" ng-src="{{ vm.profileForm.imageUrl }}" class="preview-avatar" alt="Preview" />
+            <div class="photo-upload-controls">
+              <input type="file" id="photoUpload" accept="image/jpeg,image/png,image/webp" style="display:none"
+                onchange="angular.element(this).scope().vm.onFileSelect(this)" />
+              <label for="photoUpload" class="btn-outline-sm photo-browse-btn">📁 Browse & Upload</label>
+              <span ng-if="vm.uploading" class="text-muted">Uploading...</span>
+              <span ng-if="!vm.uploading && vm.profileForm.imageUrl" class="text-success">✓ Photo ready</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Bio</label>
+          <textarea ng-model="vm.profileForm.bio" rows="3" placeholder="Tell parents about your teaching style..."></textarea>
+        </div>
+
+        <!-- Teaching Offerings -->
+        <div class="form-group">
+          <label>Teaching Offerings</label>
+          <p class="text-muted offering-hint">Select subject, level, mode and qualification, then click Add Offering.</p>
+          <div class="offering-builder">
+            <div class="form-group">
+              <label>Subject</label>
+              <select ng-model="vm.newOffering.subject">
+                <option value="">— Subject —</option>
+                <optgroup label="PSLE">
+                  <option>English Language</option>
+                  <option>Mother Tongue (Chinese)</option>
+                  <option>Mother Tongue (Malay)</option>
+                  <option>Mother Tongue (Tamil)</option>
+                  <option>Mathematics</option>
+                  <option>Science</option>
+                </optgroup>
+                <optgroup label="UPSR">
+                  <option>Bahasa Malaysia</option>
+                  <option>English</option>
+                  <option>Mathematics</option>
+                  <option>Science</option>
+                  <option>History</option>
+                </optgroup>
+                <optgroup label="O-Level">
+                  <option>English Language</option>
+                  <option>Elementary Mathematics</option>
+                  <option>Additional Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>Combined Science</option>
+                  <option>History</option>
+                  <option>Social Studies</option>
+                  <option>Geography</option>
+                  <option>Literature in English</option>
+                  <option>Principles of Accounts</option>
+                  <option>Design & Technology</option>
+                  <option>Computing</option>
+                  <option>Food & Nutrition</option>
+                  <option>Art</option>
+                  <option>Music</option>
+                </optgroup>
+                <optgroup label="SPM">
+                  <option>Bahasa Malaysia</option>
+                  <option>English</option>
+                  <option>Mathematics</option>
+                  <option>Additional Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>History</option>
+                  <option>Geography</option>
+                  <option>Economics</option>
+                  <option>Accounting</option>
+                  <option>Commerce</option>
+                  <option>Business Studies</option>
+                  <option>Information Technology</option>
+                  <option>Moral Education</option>
+                  <option>Islamic Studies</option>
+                  <option>Art & Design</option>
+                </optgroup>
+                <optgroup label="A-Level">
+                  <option>General Paper</option>
+                  <option>Mathematics</option>
+                  <option>Further Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>Computing</option>
+                  <option>Economics</option>
+                  <option>History</option>
+                  <option>Geography</option>
+                  <option>Literature in English</option>
+                  <option>Art</option>
+                  <option>Music</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Level</label>
+              <select ng-model="vm.newOffering.level">
+                <option value="">— Level —</option>
+                <option>Primary (PSLE)</option>
+                <option>Primary (UPSR)</option>
+                <option>Lower Secondary</option>
+                <option>Upper Secondary (O-Level)</option>
+                <option>Upper Secondary (SPM)</option>
+                <option>Junior College (A-Level)</option>
+                <option>Pre-University</option>
+                <option>Undergraduate</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Teaching Mode</label>
+              <select ng-model="vm.newOffering.mode">
+                <option value="">— Mode —</option>
+                <option>Online</option>
+                <option>Home Visit</option>
+                <option>Tutor Place</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Qualification</label>
+              <select ng-model="vm.newOffering.qualification">
+                <option value="">— Qualification —</option>
+                <option>Bachelor's Degree</option>
+                <option>Master's Degree</option>
+                <option>PhD / Doctorate</option>
+                <option>PGDE (Postgrad Diploma in Education)</option>
+                <option>NIE Trained Teacher</option>
+                <option>MOE Registered Teacher</option>
+                <option>Diploma</option>
+                <option>Professional Certificate</option>
+                <option>IB Certified Teacher</option>
+                <option>Verified by operations team</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Price per Session ($)</label>
+              <input type="number" ng-model="vm.newOffering.price" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addOffering()">+ Add Offering</button>
+          </div>
+
+          <div class="chip-list" ng-if="vm.profileForm.offerings.length">
+            <span class="chip offering-chip" ng-repeat="o in vm.profileForm.offerings">
+              <span class="offering-chip-text">{{ o.subject }} · {{ o.level }} · {{ o.mode }} · {{ o.qualification }}</span>
+              <span class="chip-price">${{ o.price }}</span>
+              <button type="button" class="chip-remove" ng-click="vm.removeOffering($index)">×</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Years of Experience</label>
+          <input type="number" ng-model="vm.profileForm.experienceYears" min="0" />
+        </div>
+
+        <button type="submit" class="btn-indigo full-width">Save Profile</button>
+      </form>
+    </div><!-- end profile tab -->
 
   </main>
 </div>

@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<Payout> Payouts { get; set; }
     public DbSet<Institution> Institutions { get; set; }
+    public DbSet<TutorOffering> TutorOfferings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,6 +86,14 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Tutor>()
             .Property(t => t.PricePerSession)
+            .HasPrecision(10, 2);
+
+        modelBuilder.Entity<TutorSubject>()
+            .Property(s => s.Price)
+            .HasPrecision(10, 2);
+
+        modelBuilder.Entity<TutorOffering>()
+            .Property(o => o.Price)
             .HasPrecision(10, 2);
 
         modelBuilder.Entity<Invoice>()

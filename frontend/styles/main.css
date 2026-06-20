@@ -404,3 +404,45 @@ a { text-decoration: none; color: inherit; }
 .overflow-auto { overflow-y: auto; }
 .full-width { width: 100%; }
 .mt-4 { margin-top: 16px; }
+
+/* ---- Profile form spacing ---- */
+.profile-form .form-group { margin-bottom: 14px; }
+.chip-list { margin-top: 6px; }
+
+/* ---- Tab Bar ---- */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+.tab-btn { background: none; border: none; padding: 10px 20px; font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color .15s, border-color .15s; }
+.tab-btn:hover { color: #4f46e5; }
+.tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+
+/* ---- Chip input (Edit Profile) ---- */
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+.chip-price { color: #16a34a; font-weight: 700; }
+.chip-remove { background: none; border: none; cursor: pointer; color: #818cf8; font-size: 14px; line-height: 1; padding: 0; }
+.chip-remove:hover { color: #dc2626; }
+.chip-input-row { display: flex; gap: 6px; align-items: center; }
+.chip-input-row select { flex: 1; min-width: 0; }
+.price-mini { width: 62px !important; flex: none !important; padding: 6px 6px !important; text-align: center; }
+.btn-outline-sm { padding: 6px 10px; font-size: 11px; font-weight: 600; border: 1px solid #4f46e5; color: #4f46e5; background: none; border-radius: 8px; cursor: pointer; white-space: nowrap; flex: none; }
+.btn-outline-sm:hover { background: #eef2ff; }
+
+/* ---- Profile photo upload ---- */
+.photo-upload-row { display: flex; align-items: center; gap: 14px; }
+.photo-upload-controls { display: flex; flex-direction: column; gap: 6px; }
+.preview-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #e2e8f0; flex-shrink: 0; }
+.photo-browse-btn { display: inline-block; cursor: pointer; }
+
+/* ---- Alert error ---- */
+.alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 10px 14px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+
+/* ---- Teaching Offering Builder ---- */
+.offering-hint { font-size: 11px; color: #94a3b8; margin-bottom: 10px; }
+.offering-builder { background: #f8faff; border: 1px solid #e0e7ff; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 0; }
+.offering-builder .form-group { margin-bottom: 10px; }
+.offering-builder .form-group label { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 3px; display: block; }
+.offering-builder select,
+.offering-builder input[type="number"] { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff; }
+.offering-add-btn { align-self: flex-start; margin-top: 4px; }
+.offering-chip { max-width: 100%; flex-wrap: wrap; gap: 4px; }
+.offering-chip-text { flex: 1; white-space: normal; line-height: 1.4; }

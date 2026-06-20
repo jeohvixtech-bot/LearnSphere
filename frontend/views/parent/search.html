@@ -39,6 +39,9 @@
             <option value="Home Visit">Home Visit</option>
             <option value="Tutor Place">Tutor Place</option>
           </select>
+          <label>Rating:</label>
+          <select ng-model="vm.minRating" ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
+          </select>
           <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
         </div>
       </div>

@@ -21,6 +21,19 @@ public class Tutor
     public List<TutorTimeSlot> TimeSlots { get; set; } = new();
     public List<Booking> Bookings { get; set; } = new();
     public List<Payout> Payouts { get; set; } = new();
+    public List<TutorOffering> Offerings { get; set; } = new();
+}
+
+public class TutorOffering
+{
+    public int Id { get; set; }
+    public int TutorId { get; set; }
+    public Tutor Tutor { get; set; } = null!;
+    public string Subject { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public string Mode { get; set; } = string.Empty;
+    public string Qualification { get; set; } = string.Empty;
+    public decimal Price { get; set; }
 }
 
 public class TutorSubject
@@ -29,6 +42,7 @@ public class TutorSubject
     public int TutorId { get; set; }
     public Tutor Tutor { get; set; } = null!;
     public string Subject { get; set; } = string.Empty;
+    public decimal? Price { get; set; }
 }
 
 public class TutorLevel
