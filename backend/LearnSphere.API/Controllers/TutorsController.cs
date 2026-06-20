@@ -17,7 +17,7 @@ public class TutorsController : ControllerBase
     public TutorsController(AppDbContext context) => _context = context;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search)
+    public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search, [FromQuery] double? rating)
     {
         var query = _context.Tutors
             .Include(t => t.User)
@@ -43,6 +43,9 @@ public class TutorsController : ControllerBase
                 t.Subjects.Any(sub => sub.Subject.ToLower().Contains(s)));
         }
 
+        if (rating.HasValue)
+            query = query.Where(t => t.Rating >= rating.Value);
+
         var tutors = await query.ToListAsync();
         return Ok(tutors.Select(MapToDto));
     }
@@ -62,6 +65,31 @@ public class TutorsController : ControllerBase
 
         if (tutor == null) return NotFound();
         return Ok(MapToDto(tutor));
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        _context.Tutors.Remove(tutor);
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpGet("{id}/slots")]
+    public async Task<IActionResult> GetSlots(int id)
+    {
+        var exists = await _context.Tutors.AnyAsync(t => t.Id == id);
+        if (!exists) return NotFound();
+
+        var slots = await _context.TutorTimeSlots
+            .Where(s => s.TutorId == id)
+            .ToListAsync();
+
+        return Ok(slots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }));
     }
 
     [HttpPost]

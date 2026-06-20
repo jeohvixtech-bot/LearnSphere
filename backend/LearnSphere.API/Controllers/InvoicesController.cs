@@ -76,6 +76,48 @@ public class InvoicesController : ControllerBase
         return Ok(MapToDto(invoice));
     }
 
+    [HttpPost("{id}/refund")]
+    public async Task<IActionResult> Refund(int id)
+    {
+        var invoice = await _context.Invoices
+            .Include(i => i.Booking).ThenInclude(b => b.Student)
+            .FirstOrDefaultAsync(i => i.Id == id);
+
+        if (invoice == null) return NotFound();
+        if (invoice.Status != "Paid") return BadRequest(new { message = "Only paid invoices can be refunded." });
+
+        invoice.Status = "Refunded";
+        invoice.Booking.Status = "cancelled";
+
+        // Free up the tutor slot if booked
+        if (invoice.Booking.SlotId.HasValue)
+        {
+            var slot = await _context.TutorTimeSlots.FindAsync(invoice.Booking.SlotId.Value);
+            if (slot != null)
+            {
+                slot.Status = "Available";
+                slot.BookingId = null;
+            }
+        }
+
+        // Notify parent
+        if (invoice.Booking.Student != null)
+        {
+            _context.Notifications.Add(new Notification
+            {
+                UserId = invoice.Booking.Student.ParentUserId,
+                Title = "Refund Processed",
+                Message = $"Invoice #{invoice.Id} has been refunded.",
+                Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+                Type = "payment",
+                IsRead = false
+            });
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(MapToDto(invoice));
+    }
+
     private static InvoiceDto MapToDto(Invoice i) => new()
     {
         Id = i.Id,
