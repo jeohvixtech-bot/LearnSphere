@@ -66,7 +66,7 @@ public class InvoicesController : ControllerBase
         {
             UserId = invoice.Booking.Student.ParentUserId,
             Title = "Payment Successful",
-            Message = $"Invoice #{invoice.Id} paid successfully. Digital receipt issued!",
+            Message = $"Invoice {invoice.InvoiceNumber} paid successfully. Digital receipt issued!",
             Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
             Type = "payment",
             IsRead = false
@@ -107,7 +107,7 @@ public class InvoicesController : ControllerBase
             {
                 UserId = invoice.Booking.Student.ParentUserId,
                 Title = "Refund Processed",
-                Message = $"Invoice #{invoice.Id} has been refunded.",
+                Message = $"Invoice {invoice.InvoiceNumber} has been refunded.",
                 Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                 Type = "payment",
                 IsRead = false
@@ -122,6 +122,8 @@ public class InvoicesController : ControllerBase
     {
         Id = i.Id,
         BookingId = i.BookingId,
+        InvoiceNumber = i.InvoiceNumber,
+        BookingNumber = i.Booking?.BookingNumber ?? string.Empty,
         Date = i.Date,
         Amount = i.Amount,
         Status = i.Status,

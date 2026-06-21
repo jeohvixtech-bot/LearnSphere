@@ -62,6 +62,8 @@ public class BookingsController : ControllerBase
         };
         _context.Bookings.Add(booking);
         await _context.SaveChangesAsync();
+        booking.BookingNumber = "BOK" + booking.Id.ToString("D5");
+        await _context.SaveChangesAsync();
 
         // Auto-create invoice when booking is created
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == dto.TutorId);
@@ -123,20 +125,22 @@ public class BookingsController : ControllerBase
             }
         }
 
+        Invoice? newInvoice = null;
         if (dto.Status == "confirmed")
         {
             // Auto-create invoice
             var existingInvoice = await _context.Invoices.FirstOrDefaultAsync(i => i.BookingId == id);
             if (existingInvoice == null)
             {
-                _context.Invoices.Add(new Invoice
+                newInvoice = new Invoice
                 {
                     BookingId = id,
                     Date = booking.Date,
                     Amount = booking.TotalPrice,
                     Status = "Unpaid",
                     Subject = booking.Subject
-                });
+                };
+                _context.Invoices.Add(newInvoice);
             }
 
             // Notify parent
@@ -155,6 +159,12 @@ public class BookingsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        if (newInvoice != null)
+        {
+            newInvoice.InvoiceNumber = "INV" + newInvoice.Id.ToString("D5");
+            await _context.SaveChangesAsync();
+        }
 
         var updated = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
@@ -278,6 +288,7 @@ public class BookingsController : ControllerBase
         TotalPrice = b.TotalPrice,
         Status = b.Status,
         SlotId = b.SlotId,
+        BookingNumber = b.BookingNumber,
         CounterProposal = b.CounterProposal == null ? null : new CounterProposalDto
         {
             Date = b.CounterProposal.Date,

@@ -88,6 +88,90 @@
             </div>
           </div>
 
+          <!-- Subjects Needed -->
+          <div class="form-group">
+            <label>Subjects Needed</label>
+            <div class="chip-input-row">
+              <select ng-model="vm.newStudentSubject">
+                <option value="">— Select subject —</option>
+                <optgroup label="PSLE">
+                  <option>English Language</option>
+                  <option>Mother Tongue (Chinese)</option>
+                  <option>Mother Tongue (Malay)</option>
+                  <option>Mother Tongue (Tamil)</option>
+                  <option>Mathematics</option>
+                  <option>Science</option>
+                </optgroup>
+                <optgroup label="UPSR">
+                  <option>Bahasa Malaysia</option>
+                  <option>English</option>
+                  <option>Mathematics</option>
+                  <option>Science</option>
+                  <option>History</option>
+                </optgroup>
+                <optgroup label="O-Level">
+                  <option>English Language</option>
+                  <option>Elementary Mathematics</option>
+                  <option>Additional Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>Combined Science</option>
+                  <option>History</option>
+                  <option>Social Studies</option>
+                  <option>Geography</option>
+                  <option>Literature in English</option>
+                  <option>Principles of Accounts</option>
+                  <option>Design & Technology</option>
+                  <option>Computing</option>
+                  <option>Food & Nutrition</option>
+                  <option>Art</option>
+                  <option>Music</option>
+                </optgroup>
+                <optgroup label="SPM">
+                  <option>Bahasa Malaysia</option>
+                  <option>English</option>
+                  <option>Mathematics</option>
+                  <option>Additional Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>History</option>
+                  <option>Geography</option>
+                  <option>Economics</option>
+                  <option>Accounting</option>
+                  <option>Commerce</option>
+                  <option>Business Studies</option>
+                  <option>Information Technology</option>
+                  <option>Moral Education</option>
+                  <option>Islamic Studies</option>
+                  <option>Art & Design</option>
+                </optgroup>
+                <optgroup label="A-Level">
+                  <option>General Paper</option>
+                  <option>Mathematics</option>
+                  <option>Further Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>Computing</option>
+                  <option>Economics</option>
+                  <option>History</option>
+                  <option>Geography</option>
+                  <option>Literature in English</option>
+                  <option>Art</option>
+                  <option>Music</option>
+                </optgroup>
+              </select>
+              <button type="button" class="btn-outline-sm" ng-click="vm.addStudentSubject()">Add</button>
+            </div>
+            <div class="chip-list" ng-if="vm.studentSubjects.length">
+              <span class="chip" ng-repeat="s in vm.studentSubjects">
+                {{ s }} <button type="button" class="chip-remove" ng-click="vm.removeStudentSubject($index)">×</button>
+              </span>
+            </div>
+          </div>
+
           <div class="form-group">
             <label>Learning Milestones & Goals (Optional)</label>
             <textarea ng-model="vm.studentForm.learningGoal" rows="3"
@@ -104,20 +188,95 @@
         <h3>Active Student Files</h3>
 
         <div class="student-record" ng-repeat="s in vm.students"
-          ng-class="{'newly-added': s.id === vm.newlyAddedStudentId}">
-          <div ng-if="s.id === vm.newlyAddedStudentId" class="new-badge">★ NEWLY ADDED</div>
-          <div class="student-record-header">
-            <div class="avatar-circle">{{ s.name[0] }}</div>
-            <div>
-              <strong>{{ s.name }}</strong>
-              <p class="text-muted">{{ s.educationLevel }}</p>
-              <span class="badge-school">🏫 {{ s.school }}</span>
+          ng-class="{'newly-added': s.id === vm.newlyAddedStudentId, 'editing': vm.editingStudent && vm.editingStudent.id === s.id}">
+
+          <!-- Normal view -->
+          <div ng-if="!vm.editingStudent || vm.editingStudent.id !== s.id">
+            <div ng-if="s.id === vm.newlyAddedStudentId" class="new-badge">★ NEWLY ADDED</div>
+            <div class="student-record-header">
+              <div class="avatar-circle">{{ s.name[0] }}</div>
+              <div style="flex:1">
+                <strong>{{ s.name }}</strong>
+                <p class="text-muted">{{ s.educationLevel }}</p>
+                <span class="badge-school">🏫 {{ s.school }}</span>
+                <div class="chip-list" style="margin-top:4px" ng-if="s.subjectSelect">
+                  <span class="chip" ng-repeat="sub in s.subjectSelect.split(',') track by $index">{{ sub.trim() }}</span>
+                </div>
+              </div>
+              <button type="button" class="btn-outline-sm edit-student-btn" ng-click="vm.startEditStudent(s)">✏️ Edit</button>
+            </div>
+            <div class="goal-box" ng-if="s.learningGoal">
+              <small class="label-tag">Target Milestones</small>
+              <p>"{{ s.learningGoal }}"</p>
             </div>
           </div>
-          <div class="goal-box" ng-if="s.learningGoal">
-            <small class="label-tag">Target Milestones</small>
-            <p>"{{ s.learningGoal }}"</p>
+
+          <!-- Edit view -->
+          <div ng-if="vm.editingStudent && vm.editingStudent.id === s.id" class="student-edit-form">
+            <div class="student-edit-header">
+              <strong>Editing: {{ s.name }}</strong>
+              <button type="button" class="btn-link" ng-click="vm.cancelEditStudent()">✕ Cancel</button>
+            </div>
+            <form ng-submit="vm.saveEditStudent()" class="form-stack" style="margin-top:10px">
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" ng-model="vm.editStudentForm.name" required />
+              </div>
+              <div class="form-group">
+                <label>School</label>
+                <input type="text" ng-model="vm.editStudentForm.school" placeholder="School name" />
+              </div>
+              <div class="form-group">
+                <label>Education Level</label>
+                <select ng-model="vm.editStudentForm.educationLevel">
+                  <option>Primary 5-6</option>
+                  <option>Secondary 1</option>
+                  <option>Secondary 2</option>
+                  <option>Secondary 3</option>
+                  <option>Secondary 4</option>
+                  <option>Junior College (JC)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Subjects Needed</label>
+                <div class="chip-input-row">
+                  <select ng-model="vm.newEditStudentSubject">
+                    <option value="">— Subject —</option>
+                    <optgroup label="PSLE">
+                      <option>English Language</option><option>Mother Tongue (Chinese)</option><option>Mother Tongue (Malay)</option><option>Mother Tongue (Tamil)</option><option>Mathematics</option><option>Science</option>
+                    </optgroup>
+                    <optgroup label="UPSR">
+                      <option>Bahasa Malaysia</option><option>English</option><option>Mathematics</option><option>Science</option><option>History</option>
+                    </optgroup>
+                    <optgroup label="O-Level">
+                      <option>English Language</option><option>Elementary Mathematics</option><option>Additional Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>Combined Science</option><option>History</option><option>Geography</option><option>Literature in English</option><option>Principles of Accounts</option><option>Computing</option>
+                    </optgroup>
+                    <optgroup label="SPM">
+                      <option>Bahasa Malaysia</option><option>English</option><option>Mathematics</option><option>Additional Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>History</option><option>Economics</option><option>Accounting</option>
+                    </optgroup>
+                    <optgroup label="A-Level">
+                      <option>General Paper</option><option>Mathematics</option><option>Further Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>Economics</option><option>History</option>
+                    </optgroup>
+                  </select>
+                  <button type="button" class="btn-outline-sm" ng-click="vm.addEditStudentSubject()">Add</button>
+                </div>
+                <div class="chip-list" ng-if="vm.editStudentSubjects.length" style="margin-top:6px">
+                  <span class="chip" ng-repeat="sub in vm.editStudentSubjects">
+                    {{ sub }} <button type="button" class="chip-remove" ng-click="vm.removeEditStudentSubject($index)">×</button>
+                  </span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Learning Goals</label>
+                <textarea ng-model="vm.editStudentForm.learningGoal" rows="2" placeholder="e.g. Prepare for O-Levels..."></textarea>
+              </div>
+              <div class="btn-row">
+                <button type="button" class="btn-outline" ng-click="vm.cancelEditStudent()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Changes</button>
+              </div>
+            </form>
           </div>
+
         </div>
 
         <p ng-if="!vm.students.length" class="empty-state">No student profiles added yet.</p>

@@ -29,6 +29,7 @@
           <thead>
             <tr>
               <th>Invoice #</th>
+              <th>Booking #</th>
               <th>Subject</th>
               <th>Date</th>
               <th>Amount</th>
@@ -38,7 +39,8 @@
           </thead>
           <tbody>
             <tr ng-repeat="inv in vm.invoices">
-              <td class="mono">#{{ inv.id }}</td>
+              <td class="mono">{{ inv.invoiceNumber }}</td>
+              <td class="mono">{{ inv.bookingNumber }}</td>
               <td>{{ inv.subject || '—' }}</td>
               <td>{{ inv.date }}</td>
               <td class="price">${{ inv.amount }}.00</td>

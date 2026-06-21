@@ -9,4 +9,5 @@ public class Invoice
     public decimal Amount { get; set; }
     public string Status { get; set; } = "Unpaid"; // Paid | Unpaid
     public string? Subject { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
 }

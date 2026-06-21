@@ -16,6 +16,7 @@ public class Booking
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = "pending"; // pending|countered|confirmed|completed|cancelled
     public int? SlotId { get; set; }
+    public string BookingNumber { get; set; } = string.Empty;
 
     public CounterProposal? CounterProposal { get; set; }
     public LessonReport? LessonReport { get; set; }

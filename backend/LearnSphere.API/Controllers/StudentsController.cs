@@ -35,10 +35,10 @@ public class StudentsController : ControllerBase
         {
             ParentUserId = userId,
             Name = dto.Name,
-            BirthDate = dto.BirthDate,
+            BirthDate = dto.BirthDate ?? string.Empty,
             School = dto.School,
             EducationLevel = dto.EducationLevel,
-            SubjectSelect = dto.SubjectSelect,
+            SubjectSelect = dto.SubjectSelect ?? string.Empty,
             LearningGoal = dto.LearningGoal,
             PhotoUrl = dto.PhotoUrl
         };

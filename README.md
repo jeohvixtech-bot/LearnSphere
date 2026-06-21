@@ -215,6 +215,249 @@ npx serve . -p 3000
 
 ---
 
+## Database Schema
+
+Database: **MySQL 8.0** · ORM: **Entity Framework Core (Pomelo provider)**  
+All string dates are stored as `VARCHAR` (format `YYYY-MM-DD` or `hh:mm tt`). Decimal money fields use `DECIMAL(10,2)`.
+
+---
+
+### `Users`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `Email` | VARCHAR | Unique login email |
+| `PasswordHash` | VARCHAR | BCrypt hash |
+| `Role` | VARCHAR | `parent` \| `tutor` \| `admin` |
+| `Name` | VARCHAR | Display name |
+| `CreatedAt` | DATETIME | UTC timestamp |
+
+---
+
+### `Tutors`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `UserId` | INT (FK → Users.Id) | One-to-one with User |
+| `ImageUrl` | VARCHAR | Profile photo URL |
+| `Rating` | DOUBLE | Aggregate rating (0–5) |
+| `ReviewCount` | INT | |
+| `PricePerSession` | DECIMAL(10,2) | Derived from min Offering price |
+| `ExperienceYears` | INT | |
+| `Bio` | VARCHAR | Short biography |
+| `IsVerified` | TINYINT(1) | Admin-verified flag |
+
+---
+
+### `TutorOfferings`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id, CASCADE) | |
+| `Subject` | VARCHAR(200) | e.g. "Mathematics" |
+| `Level` | VARCHAR(200) | e.g. "O-Level" |
+| `Mode` | VARCHAR(200) | `Online` \| `Home Visit` \| `Tutor Place` |
+| `Qualification` | VARCHAR(200) | e.g. "NIE Trained" |
+| `Price` | DECIMAL(10,2) | Per-session price for this offering |
+
+---
+
+### `TutorSubjects`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Subject` | VARCHAR | |
+| `Price` | DECIMAL(10,2) (nullable) | Legacy per-subject price |
+
+---
+
+### `TutorLevels`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Level` | VARCHAR | e.g. `Primary 5-6`, `O-Level` |
+
+---
+
+### `TutorModes`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Mode` | VARCHAR | `Online` \| `Home Visit` \| `Tutor Place` |
+
+---
+
+### `TutorQualifications`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Qualification` | VARCHAR | e.g. `NIE Trained`, `B.Sc. Mathematics` |
+
+---
+
+### `TutorReviews`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Author` | VARCHAR | Reviewer name |
+| `Text` | VARCHAR | Review content |
+| `Rating` | INT | 1–5 |
+
+---
+
+### `TutorTimeSlots`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Day` | VARCHAR | e.g. `Monday` |
+| `Time` | VARCHAR | e.g. `10:00 AM` |
+| `Status` | VARCHAR | `Available` \| `Booked` |
+| `BookingId` | INT (nullable) | Set when slot is booked |
+
+---
+
+### `Students`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `ParentUserId` | INT (FK → Users.Id) | |
+| `Name` | VARCHAR | Child's full name |
+| `BirthDate` | VARCHAR | Format: `YYYY-MM-DD` |
+| `School` | VARCHAR | Current school name |
+| `EducationLevel` | VARCHAR | e.g. `Secondary 3` |
+| `SubjectSelect` | VARCHAR | Comma-separated subjects needed |
+| `LearningGoal` | VARCHAR (nullable) | Parent-defined milestones |
+| `PhotoUrl` | VARCHAR (nullable) | Profile photo URL |
+
+---
+
+### `Bookings`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | Internal key |
+| `BookingNumber` | VARCHAR(20) | Human ID — format `BOK00001` |
+| `TutorId` | INT (FK → Tutors.Id, RESTRICT) | |
+| `StudentId` | INT (FK → Students.Id, RESTRICT) | |
+| `Subject` | VARCHAR | Subject + level string |
+| `Mode` | VARCHAR | `Online` \| `Home Visit` \| `Tutor Place` |
+| `Date` | VARCHAR | Session date `YYYY-MM-DD` |
+| `Time` | VARCHAR | e.g. `04:00 PM - 05:00 PM` |
+| `DurationHours` | INT | Default 1 |
+| `Message` | VARCHAR (nullable) | Parent's notes |
+| `TotalPrice` | DECIMAL(10,2) | sessions × price per session |
+| `Status` | VARCHAR | `pending` \| `countered` \| `confirmed` \| `completed` \| `cancelled` |
+| `SlotId` | INT (nullable) | FK to TutorTimeSlots |
+
+---
+
+### `CounterProposals`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `BookingId` | INT (FK → Bookings.Id) | One-to-one with Booking |
+| `Date` | VARCHAR | Counter-proposed date |
+| `Time` | VARCHAR | Counter-proposed time |
+| `Message` | VARCHAR | Tutor's explanation |
+
+---
+
+### `LessonReports`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `BookingId` | INT (FK → Bookings.Id) | One-to-one with Booking |
+| `Covered` | VARCHAR | Topics covered |
+| `Performance` | VARCHAR | Student performance notes |
+| `Homework` | VARCHAR | Assigned homework |
+| `SubmitDate` | VARCHAR | Submission timestamp |
+
+---
+
+### `LessonReportEdits`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `LessonReportId` | INT (FK → LessonReports.Id) | |
+| `Date` | VARCHAR | Edit timestamp |
+| `Changes` | VARCHAR | Description of changes made |
+
+---
+
+### `IssueReports`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `BookingId` | INT (FK → Bookings.Id) | One-to-one with Booking |
+| `IssueType` | VARCHAR | e.g. `Tutor was absent (No show)` |
+| `Details` | VARCHAR | Full description |
+| `Timestamp` | VARCHAR | Report time |
+
+---
+
+### `Invoices`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | Internal key |
+| `InvoiceNumber` | VARCHAR(20) | Human ID — format `INV00001` |
+| `BookingId` | INT (FK → Bookings.Id) | One-to-one with Booking |
+| `Date` | VARCHAR | Invoice date `YYYY-MM-DD` |
+| `Amount` | DECIMAL(10,2) | Same as Booking.TotalPrice |
+| `Status` | VARCHAR | `Unpaid` \| `Paid` \| `Refunded` |
+| `Subject` | VARCHAR (nullable) | Copied from Booking.Subject |
+
+---
+
+### `ChatMessages`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | Conversation thread key |
+| `Sender` | VARCHAR | `parent` \| `tutor` \| `system` |
+| `Text` | VARCHAR | Message body |
+| `Timestamp` | VARCHAR | e.g. `Jun 21, 2026 3:00 PM` |
+
+---
+
+### `Notifications`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `UserId` | INT (FK → Users.Id) | |
+| `Title` | VARCHAR | Short heading |
+| `Message` | VARCHAR | Full notification body |
+| `Timestamp` | VARCHAR | `YYYY-MM-DD hh:mm tt` |
+| `Type` | VARCHAR | `booking` \| `message` \| `payment` \| `system` |
+| `IsRead` | TINYINT(1) | Read/unread flag |
+
+---
+
+### `Payouts`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `Date` | VARCHAR | Payout date |
+| `Amount` | DECIMAL(10,2) | |
+| `Status` | VARCHAR | `Processing` \| `Paid` |
+
+---
+
+### `Institutions`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `Name` | VARCHAR | School / institution name |
+| `Country` | VARCHAR | `Singapore` \| `Malaysia` |
+| `Type` | VARCHAR | `Primary` \| `Secondary` \| `Junior College` \| `Polytechnic/Vocational` \| `University/Tertiary` |
+
+---
+
 ## EF Core Migrations (Optional)
 
 To use migrations instead of `EnsureCreated`:

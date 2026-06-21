@@ -17,6 +17,7 @@ public class BookingDto
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = string.Empty;
     public int? SlotId { get; set; }
+    public string BookingNumber { get; set; } = string.Empty;
     public CounterProposalDto? CounterProposal { get; set; }
     public LessonReportDto? LessonReport { get; set; }
     public IssueReportDto? IssueReport { get; set; }

@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('ParentCtrl', ['$location', '$timeout', 'AuthService', 'TutorService',
+.controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
   'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService',
-function ($location, $timeout, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService) {
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -23,9 +23,8 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
 
   // Booking form
   self.bookingForm = {
-    date: '',
-    startTime: '04:00 PM',
-    endTime: '05:00 PM',
+    classesPerMonth: 1,
+    sessions: [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM' }],
     duration: 1,
     message: '',
     studentId: '',
@@ -39,12 +38,19 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
     birthDate: '',
     school: '',
     educationLevel: '',
-    subjectSelect: '',
     learningGoal: '',
     photoUrl: ''
   };
+  self.studentSubjects = [];
+  self.newStudentSubject = '';
   self.studentSuccess = false;
   self.newlyAddedStudentId = null;
+
+  // Edit student state
+  self.editingStudent = null;
+  self.editStudentForm = {};
+  self.editStudentSubjects = [];
+  self.newEditStudentSubject = '';
 
   // School dropdown
   self.schoolSearch = '';
@@ -93,7 +99,66 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
   self.selectTutor = function (tutor) {
     self.selectedTutor = tutor;
     self.bookingForm.subject = tutor.subjects[0] || '';
+    self.bookingForm.classesPerMonth = 1;
+    self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     if (self.students.length) self.bookingForm.studentId = self.students[0].id;
+  };
+
+  self.updateSessions = function () {
+    var n = parseInt(self.bookingForm.classesPerMonth) || 1;
+    while (self.bookingForm.sessions.length < n) {
+      self.bookingForm.sessions.push({ date: '', startTime: '04:00 PM', endTime: '05:00 PM' });
+    }
+    self.bookingForm.sessions = self.bookingForm.sessions.slice(0, n);
+    self.applyRecurring();
+  };
+
+  // AngularJS 1.8 input[type=date] uses Date objects, not strings
+  function toDateObj(val) {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    var d = new Date(val + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function toDateStr(d) {
+    if (!d) return '';
+    var base = d instanceof Date ? d : new Date(d + 'T00:00:00');
+    var mm = (base.getMonth() + 1 < 10 ? '0' : '') + (base.getMonth() + 1);
+    var dd = (base.getDate() < 10 ? '0' : '') + base.getDate();
+    return base.getFullYear() + '-' + mm + '-' + dd;
+  }
+
+  self.applyRecurring = function () {
+    var sessions = self.bookingForm.sessions;
+    if (!sessions || sessions.length < 2 || !sessions[0].recurring || !sessions[0].date) return;
+    var base = toDateObj(sessions[0].date);
+    if (!base) return;
+    for (var i = 1; i < sessions.length; i++) {
+      var d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i * 7);
+      sessions[i].date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+  };
+
+  self.onDateChange = function (idx) {
+    if (idx === 0) self.applyRecurring();
+  };
+
+  self.calcEndTime = function (session) {
+    if (!session.startTime) return;
+    var match = session.startTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return;
+    var h = parseInt(match[1]);
+    var m = parseInt(match[2]);
+    var ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    h += 1;
+    var endAmpm = (h >= 12 && h < 24) ? 'PM' : 'AM';
+    if (h >= 24) h -= 24;
+    if (h === 0) h = 12;
+    else if (h > 12) h -= 12;
+    session.endTime = h + ':' + (m < 10 ? '0' + m : m) + ' ' + endAmpm;
   };
 
   self.clearSelectedTutor = function () { self.selectedTutor = null; };
@@ -102,19 +167,21 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
-    var payload = {
-      tutorId: self.selectedTutor.id,
-      studentId: self.bookingForm.studentId,
-      subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : 'Sec 3'),
-      mode: self.selectedTutor.modes[0],
-      date: self.bookingForm.date,
-      time: self.bookingForm.startTime + ' - ' + self.bookingForm.endTime,
-      durationHours: self.bookingForm.duration,
-      message: self.bookingForm.message,
-      totalPrice: self.selectedTutor.pricePerSession * self.bookingForm.duration
-    };
-    BookingService.create(payload).then(function (res) {
-      self.bookings.unshift(res.data);
+    var promises = self.bookingForm.sessions.map(function (session) {
+      return BookingService.create({
+        tutorId: self.selectedTutor.id,
+        studentId: self.bookingForm.studentId,
+        subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : ''),
+        mode: self.selectedTutor.modes[0],
+        date: toDateStr(session.date),
+        time: session.startTime + ' - ' + session.endTime,
+        durationHours: self.bookingForm.duration,
+        message: self.bookingForm.message,
+        totalPrice: self.selectedTutor.pricePerSession * parseInt(self.bookingForm.classesPerMonth)
+      });
+    });
+    $q.all(promises).then(function (results) {
+      results.forEach(function (res) { self.bookings.unshift(res.data); });
       self.bookingSuccess = true;
       $timeout(function () {
         self.bookingSuccess = false;
@@ -124,6 +191,56 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
     });
   };
 
+  // Edit student
+  self.startEditStudent = function (s) {
+    self.editingStudent = s;
+    self.editStudentForm = { name: s.name, school: s.school, educationLevel: s.educationLevel, learningGoal: s.learningGoal || '' };
+    self.editStudentSubjects = s.subjectSelect
+      ? s.subjectSelect.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; })
+      : [];
+    self.newEditStudentSubject = '';
+  };
+
+  self.cancelEditStudent = function () {
+    self.editingStudent = null;
+    self.editStudentForm = {};
+    self.editStudentSubjects = [];
+    self.newEditStudentSubject = '';
+  };
+
+  self.addEditStudentSubject = function () {
+    var v = self.newEditStudentSubject && self.newEditStudentSubject.trim();
+    if (v && self.editStudentSubjects.indexOf(v) < 0) self.editStudentSubjects.push(v);
+    self.newEditStudentSubject = '';
+  };
+
+  self.removeEditStudentSubject = function (i) { self.editStudentSubjects.splice(i, 1); };
+
+  self.saveEditStudent = function () {
+    if (!self.editingStudent || !self.editStudentForm.name.trim()) return;
+    var payload = {
+      name: self.editStudentForm.name,
+      school: self.editStudentForm.school || '',
+      educationLevel: self.editStudentForm.educationLevel,
+      subjectSelect: self.editStudentSubjects.join(', '),
+      learningGoal: self.editStudentForm.learningGoal || null
+    };
+    StudentService.update(self.editingStudent.id, payload).then(function (res) {
+      var idx = self.students.findIndex(function (s) { return s.id === self.editingStudent.id; });
+      if (idx >= 0) self.students[idx] = res.data;
+      self.cancelEditStudent();
+    });
+  };
+
+  // Student subject chips
+  self.addStudentSubject = function () {
+    var v = self.newStudentSubject && self.newStudentSubject.trim();
+    if (v && self.studentSubjects.indexOf(v) < 0) self.studentSubjects.push(v);
+    self.newStudentSubject = '';
+  };
+
+  self.removeStudentSubject = function (i) { self.studentSubjects.splice(i, 1); };
+
   // Add student
   self.createStudent = function () {
     if (!self.studentForm.name.trim()) return;
@@ -132,7 +249,7 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
       birthDate: self.studentForm.birthDate || null,
       school: self.studentForm.school || '',
       educationLevel: self.studentForm.educationLevel,
-      subjectSelect: self.studentForm.subjectSelect || '',
+      subjectSelect: self.studentSubjects.join(', '),
       learningGoal: self.studentForm.learningGoal,
       photoUrl: self.studentForm.photoUrl || null
     };
@@ -140,7 +257,9 @@ function ($location, $timeout, AuthService, TutorService, StudentService, Bookin
       self.students.push(res.data);
       self.newlyAddedStudentId = res.data.id;
       self.studentSuccess = true;
-      self.studentForm = { name: '', birthDate: '', school: '', educationLevel: '', subjectSelect: '', learningGoal: '', photoUrl: '' };
+      self.studentForm = { name: '', birthDate: '', school: '', educationLevel: '', learningGoal: '', photoUrl: '' };
+      self.studentSubjects = [];
+      self.newStudentSubject = '';
       $timeout(function () { self.studentSuccess = false; }, 5000);
     });
   };

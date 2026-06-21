@@ -168,6 +168,10 @@ public class TutorsController : ControllerBase
                 Mode = o.Mode, Qualification = o.Qualification, Price = o.Price
             }).ToList();
 
+            // Update pricePerSession to the lowest offering price so the catalog card reflects it
+            if (dto.Offerings.Count > 0)
+                tutor.PricePerSession = dto.Offerings.Min(o => o.Price);
+
             // Sync flat tables so search filters keep working
             _context.RemoveRange(tutor.Subjects);
             tutor.Subjects = dto.Offerings.Select(o => o.Subject).Distinct()
@@ -261,7 +265,7 @@ public class TutorsController : ControllerBase
         SubjectDetails = t.Subjects.Select(s => new SubjectDetailDto { Name = s.Subject, Price = s.Price }).ToList(),
         Levels = t.Levels.Select(l => l.Level).ToList(),
         Modes = t.Modes.Select(m => m.Mode).ToList(),
-        PricePerSession = t.PricePerSession,
+        PricePerSession = t.Offerings.Count > 0 ? t.Offerings.Min(o => o.Price) : t.PricePerSession,
         ExperienceYears = t.ExperienceYears,
         Bio = t.Bio,
         Qualifications = t.Qualifications.Select(q => q.Qualification).ToList(),

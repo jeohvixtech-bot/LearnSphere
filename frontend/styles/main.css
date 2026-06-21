@@ -279,6 +279,10 @@ a { text-decoration: none; color: inherit; }
 .student-record-header { display: flex; gap: 10px; align-items: flex-start; }
 .new-badge { position: absolute; top: 10px; right: 10px; background: #16a34a; color: #fff; font-size: 8px; font-weight: 800; padding: 2px 8px; border-radius: 100px; }
 .goal-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+.student-record.editing { border-color: #6366f1; background: #fdfcff; }
+.student-edit-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.student-edit-form .form-group { margin-bottom: 10px; }
+.edit-student-btn { flex-shrink: 0; }
 
 /* ---- Progress Bars ---- */
 .progress-list { display: flex; flex-direction: column; gap: 16px; }
@@ -435,6 +439,15 @@ a { text-decoration: none; color: inherit; }
 
 /* ---- Alert error ---- */
 .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 10px 14px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+
+/* ---- Search wrapper ---- */
+.search-wrapper { display: flex; flex-direction: column; gap: 20px; }
+
+/* ---- Session slots (classes per month) ---- */
+.session-slot { background: #f8faff; border: 1px solid #e0e7ff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.session-slot-label { font-size: 11px; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.recurring-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #4f46e5; margin-top: 8px; cursor: pointer; user-select: none; }
+.recurring-label input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: #6366f1; }
 
 /* ---- Teaching Offering Builder ---- */
 .offering-hint { font-size: 11px; color: #94a3b8; margin-bottom: 10px; }

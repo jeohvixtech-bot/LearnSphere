@@ -17,7 +17,7 @@
   <main class="dashboard-main">
 
     <!-- Tutor Listing -->
-    <div ng-if="!vm.selectedTutor">
+    <div ng-if="!vm.selectedTutor" class="search-wrapper">
       <div class="card">
         <div class="search-bar-row">
           <input type="text" ng-model="vm.searchQuery" placeholder="Search by name, subject..." class="search-input" />
@@ -26,11 +26,74 @@
           <label>Subjects:</label>
           <select ng-model="vm.selectedSubject">
             <option value="All">All Subjects</option>
-            <option value="Mathematics">Mathematics</option>
-            <option value="Additional Mathematics">Additional Mathematics</option>
-            <option value="Chemistry">Chemistry</option>
-            <option value="Physics">Physics</option>
-            <option value="Science">Science</option>
+            <optgroup label="PSLE">
+              <option>English Language</option>
+              <option>Mother Tongue (Chinese)</option>
+              <option>Mother Tongue (Malay)</option>
+              <option>Mother Tongue (Tamil)</option>
+              <option>Mathematics</option>
+              <option>Science</option>
+            </optgroup>
+            <optgroup label="UPSR">
+              <option>Bahasa Malaysia</option>
+              <option>English</option>
+              <option>Mathematics</option>
+              <option>Science</option>
+              <option>History</option>
+            </optgroup>
+            <optgroup label="O-Level">
+              <option>English Language</option>
+              <option>Elementary Mathematics</option>
+              <option>Additional Mathematics</option>
+              <option>Physics</option>
+              <option>Chemistry</option>
+              <option>Biology</option>
+              <option>Combined Science</option>
+              <option>History</option>
+              <option>Social Studies</option>
+              <option>Geography</option>
+              <option>Literature in English</option>
+              <option>Principles of Accounts</option>
+              <option>Design & Technology</option>
+              <option>Computing</option>
+              <option>Food & Nutrition</option>
+              <option>Art</option>
+              <option>Music</option>
+            </optgroup>
+            <optgroup label="SPM">
+              <option>Bahasa Malaysia</option>
+              <option>English</option>
+              <option>Mathematics</option>
+              <option>Additional Mathematics</option>
+              <option>Physics</option>
+              <option>Chemistry</option>
+              <option>Biology</option>
+              <option>History</option>
+              <option>Geography</option>
+              <option>Economics</option>
+              <option>Accounting</option>
+              <option>Commerce</option>
+              <option>Business Studies</option>
+              <option>Information Technology</option>
+              <option>Moral Education</option>
+              <option>Islamic Studies</option>
+              <option>Art & Design</option>
+            </optgroup>
+            <optgroup label="A-Level">
+              <option>General Paper</option>
+              <option>Mathematics</option>
+              <option>Further Mathematics</option>
+              <option>Physics</option>
+              <option>Chemistry</option>
+              <option>Biology</option>
+              <option>Computing</option>
+              <option>Economics</option>
+              <option>History</option>
+              <option>Geography</option>
+              <option>Literature in English</option>
+              <option>Art</option>
+              <option>Music</option>
+            </optgroup>
           </select>
           <label>Mode:</label>
           <select ng-model="vm.selectedMode">
@@ -77,7 +140,7 @@
     </div>
 
     <!-- Booking Form Detail View -->
-    <div class="card max-w-lg" ng-if="vm.selectedTutor">
+    <div class="card" ng-if="vm.selectedTutor">
       <button class="btn-link" ng-click="vm.clearSelectedTutor()">← Return to Tutor Listing</button>
 
       <!-- Booking Success -->
@@ -125,19 +188,40 @@
                   class="subject-chip-select">{{ s }}</button>
               </div>
             </div>
-            <div class="form-row-3">
-              <div class="form-group">
-                <label>Date</label>
-                <input type="date" ng-model="vm.bookingForm.date" required />
+            <div class="form-group">
+              <label>Classes per Month</label>
+              <select ng-model="vm.bookingForm.classesPerMonth" ng-change="vm.updateSessions()">
+                <option value="1">1 class per month</option>
+                <option value="2">2 classes per month</option>
+                <option value="3">3 classes per month</option>
+                <option value="4">4 classes per month</option>
+                <option value="8">8 classes per month</option>
+                <option value="12">12 classes per month</option>
+              </select>
+            </div>
+            <div ng-repeat="session in vm.bookingForm.sessions" class="session-slot">
+              <div class="session-slot-label" ng-if="vm.bookingForm.sessions.length > 1">Class {{ $index + 1 }}</div>
+              <div class="form-row-3">
+                <div class="form-group">
+                  <label>Date</label>
+                  <input type="date" ng-model="session.date" required
+                    ng-change="vm.onDateChange($index)" />
+                </div>
+                <div class="form-group">
+                  <label>Start Time</label>
+                  <input type="text" ng-model="session.startTime" placeholder="04:00 PM"
+                    ng-change="vm.calcEndTime(session)" />
+                </div>
+                <div class="form-group">
+                  <label>End Time</label>
+                  <input type="text" ng-model="session.endTime" placeholder="05:00 PM" />
+                </div>
               </div>
-              <div class="form-group">
-                <label>Start Time</label>
-                <input type="text" ng-model="vm.bookingForm.startTime" placeholder="04:00 PM" />
-              </div>
-              <div class="form-group">
-                <label>End Time</label>
-                <input type="text" ng-model="vm.bookingForm.endTime" placeholder="05:00 PM" />
-              </div>
+              <!-- Recurring checkbox — only on Class 1 when there are multiple sessions -->
+              <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" class="recurring-label">
+                <input type="checkbox" ng-model="session.recurring" ng-change="vm.applyRecurring()" />
+                Recurring class every week
+              </label>
             </div>
             <div class="form-group">
               <label>Message / Guidelines (Optional)</label>
@@ -146,7 +230,7 @@
             </div>
             <div class="price-summary">
               <span>Total Price</span>
-              <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.duration }}.00 for {{ vm.bookingForm.duration }} hour(s)</strong>
+              <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.classesPerMonth }}.00 for {{ vm.bookingForm.classesPerMonth }} session(s) per month</strong>
             </div>
             <button type="submit" class="btn-primary full-width">Dispatch Booking Request</button>
           </form>
