@@ -59,7 +59,7 @@
           <div>
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>{{ b.studentName }}</strong>
-            <p>{{ b.date }} • {{ b.time }} ({{ b.durationHours }}h)</p>
+            <p ng-repeat="c in b.classes track by $index">{{ c.date }} • {{ c.time }}</p>
             <em ng-if="b.message">"{{ b.message }}"</em>
           </div>
           <div class="btn-row">
@@ -71,7 +71,7 @@
     </div>
 
     <!-- Counter Proposal Form -->
-    <div class="card max-w-md" ng-if="vm.counterBooking">
+    <div class="card" ng-if="vm.counterBooking">
       <button class="btn-link" ng-click="vm.cancelCounter()">← Cancel</button>
       <div class="alert-success" ng-if="vm.counterSuccess">
         ✓ Counter-proposal dispatched. Waiting for parent approval.
@@ -79,33 +79,48 @@
       <div ng-if="!vm.counterSuccess">
         <span class="label-tag">Time Rescheduling</span>
         <h3>Counter Propose Booking Slot</h3>
-        <p class="text-muted">For: {{ vm.counterBooking.subject }}</p>
+        <p class="text-muted">For: {{ vm.counterBooking.subject }} · {{ vm.counterBooking.studentName }}</p>
         <form ng-submit="vm.submitCounter()">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Proposed Date</label>
-              <input type="date" ng-model="vm.counterForm.date" required />
+          <div class="counter-classes-table">
+            <div class="counter-class-row counter-class-header">
+              <span>#</span>
+              <span>Parent Requested</span>
+              <span>Your Proposed Date</span>
+              <span>Your Proposed Time</span>
             </div>
-            <div class="form-group">
-              <label>Proposed Time</label>
-              <input type="text" ng-model="vm.counterForm.time" placeholder="05:00 PM" />
+            <div class="counter-class-row" ng-repeat="c in vm.counterForm.classes track by $index">
+              <span class="counter-class-num">{{ $index + 1 }}</span>
+              <span class="counter-original">
+                <strong>{{ c.originalDate }}</strong><br/>
+                <small>{{ c.originalTime }}</small>
+              </span>
+              <div class="form-group mb-0">
+                <input type="text" ng-model="c.proposedDate" placeholder="YYYY-MM-DD" required />
+              </div>
+              <div class="form-group mb-0">
+                <input type="text" ng-model="c.proposedTime" placeholder="05:00 PM" />
+              </div>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group mt-3">
             <label>Explanation to Parent</label>
-            <textarea ng-model="vm.counterForm.message" rows="2"></textarea>
+            <textarea ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
           </div>
           <button type="submit" class="btn-primary full-width">Dispatch Counter Proposal</button>
         </form>
       </div>
     </div>
 
-    <!-- Calendar -->
+    <!-- Calendar (Monthly View) -->
     <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
       <div class="card-header">
-        <span class="label-tag indigo">TUTOR MONTHLY SCHEDULER</span>
+        <span class="label-tag indigo">TUTOR SCHEDULER</span>
         <h3>Calendar & Payout Coordinator</h3>
-        <span class="badge-month">📆 June 2026</span>
+        <div class="cal-nav-row">
+          <button class="btn-outline sm" ng-click="vm.prevMonth()">‹ Prev</button>
+          <span class="cal-month-label">📆 {{ vm.calMonthName() }} {{ vm.calYear }}</span>
+          <button class="btn-outline sm" ng-click="vm.nextMonth()">Next ›</button>
+        </div>
       </div>
       <div class="cal-stats-row">
         <div class="cal-stat amber">
@@ -115,37 +130,39 @@
           <span ng-if="!vm.pendingRequests().length" class="ok-badge">✓ All Clear</span>
         </div>
         <div class="cal-stat indigo">
-          <small>Sessions on June {{ vm.selectedCalDay }}</small>
+          <small ng-if="vm.selectedCalDay">Sessions on {{ vm.calMonthName() }} {{ vm.selectedCalDay }}</small>
+          <small ng-if="!vm.selectedCalDay">Select a day</small>
           <strong>{{ vm.confirmedOnDay(vm.selectedCalDay).length }} Lesson(s)</strong>
         </div>
       </div>
 
-      <!-- Calendar Grid -->
       <div class="cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
       <div class="cal-grid">
-        <button class="cal-day" ng-repeat="d in [].constructor(30) track by $index"
-          ng-click="vm.selectedCalDay = $index + 1"
+        <span class="cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
+        <button class="cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
+          ng-click="vm.selectedCalDay = d"
           ng-class="{
-            'selected': vm.selectedCalDay === $index + 1,
-            'has-paid': vm.isPaid(vm.bookingsOnDay($index + 1)[0] && vm.bookingsOnDay($index + 1)[0].id),
-            'has-unpaid': !vm.isPaid(vm.bookingsOnDay($index + 1)[0] && vm.bookingsOnDay($index + 1)[0].id) && vm.bookingsOnDay($index + 1).length > 0
+            'selected': vm.selectedCalDay === d,
+            'public-holiday': vm.isPublicHoliday(d),
+            'has-paid': vm.bookingsOnDay(d).length && vm.isPaid(vm.bookingsOnDay(d)[0].id),
+            'has-unpaid': vm.bookingsOnDay(d).length && !vm.isPaid(vm.bookingsOnDay(d)[0].id)
           }">
-          <span class="day-num">{{ $index + 1 }}</span>
-          <span class="day-label" ng-if="vm.bookingsOnDay($index + 1).length">
-            {{ vm.isPaid(vm.bookingsOnDay($index + 1)[0].id) ? '🟢' : '🔒' }}
+          <span class="day-num">{{ d }}</span>
+          <span class="day-holiday-name" ng-if="vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
+          <span class="day-label" ng-if="vm.bookingsOnDay(d).length">
+            {{ vm.isPaid(vm.bookingsOnDay(d)[0].id) ? '🟢' : '🔒' }}
           </span>
         </button>
       </div>
 
-      <!-- Selected Day Detail -->
       <div class="day-detail" ng-if="vm.selectedCalDay">
-        <h4>📅 Scheduled Classes for June {{ vm.selectedCalDay }}, 2026</h4>
+        <h4>📅 Scheduled Classes for {{ vm.calMonthName() }} {{ vm.selectedCalDay }}, {{ vm.calYear }}</h4>
         <p ng-if="!vm.bookingsOnDay(vm.selectedCalDay).length" class="empty-state">No lessons on this day.</p>
         <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(vm.selectedCalDay)">
           <div class="booking-detail-header">
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>Student: {{ b.studentName }}</strong>
-            <p>{{ b.time }} ({{ b.durationHours }}h) • ${{ b.totalPrice }}.00</p>
+            <p>{{ vm.classOnDay(b, vm.selectedCalDay).time }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
           </div>
           <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
           <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
@@ -161,7 +178,7 @@
         <div>
           <span class="badge-subject">{{ b.subject }}</span>
           <strong>Student: {{ b.studentName }}</strong>
-          <p>{{ b.date }} • {{ b.time }}</p>
+          <p ng-repeat="c in b.classes track by $index">{{ c.date }} • {{ c.time }}</p>
         </div>
         <span class="status-badge confirmed">STARTING SOON</span>
       </div>
@@ -176,7 +193,7 @@
         <div class="report-needed" ng-repeat="b in vm.needsReport()">
           <div>
             <span class="badge-amber">REPORT REQUIRED</span>
-            <strong>{{ b.subject }} on {{ b.date }}</strong>
+            <strong>{{ b.subject }} — {{ b.classes.length }} class(es)</strong>
             <p>Student: {{ b.studentName }}</p>
           </div>
           <button class="btn-indigo" ng-click="vm.startReport(b)">Submit Lesson Report</button>
@@ -209,7 +226,7 @@
       <div ng-if="!vm.reportSuccess">
         <span class="label-tag">Lesson Evaluation Form</span>
         <h3>Compile Report for {{ vm.reportBooking.studentName }}</h3>
-        <p class="text-muted">Class: {{ vm.reportBooking.subject }} on {{ vm.reportBooking.date }}</p>
+        <p class="text-muted">Class: {{ vm.reportBooking.subject }} — {{ vm.reportBooking.classes.length }} session(s)</p>
         <form ng-submit="vm.submitReport()">
           <div class="form-group">
             <label>Syllabus Covered & Focus Areas</label>

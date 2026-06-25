@@ -55,7 +55,7 @@
             <div class="session-info">
               <span class="badge-subject">{{ b.subject }}</span>
               <strong>{{ b.tutorName }}</strong>
-              <small>🕐 {{ b.date }} • {{ b.time }}</small>
+              <small>🕐 {{ b.classes[0].date }} • {{ b.classes[0].time }}<span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span></small>
             </div>
             <span class="status-badge" ng-class="b.status">{{ b.status | uppercase }}</span>
           </div>

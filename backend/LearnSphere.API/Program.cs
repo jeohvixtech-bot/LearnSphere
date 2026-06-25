@@ -99,8 +99,46 @@ using (var scope = app.Services.CreateScope())
     } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Bookings` ADD COLUMN `BookingNumber` VARCHAR(20) NOT NULL DEFAULT ''"); } catch { }
+    // Date/Time moved to BookingClasses — make legacy columns nullable so existing schema doesn't break INSERTs
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` MODIFY COLUMN `Date` longtext NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` MODIFY COLUMN `Time` longtext NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` MODIFY COLUMN `SlotId` int NULL"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Invoices` ADD COLUMN `InvoiceNumber` VARCHAR(20) NOT NULL DEFAULT ''"); } catch { }
+    // CounterProposal.Date/Time moved to per-class CounterProposalClasses
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` MODIFY COLUMN `Date` longtext NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` MODIFY COLUMN `Time` longtext NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `CounterProposalClasses` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `CounterProposalId` INT NOT NULL,
+            `OriginalDate` VARCHAR(50) NOT NULL DEFAULT '',
+            `OriginalTime` VARCHAR(50) NOT NULL DEFAULT '',
+            `ProposedDate` VARCHAR(50) NOT NULL DEFAULT '',
+            `ProposedTime` VARCHAR(50) NOT NULL DEFAULT '',
+            PRIMARY KEY (`Id`),
+            KEY `IX_CounterProposalClasses_CounterProposalId` (`CounterProposalId`),
+            CONSTRAINT `FK_CounterProposalClasses_CounterProposals_CounterProposalId`
+                FOREIGN KEY (`CounterProposalId`) REFERENCES `CounterProposals` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `BookingClasses` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BookingId` INT NOT NULL,
+            `Date` VARCHAR(50) NOT NULL DEFAULT '',
+            `Time` VARCHAR(50) NOT NULL DEFAULT '',
+            PRIMARY KEY (`Id`),
+            KEY `IX_BookingClasses_BookingId` (`BookingId`),
+            CONSTRAINT `FK_BookingClasses_Bookings_BookingId`
+                FOREIGN KEY (`BookingId`) REFERENCES `Bookings` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(

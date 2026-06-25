@@ -90,7 +90,8 @@ public class StudentsController : ControllerBase
         var bookings = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
-            .Include(b => b.CounterProposal)
+            .Include(b => b.Classes)
+            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .Where(b => studentIds.Contains(b.StudentId))
@@ -106,18 +107,20 @@ public class StudentsController : ControllerBase
             StudentName = b.Student?.Name ?? string.Empty,
             Subject = b.Subject,
             Mode = b.Mode,
-            Date = b.Date,
-            Time = b.Time,
             DurationHours = b.DurationHours,
             Message = b.Message,
             TotalPrice = b.TotalPrice,
             Status = b.Status,
-            SlotId = b.SlotId,
+            BookingNumber = b.BookingNumber,
+            Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
             CounterProposal = b.CounterProposal == null ? null : new CounterProposalDto
             {
-                Date = b.CounterProposal.Date,
-                Time = b.CounterProposal.Time,
-                Message = b.CounterProposal.Message
+                Message = b.CounterProposal.Message,
+                Classes = b.CounterProposal.Classes?.Select(c => new CounterProposalClassDto
+                {
+                    OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
+                    ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
+                }).ToList() ?? new()
             },
             LessonReport = b.LessonReport == null ? null : new LessonReportDto
             {

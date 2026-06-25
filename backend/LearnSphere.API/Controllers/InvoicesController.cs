@@ -50,17 +50,6 @@ public class InvoicesController : ControllerBase
 
         invoice.Status = "Paid";
 
-        // Mark timetable slot as booked if applicable
-        if (invoice.Booking.SlotId.HasValue)
-        {
-            var slot = await _context.TutorTimeSlots.FindAsync(invoice.Booking.SlotId.Value);
-            if (slot != null)
-            {
-                slot.Status = "Booked";
-                slot.BookingId = invoice.Booking.Id;
-            }
-        }
-
         // Notify parent
         _context.Notifications.Add(new Notification
         {
@@ -88,17 +77,6 @@ public class InvoicesController : ControllerBase
 
         invoice.Status = "Refunded";
         invoice.Booking.Status = "cancelled";
-
-        // Free up the tutor slot if booked
-        if (invoice.Booking.SlotId.HasValue)
-        {
-            var slot = await _context.TutorTimeSlots.FindAsync(invoice.Booking.SlotId.Value);
-            if (slot != null)
-            {
-                slot.Status = "Available";
-                slot.BookingId = null;
-            }
-        }
 
         // Notify parent
         if (invoice.Booking.Student != null)

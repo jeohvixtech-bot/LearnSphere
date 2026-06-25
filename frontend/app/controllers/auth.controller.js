@@ -12,7 +12,8 @@ angular.module('learnSphereApp')
 
   self.mode = 'login';  // login | register
   self.loginData  = { email: 'sarah.tan@example.com', password: 'Parent@123' };
-  self.registerData = { email: '', password: '', name: '', role: 'parent' };
+  self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
+  self.showTerms = false;
   self.errorMsg = '';
   self.loading = false;
 
@@ -33,6 +34,10 @@ angular.module('learnSphereApp')
 
   self.register = function () {
     self.errorMsg = '';
+    if (self.registerData.password !== self.registerData.confirmPassword) {
+      self.errorMsg = 'Passwords do not match.';
+      return;
+    }
     self.loading = true;
     AuthService.register(
       self.registerData.email,
@@ -49,9 +54,9 @@ angular.module('learnSphereApp')
   };
 
   function redirectByRole(role) {
-    if (role === 'parent')     $location.path('/parent/dashboard');
-    else if (role === 'tutor') $location.path('/tutor/overview');
-    else if (role === 'admin') $location.path('/admin/overview');
-    else                       $location.path('/login');
+    if (role === 'parent' || role === 'student') $location.path('/parent/dashboard');
+    else if (role === 'tutor')                   $location.path('/tutor/overview');
+    else if (role === 'admin')                   $location.path('/admin/overview');
+    else                                         $location.path('/login');
   }
 }]);

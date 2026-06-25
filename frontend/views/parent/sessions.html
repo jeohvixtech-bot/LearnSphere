@@ -76,7 +76,11 @@
               <td><span class="badge-subject">{{ b.subject }}</span></td>
               <td>{{ b.tutorName }}</td>
               <td>{{ b.studentName }}</td>
-              <td>{{ b.date }}<br/><small>{{ b.time }}</small></td>
+              <td>
+                <div ng-repeat="c in b.classes track by $index">
+                  {{ c.date }}<br/><small>{{ c.time }}</small>
+                </div>
+              </td>
               <td>${{ b.totalPrice }}.00</td>
               <td>
                 <span class="status-badge" ng-class="b.status">{{ b.status | uppercase }}</span>
@@ -92,8 +96,10 @@
                   ✓ Accept Counter
                 </button>
                 <div ng-if="b.counterProposal && b.status === 'countered'" class="counter-details">
-                  <small>Proposed: {{ b.counterProposal.date }} at {{ b.counterProposal.time }}</small><br/>
-                  <small class="text-muted">"{{ b.counterProposal.message }}"</small>
+                  <div ng-repeat="c in b.counterProposal.classes track by $index" class="counter-class-line">
+                    <small>Class {{ $index + 1 }}: <span class="text-muted">{{ c.originalDate }}</span> → <strong>{{ c.proposedDate }} {{ c.proposedTime }}</strong></small>
+                  </div>
+                  <small class="text-muted" ng-if="b.counterProposal.message">"{{ b.counterProposal.message }}"</small>
                 </div>
                 <button class="btn-sm btn-danger" ng-if="b.status === 'confirmed'"
                   ng-click="vm.startReportIssue(b.id)">

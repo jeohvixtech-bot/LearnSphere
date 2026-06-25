@@ -9,19 +9,26 @@ public class Booking
     public Student Student { get; set; } = null!;
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
-    public string Date { get; set; } = string.Empty;
-    public string Time { get; set; } = string.Empty;
     public int DurationHours { get; set; } = 1;
     public string? Message { get; set; }
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = "pending"; // pending|countered|confirmed|completed|cancelled
-    public int? SlotId { get; set; }
     public string BookingNumber { get; set; } = string.Empty;
 
+    public ICollection<BookingClass> Classes { get; set; } = new List<BookingClass>();
     public CounterProposal? CounterProposal { get; set; }
     public LessonReport? LessonReport { get; set; }
     public IssueReport? IssueReport { get; set; }
     public Invoice? Invoice { get; set; }
+}
+
+public class BookingClass
+{
+    public int Id { get; set; }
+    public int BookingId { get; set; }
+    public Booking Booking { get; set; } = null!;
+    public string Date { get; set; } = string.Empty;
+    public string Time { get; set; } = string.Empty;
 }
 
 public class CounterProposal
@@ -29,9 +36,19 @@ public class CounterProposal
     public int Id { get; set; }
     public int BookingId { get; set; }
     public Booking Booking { get; set; } = null!;
-    public string Date { get; set; } = string.Empty;
-    public string Time { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public ICollection<CounterProposalClass> Classes { get; set; } = new List<CounterProposalClass>();
+}
+
+public class CounterProposalClass
+{
+    public int Id { get; set; }
+    public int CounterProposalId { get; set; }
+    public CounterProposal CounterProposal { get; set; } = null!;
+    public string OriginalDate { get; set; } = string.Empty;
+    public string OriginalTime { get; set; } = string.Empty;
+    public string ProposedDate { get; set; } = string.Empty;
+    public string ProposedTime { get; set; } = string.Empty;
 }
 
 public class LessonReport

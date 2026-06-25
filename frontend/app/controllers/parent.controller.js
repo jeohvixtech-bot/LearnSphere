@@ -167,21 +167,20 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
-    var promises = self.bookingForm.sessions.map(function (session) {
-      return BookingService.create({
-        tutorId: self.selectedTutor.id,
-        studentId: self.bookingForm.studentId,
-        subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : ''),
-        mode: self.selectedTutor.modes[0],
-        date: toDateStr(session.date),
-        time: session.startTime + ' - ' + session.endTime,
-        durationHours: self.bookingForm.duration,
-        message: self.bookingForm.message,
-        totalPrice: self.selectedTutor.pricePerSession * parseInt(self.bookingForm.classesPerMonth)
-      });
+    var classes = self.bookingForm.sessions.map(function (session) {
+      return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
     });
-    $q.all(promises).then(function (results) {
-      results.forEach(function (res) { self.bookings.unshift(res.data); });
+    BookingService.create({
+      tutorId: self.selectedTutor.id,
+      studentId: self.bookingForm.studentId,
+      subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : ''),
+      mode: self.selectedTutor.modes[0],
+      classes: classes,
+      durationHours: self.bookingForm.duration,
+      message: self.bookingForm.message,
+      totalPrice: self.selectedTutor.pricePerSession * parseInt(self.bookingForm.classesPerMonth)
+    }).then(function (res) {
+      self.bookings.unshift(res.data);
       self.bookingSuccess = true;
       $timeout(function () {
         self.bookingSuccess = false;
@@ -337,7 +336,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Calendar helpers
   self.getBookingsForDay = function (studentId, dayStr) {
-    return self.bookings.filter(function (b) { return b.studentId === studentId && b.date === dayStr; });
+    return self.bookings.filter(function (b) {
+      return b.studentId === studentId &&
+        b.classes && b.classes.some(function (c) { return c.date === dayStr; });
+    });
   };
 
   self.getInvoiceForBooking = function (bookingId) {

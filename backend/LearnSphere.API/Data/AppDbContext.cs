@@ -17,7 +17,9 @@ public class AppDbContext : DbContext
     public DbSet<TutorTimeSlot> TutorTimeSlots { get; set; }
     public DbSet<Student> Students { get; set; }
     public DbSet<Booking> Bookings { get; set; }
+    public DbSet<BookingClass> BookingClasses { get; set; }
     public DbSet<CounterProposal> CounterProposals { get; set; }
+    public DbSet<CounterProposalClass> CounterProposalClasses { get; set; }
     public DbSet<LessonReport> LessonReports { get; set; }
     public DbSet<LessonReportEdit> LessonReportEdits { get; set; }
     public DbSet<IssueReport> IssueReports { get; set; }
@@ -54,10 +56,20 @@ public class AppDbContext : DbContext
             .HasForeignKey(b => b.StudentId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<BookingClass>()
+            .HasOne(bc => bc.Booking)
+            .WithMany(b => b.Classes)
+            .HasForeignKey(bc => bc.BookingId);
+
         modelBuilder.Entity<CounterProposal>()
             .HasOne(cp => cp.Booking)
             .WithOne(b => b.CounterProposal)
             .HasForeignKey<CounterProposal>(cp => cp.BookingId);
+
+        modelBuilder.Entity<CounterProposalClass>()
+            .HasOne(c => c.CounterProposal)
+            .WithMany(cp => cp.Classes)
+            .HasForeignKey(c => c.CounterProposalId);
 
         modelBuilder.Entity<LessonReport>()
             .HasOne(lr => lr.Booking)

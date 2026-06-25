@@ -46,13 +46,42 @@
         <input type="password" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" />
       </div>
       <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" />
+        <div class="field-error" ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword">Passwords do not match.</div>
+      </div>
+      <div class="form-group">
         <label>Account Type</label>
         <select ng-model="auth.registerData.role">
           <option value="parent">Parent / Student</option>
+          <option value="student">Student</option>
           <option value="tutor">Tutor / Teacher</option>
         </select>
       </div>
-      <button type="submit" class="btn-primary full-width" ng-disabled="auth.loading">
+      <div class="tnc-spacer"></div>
+
+      <div class="tnc-checkbox-row">
+        <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" />
+        <label for="tnc-agree" class="tnc-label">
+          I have read and agree to the
+          <span class="tnc-link" ng-click="auth.showTerms = !auth.showTerms">Terms and Conditions</span>
+        </label>
+      </div>
+
+      <div class="tnc-modal-backdrop" ng-if="auth.showTerms" ng-click="auth.showTerms = false"></div>
+      <div class="tnc-modal" ng-if="auth.showTerms">
+        <div class="tnc-modal-header">
+          <span class="tnc-modal-title">Terms and Conditions</span>
+          <button class="tnc-modal-close" ng-click="auth.showTerms = false">&times;</button>
+        </div>
+        <div class="tnc-modal-body">
+          <p>Terms and Conditions content will be added here.</p>
+        </div>
+      </div>
+
+      <div class="tnc-spacer"></div>
+
+      <button type="submit" class="btn-primary full-width" ng-disabled="auth.loading || auth.registerData.password !== auth.registerData.confirmPassword || !auth.registerData.agreedToTerms">
         <span ng-if="!auth.loading">Create Account</span>
         <span ng-if="auth.loading">Creating...</span>
       </button>
