@@ -59,7 +59,7 @@
           <div>
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>{{ b.studentName }}</strong>
-            <p ng-repeat="c in b.classes track by $index">{{ c.date }} • {{ c.time }}</p>
+            <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time }}</p>
             <em ng-if="b.message">"{{ b.message }}"</em>
           </div>
           <div class="btn-row">
@@ -88,17 +88,24 @@
               <span>Your Proposed Date</span>
               <span>Your Proposed Time</span>
             </div>
-            <div class="counter-class-row" ng-repeat="c in vm.counterForm.classes track by $index">
+            <div class="counter-class-row" ng-repeat="c in vm.counterForm.classes track by $index"
+              ng-class="{'counter-class-row-blocked': vm.isProposedDateBlocked(c.originalDate)}">
               <span class="counter-class-num">{{ $index + 1 }}</span>
               <span class="counter-original">
-                <strong>{{ c.originalDate }}</strong><br/>
+                <strong>{{ c.originalDate | dmy }}</strong>
+                <span class="badge-blocked" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
                 <small>{{ c.originalTime }}</small>
               </span>
               <div class="form-group mb-0">
-                <input type="text" ng-model="c.proposedDate" placeholder="YYYY-MM-DD" required />
+                <input type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
+                  ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
+                <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)">
+                  ⚠️ This date is in a blocked period
+                </span>
               </div>
               <div class="form-group mb-0">
-                <input type="text" ng-model="c.proposedTime" placeholder="05:00 PM" />
+                <input type="text" ng-model="c.proposedTime" placeholder="05:00 PM"
+                  ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
               </div>
             </div>
           </div>
@@ -143,13 +150,16 @@
           ng-click="vm.selectedCalDay = d"
           ng-class="{
             'selected': vm.selectedCalDay === d,
-            'public-holiday': vm.isPublicHoliday(d),
-            'has-paid': vm.bookingsOnDay(d).length && vm.isPaid(vm.bookingsOnDay(d)[0].id),
-            'has-unpaid': vm.bookingsOnDay(d).length && !vm.isPaid(vm.bookingsOnDay(d)[0].id)
+            'blocked': vm.isBlocked(d),
+            'public-holiday-sg': !vm.isBlocked(d) && vm.isSgHoliday(d),
+            'public-holiday': !vm.isBlocked(d) && vm.isPublicHoliday(d) && !vm.isSgHoliday(d),
+            'has-paid': !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.isPaid(vm.bookingsOnDay(d)[0].id),
+            'has-unpaid': !vm.isBlocked(d) && vm.bookingsOnDay(d).length && !vm.isPaid(vm.bookingsOnDay(d)[0].id)
           }">
           <span class="day-num">{{ d }}</span>
-          <span class="day-holiday-name" ng-if="vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
-          <span class="day-label" ng-if="vm.bookingsOnDay(d).length">
+          <span class="day-blocked-label" ng-if="vm.isBlocked(d)">Blocked</span>
+          <span class="day-holiday-name" ng-if="!vm.isBlocked(d) && vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
+          <span class="day-label" ng-if="!vm.isBlocked(d) && vm.bookingsOnDay(d).length">
             {{ vm.isPaid(vm.bookingsOnDay(d)[0].id) ? '🟢' : '🔒' }}
           </span>
         </button>
@@ -168,19 +178,143 @@
           <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
         </div>
       </div>
+
+      <!-- Block Unavailable Dates -->
+      <div class="block-dates-panel">
+        <div class="block-dates-title">🚫 Block Unavailable Date Range</div>
+        <div class="block-dates-form">
+          <div class="block-dates-field">
+            <label>Start Date</label>
+            <input type="text" ng-model="vm.blockForm.startDate" ng-change="vm.clearBlockConflicts()"
+              placeholder="DD-MM-YYYY" fp-date />
+          </div>
+          <div class="block-dates-field">
+            <label>End Date</label>
+            <input type="text" ng-model="vm.blockForm.endDate" ng-change="vm.clearBlockConflicts()"
+              placeholder="DD-MM-YYYY" fp-date />
+          </div>
+          <button class="btn-block-confirm"
+            ng-click="vm.confirmBlock()"
+            ng-disabled="!vm.blockForm.startDate || !vm.blockForm.endDate">
+            Confirm Block
+          </button>
+        </div>
+
+        <!-- Conflict alert -->
+        <div class="block-conflict-alert" ng-if="vm.blockConflicts.length">
+          <div class="block-conflict-header">
+            ⚠️ Change of class date required
+          </div>
+          <p class="block-conflict-sub">The selected period overlaps with {{ vm.blockConflicts.length }} confirmed class{{ vm.blockConflicts.length !== 1 ? 'es' : '' }}. Please reschedule before blocking.</p>
+          <div class="block-conflict-list">
+            <div class="block-conflict-item" ng-repeat="c in vm.blockConflicts">
+              <span class="badge-subject">{{ c.subject }}</span>
+              <span>{{ c.student }}</span>
+              <span class="block-conflict-date">📅 {{ c.date | dmy }} &bull; {{ c.time }}</span>
+              <button class="btn-warning sm" ng-click="vm.startTutorRescheduleById(c.bookingId)">
+                Reschedule →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="blocked-ranges-list" ng-if="vm.blockedRanges.length">
+          <div class="blocked-range-item" ng-repeat="r in vm.blockedRanges track by $index">
+            <span class="blocked-range-icon">🚫</span>
+            <span class="blocked-range-dates">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
+            <button class="btn-link" ng-click="vm.removeBlock($index)">✕ Remove</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reschedule Success -->
+    <div class="alert-success" ng-if="vm.rescheduleSuccess">
+      ✓ Reschedule proposal sent. The parent will be notified to confirm the new dates.
+    </div>
+
+    <!-- Reschedule Form -->
+    <div class="card reschedule-panel" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
+      <div class="reschedule-header">
+        <div class="reschedule-title-row">
+          <span class="reschedule-icon">📅</span>
+          <div>
+            <h3>Propose Reschedule</h3>
+            <p>{{ vm.rescheduleBooking.subject }} &bull; Student: {{ vm.rescheduleBooking.studentName }}</p>
+          </div>
+        </div>
+        <button class="btn-link" ng-click="vm.cancelTutorReschedule()">✕ Cancel</button>
+      </div>
+      <p class="reschedule-sub" ng-if="vm.isTutorBookingConflicted(vm.rescheduleBooking)">
+        ⚠️ Some class dates overlap with your blocked period. Propose new dates for the parent to confirm.
+      </p>
+      <p class="reschedule-sub" ng-if="!vm.isTutorBookingConflicted(vm.rescheduleBooking)" style="background:#f0fdf4;border-left-color:#16a34a">
+        Enter the new proposed dates below. The parent will receive a notification to accept.
+      </p>
+      <form ng-submit="vm.submitTutorReschedule()" class="form-stack">
+        <div class="session-slot" ng-repeat="c in vm.rescheduleForm.classes track by $index"
+          ng-class="{'slot-blocked': vm.isOriginalDateBlocked(c.originalDate)}">
+          <div class="session-slot-label" style="display:flex;align-items:center;gap:8px">
+            Class {{ $index + 1 }}
+            <span class="badge-blocked" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
+          </div>
+          <div class="reschedule-orig-date">
+            Original: <strong>{{ c.originalDate | dmy }}</strong>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>New Date</label>
+              <input type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
+                ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
+              <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)">
+                ⚠️ This date is also in a blocked period
+              </span>
+            </div>
+            <div class="form-group">
+              <label>New Time</label>
+              <input type="text" ng-model="c.proposedTime" placeholder="04:00 PM - 05:00 PM"
+                ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
+            </div>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:4px">
+          <button type="button" class="btn-outline" ng-click="vm.cancelTutorReschedule()">Cancel</button>
+          <button type="submit" class="btn-primary">Send Reschedule Proposal →</button>
+        </div>
+      </form>
     </div>
 
     <!-- Confirmed Classes -->
-    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
+    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking && !vm.rescheduleBooking">
       <h3>Confirmed Classes Checklist</h3>
       <p ng-if="!vm.confirmedClasses().length" class="empty-state">No active class appointments.</p>
-      <div class="session-item" ng-repeat="b in vm.confirmedClasses()">
-        <div>
+      <div class="session-item" ng-repeat="b in vm.confirmedClasses()"
+        ng-class="{'session-conflicted': vm.isTutorBookingConflicted(b)}">
+        <div style="flex:1">
           <span class="badge-subject">{{ b.subject }}</span>
           <strong>Student: {{ b.studentName }}</strong>
-          <p ng-repeat="c in b.classes track by $index">{{ c.date }} • {{ c.time }}</p>
+          <!-- Countered: show proposed dates, pending parent acceptance -->
+          <div ng-if="b.status === 'countered' && b.counterProposal">
+            <div class="class-date-row" ng-repeat="c in b.counterProposal.classes track by $index">
+              <p style="text-decoration:line-through;color:#94a3b8;font-size:12px">{{ c.originalDate | dmy }}</p>
+              <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime }}
+                <span class="badge-amber" style="font-size:10px;margin-left:4px">⏳ Awaiting acceptance</span>
+              </p>
+            </div>
+          </div>
+          <!-- Confirmed: show actual booking classes -->
+          <div ng-if="b.status !== 'countered' || !b.counterProposal">
+            <div class="class-date-row" ng-repeat="c in b.classes track by $index">
+              <p>{{ c.date | dmy }} • {{ c.time }}</p>
+              <span class="status-badge confirmed" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
+            </div>
+          </div>
         </div>
-        <span class="status-badge confirmed">STARTING SOON</span>
+        <button ng-class="vm.isTutorBookingConflicted(b) ? 'btn-warning sm' : 'btn-outline sm'"
+          ng-click="vm.startTutorReschedule(b)">
+          <span ng-if="vm.isTutorBookingConflicted(b)">⚠️ Reschedule Required</span>
+          <span ng-if="!vm.isTutorBookingConflicted(b)">📅 Reschedule</span>
+        </button>
       </div>
     </div>
 

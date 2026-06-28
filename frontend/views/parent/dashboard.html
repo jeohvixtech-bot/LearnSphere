@@ -1,5 +1,4 @@
 <div class="dashboard-layout">
-  <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-user">
       <div class="avatar-circle">{{ vm.user.name[0] }}</div>
@@ -10,52 +9,88 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item active">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Setup Student Profile</a>
+      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
       <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
     </nav>
   </aside>
 
-  <!-- Main Content -->
   <main class="dashboard-main">
 
-    <!-- Payment Alert Banner -->
+    <!-- ── Pay Success ───────────────────────────── -->
+    <div class="alert-success" ng-if="vm.paySuccess">
+      ✓ Payment successful. Invoice has been marked as paid.
+    </div>
+
+    <!-- ── Welcome Hero ───────────────────────────── -->
+    <div class="dash-hero">
+      <div class="dash-hero-left">
+        <p class="dash-hero-greeting">Parent Dashboard</p>
+        <h2 class="dash-hero-name">Welcome back, {{ vm.user.name.split(' ')[0] }}! 👋</h2>
+        <p class="dash-hero-sub">Here's an overview of your children's tutoring activity</p>
+      </div>
+      <div class="dash-hero-stats">
+        <div class="dash-hero-stat">
+          <strong>{{ vm.students.length }}</strong>
+          <small>Students</small>
+        </div>
+        <div class="dash-hero-stat">
+          <strong>{{ vm.confirmedAndCounteredBookings().length }}</strong>
+          <small>Upcoming</small>
+        </div>
+        <div class="dash-hero-stat">
+          <strong>{{ vm.pendingPayments().length }}</strong>
+          <small>Payments Due</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Payment Alert ─────────────────────────── -->
     <div class="alert-banner" ng-if="vm.pendingPayments().length > 0">
       <div class="alert-banner-left">
-        <span class="alert-badge">★ ACTION REQUIRED</span>
-        <h3>Class Appointment Confirmed by Tutor</h3>
-        <p>To finalize and secure your session, please complete the payment below.</p>
+        <span class="alert-badge">★ Action Required</span>
+        <h3>Session Confirmed — Payment Pending</h3>
+        <p>Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
         <div class="invoice-tags">
           <span class="invoice-tag" ng-repeat="inv in vm.pendingPayments()">
-            {{ inv.subject }} • <strong>${{ inv.amount }}.00</strong>
+            {{ inv.subject }} &bull; <strong>${{ inv.amount }}.00</strong>
           </span>
         </div>
       </div>
       <button class="btn-white" ng-click="vm.payInvoice(vm.pendingPayments()[0].id)">
-        💳 Pay Tuition (${{ vm.pendingPayments()[0].amount }}.00)
+        💳 Pay Now (${{ vm.pendingPayments()[0].amount }}.00)
       </button>
     </div>
 
+    <!-- ── Two-column: Sessions + Progress ────────── -->
     <div class="grid-2">
+
       <!-- Upcoming Tutorials -->
       <div class="card">
-        <div class="card-header">
-          <h3>Upcoming Tutorials</h3>
-          <a href="#!/parent/sessions" class="link-sm">View All</a>
+        <div class="dash-section-header">
+          <div style="display:flex;align-items:center">
+            <span class="dash-section-icon green">📅</span>
+            <span class="dash-section-title">Upcoming Tutorials</span>
+          </div>
+          <a href="#!/parent/sessions" class="link-sm">View All →</a>
         </div>
+
         <div class="empty-state-box" ng-if="!vm.confirmedAndCounteredBookings().length">
           <p>No upcoming tutorial sessions scheduled.</p>
           <a href="#!/parent/search" class="btn-primary sm">Find a Tutor</a>
         </div>
+
         <div class="session-list" ng-if="vm.confirmedAndCounteredBookings().length">
           <div class="session-item" ng-repeat="b in vm.confirmedAndCounteredBookings()">
             <img ng-src="{{ b.tutorImageUrl }}" class="avatar" alt="{{ b.tutorName }}" />
             <div class="session-info">
               <span class="badge-subject">{{ b.subject }}</span>
               <strong>{{ b.tutorName }}</strong>
-              <small>🕐 {{ b.classes[0].date }} • {{ b.classes[0].time }}<span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span></small>
+              <small>🕐 {{ b.classes[0].date | dmy }} &bull; {{ b.classes[0].time }}
+                <span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span>
+              </small>
             </div>
             <span class="status-badge" ng-class="b.status">{{ b.status | uppercase }}</span>
           </div>
@@ -64,51 +99,69 @@
 
       <!-- Progress Breakdown -->
       <div class="card">
-        <div class="card-header"><h3>Jessica's Progress Breakdown</h3></div>
+        <div class="dash-section-header">
+          <div style="display:flex;align-items:center">
+            <span class="dash-section-icon teal">📈</span>
+            <span class="dash-section-title">Progress Breakdown</span>
+          </div>
+        </div>
+
         <div class="progress-list">
           <div class="progress-item">
             <div class="progress-label">
-              <span>Secondary Geometry & Shapes</span><strong>85% Mastery</strong>
+              <span>Secondary Geometry &amp; Shapes</span>
+              <strong>85%</strong>
             </div>
             <div class="progress-bar"><div class="progress-fill blue" style="width:85%"></div></div>
           </div>
           <div class="progress-item">
             <div class="progress-label">
-              <span>Linear Algebra & Graph Solutions</span><strong>76% Mastery</strong>
+              <span>Linear Algebra &amp; Graph Solutions</span>
+              <strong>76%</strong>
             </div>
             <div class="progress-bar"><div class="progress-fill green" style="width:76%"></div></div>
           </div>
           <div class="progress-item">
             <div class="progress-label">
-              <span>Quadratic Calculations Speed</span><strong>62% Mastery</strong>
+              <span>Quadratic Calculations Speed</span>
+              <strong>62%</strong>
             </div>
             <div class="progress-bar"><div class="progress-fill amber" style="width:62%"></div></div>
           </div>
         </div>
       </div>
+
     </div>
 
-    <!-- Children Overview -->
-    <div class="card mt-4">
-      <div class="card-header">
-        <h3>Active Children Profiles</h3>
+    <!-- ── Children Overview ──────────────────────── -->
+    <div class="card">
+      <div class="dash-section-header">
+        <div style="display:flex;align-items:center">
+          <span class="dash-section-icon green">👨‍👩‍👧</span>
+          <span class="dash-section-title">Active Children Profiles</span>
+        </div>
         <a href="#!/parent/students" class="link-sm">+ Add Student</a>
       </div>
+
       <div class="student-grid">
         <div class="student-mini-card" ng-repeat="s in vm.students">
           <div class="student-avatar-circle">{{ s.name[0] }}</div>
           <div>
             <strong>{{ s.name }}</strong>
-            <p>{{ s.educationLevel }} • {{ s.school }}</p>
-            <small ng-if="s.learningGoal">Goal: "{{ s.learningGoal }}"</small>
+            <p>{{ s.educationLevel }}</p>
+            <p>🏫 {{ s.school }}</p>
+            <small ng-if="s.learningGoal">🎯 "{{ s.learningGoal }}"</small>
           </div>
+        </div>
+        <div class="student-mini-empty" ng-if="!vm.students.length">
+          No student profiles yet. <a href="#!/parent/students">Add one now →</a>
         </div>
       </div>
     </div>
 
-    <!-- System Maintenance Notice -->
+    <!-- ── Notice Banner ─────────────────────────── -->
     <div class="notice-banner">
-      ⚠️ <strong>System Maintenance Scheduled:</strong> The dashboard will undergo maintenance on June 15th, 2:00 AM – 4:00 AM SGT.
+      ⚠️ <strong>Scheduled Maintenance:</strong>&nbsp; The dashboard will be offline on June 15th, 2:00 AM – 4:00 AM SGT.
     </div>
 
   </main>

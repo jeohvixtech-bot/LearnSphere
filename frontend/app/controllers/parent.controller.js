@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService',
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -70,12 +70,115 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Active day for calendar
   self.selectedCalDay = {};
 
+  // Student schedule calendar
+  var _scNow = new Date();
+  var _scMonthNames = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December'];
+  self.studCal = { year: _scNow.getFullYear(), month: _scNow.getMonth(), selectedDay: 0, selectedStudentId: null };
+
+  self.studCalMonthName = function () { return _scMonthNames[self.studCal.month]; };
+  self.studCalPrevMonth = function () {
+    if (self.studCal.month === 0) { self.studCal.month = 11; self.studCal.year--; }
+    else { self.studCal.month--; }
+    self.studCal.selectedDay = 0;
+  };
+  self.studCalNextMonth = function () {
+    if (self.studCal.month === 11) { self.studCal.month = 0; self.studCal.year++; }
+    else { self.studCal.month++; }
+    self.studCal.selectedDay = 0;
+  };
+  self.studCalDaysArray = function () {
+    var n = new Date(self.studCal.year, self.studCal.month + 1, 0).getDate();
+    var a = []; for (var i = 0; i < n; i++) a.push(i + 1); return a;
+  };
+  self.studCalOffsetArray = function () {
+    var d = new Date(self.studCal.year, self.studCal.month, 1).getDay();
+    var off = d === 0 ? 6 : d - 1;
+    var a = []; for (var i = 0; i < off; i++) a.push(i); return a;
+  };
+  self.studCalDayStr = function (day) {
+    var m = self.studCal.month + 1;
+    return self.studCal.year + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+  };
+  self.getBookingsForStudentOnDay = function (studentId, day) {
+    if (!studentId || !day) return [];
+    var s = self.studCalDayStr(day);
+    return self.bookings.filter(function (b) {
+      return b.studentId === studentId && b.status === 'confirmed' &&
+        (b.classes || []).some(function (c) { return c.date === s; });
+    });
+  };
+  self.studCalClassTime = function (booking, day) {
+    var s = self.studCalDayStr(day);
+    var c = (booking.classes || []).find(function (c) { return c.date === s; });
+    return c ? c.time : '';
+  };
+
+  // Reschedule
+  self.rescheduleBooking = null;
+  self.rescheduleForm = { classes: [] };
+  self.rescheduleSuccess = false;
+
+  self.isBookingConflicted = function (booking) {
+    if (!booking || booking.status !== 'confirmed') return false;
+    return (booking.classes || []).some(function (c) {
+      return ScheduleService.isBlocked(booking.tutorId, c.date);
+    });
+  };
+
+  self.startReschedule = function (booking) {
+    self.rescheduleBooking = booking;
+    self.rescheduleForm.classes = (booking.classes || []).map(function (c) {
+      return { originalDate: c.date, date: c.date, time: c.time };
+    });
+    self.rescheduleSuccess = false;
+  };
+
+  self.cancelReschedule = function () {
+    self.rescheduleBooking = null;
+    self.rescheduleForm = { classes: [] };
+  };
+
+  self.submitReschedule = function () {
+    if (!self.rescheduleBooking) return;
+    var newClasses = self.rescheduleForm.classes.map(function (c) {
+      return { date: toDateStr(toDateObj(c.date)), time: c.time };
+    });
+    self.rescheduleBooking.classes = newClasses;
+    self.rescheduleSuccess = true;
+    self.cancelReschedule();
+    $timeout(function () {
+      self.rescheduleSuccess = false;
+    }, 2500);
+  };
+
+  self.isDateBlockedForTutor = function (tutorId, dateVal) {
+    if (!tutorId || !dateVal) return false;
+    var s = dateVal instanceof Date ? toDateStr(dateVal) : dateVal;
+    return ScheduleService.isBlocked(tutorId, s);
+  };
+
+  self.isSessionDateBlocked = function (dateVal) {
+    if (!dateVal || !self.selectedTutor) return false;
+    return self.isDateBlockedForTutor(self.selectedTutor.id, dateVal);
+  };
+
+  self.hasBlockedSessionDate = function () {
+    if (!self.selectedTutor || !self.bookingForm.sessions) return false;
+    return self.bookingForm.sessions.some(function (s) {
+      return s.date && self.isSessionDateBlocked(s.date);
+    });
+  };
+
   // Load data
   function init() {
     TutorService.getAll().then(function (res) { self.tutors = res.data; });
     StudentService.getMyStudents().then(function (res) {
       self.students = res.data;
-      if (res.data.length) self.bookingForm.studentId = res.data[0].id;
+      if (res.data.length) {
+        self.bookingForm.studentId = res.data[0].id;
+        self.studCal.selectedStudentId = res.data[0].id;
+      }
     });
     BookingService.getAll().then(function (res) { self.bookings = res.data; });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
@@ -113,20 +216,32 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.applyRecurring();
   };
 
-  // AngularJS 1.8 input[type=date] uses Date objects, not strings
+  function parseAnyDate(val) {
+    if (!val) return new Date(NaN);
+    if (val instanceof Date) return new Date(val.getFullYear(), val.getMonth(), val.getDate());
+    var s = String(val).trim();
+    var dmyh = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dmyh) return new Date(+dmyh[3], +dmyh[2] - 1, +dmyh[1]);
+    var dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmy) return new Date(+dmy[3], +dmy[2] - 1, +dmy[1]);
+    var ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymd) return new Date(+ymd[1], +ymd[2] - 1, +ymd[3]);
+    return new Date(s + 'T00:00:00');
+  }
+
   function toDateObj(val) {
     if (!val) return null;
-    if (val instanceof Date) return val;
-    var d = new Date(val + 'T00:00:00');
+    var d = parseAnyDate(val);
     return isNaN(d.getTime()) ? null : d;
   }
 
-  function toDateStr(d) {
-    if (!d) return '';
-    var base = d instanceof Date ? d : new Date(d + 'T00:00:00');
-    var mm = (base.getMonth() + 1 < 10 ? '0' : '') + (base.getMonth() + 1);
-    var dd = (base.getDate() < 10 ? '0' : '') + base.getDate();
-    return base.getFullYear() + '-' + mm + '-' + dd;
+  function toDateStr(val) {
+    if (!val) return '';
+    var d = parseAnyDate(val);
+    if (isNaN(d.getTime())) return '';
+    var mm = (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+    var dd = (d.getDate() < 10 ? '0' : '') + d.getDate();
+    return d.getFullYear() + '-' + mm + '-' + dd;
   }
 
   self.applyRecurring = function () {
@@ -136,7 +251,9 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     if (!base) return;
     for (var i = 1; i < sessions.length; i++) {
       var d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i * 7);
-      sessions[i].date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      var dday = (d.getDate() < 10 ? '0' : '') + d.getDate();
+      var dmon = (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+      sessions[i].date = dday + '-' + dmon + '-' + d.getFullYear();
     }
   };
 
@@ -264,9 +381,15 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   // Pay an invoice
+  self.paySuccess = false;
+
   self.payInvoice = function (invoiceId) {
     InvoiceService.pay(invoiceId).then(function () {
+      self.paySuccess = true;
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+      $timeout(function () {
+        self.paySuccess = false;
+      }, 2500);
     });
   };
 
@@ -283,10 +406,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       details: self.issueForm.details
     }).then(function () {
       self.issueSuccess = true;
+      self.issueForm.bookingId = null;
       BookingService.getAll().then(function (res) { self.bookings = res.data; });
       $timeout(function () {
         self.issueSuccess = false;
-        self.issueForm.bookingId = null;
       }, 3000);
     });
   };
@@ -362,11 +485,17 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return self.bookings.filter(function (b) { return b.status === 'confirmed' || b.status === 'countered'; });
   };
 
+  self.counterAcceptSuccess = false;
+
   self.acceptCounterProposal = function (booking) {
     BookingService.updateStatus(booking.id, 'confirmed', null)
       .then(function () {
+        self.counterAcceptSuccess = true;
         BookingService.getAll().then(function (res) { self.bookings = res.data; });
         InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+        $timeout(function () {
+          self.counterAcceptSuccess = false;
+        }, 2500);
       });
   };
 

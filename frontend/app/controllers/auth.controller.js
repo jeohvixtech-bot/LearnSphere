@@ -22,10 +22,22 @@ angular.module('learnSphereApp')
     self.loading = true;
     AuthService.login(self.loginData.email, self.loginData.password)
       .then(function (user) {
+        if (!user || !user.role) {
+          self.errorMsg = 'Unexpected response from server. Please try again.';
+          return;
+        }
         redirectByRole(user.role);
       })
-      .catch(function () {
-        self.errorMsg = 'Invalid email or password. Please try again.';
+      .catch(function (err) {
+        if (err && err.status === 401) {
+          self.errorMsg = 'Invalid email or password.';
+        } else if (err && err.status === 0) {
+          self.errorMsg = 'Cannot reach server. Is the backend running?';
+        } else if (err && err.status) {
+          self.errorMsg = 'Server error (' + err.status + '). Please try again.';
+        } else {
+          self.errorMsg = 'Login error: ' + (err && err.message ? err.message : 'unknown');
+        }
       })
       .finally(function () {
         self.loading = false;

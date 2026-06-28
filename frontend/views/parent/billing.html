@@ -6,60 +6,117 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Setup Student Profile</a>
+      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
-      <a href="#!/parent/billing" class="nav-item active">💳 Billing & Invoices</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
+      <a href="#!/parent/billing" class="nav-item active">💳 Billing &amp; Invoices</a>
       <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
-    <div class="card">
-      <div class="card-header">
-        <h3>💳 Billing & Invoices</h3>
-      </div>
 
-      <div class="empty-state-box" ng-if="!vm.invoices.length">
-        <p>No invoices yet. Invoices are auto-generated when a booking is confirmed.</p>
-      </div>
+    <!-- ── Pay Success ───────────────────────────── -->
+    <div class="alert-success" ng-if="vm.paySuccess">
+      ✓ Payment successful. Invoice has been marked as paid.
+    </div>
 
-      <div class="table-wrap" ng-if="vm.invoices.length">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Invoice #</th>
-              <th>Booking #</th>
-              <th>Subject</th>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr ng-repeat="inv in vm.invoices">
-              <td class="mono">{{ inv.invoiceNumber }}</td>
-              <td class="mono">{{ inv.bookingNumber }}</td>
-              <td>{{ inv.subject || '—' }}</td>
-              <td>{{ inv.date }}</td>
-              <td class="price">${{ inv.amount }}.00</td>
-              <td>
-                <span class="status-badge" ng-class="inv.status === 'Paid' ? 'confirmed' : 'pending'">
-                  {{ inv.status }}
-                </span>
-              </td>
-              <td>
-                <button class="btn-primary sm" ng-if="inv.status === 'Unpaid'"
-                  ng-click="vm.payInvoice(inv.id)">
-                  💳 Pay Now
-                </button>
-                <span class="text-success" ng-if="inv.status === 'Paid'">✓ Paid</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- ── Page Hero ──────────────────────────────── -->
+    <div class="profile-hero">
+      <div class="profile-hero-left">
+        <div class="profile-hero-icon">💳</div>
+        <div>
+          <h2 class="profile-hero-title">Billing &amp; Invoices</h2>
+          <p class="profile-hero-sub">View and manage all your tuition payment invoices</p>
+        </div>
+      </div>
+      <div class="profile-hero-right">
+        <div class="profile-hero-stat">
+          <strong>{{ vm.invoices.length }}</strong>
+          <small>Total Invoices</small>
+        </div>
+        <div class="profile-hero-divider"></div>
+        <div class="profile-hero-stat">
+          <strong>{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</strong>
+          <small>Unpaid</small>
+        </div>
       </div>
     </div>
+
+    <!-- ── Summary Cards ──────────────────────────── -->
+    <div class="billing-summary-row" ng-if="vm.invoices.length">
+      <div class="billing-summary-card">
+        <div class="billing-summary-icon green">📋</div>
+        <div>
+          <div class="billing-summary-value">{{ vm.invoices.length }}</div>
+          <div class="billing-summary-label">Total Invoices</div>
+        </div>
+      </div>
+      <div class="billing-summary-card">
+        <div class="billing-summary-icon teal">✓</div>
+        <div>
+          <div class="billing-summary-value">{{ (vm.invoices | filter:{status:'Paid'}).length }}</div>
+          <div class="billing-summary-label">Paid</div>
+        </div>
+      </div>
+      <div class="billing-summary-card">
+        <div class="billing-summary-icon amber">⏳</div>
+        <div>
+          <div class="billing-summary-value">{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</div>
+          <div class="billing-summary-label">Outstanding</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Empty State ─────────────────────────────── -->
+    <div class="empty-state-box" ng-if="!vm.invoices.length">
+      <p>No invoices yet. Invoices are auto-generated when a booking is confirmed.</p>
+    </div>
+
+    <!-- ── Invoice List ───────────────────────────── -->
+    <div class="invoice-list" ng-if="vm.invoices.length">
+      <span class="profile-registry-label">{{ vm.invoices.length }} Invoice{{ vm.invoices.length !== 1 ? 's' : '' }}</span>
+
+      <div class="invoice-card" ng-repeat="inv in vm.invoices">
+
+        <!-- Status icon -->
+        <div class="invoice-card-icon" ng-class="inv.status === 'Paid' ? 'paid' : 'unpaid'">
+          {{ inv.status === 'Paid' ? '✓' : '💳' }}
+        </div>
+
+        <!-- Invoice & booking number -->
+        <div style="min-width:120px">
+          <div class="invoice-number">{{ inv.invoiceNumber }}</div>
+          <div class="invoice-booking-ref">Booking {{ inv.bookingNumber }}</div>
+        </div>
+
+        <!-- Subject + date -->
+        <div style="flex:1;min-width:120px">
+          <div class="invoice-card-subject">{{ inv.subject || '—' }}</div>
+          <div class="invoice-card-date">📅 {{ inv.date | dmy }}</div>
+        </div>
+
+        <!-- Amount -->
+        <div class="invoice-amount" ng-class="inv.status === 'Paid' ? 'paid' : 'unpaid'">
+          ${{ inv.amount }}.00
+        </div>
+
+        <!-- Status badge -->
+        <span class="status-badge" ng-class="inv.status === 'Paid' ? 'confirmed' : 'pending'">
+          {{ inv.status | uppercase }}
+        </span>
+
+        <!-- Action -->
+        <div style="flex-shrink:0;min-width:90px;text-align:right">
+          <button class="btn-primary sm" ng-if="inv.status === 'Unpaid'"
+            ng-click="vm.payInvoice(inv.id)">
+            💳 Pay Now
+          </button>
+          <span class="text-success" ng-if="inv.status === 'Paid'">✓ Paid</span>
+        </div>
+
+      </div><!-- end ng-repeat -->
+    </div>
+
   </main>
 </div>

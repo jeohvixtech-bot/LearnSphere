@@ -6,187 +6,255 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Setup Student Profile</a>
+      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
       <a href="#!/parent/search" class="nav-item active">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
       <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
 
-    <!-- Tutor Listing -->
-    <div ng-if="!vm.selectedTutor" class="search-wrapper">
-      <div class="card">
-        <div class="search-bar-row">
-          <input type="text" ng-model="vm.searchQuery" placeholder="Search by name, subject..." class="search-input" />
-        </div>
-        <div class="filter-row">
-          <label>Subjects:</label>
-          <select ng-model="vm.selectedSubject">
-            <option value="All">All Subjects</option>
-            <optgroup label="PSLE">
-              <option>English Language</option>
-              <option>Mother Tongue (Chinese)</option>
-              <option>Mother Tongue (Malay)</option>
-              <option>Mother Tongue (Tamil)</option>
-              <option>Mathematics</option>
-              <option>Science</option>
-            </optgroup>
-            <optgroup label="UPSR">
-              <option>Bahasa Malaysia</option>
-              <option>English</option>
-              <option>Mathematics</option>
-              <option>Science</option>
-              <option>History</option>
-            </optgroup>
-            <optgroup label="O-Level">
-              <option>English Language</option>
-              <option>Elementary Mathematics</option>
-              <option>Additional Mathematics</option>
-              <option>Physics</option>
-              <option>Chemistry</option>
-              <option>Biology</option>
-              <option>Combined Science</option>
-              <option>History</option>
-              <option>Social Studies</option>
-              <option>Geography</option>
-              <option>Literature in English</option>
-              <option>Principles of Accounts</option>
-              <option>Design & Technology</option>
-              <option>Computing</option>
-              <option>Food & Nutrition</option>
-              <option>Art</option>
-              <option>Music</option>
-            </optgroup>
-            <optgroup label="SPM">
-              <option>Bahasa Malaysia</option>
-              <option>English</option>
-              <option>Mathematics</option>
-              <option>Additional Mathematics</option>
-              <option>Physics</option>
-              <option>Chemistry</option>
-              <option>Biology</option>
-              <option>History</option>
-              <option>Geography</option>
-              <option>Economics</option>
-              <option>Accounting</option>
-              <option>Commerce</option>
-              <option>Business Studies</option>
-              <option>Information Technology</option>
-              <option>Moral Education</option>
-              <option>Islamic Studies</option>
-              <option>Art & Design</option>
-            </optgroup>
-            <optgroup label="A-Level">
-              <option>General Paper</option>
-              <option>Mathematics</option>
-              <option>Further Mathematics</option>
-              <option>Physics</option>
-              <option>Chemistry</option>
-              <option>Biology</option>
-              <option>Computing</option>
-              <option>Economics</option>
-              <option>History</option>
-              <option>Geography</option>
-              <option>Literature in English</option>
-              <option>Art</option>
-              <option>Music</option>
-            </optgroup>
-          </select>
-          <label>Mode:</label>
-          <select ng-model="vm.selectedMode">
-            <option value="All">All Modes</option>
-            <option value="Online">Online</option>
-            <option value="Home Visit">Home Visit</option>
-            <option value="Tutor Place">Tutor Place</option>
-          </select>
-          <label>Rating:</label>
-          <select ng-model="vm.minRating" ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
-          </select>
-          <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+    <!-- ══════════════════════════════════════════════
+         TUTOR LISTING VIEW
+         ══════════════════════════════════════════════ -->
+    <div ng-if="!vm.selectedTutor">
+
+      <!-- ── Search Hero ─────────────────────────── -->
+      <div class="search-hero">
+        <h2 class="search-hero-title">Find Your Perfect Tutor</h2>
+        <p class="search-hero-sub">Browse verified NIE-trained tutors across Singapore &amp; Malaysia</p>
+        <div class="search-hero-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" ng-model="vm.searchQuery" placeholder="Search by name, subject, or qualification..." />
         </div>
       </div>
 
+      <!-- ── Filter Bar ──────────────────────────── -->
+      <div class="filter-bar">
+        <span class="filter-bar-label">Filter</span>
+
+        <div class="filter-bar-divider"></div>
+
+        <span class="filter-bar-label">Subject</span>
+        <select class="filter-select-sm" ng-model="vm.selectedSubject">
+          <option value="All">All Subjects</option>
+          <optgroup label="PSLE">
+            <option>English Language</option>
+            <option>Mother Tongue (Chinese)</option>
+            <option>Mother Tongue (Malay)</option>
+            <option>Mother Tongue (Tamil)</option>
+            <option>Mathematics</option>
+            <option>Science</option>
+          </optgroup>
+          <optgroup label="UPSR">
+            <option>Bahasa Malaysia</option>
+            <option>English</option>
+            <option>Mathematics</option>
+            <option>Science</option>
+            <option>History</option>
+          </optgroup>
+          <optgroup label="O-Level">
+            <option>English Language</option>
+            <option>Elementary Mathematics</option>
+            <option>Additional Mathematics</option>
+            <option>Physics</option>
+            <option>Chemistry</option>
+            <option>Biology</option>
+            <option>Combined Science</option>
+            <option>History</option>
+            <option>Social Studies</option>
+            <option>Geography</option>
+            <option>Literature in English</option>
+            <option>Principles of Accounts</option>
+            <option>Design &amp; Technology</option>
+            <option>Computing</option>
+            <option>Food &amp; Nutrition</option>
+            <option>Art</option>
+            <option>Music</option>
+          </optgroup>
+          <optgroup label="SPM">
+            <option>Bahasa Malaysia</option>
+            <option>English</option>
+            <option>Mathematics</option>
+            <option>Additional Mathematics</option>
+            <option>Physics</option>
+            <option>Chemistry</option>
+            <option>Biology</option>
+            <option>History</option>
+            <option>Geography</option>
+            <option>Economics</option>
+            <option>Accounting</option>
+            <option>Commerce</option>
+            <option>Business Studies</option>
+            <option>Information Technology</option>
+            <option>Moral Education</option>
+            <option>Islamic Studies</option>
+            <option>Art &amp; Design</option>
+          </optgroup>
+          <optgroup label="A-Level">
+            <option>General Paper</option>
+            <option>Mathematics</option>
+            <option>Further Mathematics</option>
+            <option>Physics</option>
+            <option>Chemistry</option>
+            <option>Biology</option>
+            <option>Computing</option>
+            <option>Economics</option>
+            <option>History</option>
+            <option>Geography</option>
+            <option>Literature in English</option>
+            <option>Art</option>
+            <option>Music</option>
+          </optgroup>
+        </select>
+
+        <div class="filter-bar-divider"></div>
+
+        <span class="filter-bar-label">Mode</span>
+        <select class="filter-select-sm" ng-model="vm.selectedMode">
+          <option value="All">All Modes</option>
+          <option value="Online">Online</option>
+          <option value="Home Visit">Home Visit</option>
+          <option value="Tutor Place">Tutor Place</option>
+        </select>
+
+        <div class="filter-bar-divider"></div>
+
+        <span class="filter-bar-label">Rating</span>
+        <select class="filter-select-sm" ng-model="vm.minRating"
+          ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
+        </select>
+
+        <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+      </div>
+
+      <!-- ── Tutor Grid ───────────────────────────── -->
       <div class="tutor-grid">
         <div class="tutor-card" ng-repeat="t in vm.filteredTutors()">
-          <div class="tutor-card-header">
+
+          <!-- ── Top row: avatar + info ── -->
+          <div class="tutor-card-main">
             <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
-            <div>
-              <h4>{{ t.name }}
+            <div class="tutor-card-body">
+              <div class="tutor-card-name-row">
+                <h4>{{ t.name }}</h4>
                 <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
-              </h4>
+              </div>
+              <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
+              <div class="qual-tags">
+                <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
+              </div>
+              <div class="tutor-card-subjects-label">Teaches</div>
               <div class="subject-list">
                 <button ng-repeat="s in t.subjects" ng-click="vm.selectedSubject = s" class="subject-chip">{{ s }}</button>
               </div>
-              <small>{{ t.experienceYears }} Yrs Exp • {{ t.modes.join(' / ') }}</small>
+              <p class="tutor-bio">"{{ t.bio }}"</p>
             </div>
-            <span class="rating-badge">⭐ {{ t.rating }}</span>
           </div>
-          <p class="tutor-bio">"{{ t.bio }}"</p>
-          <div class="qual-tags">
-            <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:2">{{ q }}</span>
-          </div>
-          <div class="tutor-card-footer">
-            <div>
-              <small>TRIAL RATE</small>
+
+          <!-- ── Bottom bar: rating + modes + price + CTA ── -->
+          <div class="tutor-card-bar">
+            <div class="tutor-card-rating">
+              <span class="tutor-rating-star">⭐</span>
+              <span class="tutor-rating-value">{{ t.rating }}</span>
+              <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
+            </div>
+            <div class="tutor-card-modes">
+              <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
+            </div>
+            <div class="tutor-card-bar-spacer"></div>
+            <div class="tutor-card-price">
+              <small>Trial Rate</small>
               <strong class="price">${{ t.pricePerSession }}/hr</strong>
             </div>
-            <button class="btn-primary" ng-click="vm.selectTutor(t)">View Profile & Book</button>
+            <button class="btn-primary" ng-click="vm.selectTutor(t)">View &amp; Book →</button>
           </div>
+
         </div>
       </div>
-    </div>
 
-    <!-- Booking Form Detail View -->
-    <div class="card" ng-if="vm.selectedTutor">
-      <button class="btn-link" ng-click="vm.clearSelectedTutor()">← Return to Tutor Listing</button>
+    </div><!-- end listing view -->
+
+
+    <!-- ══════════════════════════════════════════════
+         BOOKING DETAIL VIEW
+         ══════════════════════════════════════════════ -->
+    <div ng-if="vm.selectedTutor">
+
+      <!-- Back button -->
+      <div class="booking-back">
+        <button class="btn-link" ng-click="vm.clearSelectedTutor()">← Back to Tutor Catalog</button>
+      </div>
 
       <!-- Booking Success -->
       <div class="alert-success large" ng-if="vm.bookingSuccess">
         ✓ Booking Request Dispatched!<br/>
-        <small>Connecting you with {{ vm.selectedTutor.name }}. Redirecting...</small>
+        <small style="font-weight:400">Connecting you with {{ vm.selectedTutor.name }}. Redirecting to your sessions...</small>
       </div>
 
-      <div ng-if="!vm.bookingSuccess" class="booking-grid">
-        <!-- Tutor Info -->
-        <div class="tutor-info-col">
-          <div class="tutor-profile-card">
-            <img ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-avatar-lg" />
-            <h4>{{ vm.selectedTutor.name }}</h4>
-            <small>{{ vm.selectedTutor.subjects[0] }}</small>
-            <p class="rating">⭐ {{ vm.selectedTutor.rating }} ({{ vm.selectedTutor.reviewCount }} reviews)</p>
+      <!-- ── Full-width tutor profile header ────── -->
+      <div class="tutor-detail-card" ng-if="!vm.bookingSuccess">
+
+        <div class="tutor-detail-top">
+          <img ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-detail-avatar" alt="{{ vm.selectedTutor.name }}" />
+          <div class="tutor-detail-info">
+            <div class="tutor-detail-name">
+              {{ vm.selectedTutor.name }}
+              <span ng-if="vm.selectedTutor.isVerified" class="badge-verified">✓ Verified</span>
+            </div>
+            <p class="tutor-detail-meta">
+              {{ vm.selectedTutor.experienceYears }} yrs experience &bull; {{ vm.selectedTutor.modes.join(' / ') }}
+              &bull; ⭐ {{ vm.selectedTutor.rating }} ({{ vm.selectedTutor.reviewCount }} reviews)
+            </p>
           </div>
-          <div class="qual-section">
-            <h5>Credentials</h5>
-            <div class="qual-item" ng-repeat="q in vm.selectedTutor.qualifications">
-              ✓ {{ q }}
+          <div class="tutor-detail-rate">
+            <small>Session Rate</small>
+            <div class="price">${{ vm.selectedTutor.pricePerSession }}/hr</div>
+            <span class="rating-badge" style="margin-top:8px;display:inline-flex">⭐ {{ vm.selectedTutor.rating }}</span>
+          </div>
+        </div>
+
+        <div class="tutor-detail-bio-row">
+          <p class="tutor-detail-bio">"{{ vm.selectedTutor.bio }}"</p>
+        </div>
+
+        <div class="tutor-detail-footer">
+          <div class="tutor-detail-footer-section">
+            <span class="tutor-detail-footer-label">Subjects Offered</span>
+            <div class="subject-list">
+              <button ng-repeat="s in vm.selectedTutor.subjects" ng-click="vm.selectedSubject = s" class="subject-chip">{{ s }}</button>
+            </div>
+          </div>
+          <div class="tutor-detail-footer-section">
+            <span class="tutor-detail-footer-label">Credentials &amp; Qualifications</span>
+            <div class="qual-tags">
+              <span class="qual-tag" ng-repeat="q in vm.selectedTutor.qualifications">✓ {{ q }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Booking Form -->
-        <div class="booking-form-col">
-          <span class="label-tag">Pre-Booking Appointment Form</span>
-          <h3>Request Tutorial Session</h3>
-          <p class="text-muted">Rate: ${{ vm.selectedTutor.pricePerSession }}/session</p>
+      </div><!-- end tutor-detail-card -->
 
-          <form ng-submit="vm.submitBooking()">
+      <!-- ── Booking form (full width below profile) -->
+      <div class="booking-form-single card" ng-if="!vm.bookingSuccess">
+
+        <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e2e8f0">
+          <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">Request Tutorial Session</h3>
+          <p class="text-muted">Complete the form below to send your booking request to {{ vm.selectedTutor.name }}</p>
+        </div>
+
+        <form ng-submit="vm.submitBooking()" class="form-stack">
+
+          <div class="booking-form-section">Student &amp; Subject</div>
+
+          <div class="form-row">
             <div class="form-group">
               <label>Select Student</label>
               <select ng-model="vm.bookingForm.studentId">
                 <option ng-repeat="s in vm.students" value="{{ s.id }}">{{ s.name }}</option>
               </select>
-            </div>
-            <div class="form-group">
-              <label>Subject Module</label>
-              <div class="subject-chips">
-                <button type="button" ng-repeat="s in vm.selectedTutor.subjects"
-                  ng-click="vm.bookingForm.subject = s"
-                  ng-class="{selected: vm.bookingForm.subject === s}"
-                  class="subject-chip-select">{{ s }}</button>
-              </div>
             </div>
             <div class="form-group">
               <label>Classes per Month</label>
@@ -199,44 +267,75 @@
                 <option value="12">12 classes per month</option>
               </select>
             </div>
-            <div ng-repeat="session in vm.bookingForm.sessions" class="session-slot">
-              <div class="session-slot-label" ng-if="vm.bookingForm.sessions.length > 1">Class {{ $index + 1 }}</div>
-              <div class="form-row-3">
-                <div class="form-group">
-                  <label>Date</label>
-                  <input type="date" ng-model="session.date" required
-                    ng-change="vm.onDateChange($index)" />
-                </div>
-                <div class="form-group">
-                  <label>Start Time</label>
-                  <input type="text" ng-model="session.startTime" placeholder="04:00 PM"
-                    ng-change="vm.calcEndTime(session)" />
-                </div>
-                <div class="form-group">
-                  <label>End Time</label>
-                  <input type="text" ng-model="session.endTime" placeholder="05:00 PM" />
-                </div>
+          </div>
+
+          <div class="form-group">
+            <label>Subject Module</label>
+            <div class="subject-chips">
+              <button type="button" ng-repeat="s in vm.selectedTutor.subjects"
+                ng-click="vm.bookingForm.subject = s"
+                ng-class="{selected: vm.bookingForm.subject === s}"
+                class="subject-chip-select">{{ s }}</button>
+            </div>
+          </div>
+
+          <div class="booking-form-section">Schedule</div>
+
+          <div ng-repeat="session in vm.bookingForm.sessions" class="session-slot">
+            <div class="session-slot-label" ng-if="vm.bookingForm.sessions.length > 1">
+              Class {{ $index + 1 }}
+            </div>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Date</label>
+                <input type="text" ng-model="session.date" required ng-change="vm.onDateChange($index)"
+                  placeholder="DD-MM-YYYY" fp-date
+                  ng-class="{'input-blocked': session.date && vm.isSessionDateBlocked(session.date)}" />
+                <span class="blocked-date-hint" ng-if="session.date && vm.isSessionDateBlocked(session.date)">
+                  ⚠️ Tutor unavailable on this date — blocked period
+                </span>
               </div>
-              <!-- Recurring checkbox — only on Class 1 when there are multiple sessions -->
-              <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" class="recurring-label">
-                <input type="checkbox" ng-model="session.recurring" ng-change="vm.applyRecurring()" />
-                Recurring class every week
-              </label>
+              <div class="form-group">
+                <label>Start Time</label>
+                <input type="text" ng-model="session.startTime" placeholder="04:00 PM" ng-change="vm.calcEndTime(session)" />
+              </div>
+              <div class="form-group">
+                <label>End Time</label>
+                <input type="text" ng-model="session.endTime" placeholder="05:00 PM" />
+              </div>
             </div>
-            <div class="form-group">
-              <label>Message / Guidelines (Optional)</label>
-              <textarea ng-model="vm.bookingForm.message" rows="2"
-                placeholder="e.g. Please focus on quadratic equation formulas."></textarea>
-            </div>
-            <div class="price-summary">
-              <span>Total Price</span>
-              <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.classesPerMonth }}.00 for {{ vm.bookingForm.classesPerMonth }} session(s) per month</strong>
-            </div>
-            <button type="submit" class="btn-primary full-width">Dispatch Booking Request</button>
-          </form>
-        </div>
-      </div>
-    </div>
+            <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" class="recurring-label">
+              <input type="checkbox" ng-model="session.recurring" ng-change="vm.applyRecurring()" />
+              Recurring class every week
+            </label>
+          </div>
+
+          <div class="booking-form-section">Notes</div>
+
+          <div class="form-group">
+            <label>Message / Guidelines <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
+            <textarea ng-model="vm.bookingForm.message" rows="2"
+              placeholder="e.g. Please focus on quadratic equation formulas."></textarea>
+          </div>
+
+          <div class="price-summary">
+            <span>💳 Estimated Monthly Total</span>
+            <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.classesPerMonth }}.00 / month</strong>
+          </div>
+
+          <div class="block-conflict-alert" ng-if="vm.hasBlockedSessionDate()">
+            <div class="block-conflict-header">⚠️ Tutor unavailable on selected dates</div>
+            <p class="block-conflict-sub">One or more class dates fall within the tutor's blocked period. Please change the highlighted dates.</p>
+          </div>
+
+          <button type="submit" class="btn-primary full-width"
+            ng-disabled="vm.hasBlockedSessionDate()">
+            Dispatch Booking Request →
+          </button>
+
+        </form>
+      </div><!-- end booking form -->
+    </div><!-- end booking detail view -->
 
   </main>
 </div>

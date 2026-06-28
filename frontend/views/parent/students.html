@@ -6,225 +6,107 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item active">👤 Setup Student Profile</a>
+      <a href="#!/parent/students" class="nav-item active">👤 Student Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
       <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
-    <div class="grid-col-7-5">
 
-      <!-- Add Student Form -->
-      <div class="card">
-        <span class="label-tag blue">Profiling System</span>
-        <h2>Add Child / Student Profile</h2>
-        <p class="text-muted">Customize their education tier, school, and subjects to match with NIE teachers.</p>
+    <!-- ── Page Hero ──────────────────────────────── -->
+    <div class="profile-hero">
+      <div class="profile-hero-left">
+        <div class="profile-hero-icon">👨‍👩‍👧</div>
+        <div>
+          <h2 class="profile-hero-title">Student Profiles</h2>
+          <p class="profile-hero-sub">Manage your children's learning profiles and match them with expert tutors</p>
+        </div>
+      </div>
+      <div class="profile-hero-right">
+        <div class="profile-hero-stat">
+          <strong>{{ vm.students.length }}</strong>
+          <small>Active Profiles</small>
+        </div>
+        <div class="profile-hero-divider"></div>
+        <div class="profile-hero-stat">
+          <strong>SG &amp; MY</strong>
+          <small>Coverage</small>
+        </div>
+      </div>
+    </div>
 
-        <div class="alert-success" ng-if="vm.studentSuccess">
+    <!-- ── Main grid: Registry left + Form right ─── -->
+    <div class="profile-grid">
+
+      <!-- ── Left: Student Registry ─────────────── -->
+      <div class="profile-registry">
+        <span class="profile-registry-label">
+          {{ vm.students.length }} Profile{{ vm.students.length !== 1 ? 's' : '' }} Registered
+        </span>
+
+        <!-- Success toast -->
+        <div class="alert-success" ng-if="vm.studentSuccess" style="margin-bottom:12px">
           ✓ New student profile has been created successfully!
         </div>
 
-        <form ng-submit="vm.createStudent()" class="form-stack">
-          <div class="form-row">
-            <div class="form-group half">
-              <label>Child Full Name</label>
-              <input type="text" ng-model="vm.studentForm.name" required placeholder="e.g. Jessica Tan" />
-            </div>
-          </div>
+        <!-- Empty state -->
+        <div class="profile-empty-state" ng-if="!vm.students.length">
+          <div class="profile-empty-icon">👤</div>
+          <h4>No Profiles Yet</h4>
+          <p>Add your first child's profile using the form on the right to get started.</p>
+        </div>
 
-          <!-- School search -->
-          <div class="form-group" style="position:relative">
-            <label>Current Education Institution</label>
-            <input type="text" ng-model="vm.schoolSearch"
-              ng-change="vm.searchSchools()"
-              ng-focus="vm.openSchoolDropdown()"
-              ng-blur="vm.closeSchoolDropdown()"
-              placeholder="Search or select school in SG/MY..." />
-            <div class="school-dropdown" ng-if="vm.schoolDropdownOpen">
-              <div class="school-filters">
-                <button type="button" ng-repeat="c in ['All','Singapore','Malaysia']"
-                  ng-click="vm.countryFilter = c; vm.searchSchools()"
-                  ng-class="{active: vm.countryFilter === c}" class="filter-chip">
-                  {{ c === 'Singapore' ? 'SG 🇸🇬' : c === 'Malaysia' ? 'MY 🇲🇾' : 'All' }}
-                </button>
-              </div>
-              <select ng-model="vm.typeFilter" ng-change="vm.searchSchools()" class="filter-select">
-                <option value="All">All Types</option>
-                <option value="Primary">Primary</option>
-                <option value="Secondary">Secondary</option>
-                <option value="Junior College">Junior College</option>
-                <option value="Polytechnic/Vocational">Polytechnic/Vocational</option>
-                <option value="University/Tertiary">University/Tertiary</option>
-              </select>
-              <div class="school-list">
-                <button type="button" class="school-option"
-                  ng-repeat="inst in vm.institutions"
-                  ng-click="vm.selectSchool(inst.name)">
-                  <span>{{ inst.name }}</span>
-                  <div>
-                    <span class="badge-country">{{ inst.country === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}</span>
-                    <span class="badge-type">{{ inst.type }}</span>
-                  </div>
-                </button>
-                <p ng-if="!vm.institutions.length" class="empty-state">No matching institutions found.</p>
-              </div>
-            </div>
-          </div>
+        <!-- ── Student cards ── -->
+        <div class="profile-card" ng-repeat="s in vm.students"
+          ng-class="{'profile-card--new': s.id === vm.newlyAddedStudentId, 'profile-card--editing': vm.editingStudent && vm.editingStudent.id === s.id}">
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Education Level</label>
-              <select ng-model="vm.studentForm.educationLevel">
-                <option>Primary 5-6</option>
-                <option>Secondary 1</option>
-                <option>Secondary 2</option>
-                <option>Secondary 3</option>
-                <option>Secondary 4</option>
-                <option>Junior College (JC)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Subjects Needed -->
-          <div class="form-group">
-            <label>Subjects Needed</label>
-            <div class="chip-input-row">
-              <select ng-model="vm.newStudentSubject">
-                <option value="">— Select subject —</option>
-                <optgroup label="PSLE">
-                  <option>English Language</option>
-                  <option>Mother Tongue (Chinese)</option>
-                  <option>Mother Tongue (Malay)</option>
-                  <option>Mother Tongue (Tamil)</option>
-                  <option>Mathematics</option>
-                  <option>Science</option>
-                </optgroup>
-                <optgroup label="UPSR">
-                  <option>Bahasa Malaysia</option>
-                  <option>English</option>
-                  <option>Mathematics</option>
-                  <option>Science</option>
-                  <option>History</option>
-                </optgroup>
-                <optgroup label="O-Level">
-                  <option>English Language</option>
-                  <option>Elementary Mathematics</option>
-                  <option>Additional Mathematics</option>
-                  <option>Physics</option>
-                  <option>Chemistry</option>
-                  <option>Biology</option>
-                  <option>Combined Science</option>
-                  <option>History</option>
-                  <option>Social Studies</option>
-                  <option>Geography</option>
-                  <option>Literature in English</option>
-                  <option>Principles of Accounts</option>
-                  <option>Design & Technology</option>
-                  <option>Computing</option>
-                  <option>Food & Nutrition</option>
-                  <option>Art</option>
-                  <option>Music</option>
-                </optgroup>
-                <optgroup label="SPM">
-                  <option>Bahasa Malaysia</option>
-                  <option>English</option>
-                  <option>Mathematics</option>
-                  <option>Additional Mathematics</option>
-                  <option>Physics</option>
-                  <option>Chemistry</option>
-                  <option>Biology</option>
-                  <option>History</option>
-                  <option>Geography</option>
-                  <option>Economics</option>
-                  <option>Accounting</option>
-                  <option>Commerce</option>
-                  <option>Business Studies</option>
-                  <option>Information Technology</option>
-                  <option>Moral Education</option>
-                  <option>Islamic Studies</option>
-                  <option>Art & Design</option>
-                </optgroup>
-                <optgroup label="A-Level">
-                  <option>General Paper</option>
-                  <option>Mathematics</option>
-                  <option>Further Mathematics</option>
-                  <option>Physics</option>
-                  <option>Chemistry</option>
-                  <option>Biology</option>
-                  <option>Computing</option>
-                  <option>Economics</option>
-                  <option>History</option>
-                  <option>Geography</option>
-                  <option>Literature in English</option>
-                  <option>Art</option>
-                  <option>Music</option>
-                </optgroup>
-              </select>
-              <button type="button" class="btn-outline-sm" ng-click="vm.addStudentSubject()">Add</button>
-            </div>
-            <div class="chip-list" ng-if="vm.studentSubjects.length">
-              <span class="chip" ng-repeat="s in vm.studentSubjects">
-                {{ s }} <button type="button" class="chip-remove" ng-click="vm.removeStudentSubject($index)">×</button>
-              </span>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Learning Milestones & Goals (Optional)</label>
-            <textarea ng-model="vm.studentForm.learningGoal" rows="3"
-              placeholder="e.g. Improve algebra speed, prepare for national exams..."></textarea>
-          </div>
-
-          <button type="submit" class="btn-primary full-width">Save Student Profile</button>
-        </form>
-      </div>
-
-      <!-- Active Students List -->
-      <div class="card overflow-auto" style="max-height:640px">
-        <span class="label-tag purple">Registry Records</span>
-        <h3>Active Student Files</h3>
-
-        <div class="student-record" ng-repeat="s in vm.students"
-          ng-class="{'newly-added': s.id === vm.newlyAddedStudentId, 'editing': vm.editingStudent && vm.editingStudent.id === s.id}">
-
-          <!-- Normal view -->
+          <!-- View mode -->
           <div ng-if="!vm.editingStudent || vm.editingStudent.id !== s.id">
-            <div ng-if="s.id === vm.newlyAddedStudentId" class="new-badge">★ NEWLY ADDED</div>
-            <div class="student-record-header">
-              <div class="avatar-circle">{{ s.name[0] }}</div>
-              <div style="flex:1">
-                <strong>{{ s.name }}</strong>
-                <p class="text-muted">{{ s.educationLevel }}</p>
-                <span class="badge-school">🏫 {{ s.school }}</span>
-                <div class="chip-list" style="margin-top:4px" ng-if="s.subjectSelect">
-                  <span class="chip" ng-repeat="sub in s.subjectSelect.split(',') track by $index">{{ sub.trim() }}</span>
-                </div>
+            <span class="profile-new-badge" ng-if="s.id === vm.newlyAddedStudentId">★ NEW</span>
+            <div class="profile-card-top">
+              <div class="profile-avatar">{{ s.name[0] }}</div>
+              <div class="profile-card-body">
+                <div class="profile-card-name">{{ s.name }}</div>
+                <span class="profile-card-level">{{ s.educationLevel }}</span>
+                <div class="profile-card-school">🏫 {{ s.school }}</div>
               </div>
-              <button type="button" class="btn-outline-sm edit-student-btn" ng-click="vm.startEditStudent(s)">✏️ Edit</button>
+              <button type="button" class="btn-outline-sm" ng-click="vm.startEditStudent(s)">✏️ Edit</button>
             </div>
-            <div class="goal-box" ng-if="s.learningGoal">
-              <small class="label-tag">Target Milestones</small>
+
+            <div class="profile-subjects" ng-if="s.subjectSelect">
+              <span class="profile-subject-tag"
+                ng-repeat="sub in s.subjectSelect.split(',') track by $index">{{ sub.trim() }}</span>
+            </div>
+
+            <div class="profile-goal" ng-if="s.learningGoal">
+              <span class="profile-goal-label">🎯 Learning Goal</span>
               <p>"{{ s.learningGoal }}"</p>
             </div>
           </div>
 
-          <!-- Edit view -->
-          <div ng-if="vm.editingStudent && vm.editingStudent.id === s.id" class="student-edit-form">
-            <div class="student-edit-header">
-              <strong>Editing: {{ s.name }}</strong>
-              <button type="button" class="btn-link" ng-click="vm.cancelEditStudent()">✕ Cancel</button>
-            </div>
-            <form ng-submit="vm.saveEditStudent()" class="form-stack" style="margin-top:10px">
-              <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" ng-model="vm.editStudentForm.name" required />
+          <!-- Edit mode -->
+          <div ng-if="vm.editingStudent && vm.editingStudent.id === s.id">
+            <div class="profile-edit-header">
+              <div class="profile-avatar profile-avatar--sm">{{ s.name[0] }}</div>
+              <div>
+                <strong>Editing: {{ s.name }}</strong>
+                <p class="text-muted">Update the details below and save</p>
               </div>
-              <div class="form-group">
-                <label>School</label>
-                <input type="text" ng-model="vm.editStudentForm.school" placeholder="School name" />
+              <button type="button" class="btn-link" ng-click="vm.cancelEditStudent()" style="margin-left:auto">✕ Cancel</button>
+            </div>
+            <form ng-submit="vm.saveEditStudent()" class="form-stack" style="margin-top:14px">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Full Name</label>
+                  <input type="text" ng-model="vm.editStudentForm.name" required />
+                </div>
+                <div class="form-group">
+                  <label>School</label>
+                  <input type="text" ng-model="vm.editStudentForm.school" placeholder="School name" />
+                </div>
               </div>
               <div class="form-group">
                 <label>Education Level</label>
@@ -268,7 +150,8 @@
               </div>
               <div class="form-group">
                 <label>Learning Goals</label>
-                <textarea ng-model="vm.editStudentForm.learningGoal" rows="2" placeholder="e.g. Prepare for O-Levels..."></textarea>
+                <textarea ng-model="vm.editStudentForm.learningGoal" rows="2"
+                  placeholder="e.g. Prepare for O-Levels..."></textarea>
               </div>
               <div class="btn-row">
                 <button type="button" class="btn-outline" ng-click="vm.cancelEditStudent()">Cancel</button>
@@ -277,11 +160,238 @@
             </form>
           </div>
 
+        </div><!-- end ng-repeat -->
+      </div><!-- end profile-registry -->
+
+      <!-- ── Right: Add Student Form ────────────── -->
+      <div class="profile-form-panel card">
+        <div class="profile-form-header">
+          <div class="profile-form-icon">✚</div>
+          <div>
+            <h3>Add New Student</h3>
+            <p>Fill in your child's details to find the right tutor match</p>
+          </div>
         </div>
 
-        <p ng-if="!vm.students.length" class="empty-state">No student profiles added yet.</p>
+        <form ng-submit="vm.createStudent()" class="form-stack">
+
+          <div class="profile-form-section">Basic Information</div>
+          <div class="form-group">
+            <label>Child Full Name</label>
+            <input type="text" ng-model="vm.studentForm.name" required placeholder="e.g. Jessica Tan" />
+          </div>
+
+          <div class="form-group" style="position:relative">
+            <label>Education Institution</label>
+            <input type="text" ng-model="vm.schoolSearch"
+              ng-change="vm.searchSchools()"
+              ng-focus="vm.openSchoolDropdown()"
+              ng-blur="vm.closeSchoolDropdown()"
+              placeholder="Search school in SG / MY..." />
+            <div class="school-dropdown" ng-if="vm.schoolDropdownOpen">
+              <div class="school-filters">
+                <button type="button" ng-repeat="c in ['All','Singapore','Malaysia']"
+                  ng-click="vm.countryFilter = c; vm.searchSchools()"
+                  ng-class="{active: vm.countryFilter === c}" class="filter-chip">
+                  {{ c === 'Singapore' ? 'SG 🇸🇬' : c === 'Malaysia' ? 'MY 🇲🇾' : 'All' }}
+                </button>
+              </div>
+              <select ng-model="vm.typeFilter" ng-change="vm.searchSchools()" class="filter-select">
+                <option value="All">All Types</option>
+                <option value="Primary">Primary</option>
+                <option value="Secondary">Secondary</option>
+                <option value="Junior College">Junior College</option>
+                <option value="Polytechnic/Vocational">Polytechnic/Vocational</option>
+                <option value="University/Tertiary">University/Tertiary</option>
+              </select>
+              <div class="school-list">
+                <button type="button" class="school-option"
+                  ng-repeat="inst in vm.institutions"
+                  ng-click="vm.selectSchool(inst.name)">
+                  <span>{{ inst.name }}</span>
+                  <div>
+                    <span class="badge-country">{{ inst.country === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}</span>
+                    <span class="badge-type">{{ inst.type }}</span>
+                  </div>
+                </button>
+                <p ng-if="!vm.institutions.length" class="empty-state">No matching institutions found.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-form-section">Academic Details</div>
+          <div class="form-group">
+            <label>Education Level</label>
+            <select ng-model="vm.studentForm.educationLevel">
+              <option>Primary 5-6</option>
+              <option>Secondary 1</option>
+              <option>Secondary 2</option>
+              <option>Secondary 3</option>
+              <option>Secondary 4</option>
+              <option>Junior College (JC)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Subjects Needed</label>
+            <div class="chip-input-row">
+              <select ng-model="vm.newStudentSubject">
+                <option value="">— Select subject —</option>
+                <optgroup label="PSLE">
+                  <option>English Language</option>
+                  <option>Mother Tongue (Chinese)</option>
+                  <option>Mother Tongue (Malay)</option>
+                  <option>Mother Tongue (Tamil)</option>
+                  <option>Mathematics</option>
+                  <option>Science</option>
+                </optgroup>
+                <optgroup label="UPSR">
+                  <option>Bahasa Malaysia</option>
+                  <option>English</option>
+                  <option>Mathematics</option>
+                  <option>Science</option>
+                  <option>History</option>
+                </optgroup>
+                <optgroup label="O-Level">
+                  <option>English Language</option>
+                  <option>Elementary Mathematics</option>
+                  <option>Additional Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>Combined Science</option>
+                  <option>History</option>
+                  <option>Social Studies</option>
+                  <option>Geography</option>
+                  <option>Literature in English</option>
+                  <option>Principles of Accounts</option>
+                  <option>Design &amp; Technology</option>
+                  <option>Computing</option>
+                  <option>Food &amp; Nutrition</option>
+                  <option>Art</option>
+                  <option>Music</option>
+                </optgroup>
+                <optgroup label="SPM">
+                  <option>Bahasa Malaysia</option>
+                  <option>English</option>
+                  <option>Mathematics</option>
+                  <option>Additional Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>History</option>
+                  <option>Geography</option>
+                  <option>Economics</option>
+                  <option>Accounting</option>
+                  <option>Commerce</option>
+                  <option>Business Studies</option>
+                  <option>Information Technology</option>
+                  <option>Moral Education</option>
+                  <option>Islamic Studies</option>
+                  <option>Art &amp; Design</option>
+                </optgroup>
+                <optgroup label="A-Level">
+                  <option>General Paper</option>
+                  <option>Mathematics</option>
+                  <option>Further Mathematics</option>
+                  <option>Physics</option>
+                  <option>Chemistry</option>
+                  <option>Biology</option>
+                  <option>Computing</option>
+                  <option>Economics</option>
+                  <option>History</option>
+                  <option>Geography</option>
+                  <option>Literature in English</option>
+                  <option>Art</option>
+                  <option>Music</option>
+                </optgroup>
+              </select>
+              <button type="button" class="btn-outline-sm" ng-click="vm.addStudentSubject()">Add</button>
+            </div>
+            <div class="chip-list" ng-if="vm.studentSubjects.length" style="margin-top:6px">
+              <span class="chip" ng-repeat="s in vm.studentSubjects">
+                {{ s }} <button type="button" class="chip-remove" ng-click="vm.removeStudentSubject($index)">×</button>
+              </span>
+            </div>
+          </div>
+
+          <div class="profile-form-section">Learning Goals</div>
+          <div class="form-group">
+            <label>Milestones &amp; Objectives <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
+            <textarea ng-model="vm.studentForm.learningGoal" rows="3"
+              placeholder="e.g. Improve algebra speed, prepare for national exams..."></textarea>
+          </div>
+
+          <button type="submit" class="btn-primary full-width" style="margin-top:4px">
+            Create Student Profile →
+          </button>
+
+        </form>
+      </div><!-- end profile-form-panel -->
+
+    </div><!-- end profile-grid -->
+
+    <!-- ── Student Schedule Calendar ──────────────────── -->
+    <div class="stud-cal-section card" ng-if="vm.students.length">
+
+      <div class="stud-cal-header">
+        <div>
+          <h3 class="stud-cal-title">📅 Student Schedule</h3>
+          <p class="stud-cal-sub">Confirmed class dates for each student</p>
+        </div>
+        <div class="cal-nav-row">
+          <button class="btn-outline sm" ng-click="vm.studCalPrevMonth()">‹ Prev</button>
+          <span class="cal-month-label">{{ vm.studCalMonthName() }} {{ vm.studCal.year }}</span>
+          <button class="btn-outline sm" ng-click="vm.studCalNextMonth()">Next ›</button>
+        </div>
       </div>
 
-    </div>
+      <!-- Student selector tabs -->
+      <div class="stud-tabs">
+        <button class="stud-tab"
+          ng-repeat="s in vm.students"
+          ng-class="{'active': vm.studCal.selectedStudentId === s.id}"
+          ng-click="vm.studCal.selectedStudentId = s.id; vm.studCal.selectedDay = 0">
+          <span class="stud-tab-avatar">{{ s.name[0] }}</span>
+          {{ s.name }}
+        </button>
+      </div>
+
+      <!-- Calendar grid -->
+      <div ng-if="vm.studCal.selectedStudentId">
+        <div class="cal-weekdays">
+          <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+        </div>
+        <div class="cal-grid">
+          <span class="cal-day-empty" ng-repeat="_ in vm.studCalOffsetArray() track by $index"></span>
+          <button class="cal-day" ng-repeat="d in vm.studCalDaysArray() track by $index"
+            ng-click="vm.studCal.selectedDay = d"
+            ng-class="{
+              'selected': vm.studCal.selectedDay === d,
+              'stud-has-class': vm.getBookingsForStudentOnDay(vm.studCal.selectedStudentId, d).length > 0
+            }">
+            <span class="day-num">{{ d }}</span>
+            <span class="day-dot" ng-if="vm.getBookingsForStudentOnDay(vm.studCal.selectedStudentId, d).length > 0"></span>
+          </button>
+        </div>
+
+        <!-- Day detail -->
+        <div class="day-detail" ng-if="vm.studCal.selectedDay">
+          <h4>📅 Classes on {{ vm.studCalMonthName() }} {{ vm.studCal.selectedDay }}, {{ vm.studCal.year }}</h4>
+          <p ng-if="!vm.getBookingsForStudentOnDay(vm.studCal.selectedStudentId, vm.studCal.selectedDay).length"
+            class="empty-state">No confirmed classes on this day.</p>
+          <div class="booking-detail-card"
+            ng-repeat="b in vm.getBookingsForStudentOnDay(vm.studCal.selectedStudentId, vm.studCal.selectedDay)">
+            <div class="booking-detail-header">
+              <span class="badge-subject">{{ b.subject }}</span>
+              <strong>👨‍🏫 {{ b.tutorName }}</strong>
+              <p>{{ vm.studCalClassTime(b, vm.studCal.selectedDay) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end stud-cal-section -->
+
   </main>
 </div>

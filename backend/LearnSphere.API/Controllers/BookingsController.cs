@@ -112,7 +112,24 @@ public class BookingsController : ControllerBase
 
         if (booking == null) return NotFound();
 
+        var previousStatus = booking.Status;
         booking.Status = dto.Status;
+
+        // When parent accepts a counter proposal, update the actual booking classes
+        if (dto.Status == "confirmed" && previousStatus == "countered"
+            && booking.CounterProposal?.Classes?.Count > 0)
+        {
+            _context.BookingClasses.RemoveRange(booking.Classes);
+            foreach (var cp in booking.CounterProposal.Classes)
+            {
+                _context.BookingClasses.Add(new BookingClass
+                {
+                    BookingId = id,
+                    Date = string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
+                    Time = string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
+                });
+            }
+        }
 
         if (dto.Status == "countered" && dto.CounterProposal != null)
         {
@@ -183,7 +200,7 @@ public class BookingsController : ControllerBase
             await _context.SaveChangesAsync();
         }
 
-        var updated = await _context.Bookings
+        var updated = await _context.Bookings.AsNoTracking()
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
             .Include(b => b.Classes)
