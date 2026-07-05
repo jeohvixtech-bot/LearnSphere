@@ -76,3 +76,10 @@ public class AddTimeSlotDto
     public string Day { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
 }
+
+public class CreateReviewDto
+{
+    public int Rating { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public int? BookingId { get; set; }
+}

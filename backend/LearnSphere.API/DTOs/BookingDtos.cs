@@ -31,6 +31,7 @@ public class CreateBookingDto
 {
     public int TutorId { get; set; }
     public int StudentId { get; set; }
+    public int? SlotId { get; set; }
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
     public List<BookingClassDto> Classes { get; set; } = new();

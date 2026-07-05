@@ -116,6 +116,21 @@ public class AdminController : ControllerBase
         return Ok();
     }
 
+    [HttpPatch("payouts/{id}/approve")]
+    public async Task<IActionResult> ApprovePayout(int id)
+    {
+        var payout = await _context.Payouts.FindAsync(id);
+
+        if (payout == null) return NotFound();
+
+        if (payout.Status != "Processing")
+            return BadRequest("Payout is not in an approvable state.");
+
+        payout.Status = "Completed";
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
     [HttpGet("institutions")]
     [AllowAnonymous]
     public async Task<IActionResult> GetInstitutions([FromQuery] string? country, [FromQuery] string? type, [FromQuery] string? search)

@@ -119,5 +119,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Payout>()
             .Property(p => p.Amount)
             .HasPrecision(10, 2);
+
+        // Filtered unique index: one review per booking (only when BookingId is set)
+        modelBuilder.Entity<TutorReview>()
+            .HasIndex(r => new { r.TutorId, r.BookingId })
+            .IsUnique()
+            .HasFilter("[BookingId] IS NOT NULL");
     }
 }

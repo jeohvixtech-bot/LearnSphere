@@ -253,6 +253,72 @@ public class TutorsController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("{id}/reviews")]
+    [Authorize(Roles = "parent")]
+    public async Task<IActionResult> AddReview(int id, [FromBody] CreateReviewDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userName = User.FindFirstValue(ClaimTypes.Name)!;
+
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        if (dto.Rating < 1 || dto.Rating > 5)
+            return BadRequest(new { message = "Rating must be between 1 and 5." });
+
+        if (string.IsNullOrWhiteSpace(dto.Text))
+            return BadRequest(new { message = "Review text cannot be empty." });
+
+        if (dto.BookingId.HasValue)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Student)
+                .FirstOrDefaultAsync(b => b.Id == dto.BookingId.Value);
+
+            if (booking == null
+                || booking.Status != "completed"
+                || booking.TutorId != id
+                || booking.Student.ParentUserId != userId)
+            {
+                return BadRequest(new { message = "No qualifying completed booking found." });
+            }
+
+            var duplicate = await _context.TutorReviews
+                .AnyAsync(r => r.BookingId == dto.BookingId.Value);
+
+            if (duplicate)
+                return Conflict(new { message = "A review for this booking has already been submitted." });
+        }
+
+        var review = new TutorReview
+        {
+            TutorId = id,
+            Author = userName,
+            Text = dto.Text,
+            Rating = dto.Rating,
+            BookingId = dto.BookingId
+        };
+        _context.TutorReviews.Add(review);
+
+        tutor.Rating = (tutor.Rating * tutor.ReviewCount + dto.Rating) / (tutor.ReviewCount + 1);
+        tutor.ReviewCount += 1;
+
+        await _context.SaveChangesAsync();
+
+        var updated = await _context.Tutors
+            .Include(t => t.User)
+            .Include(t => t.Subjects)
+            .Include(t => t.Levels)
+            .Include(t => t.Modes)
+            .Include(t => t.Qualifications)
+            .Include(t => t.Reviews)
+            .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        return Ok(MapToDto(updated!));
+    }
+
     private static TutorDto MapToDto(Tutor t) => new()
     {
         Id = t.Id,

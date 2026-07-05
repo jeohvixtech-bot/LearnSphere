@@ -58,8 +58,16 @@ angular.module('learnSphereApp')
       self.registerData.role
     ).then(function (user) {
       redirectByRole(user.role);
-    }).catch(function () {
-      self.errorMsg = 'Registration failed. Email may already be in use.';
+    }).catch(function (err) {
+      if (err && err.status === 400 && err.data && err.data.message) {
+        self.errorMsg = err.data.message;
+      } else if (err && err.status === 0) {
+        self.errorMsg = 'Cannot reach server. Is the backend running on http://127.0.0.1:5000?';
+      } else if (err && err.status) {
+        self.errorMsg = 'Server error ' + err.status + ': ' + (err.data && err.data.message ? err.data.message : JSON.stringify(err.data));
+      } else {
+        self.errorMsg = 'Unknown error: ' + JSON.stringify(err);
+      }
     }).finally(function () {
       self.loading = false;
     });

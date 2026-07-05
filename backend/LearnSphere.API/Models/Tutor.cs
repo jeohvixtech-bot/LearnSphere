@@ -77,6 +77,7 @@ public class TutorReview
     public string Author { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
     public int Rating { get; set; }
+    public int? BookingId { get; set; }
 }
 
 public class TutorTimeSlot

@@ -47,6 +47,15 @@ public class BookingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBookingDto dto)
     {
+        if (dto.SlotId.HasValue)
+        {
+            var slot = await _context.TutorTimeSlots.FindAsync(dto.SlotId.Value);
+            if (slot == null)
+                return BadRequest("The specified slot does not exist.");
+            if (slot.TutorId != dto.TutorId)
+                return BadRequest("The specified slot does not belong to the requested tutor.");
+        }
+
         var booking = new Booking
         {
             TutorId = dto.TutorId,
