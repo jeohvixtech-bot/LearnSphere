@@ -27,6 +27,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Qualifications)
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(subject) && subject != "All")
@@ -61,6 +62,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Qualifications)
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null) return NotFound();
@@ -113,6 +115,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Qualifications)
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
             .FirstOrDefaultAsync(t => t.Id == tutor.Id);
 
         return Ok(MapToDto(created!));
@@ -130,6 +133,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Qualifications)
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
             .FirstOrDefaultAsync(t => t.UserId == userId);
 
         if (tutor == null) return NotFound();
@@ -145,6 +149,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
+            .Include(t => t.Offerings)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null) return NotFound();
@@ -154,25 +159,55 @@ public class TutorsController : ControllerBase
         if (dto.PricePerSession.HasValue) tutor.PricePerSession = dto.PricePerSession.Value;
         if (dto.ExperienceYears.HasValue) tutor.ExperienceYears = dto.ExperienceYears.Value;
 
-        if (dto.Subjects != null)
+        if (dto.Offerings != null)
         {
+            _context.RemoveRange(tutor.Offerings);
+            tutor.Offerings = dto.Offerings.Select(o => new TutorOffering
+            {
+                TutorId = id, Subject = o.Subject, Level = o.Level,
+                Mode = o.Mode, Qualification = o.Qualification, Price = o.Price
+            }).ToList();
+
+            // Update pricePerSession to the lowest offering price so the catalog card reflects it
+            if (dto.Offerings.Count > 0)
+                tutor.PricePerSession = dto.Offerings.Min(o => o.Price);
+
+            // Sync flat tables so search filters keep working
             _context.RemoveRange(tutor.Subjects);
-            tutor.Subjects = dto.Subjects.Select(s => new TutorSubject { TutorId = id, Subject = s }).ToList();
-        }
-        if (dto.Levels != null)
-        {
+            tutor.Subjects = dto.Offerings.Select(o => o.Subject).Distinct()
+                .Select(s => new TutorSubject { TutorId = id, Subject = s }).ToList();
             _context.RemoveRange(tutor.Levels);
-            tutor.Levels = dto.Levels.Select(l => new TutorLevel { TutorId = id, Level = l }).ToList();
-        }
-        if (dto.Modes != null)
-        {
+            tutor.Levels = dto.Offerings.Select(o => o.Level).Distinct()
+                .Select(l => new TutorLevel { TutorId = id, Level = l }).ToList();
             _context.RemoveRange(tutor.Modes);
-            tutor.Modes = dto.Modes.Select(m => new TutorMode { TutorId = id, Mode = m }).ToList();
-        }
-        if (dto.Qualifications != null)
-        {
+            tutor.Modes = dto.Offerings.Select(o => o.Mode).Distinct()
+                .Select(m => new TutorMode { TutorId = id, Mode = m }).ToList();
             _context.RemoveRange(tutor.Qualifications);
-            tutor.Qualifications = dto.Qualifications.Select(q => new TutorQualification { TutorId = id, Qualification = q }).ToList();
+            tutor.Qualifications = dto.Offerings.Select(o => o.Qualification).Distinct()
+                .Select(q => new TutorQualification { TutorId = id, Qualification = q }).ToList();
+        }
+        else
+        {
+            if (dto.Subjects != null)
+            {
+                _context.RemoveRange(tutor.Subjects);
+                tutor.Subjects = dto.Subjects.Select(s => new TutorSubject { TutorId = id, Subject = s.Name, Price = s.Price }).ToList();
+            }
+            if (dto.Levels != null)
+            {
+                _context.RemoveRange(tutor.Levels);
+                tutor.Levels = dto.Levels.Select(l => new TutorLevel { TutorId = id, Level = l }).ToList();
+            }
+            if (dto.Modes != null)
+            {
+                _context.RemoveRange(tutor.Modes);
+                tutor.Modes = dto.Modes.Select(m => new TutorMode { TutorId = id, Mode = m }).ToList();
+            }
+            if (dto.Qualifications != null)
+            {
+                _context.RemoveRange(tutor.Qualifications);
+                tutor.Qualifications = dto.Qualifications.Select(q => new TutorQualification { TutorId = id, Qualification = q }).ToList();
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -185,6 +220,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Qualifications)
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         return Ok(MapToDto(updated!));
@@ -217,6 +253,72 @@ public class TutorsController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("{id}/reviews")]
+    [Authorize(Roles = "parent")]
+    public async Task<IActionResult> AddReview(int id, [FromBody] CreateReviewDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userName = User.FindFirstValue(ClaimTypes.Name)!;
+
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        if (dto.Rating < 1 || dto.Rating > 5)
+            return BadRequest(new { message = "Rating must be between 1 and 5." });
+
+        if (string.IsNullOrWhiteSpace(dto.Text))
+            return BadRequest(new { message = "Review text cannot be empty." });
+
+        if (dto.BookingId.HasValue)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Student)
+                .FirstOrDefaultAsync(b => b.Id == dto.BookingId.Value);
+
+            if (booking == null
+                || booking.Status != "completed"
+                || booking.TutorId != id
+                || booking.Student.ParentUserId != userId)
+            {
+                return BadRequest(new { message = "No qualifying completed booking found." });
+            }
+
+            var duplicate = await _context.TutorReviews
+                .AnyAsync(r => r.BookingId == dto.BookingId.Value);
+
+            if (duplicate)
+                return Conflict(new { message = "A review for this booking has already been submitted." });
+        }
+
+        var review = new TutorReview
+        {
+            TutorId = id,
+            Author = userName,
+            Text = dto.Text,
+            Rating = dto.Rating,
+            BookingId = dto.BookingId
+        };
+        _context.TutorReviews.Add(review);
+
+        tutor.Rating = (tutor.Rating * tutor.ReviewCount + dto.Rating) / (tutor.ReviewCount + 1);
+        tutor.ReviewCount += 1;
+
+        await _context.SaveChangesAsync();
+
+        var updated = await _context.Tutors
+            .Include(t => t.User)
+            .Include(t => t.Subjects)
+            .Include(t => t.Levels)
+            .Include(t => t.Modes)
+            .Include(t => t.Qualifications)
+            .Include(t => t.Reviews)
+            .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        return Ok(MapToDto(updated!));
+    }
+
     private static TutorDto MapToDto(Tutor t) => new()
     {
         Id = t.Id,
@@ -226,14 +328,16 @@ public class TutorsController : ControllerBase
         Rating = t.Rating,
         ReviewCount = t.ReviewCount,
         Subjects = t.Subjects.Select(s => s.Subject).ToList(),
+        SubjectDetails = t.Subjects.Select(s => new SubjectDetailDto { Name = s.Subject, Price = s.Price }).ToList(),
         Levels = t.Levels.Select(l => l.Level).ToList(),
         Modes = t.Modes.Select(m => m.Mode).ToList(),
-        PricePerSession = t.PricePerSession,
+        PricePerSession = t.Offerings.Count > 0 ? t.Offerings.Min(o => o.Price) : t.PricePerSession,
         ExperienceYears = t.ExperienceYears,
         Bio = t.Bio,
         Qualifications = t.Qualifications.Select(q => q.Qualification).ToList(),
         IsVerified = t.IsVerified,
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
-        Timetable = t.TimeSlots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }).ToList()
+        Timetable = t.TimeSlots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }).ToList(),
+        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
     };
 }

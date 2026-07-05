@@ -2,7 +2,7 @@
 
 angular.module('learnSphereApp', ['ngRoute'])
 
-.constant('API_URL', 'http://localhost:5000/api')
+.constant('API_URL', 'http://127.0.0.1:5000/api')
 
 .config(['$routeProvider', '$locationProvider', function ($routeProvider, $locationProvider) {
   $locationProvider.hashPrefix('!');

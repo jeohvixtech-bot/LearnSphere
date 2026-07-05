@@ -26,7 +26,8 @@ public class BookingsController : ControllerBase
         var query = _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
-            .Include(b => b.CounterProposal)
+            .Include(b => b.Classes)
+            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .AsQueryable();
@@ -46,28 +47,45 @@ public class BookingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBookingDto dto)
     {
+        if (dto.SlotId.HasValue)
+        {
+            var slot = await _context.TutorTimeSlots.FindAsync(dto.SlotId.Value);
+            if (slot == null)
+                return BadRequest("The specified slot does not exist.");
+            if (slot.TutorId != dto.TutorId)
+                return BadRequest("The specified slot does not belong to the requested tutor.");
+        }
+
         var booking = new Booking
         {
             TutorId = dto.TutorId,
             StudentId = dto.StudentId,
             Subject = dto.Subject,
             Mode = dto.Mode,
-            Date = dto.Date,
-            Time = dto.Time,
             DurationHours = dto.DurationHours,
             Message = dto.Message,
             TotalPrice = dto.TotalPrice,
-            Status = "pending",
-            SlotId = dto.SlotId
+            Status = "pending"
         };
         _context.Bookings.Add(booking);
         await _context.SaveChangesAsync();
+        booking.BookingNumber = "BOK" + booking.Id.ToString("D5");
 
-        // Auto-create invoice when booking is created
+        foreach (var c in dto.Classes)
+        {
+            _context.BookingClasses.Add(new BookingClass
+            {
+                BookingId = booking.Id,
+                Date = c.Date,
+                Time = c.Time
+            });
+        }
+        await _context.SaveChangesAsync();
+
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == dto.TutorId);
         var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == dto.StudentId);
+        var firstDate = dto.Classes.FirstOrDefault()?.Date ?? "TBD";
 
-        // Push notification to parent
         var parentUserId = student?.ParentUserId ?? 0;
         if (parentUserId > 0)
         {
@@ -75,7 +93,7 @@ public class BookingsController : ControllerBase
             {
                 UserId = parentUserId,
                 Title = "Booking Request Sent",
-                Message = $"You requested a session on {dto.Date} with {tutor?.User?.Name ?? "tutor"}.",
+                Message = $"You requested {dto.Classes.Count} session(s) starting {firstDate} with {tutor?.User?.Name ?? "tutor"}.",
                 Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                 Type = "booking",
                 IsRead = false
@@ -86,6 +104,7 @@ public class BookingsController : ControllerBase
         var created = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
+            .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == booking.Id);
 
         return Ok(MapToDto(created!));
@@ -95,48 +114,76 @@ public class BookingsController : ControllerBase
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateBookingStatusDto dto)
     {
         var booking = await _context.Bookings
-            .Include(b => b.CounterProposal)
+            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
             .Include(b => b.Student)
+            .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
 
+        var previousStatus = booking.Status;
         booking.Status = dto.Status;
+
+        // When parent accepts a counter proposal, update the actual booking classes
+        if (dto.Status == "confirmed" && previousStatus == "countered"
+            && booking.CounterProposal?.Classes?.Count > 0)
+        {
+            _context.BookingClasses.RemoveRange(booking.Classes);
+            foreach (var cp in booking.CounterProposal.Classes)
+            {
+                _context.BookingClasses.Add(new BookingClass
+                {
+                    BookingId = id,
+                    Date = string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
+                    Time = string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
+                });
+            }
+        }
 
         if (dto.Status == "countered" && dto.CounterProposal != null)
         {
             if (booking.CounterProposal != null)
             {
-                booking.CounterProposal.Date = dto.CounterProposal.Date;
-                booking.CounterProposal.Time = dto.CounterProposal.Time;
                 booking.CounterProposal.Message = dto.CounterProposal.Message;
+                _context.CounterProposalClasses.RemoveRange(booking.CounterProposal.Classes);
+                foreach (var c in dto.CounterProposal.Classes)
+                    booking.CounterProposal.Classes.Add(new CounterProposalClass
+                    {
+                        OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
+                        ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
+                    });
             }
             else
             {
                 booking.CounterProposal = new CounterProposal
                 {
                     BookingId = id,
-                    Date = dto.CounterProposal.Date,
-                    Time = dto.CounterProposal.Time,
-                    Message = dto.CounterProposal.Message
+                    Message = dto.CounterProposal.Message,
+                    Classes = dto.CounterProposal.Classes.Select(c => new CounterProposalClass
+                    {
+                        OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
+                        ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
+                    }).ToList()
                 };
             }
         }
 
+        Invoice? newInvoice = null;
         if (dto.Status == "confirmed")
         {
             // Auto-create invoice
             var existingInvoice = await _context.Invoices.FirstOrDefaultAsync(i => i.BookingId == id);
             if (existingInvoice == null)
             {
-                _context.Invoices.Add(new Invoice
+                newInvoice = new Invoice
                 {
                     BookingId = id,
-                    Date = booking.Date,
+                    Date = booking.Classes.OrderBy(c => c.Date).FirstOrDefault()?.Date ?? DateTime.Now.ToString("yyyy-MM-dd"),
                     Amount = booking.TotalPrice,
                     Status = "Unpaid",
                     Subject = booking.Subject
-                });
+                };
+                _context.Invoices.Add(newInvoice);
             }
 
             // Notify parent
@@ -156,10 +203,17 @@ public class BookingsController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        var updated = await _context.Bookings
+        if (newInvoice != null)
+        {
+            newInvoice.InvoiceNumber = "INV" + newInvoice.Id.ToString("D5");
+            await _context.SaveChangesAsync();
+        }
+
+        var updated = await _context.Bookings.AsNoTracking()
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
-            .Include(b => b.CounterProposal)
+            .Include(b => b.Classes)
+            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -271,18 +325,20 @@ public class BookingsController : ControllerBase
         StudentName = b.Student?.Name ?? string.Empty,
         Subject = b.Subject,
         Mode = b.Mode,
-        Date = b.Date,
-        Time = b.Time,
         DurationHours = b.DurationHours,
         Message = b.Message,
         TotalPrice = b.TotalPrice,
         Status = b.Status,
-        SlotId = b.SlotId,
+        BookingNumber = b.BookingNumber,
+        Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
         CounterProposal = b.CounterProposal == null ? null : new CounterProposalDto
         {
-            Date = b.CounterProposal.Date,
-            Time = b.CounterProposal.Time,
-            Message = b.CounterProposal.Message
+            Message = b.CounterProposal.Message,
+            Classes = b.CounterProposal.Classes?.Select(c => new CounterProposalClassDto
+            {
+                OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
+                ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
+            }).ToList() ?? new()
         },
         LessonReport = b.LessonReport == null ? null : new LessonReportDto
         {

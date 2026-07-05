@@ -9,6 +9,7 @@
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular-route.min.js"></script>
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
@@ -22,7 +23,7 @@
         <div class="brand">
           <div class="brand-icon">📚</div>
           <div>
-            <h1 class="brand-name">LearnSphere <span class="badge-demo">Demo Workspace</span></h1>
+            <h1 class="brand-name">LearnSphere <span class="badge-demo">Demo</span></h1>
             <p class="brand-tagline">Learn Continuously, Grow Confidently.</p>
           </div>
         </div>
@@ -38,7 +39,7 @@
             <span class="notif-count" ng-if="app.unreadCount > 0">{{ app.unreadCount }}</span>
           </button>
 
-          <button class="btn-outline" ng-click="app.logout()">Sign Out</button>
+          <button class="btn-signout" ng-click="app.logout()">Sign Out</button>
         </nav>
       </div>
     </header>
@@ -71,8 +72,12 @@
 
   </div>
 
+  <!-- Flatpickr -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
   <!-- App Scripts -->
   <script src="app/app.js"></script>
+  <script src="app/filters.js"></script>
   <script src="app/services/auth.service.js"></script>
   <script src="app/services/tutor.service.js"></script>
   <script src="app/services/student.service.js"></script>
@@ -81,6 +86,7 @@
   <script src="app/services/notification.service.js"></script>
   <script src="app/services/invoice.service.js"></script>
   <script src="app/services/admin.service.js"></script>
+  <script src="app/services/schedule.service.js"></script>
   <script src="app/controllers/app.controller.js"></script>
   <script src="app/controllers/auth.controller.js"></script>
   <script src="app/controllers/parent.controller.js"></script>

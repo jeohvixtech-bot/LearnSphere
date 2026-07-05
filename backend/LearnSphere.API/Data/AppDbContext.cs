@@ -17,7 +17,9 @@ public class AppDbContext : DbContext
     public DbSet<TutorTimeSlot> TutorTimeSlots { get; set; }
     public DbSet<Student> Students { get; set; }
     public DbSet<Booking> Bookings { get; set; }
+    public DbSet<BookingClass> BookingClasses { get; set; }
     public DbSet<CounterProposal> CounterProposals { get; set; }
+    public DbSet<CounterProposalClass> CounterProposalClasses { get; set; }
     public DbSet<LessonReport> LessonReports { get; set; }
     public DbSet<LessonReportEdit> LessonReportEdits { get; set; }
     public DbSet<IssueReport> IssueReports { get; set; }
@@ -26,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<Payout> Payouts { get; set; }
     public DbSet<Institution> Institutions { get; set; }
+    public DbSet<TutorOffering> TutorOfferings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,10 +56,20 @@ public class AppDbContext : DbContext
             .HasForeignKey(b => b.StudentId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<BookingClass>()
+            .HasOne(bc => bc.Booking)
+            .WithMany(b => b.Classes)
+            .HasForeignKey(bc => bc.BookingId);
+
         modelBuilder.Entity<CounterProposal>()
             .HasOne(cp => cp.Booking)
             .WithOne(b => b.CounterProposal)
             .HasForeignKey<CounterProposal>(cp => cp.BookingId);
+
+        modelBuilder.Entity<CounterProposalClass>()
+            .HasOne(c => c.CounterProposal)
+            .WithMany(cp => cp.Classes)
+            .HasForeignKey(c => c.CounterProposalId);
 
         modelBuilder.Entity<LessonReport>()
             .HasOne(lr => lr.Booking)
@@ -87,6 +100,14 @@ public class AppDbContext : DbContext
             .Property(t => t.PricePerSession)
             .HasPrecision(10, 2);
 
+        modelBuilder.Entity<TutorSubject>()
+            .Property(s => s.Price)
+            .HasPrecision(10, 2);
+
+        modelBuilder.Entity<TutorOffering>()
+            .Property(o => o.Price)
+            .HasPrecision(10, 2);
+
         modelBuilder.Entity<Invoice>()
             .Property(i => i.Amount)
             .HasPrecision(10, 2);
@@ -98,5 +119,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Payout>()
             .Property(p => p.Amount)
             .HasPrecision(10, 2);
+
+        // Filtered unique index: one review per booking (only when BookingId is set)
+        modelBuilder.Entity<TutorReview>()
+            .HasIndex(r => new { r.TutorId, r.BookingId })
+            .IsUnique()
+            .HasFilter("[BookingId] IS NOT NULL");
     }
 }

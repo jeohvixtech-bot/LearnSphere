@@ -10,30 +10,34 @@ public class BookingDto
     public string StudentName { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
-    public string Date { get; set; } = string.Empty;
-    public string Time { get; set; } = string.Empty;
     public int DurationHours { get; set; }
     public string? Message { get; set; }
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = string.Empty;
-    public int? SlotId { get; set; }
+    public string BookingNumber { get; set; } = string.Empty;
+    public List<BookingClassDto> Classes { get; set; } = new();
     public CounterProposalDto? CounterProposal { get; set; }
     public LessonReportDto? LessonReport { get; set; }
     public IssueReportDto? IssueReport { get; set; }
+}
+
+public class BookingClassDto
+{
+    public string Date { get; set; } = string.Empty;
+    public string Time { get; set; } = string.Empty;
 }
 
 public class CreateBookingDto
 {
     public int TutorId { get; set; }
     public int StudentId { get; set; }
+    public int? SlotId { get; set; }
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
-    public string Date { get; set; } = string.Empty;
-    public string Time { get; set; } = string.Empty;
+    public List<BookingClassDto> Classes { get; set; } = new();
     public int DurationHours { get; set; } = 1;
     public string? Message { get; set; }
     public decimal TotalPrice { get; set; }
-    public int? SlotId { get; set; }
 }
 
 public class UpdateBookingStatusDto
@@ -44,9 +48,16 @@ public class UpdateBookingStatusDto
 
 public class CounterProposalDto
 {
-    public string Date { get; set; } = string.Empty;
-    public string Time { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public List<CounterProposalClassDto> Classes { get; set; } = new();
+}
+
+public class CounterProposalClassDto
+{
+    public string OriginalDate { get; set; } = string.Empty;
+    public string OriginalTime { get; set; } = string.Empty;
+    public string ProposedDate { get; set; } = string.Empty;
+    public string ProposedTime { get; set; } = string.Empty;
 }
 
 public class LessonReportDto

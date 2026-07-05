@@ -11,4 +11,8 @@ angular.module('learnSphereApp')
   self.create = function (data) {
     return $http.post(API_URL + '/students', data, { headers: AuthService.authHeader() });
   };
+
+  self.update = function (id, data) {
+    return $http.put(API_URL + '/students/' + id, data, { headers: AuthService.authHeader() });
+  };
 }]);
