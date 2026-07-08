@@ -28,7 +28,8 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     duration: 1,
     message: '',
     studentId: '',
-    subject: ''
+    subject: '',
+    mode: 'Online'
   };
   self.bookingSuccess = false;
 
@@ -202,6 +203,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.selectTutor = function (tutor) {
     self.selectedTutor = tutor;
     self.bookingForm.subject = tutor.subjects[0] || '';
+    self.bookingForm.mode = (tutor.modes && tutor.modes.length) ? tutor.modes[0] : 'Online';
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     if (self.students.length) self.bookingForm.studentId = self.students[0].id;
@@ -283,17 +285,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Book a tutor
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
-    var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
+    var studentId = parseInt(self.bookingForm.studentId, 10);
+    var student = self.students.find(function (s) { return s.id === studentId; });
     var classes = self.bookingForm.sessions.map(function (session) {
       return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
     });
+    self.bookingError = '';
     BookingService.create({
       tutorId: self.selectedTutor.id,
-      studentId: self.bookingForm.studentId,
-      subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : ''),
-      mode: self.selectedTutor.modes[0],
+      studentId: studentId,
+      subject: self.bookingForm.subject + (student ? ' - ' + student.educationLevel : ''),
+      mode: self.bookingForm.mode || 'Online',
       classes: classes,
-      durationHours: self.bookingForm.duration,
+      durationHours: parseInt(self.bookingForm.duration) || 1,
       message: self.bookingForm.message,
       totalPrice: self.selectedTutor.pricePerSession * parseInt(self.bookingForm.classesPerMonth)
     }).then(function (res) {
@@ -304,6 +308,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         self.selectedTutor = null;
         $location.path('/parent/sessions');
       }, 2000);
+    }).catch(function (err) {
+      self.bookingError = (err && err.data && err.data.message)
+        ? err.data.message
+        : 'Failed to dispatch booking. Please try again.';
     });
   };
 
