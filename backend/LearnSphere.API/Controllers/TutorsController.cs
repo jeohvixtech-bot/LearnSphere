@@ -164,7 +164,7 @@ public class TutorsController : ControllerBase
             _context.RemoveRange(tutor.Offerings);
             tutor.Offerings = dto.Offerings.Select(o => new TutorOffering
             {
-                TutorId = id, Subject = o.Subject, Level = o.Level,
+                TutorId = id, Country = o.Country, Subject = o.Subject, Level = o.Level,
                 Mode = o.Mode, Qualification = o.Qualification, Price = o.Price
             }).ToList();
 
@@ -338,6 +338,6 @@ public class TutorsController : ControllerBase
         IsVerified = t.IsVerified,
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }).ToList(),
-        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
+        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
     };
 }

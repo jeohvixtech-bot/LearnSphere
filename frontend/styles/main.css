@@ -100,6 +100,10 @@ a { text-decoration: none; color: inherit; }
 .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
 .card h2 { font-size: 20px; font-weight: 800; margin: 8px 0 4px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.weightage-input { display: flex; align-items: center; gap: 6px; }
+.weightage-input input { width: 64px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; text-align: right; }
+.weightage-input span { font-weight: 600; color: #64748b; }
+.threshold-formula { margin-top: 12px; padding: 14px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-size: 14px; line-height: 1.8; color: #1e293b; }
 .mt-4 { margin-top: 16px; }
 
 /* ---- Grids ---- */
@@ -639,6 +643,11 @@ a { text-decoration: none; color: inherit; }
 .offering-chip { max-width: 100%; flex-wrap: wrap; gap: 4px; }
 .offering-chip-text { flex: 1; white-space: normal; line-height: 1.4; }
 
+/* Country radio button selection (Tutor Offerings, Student Subjects) */
+.radio-row { display: flex; gap: 18px; }
+.radio-option { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #475569; cursor: pointer; }
+.radio-option input[type="radio"] { width: 15px; height: 15px; cursor: pointer; accent-color: #059669; }
+
 /* ---- Calendar nav ---- */
 .cal-nav-row { display: flex; align-items: center; gap: 12px; }
 .cal-month-label { font-size: 16px; font-weight: 700; color: #1e293b; font-family: monospace; min-width: 100px; text-align: center; }
@@ -791,6 +800,25 @@ a { text-decoration: none; color: inherit; }
 .cal-day.stud-has-class.selected { background: #16a34a; border-color: #15803d; }
 .cal-day.stud-has-class.selected .day-num { color: #fff; }
 .day-dot { display: block; width: 6px; height: 6px; border-radius: 50%; background: #16a34a; margin: 2px auto 0; }
+
+/* Inline per-profile calendar (Student Profiles page) — 50% size of the standard calendar */
+.stud-cal-inline { margin-top: 14px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; }
+.stud-cal-inline .cal-nav-row { gap: 6px; margin-bottom: 6px; }
+.stud-cal-inline .btn-outline.sm { font-size: 7px; padding: 3px 6px; border-radius: 4px; }
+.stud-cal-inline .cal-month-label { font-size: 8px; min-width: 50px; }
+.stud-cal-inline .cal-weekdays { font-size: 6px; margin-bottom: 4px; padding-bottom: 4px; }
+.stud-cal-inline .cal-grid { gap: 2px; }
+.stud-cal-inline .cal-day { min-height: 26px; padding: 3px 2px; border-radius: 5px; }
+.stud-cal-inline .cal-day-empty { min-height: 26px; }
+.stud-cal-inline .day-num { font-size: 7px; }
+.stud-cal-inline .day-dot { width: 3px; height: 3px; margin: 1px auto 0; }
+.stud-cal-inline .day-detail { margin-top: 8px; padding: 8px; border-radius: 7px; }
+.stud-cal-inline .day-detail h4 { font-size: 7px; margin-bottom: 6px; }
+.stud-cal-inline .booking-detail-card { padding: 6px; margin-bottom: 4px; border-radius: 6px; }
+.stud-cal-inline .booking-detail-header strong { font-size: 8px; margin-top: 2px; }
+.stud-cal-inline .booking-detail-header p { font-size: 7px; }
+.stud-cal-inline .badge-subject { font-size: 6px; padding: 1px 5px; }
+.stud-cal-inline .empty-state { font-size: 7px; }
 
 /* ---- Reschedule panel ---- */
 .reschedule-panel { margin-bottom: 20px; }
@@ -1028,9 +1056,22 @@ a { text-decoration: none; color: inherit; }
 }
 .profile-card-school { font-size: 13px; color: #64748b; }
 
+/* AI Speed Match — 3 student profiles per row */
+.ai-match-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 900px) { .ai-match-grid-3 { grid-template-columns: 1fr; } }
+.ai-match-grid-3 .profile-card { width: 90%; }
+
 .profile-new-badge {
   position: absolute; top: 14px; right: 14px;
   background: linear-gradient(135deg, #059669, #0d9488);
+  color: #fff; font-size: 11px; font-weight: 800;
+  padding: 3px 10px; border-radius: 100px; letter-spacing: .04em;
+}
+
+.profile-card--selected { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+.profile-selected-badge {
+  position: absolute; top: 14px; right: 14px;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: #fff; font-size: 11px; font-weight: 800;
   padding: 3px 10px; border-radius: 100px; letter-spacing: .04em;
 }

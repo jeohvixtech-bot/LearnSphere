@@ -2,6 +2,7 @@ namespace LearnSphere.API.DTOs;
 
 public class TutorOfferingDto
 {
+    public string Country { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Level { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;

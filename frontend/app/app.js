@@ -49,6 +49,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('parent') }
     })
+    .when('/parent/ai-match', {
+      templateUrl: 'views/parent/ai-match.html',
+      controller: 'ParentCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('parent') }
+    })
     .when('/tutor/overview', {
       templateUrl: 'views/tutor/overview.html',
       controller: 'TutorCtrl',
@@ -75,6 +81,12 @@ angular.module('learnSphereApp', ['ngRoute'])
     })
     .when('/admin/disputes', {
       templateUrl: 'views/admin/disputes.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
+    .when('/admin/scoring', {
+      templateUrl: 'views/admin/scoring.html',
       controller: 'AdminCtrl',
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }

@@ -1,204 +1,283 @@
 -- LearnSphere MySQL Schema
--- Run this to create the database manually (EF Core migrations handle it automatically)
+-- Generated from EF Core models (AppDbContext + AppDbContextModelSnapshot)
+-- Last updated: reflects all migrations including AddReviewBookingId
+-- Run this against a fresh MySQL instance to create the full schema manually.
+-- (The .NET backend uses EF Core migrations at runtime — this file is for manual/reference use.)
 
-CREATE DATABASE IF NOT EXISTS learnsphere_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE learnsphere_db;
+CREATE DATABASE IF NOT EXISTS LearnSphere CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE LearnSphere;
 
+-- ============================================================
 -- Users
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Users (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    Email VARCHAR(255) NOT NULL UNIQUE,
-    PasswordHash VARCHAR(255) NOT NULL,
-    Role VARCHAR(20) NOT NULL DEFAULT 'parent',
-    Name VARCHAR(255) NOT NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    Id           INT AUTO_INCREMENT PRIMARY KEY,
+    Email        LONGTEXT        NOT NULL,
+    PasswordHash LONGTEXT        NOT NULL,
+    Role         LONGTEXT        NOT NULL DEFAULT 'parent',  -- parent | tutor | admin
+    Name         LONGTEXT        NOT NULL,
+    CreatedAt    DATETIME(6)     NOT NULL
 );
 
+-- ============================================================
 -- Tutors
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Tutors (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    UserId INT NOT NULL UNIQUE,
-    ImageUrl TEXT,
-    Rating DOUBLE NOT NULL DEFAULT 0,
-    ReviewCount INT NOT NULL DEFAULT 0,
-    PricePerSession DECIMAL(10,2) NOT NULL DEFAULT 0,
-    ExperienceYears INT NOT NULL DEFAULT 0,
-    Bio TEXT,
-    IsVerified TINYINT(1) NOT NULL DEFAULT 0,
-    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    UserId           INT             NOT NULL UNIQUE,
+    ImageUrl         LONGTEXT        NOT NULL,
+    Rating           DOUBLE          NOT NULL DEFAULT 0,
+    ReviewCount      INT             NOT NULL DEFAULT 0,
+    PricePerSession  DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    ExperienceYears  INT             NOT NULL DEFAULT 0,
+    Bio              LONGTEXT        NOT NULL,
+    IsVerified       TINYINT(1)      NOT NULL DEFAULT 0,
+    CONSTRAINT FK_Tutors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
--- Tutor Subjects
+-- ============================================================
+-- Tutor — detail tables
+-- ============================================================
 CREATE TABLE IF NOT EXISTS TutorSubjects (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Subject VARCHAR(100) NOT NULL,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id        INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId   INT             NOT NULL,
+    Subject   LONGTEXT        NOT NULL,
+    Price     DECIMAL(10,2)   NULL,
+    CONSTRAINT FK_TutorSubjects_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
--- Tutor Levels
 CREATE TABLE IF NOT EXISTS TutorLevels (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Level VARCHAR(100) NOT NULL,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id        INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId   INT         NOT NULL,
+    Level     LONGTEXT    NOT NULL,
+    CONSTRAINT FK_TutorLevels_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
--- Tutor Modes
 CREATE TABLE IF NOT EXISTS TutorModes (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Mode VARCHAR(50) NOT NULL,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id        INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId   INT         NOT NULL,
+    Mode      LONGTEXT    NOT NULL,
+    CONSTRAINT FK_TutorModes_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
--- Tutor Qualifications
 CREATE TABLE IF NOT EXISTS TutorQualifications (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Qualification VARCHAR(255) NOT NULL,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id             INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId        INT         NOT NULL,
+    Qualification  LONGTEXT    NOT NULL,
+    CONSTRAINT FK_TutorQualifications_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
--- Tutor Reviews
+-- Composite offerings (subject + level + mode + qualification + price in one row)
+CREATE TABLE IF NOT EXISTS TutorOfferings (
+    Id             INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId        INT             NOT NULL,
+    Country        VARCHAR(50)     NOT NULL DEFAULT 'Singapore', -- Singapore | Malaysia
+    Subject        LONGTEXT        NOT NULL,
+    Level          LONGTEXT        NOT NULL,
+    Mode           LONGTEXT        NOT NULL,
+    Qualification  LONGTEXT        NOT NULL,
+    Price          DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    CONSTRAINT FK_TutorOfferings_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- TutorReviews
+-- Added: BookingId (nullable) + filtered unique index (task 2 / AddReviewBookingId migration)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS TutorReviews (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Author VARCHAR(150) NOT NULL,
-    Text TEXT NOT NULL,
-    Rating INT NOT NULL DEFAULT 5,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId    INT         NOT NULL,
+    Author     LONGTEXT    NOT NULL,
+    Text       LONGTEXT    NOT NULL,
+    Rating     INT         NOT NULL DEFAULT 5,
+    BookingId  INT         NULL,                        -- nullable; links review to a specific completed booking
+    CONSTRAINT FK_TutorReviews_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
--- Tutor TimeSlots
+-- Filtered unique index: one review per (tutor, booking) — only enforced when BookingId IS NOT NULL
+-- MySQL equivalent of the EF Core HasFilter("[BookingId] IS NOT NULL")
+CREATE UNIQUE INDEX UQ_TutorReviews_TutorBooking
+    ON TutorReviews (TutorId, BookingId);               -- MySQL enforces uniqueness only on non-NULL pairs naturally
+
+-- ============================================================
+-- TutorTimeSlots
+-- ============================================================
 CREATE TABLE IF NOT EXISTS TutorTimeSlots (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Day VARCHAR(20) NOT NULL,
-    Time VARCHAR(50) NOT NULL,
-    Status VARCHAR(20) NOT NULL DEFAULT 'Available',
-    BookingId INT,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId    INT         NOT NULL,
+    Day        LONGTEXT    NOT NULL,
+    Time       LONGTEXT    NOT NULL,
+    Status     LONGTEXT    NOT NULL DEFAULT 'Available', -- Available | Booked
+    BookingId  INT         NULL,
+    CONSTRAINT FK_TutorTimeSlots_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
+-- ============================================================
 -- Students
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Students (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    ParentUserId INT NOT NULL,
-    Name VARCHAR(255) NOT NULL,
-    BirthDate VARCHAR(20),
-    School VARCHAR(255),
-    EducationLevel VARCHAR(100),
-    SubjectSelect VARCHAR(100),
-    LearningGoal TEXT,
-    PhotoUrl TEXT,
-    FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
+    Id              INT AUTO_INCREMENT PRIMARY KEY,
+    ParentUserId    INT         NOT NULL,
+    Name            LONGTEXT    NOT NULL,
+    BirthDate       LONGTEXT    NOT NULL,
+    School          LONGTEXT    NOT NULL,
+    EducationLevel  LONGTEXT    NOT NULL,
+    SubjectSelect   LONGTEXT    NOT NULL,
+    LearningGoal    LONGTEXT    NULL,
+    PhotoUrl        LONGTEXT    NULL,
+    CONSTRAINT FK_Students_Users FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
+-- ============================================================
 -- Bookings
+-- Added: BookingNumber (was missing from old schema.sql)
+-- Note: no Date/Time columns — schedule is stored in BookingClasses
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Bookings (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    StudentId INT NOT NULL,
-    Subject VARCHAR(255) NOT NULL,
-    Mode VARCHAR(50) NOT NULL,
-    Date VARCHAR(20) NOT NULL,
-    Time VARCHAR(50) NOT NULL,
-    DurationHours INT NOT NULL DEFAULT 1,
-    Message TEXT,
-    TotalPrice DECIMAL(10,2) NOT NULL,
-    Status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    SlotId INT,
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id),
-    FOREIGN KEY (StudentId) REFERENCES Students(Id)
+    Id             INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId        INT             NOT NULL,
+    StudentId      INT             NOT NULL,
+    Subject        LONGTEXT        NOT NULL,
+    Mode           LONGTEXT        NOT NULL,
+    DurationHours  INT             NOT NULL DEFAULT 1,
+    Message        LONGTEXT        NULL,
+    TotalPrice     DECIMAL(10,2)   NOT NULL,
+    Status         LONGTEXT        NOT NULL DEFAULT 'pending', -- pending | countered | confirmed | completed | cancelled
+    BookingNumber  LONGTEXT        NOT NULL,
+    CONSTRAINT FK_Bookings_Tutors   FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)   ON DELETE RESTRICT,
+    CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT
 );
 
--- Counter Proposals
+-- ============================================================
+-- BookingClasses  (each row = one session date/time within a booking)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS BookingClasses (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId  INT         NOT NULL,
+    Date       LONGTEXT    NOT NULL,
+    Time       LONGTEXT    NOT NULL,
+    CONSTRAINT FK_BookingClasses_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- CounterProposals  (1-to-1 with Booking)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS CounterProposals (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId INT NOT NULL UNIQUE,
-    Date VARCHAR(20) NOT NULL,
-    Time VARCHAR(50) NOT NULL,
-    Message TEXT,
-    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId  INT         NOT NULL UNIQUE,
+    Message    LONGTEXT    NOT NULL,
+    CONSTRAINT FK_CounterProposals_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
--- Lesson Reports
+-- ============================================================
+-- CounterProposalClasses  (proposed reschedule rows for a counter-proposal)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS CounterProposalClasses (
+    Id                  INT AUTO_INCREMENT PRIMARY KEY,
+    CounterProposalId   INT         NOT NULL,
+    OriginalDate        LONGTEXT    NOT NULL,
+    OriginalTime        LONGTEXT    NOT NULL,
+    ProposedDate        LONGTEXT    NOT NULL,
+    ProposedTime        LONGTEXT    NOT NULL,
+    CONSTRAINT FK_CounterProposalClasses_CounterProposals
+        FOREIGN KEY (CounterProposalId) REFERENCES CounterProposals(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- LessonReports  (1-to-1 with Booking)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS LessonReports (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId INT NOT NULL UNIQUE,
-    Covered TEXT NOT NULL,
-    Performance TEXT NOT NULL,
-    Homework TEXT NOT NULL,
-    SubmitDate VARCHAR(50) NOT NULL,
-    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+    Id          INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId   INT         NOT NULL UNIQUE,
+    Covered     LONGTEXT    NOT NULL,
+    Performance LONGTEXT    NOT NULL,
+    Homework    LONGTEXT    NOT NULL,
+    SubmitDate  LONGTEXT    NOT NULL,
+    CONSTRAINT FK_LessonReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
--- Lesson Report Edit History
+-- ============================================================
+-- LessonReportEdits  (edit history for a lesson report)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS LessonReportEdits (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    LessonReportId INT NOT NULL,
-    Date VARCHAR(50) NOT NULL,
-    Changes TEXT NOT NULL,
-    FOREIGN KEY (LessonReportId) REFERENCES LessonReports(Id) ON DELETE CASCADE
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    LessonReportId   INT         NOT NULL,
+    Date             LONGTEXT    NOT NULL,
+    Changes          LONGTEXT    NOT NULL,
+    CONSTRAINT FK_LessonReportEdits_LessonReports
+        FOREIGN KEY (LessonReportId) REFERENCES LessonReports(Id) ON DELETE CASCADE
 );
 
--- Issue Reports
+-- ============================================================
+-- IssueReports  (1-to-1 with Booking)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS IssueReports (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId INT NOT NULL UNIQUE,
-    IssueType VARCHAR(150) NOT NULL,
-    Details TEXT NOT NULL,
-    Timestamp VARCHAR(50) NOT NULL,
-    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+    Id          INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId   INT         NOT NULL UNIQUE,
+    IssueType   LONGTEXT    NOT NULL,
+    Details     LONGTEXT    NOT NULL,
+    Timestamp   LONGTEXT    NOT NULL,
+    CONSTRAINT FK_IssueReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
--- Chat Messages
-CREATE TABLE IF NOT EXISTS ChatMessages (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Sender VARCHAR(20) NOT NULL,
-    Text TEXT NOT NULL,
-    Timestamp VARCHAR(50) NOT NULL
-);
-
--- Notifications
-CREATE TABLE IF NOT EXISTS Notifications (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    UserId INT NOT NULL,
-    Title VARCHAR(255) NOT NULL,
-    Message TEXT NOT NULL,
-    Timestamp VARCHAR(50) NOT NULL,
-    Type VARCHAR(30) NOT NULL DEFAULT 'system',
-    IsRead TINYINT(1) NOT NULL DEFAULT 0,
-    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
-);
-
--- Invoices
+-- ============================================================
+-- Invoices  (1-to-1 with Booking)
+-- Added: InvoiceNumber (was missing from old schema.sql)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Invoices (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId INT NOT NULL UNIQUE,
-    Date VARCHAR(20) NOT NULL,
-    Amount DECIMAL(10,2) NOT NULL,
-    Status VARCHAR(20) NOT NULL DEFAULT 'Unpaid',
-    Subject VARCHAR(255),
-    FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+    Id              INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId       INT             NOT NULL UNIQUE,
+    Date            LONGTEXT        NOT NULL,
+    Amount          DECIMAL(10,2)   NOT NULL,
+    Status          LONGTEXT        NOT NULL DEFAULT 'Unpaid', -- Paid | Unpaid
+    Subject         LONGTEXT        NULL,
+    InvoiceNumber   LONGTEXT        NOT NULL,
+    CONSTRAINT FK_Invoices_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
+-- ============================================================
 -- Payouts
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Payouts (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId INT NOT NULL,
-    Date VARCHAR(20) NOT NULL,
-    Amount DECIMAL(10,2) NOT NULL,
-    Status VARCHAR(20) NOT NULL DEFAULT 'Processing',
-    FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+    Id        INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId   INT             NOT NULL,
+    Date      LONGTEXT        NOT NULL,
+    Amount    DECIMAL(10,2)   NOT NULL,
+    Status    LONGTEXT        NOT NULL DEFAULT 'Processing', -- Processing | Completed
+    CONSTRAINT FK_Payouts_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
+-- ============================================================
+-- ChatMessages
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ChatMessages (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId    INT         NOT NULL,
+    Sender     LONGTEXT    NOT NULL, -- parent | tutor | system
+    Text       LONGTEXT    NOT NULL,
+    Timestamp  LONGTEXT    NOT NULL
+);
+
+-- ============================================================
+-- Notifications
+-- ============================================================
+CREATE TABLE IF NOT EXISTS Notifications (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    UserId     INT         NOT NULL,
+    Title      LONGTEXT    NOT NULL,
+    Message    LONGTEXT    NOT NULL,
+    Timestamp  LONGTEXT    NOT NULL,
+    Type       LONGTEXT    NOT NULL DEFAULT 'system', -- booking | message | payment | system
+    IsRead     TINYINT(1)  NOT NULL DEFAULT 0,
+    CONSTRAINT FK_Notifications_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- Institutions
+-- ============================================================
 CREATE TABLE IF NOT EXISTS Institutions (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    Name VARCHAR(255) NOT NULL,
-    Country VARCHAR(50) NOT NULL,
-    Type VARCHAR(100) NOT NULL
+    Id       INT AUTO_INCREMENT PRIMARY KEY,
+    Name     LONGTEXT    NOT NULL,
+    Country  LONGTEXT    NOT NULL, -- Singapore | Malaysia
+    Type     LONGTEXT    NOT NULL  -- Primary | Secondary | Junior College | Polytechnic/Vocational | University/Tertiary
 );

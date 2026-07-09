@@ -20,7 +20,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.profileSuccess = false;
   self.profileError = '';
   self.uploading = false;
-  self.newOffering = { subject: '', level: '', mode: '', qualification: '', price: null };
+  self.newOffering = { country: '', subject: '', level: '', mode: '', qualification: '', price: null };
 
   // Report forms
   self.reportBooking = null;
@@ -55,7 +55,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
         experienceYears: res.data.experienceYears,
         offerings: res.data.offerings && res.data.offerings.length
           ? res.data.offerings.map(function(o) {
-              return { subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
+              return { country: o.country, subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
             })
           : []
       };
@@ -489,15 +489,16 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   // Edit profile offerings
   self.addOffering = function () {
-    if (!self.newOffering.subject || !self.newOffering.level || !self.newOffering.mode || !self.newOffering.qualification) return;
+    if (!self.newOffering.country || !self.newOffering.subject || !self.newOffering.level || !self.newOffering.mode || !self.newOffering.qualification) return;
     self.profileForm.offerings.push({
+      country: self.newOffering.country,
       subject: self.newOffering.subject,
       level: self.newOffering.level,
       mode: self.newOffering.mode,
       qualification: self.newOffering.qualification,
       price: parseFloat(self.newOffering.price) || 0
     });
-    self.newOffering = { subject: '', level: '', mode: '', qualification: '', price: null };
+    self.newOffering = { country: '', subject: '', level: '', mode: '', qualification: '', price: null };
   };
 
   self.removeOffering = function (index) {

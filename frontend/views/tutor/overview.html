@@ -448,8 +448,15 @@
         <!-- Teaching Offerings -->
         <div class="form-group">
           <label>Teaching Offerings</label>
-          <p class="text-muted offering-hint">Select subject, level, mode and qualification, then click Add Offering.</p>
+          <p class="text-muted offering-hint">Select country, subject, level, mode and qualification, then click Add Offering.</p>
           <div class="offering-builder">
+            <div class="form-group">
+              <label>Country</label>
+              <div class="radio-row">
+                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Singapore" /> Singapore 🇸🇬</label>
+                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Malaysia" /> Malaysia 🇲🇾</label>
+              </div>
+            </div>
             <div class="form-group">
               <label>Subject</label>
               <select ng-model="vm.newOffering.subject">
@@ -572,7 +579,7 @@
 
           <div class="chip-list" ng-if="vm.profileForm.offerings.length">
             <span class="chip offering-chip" ng-repeat="o in vm.profileForm.offerings">
-              <span class="offering-chip-text">{{ o.subject }} · {{ o.level }} · {{ o.mode }} · {{ o.qualification }}</span>
+              <span class="offering-chip-text">{{ o.country }} · {{ o.subject }} · {{ o.level }} · {{ o.mode }} · {{ o.qualification }}</span>
               <span class="chip-price">${{ o.price }}</span>
               <button type="button" class="chip-remove" ng-click="vm.removeOffering($index)">×</button>
             </span>

@@ -29,6 +29,7 @@ public class TutorOffering
     public int Id { get; set; }
     public int TutorId { get; set; }
     public Tutor Tutor { get; set; } = null!;
+    public string Country { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Level { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;

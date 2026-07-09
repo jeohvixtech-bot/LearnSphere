@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService',
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -14,6 +14,30 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.invoices = [];
   self.chatMessages = [];
   self.selectedTutor = null;
+
+  // AI Speed Match
+  self.aiMatchSelectedStudentId = null;
+  self.selectAiMatchStudent = function (studentId) {
+    self.aiMatchSelectedStudentId = self.aiMatchSelectedStudentId === studentId ? null : studentId;
+  };
+  self.aiMatchSubjectChoice = {}; // studentId -> chosen "level · subject" string
+  self.aiMatchAppliedStudentId = null;
+  self.aiMatchAppliedSubject = '';
+  self.aiMatchResults = [];
+  self.applyAiMatch = function (s) {
+    self.aiMatchSelectedStudentId = s.id;
+    self.aiMatchAppliedStudentId = s.id;
+    self.aiMatchAppliedSubject = self.aiMatchSubjectChoice[s.id] || '';
+
+    var combo = (s.subjectCombos || []).find(function (c) {
+      return (c.country + ' · ' + c.level + ' · ' + c.subject) === self.aiMatchAppliedSubject;
+    });
+    var subjectName = combo ? combo.subject : '';
+    self.aiMatchResults = self.tutors.filter(function (t) {
+      return (t.offerings || []).some(function (o) { return o.subject === subjectName; }) ||
+             (t.subjects || []).indexOf(subjectName) >= 0;
+    });
+  };
 
   // Search / filter state
   self.searchQuery = '';
@@ -37,20 +61,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     name: '',
     birthDate: '',
     school: '',
-    educationLevel: '',
     learningGoal: '',
     photoUrl: ''
   };
-  self.studentSubjects = [];
-  self.newStudentSubject = '';
+  self.studentSubjects = []; // [{country, level, subject}]
+  self.newStudentSubjectCombo = { country: '', level: '', subject: '' };
   self.studentSuccess = false;
   self.newlyAddedStudentId = null;
 
   // Edit student state
   self.editingStudent = null;
   self.editStudentForm = {};
-  self.editStudentSubjects = [];
-  self.newEditStudentSubject = '';
+  self.editStudentSubjects = []; // [{country, level, subject}]
+  self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
 
   // School dropdown
   self.schoolSearch = '';
@@ -113,6 +136,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     var c = (booking.classes || []).find(function (c) { return c.date === s; });
     return c ? c.time : '';
   };
+  self.toggleStudentCalendar = function (studentId) {
+    self.studCal.selectedStudentId = self.studCal.selectedStudentId === studentId ? null : studentId;
+    self.studCal.selectedDay = 0;
+  };
 
   // Reschedule
   self.rescheduleBooking = null;
@@ -172,12 +199,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Load data
   function init() {
-    TutorService.getAll().then(function (res) { self.tutors = res.data; });
+    TutorService.getAll().then(function (res) {
+      self.tutors = res.data;
+      var pendingTutorId = PendingMatchService.consumeTutor();
+      if (pendingTutorId) {
+        var t = self.tutors.find(function (x) { return x.id === pendingTutorId; });
+        if (t) self.selectTutor(t);
+      }
+    });
     StudentService.getMyStudents().then(function (res) {
       self.students = res.data;
+      self.students.forEach(function (s) { s.subjectCombos = self.parseSubjectCombos(s.subjectSelect, s.educationLevel); });
       if (res.data.length) {
         self.bookingForm.studentId = res.data[0].id;
-        self.studCal.selectedStudentId = res.data[0].id;
       }
     });
     BookingService.getAll().then(function (res) { self.bookings = res.data; });
@@ -205,6 +239,14 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     if (self.students.length) self.bookingForm.studentId = self.students[0].id;
+  };
+
+  // Jump from AI Speed Match results straight into the booking flow on the search page.
+  // Route changes re-instantiate ParentCtrl, so the tutor id is handed off via PendingMatchService
+  // and picked back up once the search page's tutor list has loaded (see init()).
+  self.goToBookTutor = function (tutor) {
+    PendingMatchService.setTutor(tutor.id);
+    $location.path('/parent/search');
   };
 
   self.updateSessions = function () {
@@ -307,27 +349,43 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  // Subject combinations (Country + Level + Subject per entry, mirrors the Tutor Offering builder)
+  self.parseSubjectCombos = function (subjectSelect, fallbackLevel) {
+    if (!subjectSelect) return [];
+    return subjectSelect.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; })
+      .map(function (token) {
+        var parts = token.split('·').map(function (p) { return p.trim(); });
+        if (parts.length >= 3) return { country: parts[0], level: parts[1], subject: parts.slice(2).join('·').trim() };
+        if (parts.length === 2) return { country: 'Singapore', level: parts[0], subject: parts[1] };
+        return { country: 'Singapore', level: fallbackLevel || '', subject: token };
+      });
+  };
+
+  self.formatSubjectCombos = function (combos) {
+    return combos.map(function (c) { return c.country + ' · ' + c.level + ' · ' + c.subject; }).join(', ');
+  };
+
   // Edit student
   self.startEditStudent = function (s) {
     self.editingStudent = s;
-    self.editStudentForm = { name: s.name, school: s.school, educationLevel: s.educationLevel, learningGoal: s.learningGoal || '' };
-    self.editStudentSubjects = s.subjectSelect
-      ? s.subjectSelect.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; })
-      : [];
-    self.newEditStudentSubject = '';
+    self.editStudentForm = { name: s.name, school: s.school, learningGoal: s.learningGoal || '' };
+    self.editStudentSubjects = self.parseSubjectCombos(s.subjectSelect, s.educationLevel);
+    self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
   };
 
   self.cancelEditStudent = function () {
     self.editingStudent = null;
     self.editStudentForm = {};
     self.editStudentSubjects = [];
-    self.newEditStudentSubject = '';
+    self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
   };
 
   self.addEditStudentSubject = function () {
-    var v = self.newEditStudentSubject && self.newEditStudentSubject.trim();
-    if (v && self.editStudentSubjects.indexOf(v) < 0) self.editStudentSubjects.push(v);
-    self.newEditStudentSubject = '';
+    var c = self.newEditStudentSubjectCombo;
+    if (c.country && c.level && c.subject && !self.editStudentSubjects.some(function (x) { return x.country === c.country && x.level === c.level && x.subject === c.subject; })) {
+      self.editStudentSubjects.push({ country: c.country, level: c.level, subject: c.subject });
+    }
+    self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
   };
 
   self.removeEditStudentSubject = function (i) { self.editStudentSubjects.splice(i, 1); };
@@ -337,22 +395,24 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     var payload = {
       name: self.editStudentForm.name,
       school: self.editStudentForm.school || '',
-      educationLevel: self.editStudentForm.educationLevel,
-      subjectSelect: self.editStudentSubjects.join(', '),
+      educationLevel: self.editStudentSubjects.length ? self.editStudentSubjects[0].level : (self.editingStudent.educationLevel || ''),
+      subjectSelect: self.formatSubjectCombos(self.editStudentSubjects),
       learningGoal: self.editStudentForm.learningGoal || null
     };
     StudentService.update(self.editingStudent.id, payload).then(function (res) {
+      res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
       var idx = self.students.findIndex(function (s) { return s.id === self.editingStudent.id; });
       if (idx >= 0) self.students[idx] = res.data;
       self.cancelEditStudent();
     });
   };
 
-  // Student subject chips
   self.addStudentSubject = function () {
-    var v = self.newStudentSubject && self.newStudentSubject.trim();
-    if (v && self.studentSubjects.indexOf(v) < 0) self.studentSubjects.push(v);
-    self.newStudentSubject = '';
+    var c = self.newStudentSubjectCombo;
+    if (c.country && c.level && c.subject && !self.studentSubjects.some(function (x) { return x.country === c.country && x.level === c.level && x.subject === c.subject; })) {
+      self.studentSubjects.push({ country: c.country, level: c.level, subject: c.subject });
+    }
+    self.newStudentSubjectCombo = { country: '', level: '', subject: '' };
   };
 
   self.removeStudentSubject = function (i) { self.studentSubjects.splice(i, 1); };
@@ -364,18 +424,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       name: self.studentForm.name,
       birthDate: self.studentForm.birthDate || null,
       school: self.studentForm.school || '',
-      educationLevel: self.studentForm.educationLevel,
-      subjectSelect: self.studentSubjects.join(', '),
+      educationLevel: self.studentSubjects.length ? self.studentSubjects[0].level : '',
+      subjectSelect: self.formatSubjectCombos(self.studentSubjects),
       learningGoal: self.studentForm.learningGoal,
       photoUrl: self.studentForm.photoUrl || null
     };
     StudentService.create(payload).then(function (res) {
+      res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
       self.students.push(res.data);
       self.newlyAddedStudentId = res.data.id;
       self.studentSuccess = true;
-      self.studentForm = { name: '', birthDate: '', school: '', educationLevel: '', learningGoal: '', photoUrl: '' };
+      self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
       self.studentSubjects = [];
-      self.newStudentSubject = '';
+      self.newStudentSubjectCombo = { country: '', level: '', subject: '' };
       $timeout(function () { self.studentSuccess = false; }, 5000);
     });
   };
