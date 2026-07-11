@@ -13,6 +13,8 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
     else if (user.role === 'admin') $location.path('/admin/overview');
   }
 
+  self.goToLogin = function () { $location.path('/login'); };
+
   self.tutors = [];
   TutorService.getAll().then(function (res) {
     self.tutors = res.data;
