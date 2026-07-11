@@ -448,101 +448,21 @@
         <!-- Teaching Offerings -->
         <div class="form-group">
           <label>Teaching Offerings</label>
-          <p class="text-muted offering-hint">Select country, subject, level, mode and qualification, then click Add Offering.</p>
+          <p class="text-muted offering-hint">Select a country, then a subject, then mode and qualification, then click Add Offering.</p>
           <div class="offering-builder">
             <div class="form-group">
               <label>Country</label>
               <div class="radio-row">
-                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Singapore" /> Singapore 🇸🇬</label>
-                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Malaysia" /> Malaysia 🇲🇾</label>
+                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Singapore" ng-click="vm.newOffering.selectedOption = null" /> Singapore 🇸🇬</label>
+                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Malaysia" ng-click="vm.newOffering.selectedOption = null" /> Malaysia 🇲🇾</label>
               </div>
             </div>
             <div class="form-group">
               <label>Subject</label>
-              <select ng-model="vm.newOffering.subject">
-                <option value="">— Subject —</option>
-                <optgroup label="PSLE">
-                  <option>English Language</option>
-                  <option>Mother Tongue (Chinese)</option>
-                  <option>Mother Tongue (Malay)</option>
-                  <option>Mother Tongue (Tamil)</option>
-                  <option>Mathematics</option>
-                  <option>Science</option>
-                </optgroup>
-                <optgroup label="UPSR">
-                  <option>Bahasa Malaysia</option>
-                  <option>English</option>
-                  <option>Mathematics</option>
-                  <option>Science</option>
-                  <option>History</option>
-                </optgroup>
-                <optgroup label="O-Level">
-                  <option>English Language</option>
-                  <option>Elementary Mathematics</option>
-                  <option>Additional Mathematics</option>
-                  <option>Physics</option>
-                  <option>Chemistry</option>
-                  <option>Biology</option>
-                  <option>Combined Science</option>
-                  <option>History</option>
-                  <option>Social Studies</option>
-                  <option>Geography</option>
-                  <option>Literature in English</option>
-                  <option>Principles of Accounts</option>
-                  <option>Design & Technology</option>
-                  <option>Computing</option>
-                  <option>Food & Nutrition</option>
-                  <option>Art</option>
-                  <option>Music</option>
-                </optgroup>
-                <optgroup label="SPM">
-                  <option>Bahasa Malaysia</option>
-                  <option>English</option>
-                  <option>Mathematics</option>
-                  <option>Additional Mathematics</option>
-                  <option>Physics</option>
-                  <option>Chemistry</option>
-                  <option>Biology</option>
-                  <option>History</option>
-                  <option>Geography</option>
-                  <option>Economics</option>
-                  <option>Accounting</option>
-                  <option>Commerce</option>
-                  <option>Business Studies</option>
-                  <option>Information Technology</option>
-                  <option>Moral Education</option>
-                  <option>Islamic Studies</option>
-                  <option>Art & Design</option>
-                </optgroup>
-                <optgroup label="A-Level">
-                  <option>General Paper</option>
-                  <option>Mathematics</option>
-                  <option>Further Mathematics</option>
-                  <option>Physics</option>
-                  <option>Chemistry</option>
-                  <option>Biology</option>
-                  <option>Computing</option>
-                  <option>Economics</option>
-                  <option>History</option>
-                  <option>Geography</option>
-                  <option>Literature in English</option>
-                  <option>Art</option>
-                  <option>Music</option>
-                </optgroup>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Level</label>
-              <select ng-model="vm.newOffering.level">
-                <option value="">— Level —</option>
-                <option>Primary (PSLE)</option>
-                <option>Primary (UPSR)</option>
-                <option>Lower Secondary</option>
-                <option>Upper Secondary (O-Level)</option>
-                <option>Upper Secondary (SPM)</option>
-                <option>Junior College (A-Level)</option>
-                <option>Pre-University</option>
-                <option>Undergraduate</option>
+              <select ng-model="vm.newOffering.selectedOption"
+                ng-disabled="!vm.newOffering.country"
+                ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.newOffering.country]">
+                <option value="">{{ vm.newOffering.country ? '— Select subject —' : '— Select a country first —' }}</option>
               </select>
             </div>
             <div class="form-group">

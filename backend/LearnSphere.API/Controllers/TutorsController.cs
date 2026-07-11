@@ -94,6 +94,23 @@ public class TutorsController : ControllerBase
         return Ok(slots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }));
     }
 
+    // Date/time of this tutor's confirmed classes only — lets parents avoid booking
+    // an overlapping slot without seeing which other family/subject occupies it.
+    [HttpGet("{id}/busy-times")]
+    public async Task<IActionResult> GetBusyTimes(int id)
+    {
+        var exists = await _context.Tutors.AnyAsync(t => t.Id == id);
+        if (!exists) return NotFound();
+
+        var busyTimes = await _context.Bookings
+            .Where(b => b.TutorId == id && b.Status == "confirmed")
+            .SelectMany(b => b.Classes)
+            .Select(c => new BusyTimeDto { Date = c.Date, Time = c.Time })
+            .ToListAsync();
+
+        return Ok(busyTimes);
+    }
+
     [HttpPost]
     [Authorize]
     public async Task<IActionResult> Register()

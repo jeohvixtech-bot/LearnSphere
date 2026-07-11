@@ -2,11 +2,20 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog',
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
+  self.subjectCatalog = SubjectCatalog;
+
+  // Subject catalog + a leading "Other" entry, precomputed once (stable references,
+  // safe for ng-options — see parseSubjectCombos note on the infinite-digest guard).
+  var OTHER_SUBJECT_OPTION = { examType: 'Other', subject: 'Other', level: '', label: 'Other' };
+  self.subjectCatalogWithOther = {
+    Singapore: [OTHER_SUBJECT_OPTION].concat(SubjectCatalog.Singapore),
+    Malaysia: [OTHER_SUBJECT_OPTION].concat(SubjectCatalog.Malaysia)
+  };
 
   self.tutors = [];
   self.students = [];
@@ -39,6 +48,47 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  // Personalize My Class
+  self.personalize = {
+    mode: '',
+    qualification: '',
+    country: '',
+    selectedSubjectOption: null,
+    subjectOther: '',
+    price: null,
+    description: ''
+  };
+  self.onPersonalizeCountryChange = function () {
+    self.personalize.selectedSubjectOption = null;
+  };
+
+  self.personalizeTab = 'form';
+  self.personalizeSaveSuccess = false;
+  self.personalizeApplications = JSON.parse(localStorage.getItem('ls_personalize_apps') || '[]');
+
+  self.savePersonalizeApplication = function () {
+    var opt = self.personalize.selectedSubjectOption;
+    var subjectLabel = opt ? (opt.subject === 'Other' ? ('Other: ' + (self.personalize.subjectOther || '')) : opt.label) : '';
+    self.personalizeApplications.unshift({
+      id: Date.now(),
+      mode: self.personalize.mode,
+      qualification: self.personalize.qualification,
+      country: self.personalize.country,
+      subject: subjectLabel,
+      price: self.personalize.price,
+      description: self.personalize.description,
+      savedAt: new Date().toLocaleString()
+    });
+    localStorage.setItem('ls_personalize_apps', JSON.stringify(self.personalizeApplications));
+    self.personalizeSaveSuccess = true;
+    $timeout(function () { self.personalizeSaveSuccess = false; }, 2500);
+  };
+
+  self.removePersonalizeApplication = function (id) {
+    self.personalizeApplications = self.personalizeApplications.filter(function (a) { return a.id !== id; });
+    localStorage.setItem('ls_personalize_apps', JSON.stringify(self.personalizeApplications));
+  };
+
   // Search / filter state
   self.searchQuery = '';
   self.selectedSubject = 'All';
@@ -65,7 +115,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     photoUrl: ''
   };
   self.studentSubjects = []; // [{country, level, subject}]
-  self.newStudentSubjectCombo = { country: '', level: '', subject: '' };
+  self.newStudentSubjectCombo = { country: '', selectedOption: null };
   self.studentSuccess = false;
   self.newlyAddedStudentId = null;
 
@@ -73,7 +123,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.editingStudent = null;
   self.editStudentForm = {};
   self.editStudentSubjects = []; // [{country, level, subject}]
-  self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
+  self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
 
   // School dropdown
   self.schoolSearch = '';
@@ -139,6 +189,43 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.toggleStudentCalendar = function (studentId) {
     self.studCal.selectedStudentId = self.studCal.selectedStudentId === studentId ? null : studentId;
     self.studCal.selectedDay = 0;
+  };
+
+  // Tutor busy-times calendar (booking page) — dates/times only, no booking details,
+  // so parents can avoid picking an overlapping slot.
+  self.tutorCal = { year: _scNow.getFullYear(), month: _scNow.getMonth(), selectedDay: 0, busyTimes: [] };
+
+  self.tutorCalMonthName = function () { return _scMonthNames[self.tutorCal.month]; };
+  self.tutorCalPrevMonth = function () {
+    if (self.tutorCal.month === 0) { self.tutorCal.month = 11; self.tutorCal.year--; }
+    else { self.tutorCal.month--; }
+    self.tutorCal.selectedDay = 0;
+  };
+  self.tutorCalNextMonth = function () {
+    if (self.tutorCal.month === 11) { self.tutorCal.month = 0; self.tutorCal.year++; }
+    else { self.tutorCal.month++; }
+    self.tutorCal.selectedDay = 0;
+  };
+  self.tutorCalDaysArray = function () {
+    var n = new Date(self.tutorCal.year, self.tutorCal.month + 1, 0).getDate();
+    var a = []; for (var i = 0; i < n; i++) a.push(i + 1); return a;
+  };
+  self.tutorCalOffsetArray = function () {
+    var d = new Date(self.tutorCal.year, self.tutorCal.month, 1).getDay();
+    var off = d === 0 ? 6 : d - 1;
+    var a = []; for (var i = 0; i < off; i++) a.push(i); return a;
+  };
+  self.tutorCalDayStr = function (day) {
+    var m = self.tutorCal.month + 1;
+    return self.tutorCal.year + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+  };
+  self.getBusyTimesForDay = function (day) {
+    if (!day) return [];
+    var s = self.tutorCalDayStr(day);
+    return self.tutorCal.busyTimes.filter(function (b) { return b.date === s; });
+  };
+  self.dayHasBusyTimes = function (day) {
+    return self.getBusyTimesForDay(day).length > 0;
   };
 
   // Reschedule
@@ -239,6 +326,12 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     if (self.students.length) self.bookingForm.studentId = self.students[0].id;
+
+    self.tutorCal.year = _scNow.getFullYear();
+    self.tutorCal.month = _scNow.getMonth();
+    self.tutorCal.selectedDay = 0;
+    self.tutorCal.busyTimes = [];
+    TutorService.getBusyTimes(tutor.id).then(function (res) { self.tutorCal.busyTimes = res.data; });
   };
 
   // Jump from AI Speed Match results straight into the booking flow on the search page.
@@ -370,22 +463,23 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.editingStudent = s;
     self.editStudentForm = { name: s.name, school: s.school, learningGoal: s.learningGoal || '' };
     self.editStudentSubjects = self.parseSubjectCombos(s.subjectSelect, s.educationLevel);
-    self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
+    self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
   };
 
   self.cancelEditStudent = function () {
     self.editingStudent = null;
     self.editStudentForm = {};
     self.editStudentSubjects = [];
-    self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
+    self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
   };
 
   self.addEditStudentSubject = function () {
     var c = self.newEditStudentSubjectCombo;
-    if (c.country && c.level && c.subject && !self.editStudentSubjects.some(function (x) { return x.country === c.country && x.level === c.level && x.subject === c.subject; })) {
-      self.editStudentSubjects.push({ country: c.country, level: c.level, subject: c.subject });
+    var opt = c.selectedOption;
+    if (c.country && opt && !self.editStudentSubjects.some(function (x) { return x.country === c.country && x.level === opt.level && x.subject === opt.subject; })) {
+      self.editStudentSubjects.push({ country: c.country, level: opt.level, subject: opt.subject });
     }
-    self.newEditStudentSubjectCombo = { country: '', level: '', subject: '' };
+    self.newEditStudentSubjectCombo = { country: c.country, selectedOption: null };
   };
 
   self.removeEditStudentSubject = function (i) { self.editStudentSubjects.splice(i, 1); };
@@ -409,10 +503,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.addStudentSubject = function () {
     var c = self.newStudentSubjectCombo;
-    if (c.country && c.level && c.subject && !self.studentSubjects.some(function (x) { return x.country === c.country && x.level === c.level && x.subject === c.subject; })) {
-      self.studentSubjects.push({ country: c.country, level: c.level, subject: c.subject });
+    var opt = c.selectedOption;
+    if (c.country && opt && !self.studentSubjects.some(function (x) { return x.country === c.country && x.level === opt.level && x.subject === opt.subject; })) {
+      self.studentSubjects.push({ country: c.country, level: opt.level, subject: opt.subject });
     }
-    self.newStudentSubjectCombo = { country: '', level: '', subject: '' };
+    self.newStudentSubjectCombo = { country: c.country, selectedOption: null };
   };
 
   self.removeStudentSubject = function (i) { self.studentSubjects.splice(i, 1); };
@@ -436,7 +531,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       self.studentSuccess = true;
       self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
       self.studentSubjects = [];
-      self.newStudentSubjectCombo = { country: '', level: '', subject: '' };
+      self.newStudentSubjectCombo = { country: '', selectedOption: null };
       $timeout(function () { self.studentSuccess = false; }, 5000);
     });
   };

@@ -1,0 +1,71 @@
+<div class="welcome-page">
+
+  <!-- ── Top bar ─────────────────────────────────── -->
+  <header class="main-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">📚</div>
+        <div>
+          <h1 class="brand-name">LearnSphere</h1>
+          <p class="brand-tagline">Learn Continuously, Grow Confidently.</p>
+        </div>
+      </div>
+      <a href="#!/login" class="btn-primary">Sign In →</a>
+    </div>
+  </header>
+
+  <div class="welcome-content">
+
+  <!-- ── Hero ────────────────────────────────────── -->
+  <div class="search-hero">
+    <h2 class="search-hero-title">Find Your Perfect Tutor</h2>
+    <p class="search-hero-sub">Browse verified NIE-trained tutors across Singapore &amp; Malaysia</p>
+  </div>
+
+  <!-- ── Tutor Grid (2 per row, read-only preview) ── -->
+  <div class="welcome-tutor-grid">
+    <div class="tutor-card" ng-repeat="t in vm.tutors">
+
+      <!-- ── Top row: avatar + info ── -->
+      <div class="tutor-card-main">
+        <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+        <div class="tutor-card-body">
+          <div class="tutor-card-name-row">
+            <h4>{{ t.name }}</h4>
+            <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
+          </div>
+          <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
+          <div class="qual-tags">
+            <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
+          </div>
+          <div class="tutor-card-subjects-label">Teaches</div>
+          <div class="subject-list">
+            <button ng-repeat="s in t.subjects" class="subject-chip">{{ s }}</button>
+          </div>
+          <p class="tutor-bio">"{{ t.bio }}"</p>
+        </div>
+      </div>
+
+      <!-- ── Bottom bar: rating + modes + price ── -->
+      <div class="tutor-card-bar">
+        <div class="tutor-card-rating">
+          <span class="tutor-rating-star">⭐</span>
+          <span class="tutor-rating-value">{{ t.rating }}</span>
+          <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
+        </div>
+        <div class="tutor-card-modes">
+          <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
+        </div>
+        <div class="tutor-card-bar-spacer"></div>
+        <div class="tutor-card-price">
+          <small>Trial Rate</small>
+          <strong class="price">${{ t.pricePerSession }}/hr</strong>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  </div><!-- end welcome-content -->
+
+</div>

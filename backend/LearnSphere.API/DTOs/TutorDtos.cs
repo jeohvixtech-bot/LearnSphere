@@ -84,3 +84,11 @@ public class CreateReviewDto
     public string Text { get; set; } = string.Empty;
     public int? BookingId { get; set; }
 }
+
+// Date/time only — no student, subject or message details — so parents can
+// see when a tutor is already busy without exposing other families' bookings.
+public class BusyTimeDto
+{
+    public string Date { get; set; } = string.Empty;
+    public string Time { get; set; } = string.Empty;
+}

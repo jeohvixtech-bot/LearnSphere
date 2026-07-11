@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('TutorCtrl', ['$location', '$timeout', '$interval', '$rootScope', 'AuthService', 'TutorService',
-  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService',
-function ($location, $timeout, $interval, $rootScope, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService) {
+  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog',
+function ($location, $timeout, $interval, $rootScope, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -11,6 +11,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.bookings = [];
   self.invoices = [];
   self.chatMessages = [];
+  self.subjectCatalog = SubjectCatalog;
 
   // Tab state
   self.activeTab = 'overview';
@@ -20,7 +21,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.profileSuccess = false;
   self.profileError = '';
   self.uploading = false;
-  self.newOffering = { country: '', subject: '', level: '', mode: '', qualification: '', price: null };
+  self.newOffering = { country: '', selectedOption: null, mode: '', qualification: '', price: null };
 
   // Report forms
   self.reportBooking = null;
@@ -489,16 +490,17 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   // Edit profile offerings
   self.addOffering = function () {
-    if (!self.newOffering.country || !self.newOffering.subject || !self.newOffering.level || !self.newOffering.mode || !self.newOffering.qualification) return;
+    var opt = self.newOffering.selectedOption;
+    if (!self.newOffering.country || !opt || !self.newOffering.mode || !self.newOffering.qualification) return;
     self.profileForm.offerings.push({
       country: self.newOffering.country,
-      subject: self.newOffering.subject,
-      level: self.newOffering.level,
+      subject: opt.subject,
+      level: opt.level,
       mode: self.newOffering.mode,
       qualification: self.newOffering.qualification,
       price: parseFloat(self.newOffering.price) || 0
     });
-    self.newOffering = { country: '', subject: '', level: '', mode: '', qualification: '', price: null };
+    self.newOffering = { country: self.newOffering.country, selectedOption: null, mode: '', qualification: '', price: null };
   };
 
   self.removeOffering = function (index) {

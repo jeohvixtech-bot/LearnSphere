@@ -9,6 +9,7 @@
       <a href="#!/parent/students" class="nav-item active">👤 Student Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
+      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
       <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
       <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
       <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
@@ -150,46 +151,21 @@
               </div>
               <div class="form-group">
                 <label>Subjects Needed</label>
-                <p class="text-muted offering-hint">Select country, level and subject, then click Add Subject. Each subject is its own country and level combination.</p>
+                <p class="text-muted offering-hint">Select a country, then a subject, then click Add Subject.</p>
                 <div class="offering-builder">
                   <div class="form-group">
                     <label>Country</label>
                     <div class="radio-row">
-                      <label class="radio-option"><input type="radio" ng-model="vm.newEditStudentSubjectCombo.country" value="Singapore" /> Singapore 🇸🇬</label>
-                      <label class="radio-option"><input type="radio" ng-model="vm.newEditStudentSubjectCombo.country" value="Malaysia" /> Malaysia 🇲🇾</label>
+                      <label class="radio-option"><input type="radio" ng-model="vm.newEditStudentSubjectCombo.country" value="Singapore" ng-click="vm.newEditStudentSubjectCombo.selectedOption = null" /> Singapore 🇸🇬</label>
+                      <label class="radio-option"><input type="radio" ng-model="vm.newEditStudentSubjectCombo.country" value="Malaysia" ng-click="vm.newEditStudentSubjectCombo.selectedOption = null" /> Malaysia 🇲🇾</label>
                     </div>
                   </div>
                   <div class="form-group">
-                    <label>Education Level</label>
-                    <select ng-model="vm.newEditStudentSubjectCombo.level">
-                      <option value="">— Level —</option>
-                      <option>Primary 5-6</option>
-                      <option>Secondary 1</option>
-                      <option>Secondary 2</option>
-                      <option>Secondary 3</option>
-                      <option>Secondary 4</option>
-                      <option>Junior College (JC)</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
                     <label>Subject</label>
-                    <select ng-model="vm.newEditStudentSubjectCombo.subject">
-                      <option value="">— Subject —</option>
-                      <optgroup label="PSLE">
-                        <option>English Language</option><option>Mother Tongue (Chinese)</option><option>Mother Tongue (Malay)</option><option>Mother Tongue (Tamil)</option><option>Mathematics</option><option>Science</option>
-                      </optgroup>
-                      <optgroup label="UPSR">
-                        <option>Bahasa Malaysia</option><option>English</option><option>Mathematics</option><option>Science</option><option>History</option>
-                      </optgroup>
-                      <optgroup label="O-Level">
-                        <option>English Language</option><option>Elementary Mathematics</option><option>Additional Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>Combined Science</option><option>History</option><option>Geography</option><option>Literature in English</option><option>Principles of Accounts</option><option>Computing</option>
-                      </optgroup>
-                      <optgroup label="SPM">
-                        <option>Bahasa Malaysia</option><option>English</option><option>Mathematics</option><option>Additional Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>History</option><option>Economics</option><option>Accounting</option>
-                      </optgroup>
-                      <optgroup label="A-Level">
-                        <option>General Paper</option><option>Mathematics</option><option>Further Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>Economics</option><option>History</option>
-                      </optgroup>
+                    <select ng-model="vm.newEditStudentSubjectCombo.selectedOption"
+                      ng-disabled="!vm.newEditStudentSubjectCombo.country"
+                      ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.newEditStudentSubjectCombo.country]">
+                      <option value="">{{ vm.newEditStudentSubjectCombo.country ? '— Select subject —' : '— Select a country first —' }}</option>
                     </select>
                   </div>
                   <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addEditStudentSubject()">+ Add Subject</button>
@@ -275,99 +251,21 @@
           <div class="profile-form-section">Academic Details</div>
           <div class="form-group">
             <label>Subjects Needed</label>
-            <p class="text-muted offering-hint">Select country, level and subject, then click Add Subject. Each subject is its own country and level combination.</p>
+            <p class="text-muted offering-hint">Select a country, then a subject, then click Add Subject.</p>
             <div class="offering-builder">
               <div class="form-group">
                 <label>Country</label>
                 <div class="radio-row">
-                  <label class="radio-option"><input type="radio" ng-model="vm.newStudentSubjectCombo.country" value="Singapore" /> Singapore 🇸🇬</label>
-                  <label class="radio-option"><input type="radio" ng-model="vm.newStudentSubjectCombo.country" value="Malaysia" /> Malaysia 🇲🇾</label>
+                  <label class="radio-option"><input type="radio" ng-model="vm.newStudentSubjectCombo.country" value="Singapore" ng-click="vm.newStudentSubjectCombo.selectedOption = null" /> Singapore 🇸🇬</label>
+                  <label class="radio-option"><input type="radio" ng-model="vm.newStudentSubjectCombo.country" value="Malaysia" ng-click="vm.newStudentSubjectCombo.selectedOption = null" /> Malaysia 🇲🇾</label>
                 </div>
               </div>
               <div class="form-group">
-                <label>Education Level</label>
-                <select ng-model="vm.newStudentSubjectCombo.level">
-                  <option value="">— Level —</option>
-                  <option>Primary 5-6</option>
-                  <option>Secondary 1</option>
-                  <option>Secondary 2</option>
-                  <option>Secondary 3</option>
-                  <option>Secondary 4</option>
-                  <option>Junior College (JC)</option>
-                </select>
-              </div>
-              <div class="form-group">
                 <label>Subject</label>
-                <select ng-model="vm.newStudentSubjectCombo.subject">
-                  <option value="">— Select subject —</option>
-                  <optgroup label="PSLE">
-                    <option>English Language</option>
-                    <option>Mother Tongue (Chinese)</option>
-                    <option>Mother Tongue (Malay)</option>
-                    <option>Mother Tongue (Tamil)</option>
-                    <option>Mathematics</option>
-                    <option>Science</option>
-                  </optgroup>
-                  <optgroup label="UPSR">
-                    <option>Bahasa Malaysia</option>
-                    <option>English</option>
-                    <option>Mathematics</option>
-                    <option>Science</option>
-                    <option>History</option>
-                  </optgroup>
-                  <optgroup label="O-Level">
-                    <option>English Language</option>
-                    <option>Elementary Mathematics</option>
-                    <option>Additional Mathematics</option>
-                    <option>Physics</option>
-                    <option>Chemistry</option>
-                    <option>Biology</option>
-                    <option>Combined Science</option>
-                    <option>History</option>
-                    <option>Social Studies</option>
-                    <option>Geography</option>
-                    <option>Literature in English</option>
-                    <option>Principles of Accounts</option>
-                    <option>Design &amp; Technology</option>
-                    <option>Computing</option>
-                    <option>Food &amp; Nutrition</option>
-                    <option>Art</option>
-                    <option>Music</option>
-                  </optgroup>
-                  <optgroup label="SPM">
-                    <option>Bahasa Malaysia</option>
-                    <option>English</option>
-                    <option>Mathematics</option>
-                    <option>Additional Mathematics</option>
-                    <option>Physics</option>
-                    <option>Chemistry</option>
-                    <option>Biology</option>
-                    <option>History</option>
-                    <option>Geography</option>
-                    <option>Economics</option>
-                    <option>Accounting</option>
-                    <option>Commerce</option>
-                    <option>Business Studies</option>
-                    <option>Information Technology</option>
-                    <option>Moral Education</option>
-                    <option>Islamic Studies</option>
-                    <option>Art &amp; Design</option>
-                  </optgroup>
-                  <optgroup label="A-Level">
-                    <option>General Paper</option>
-                    <option>Mathematics</option>
-                    <option>Further Mathematics</option>
-                    <option>Physics</option>
-                    <option>Chemistry</option>
-                    <option>Biology</option>
-                    <option>Computing</option>
-                    <option>Economics</option>
-                    <option>History</option>
-                    <option>Geography</option>
-                    <option>Literature in English</option>
-                    <option>Art</option>
-                    <option>Music</option>
-                  </optgroup>
+                <select ng-model="vm.newStudentSubjectCombo.selectedOption"
+                  ng-disabled="!vm.newStudentSubjectCombo.country"
+                  ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.newStudentSubjectCombo.country]">
+                  <option value="">{{ vm.newStudentSubjectCombo.country ? '— Select subject —' : '— Select a country first —' }}</option>
                 </select>
               </div>
               <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addStudentSubject()">+ Add Subject</button>

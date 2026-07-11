@@ -12,6 +12,10 @@ angular.module('learnSphereApp')
     return $http.get(API_URL + '/tutors/' + id);
   };
 
+  self.getBusyTimes = function (id) {
+    return $http.get(API_URL + '/tutors/' + id + '/busy-times');
+  };
+
   self.getByUser = function (userId) {
     return $http.get(API_URL + '/tutors/by-user/' + userId, {
       headers: AuthService.authHeader()
