@@ -131,7 +131,9 @@ CREATE TABLE IF NOT EXISTS Students (
 -- ============================================================
 -- Bookings
 -- Added: BookingNumber (was missing from old schema.sql)
--- Note: no Date/Time columns — schedule is stored in BookingClasses
+-- Schedule now lives in BookingClasses — Date/Time/SlotId are legacy
+-- columns left NULLable by the self-migration in Program.cs rather than
+-- dropped, so they're kept here to mirror the live database exactly.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS Bookings (
     Id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -139,10 +141,13 @@ CREATE TABLE IF NOT EXISTS Bookings (
     StudentId      INT             NOT NULL,
     Subject        LONGTEXT        NOT NULL,
     Mode           LONGTEXT        NOT NULL,
+    Date           LONGTEXT        NULL,                     -- legacy; superseded by BookingClasses.Date
+    Time           LONGTEXT        NULL,                     -- legacy; superseded by BookingClasses.Time
     DurationHours  INT             NOT NULL DEFAULT 1,
     Message        LONGTEXT        NULL,
     TotalPrice     DECIMAL(10,2)   NOT NULL,
     Status         LONGTEXT        NOT NULL DEFAULT 'pending', -- pending | countered | confirmed | completed | cancelled
+    SlotId         INT             NULL,                     -- legacy; unused
     BookingNumber  LONGTEXT        NOT NULL,
     CONSTRAINT FK_Bookings_Tutors   FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)   ON DELETE RESTRICT,
     CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT
@@ -161,10 +166,15 @@ CREATE TABLE IF NOT EXISTS BookingClasses (
 
 -- ============================================================
 -- CounterProposals  (1-to-1 with Booking)
+-- Date/Time moved to per-class CounterProposalClasses — the columns below
+-- are legacy, left NULLable rather than dropped, kept here to mirror the
+-- live database exactly.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS CounterProposals (
     Id         INT AUTO_INCREMENT PRIMARY KEY,
     BookingId  INT         NOT NULL UNIQUE,
+    Date       LONGTEXT    NULL,                     -- legacy; superseded by CounterProposalClasses.ProposedDate
+    Time       LONGTEXT    NULL,                     -- legacy; superseded by CounterProposalClasses.ProposedTime
     Message    LONGTEXT    NOT NULL,
     CONSTRAINT FK_CounterProposals_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
