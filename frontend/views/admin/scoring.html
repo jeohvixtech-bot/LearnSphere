@@ -1,0 +1,143 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item active">📐 Scoring Config</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'threshold'}" ng-click="vm.activeScoringTab = 'threshold'">🎯 Score Threshold</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'weightage'}" ng-click="vm.activeScoringTab = 'weightage'">⚖️ Score Weightage</button>
+    </div>
+
+    <!-- ===== SCORE THRESHOLD TAB ===== -->
+    <div ng-if="vm.activeScoringTab === 'threshold'">
+      <div class="card">
+        <h3>Score Threshold</h3>
+        <p class="text-muted">Total Score = Σ (Panel Score × Panel Weightage)</p>
+        <div class="threshold-formula mono">
+          <span ng-repeat="w in vm.weightages | filter:{label:'!NA'}">({{ w.label }} Score × {{ w.percent }}%)<span ng-if="!$last"> + </span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SCORE WEIGHTAGE TAB ===== -->
+    <div ng-if="vm.activeScoringTab === 'weightage'">
+      <div class="alert-success" ng-if="vm.weightageSaveSuccess" style="margin-bottom:12px">
+        ✓ Weightage percentages saved successfully!
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h4>{{ vm.weightages[0].label }}</h4>
+            <div class="weightage-input">
+              <input type="number" ng-model="vm.weightages[0].percent" min="0" max="100" placeholder="0" />
+              <span>%</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Score Range</th><th>Points</th></tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="r in vm.ratingScale">
+                  <td>{{ r.range }}</td>
+                  <td>{{ r.points }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h4>{{ vm.weightages[1].label }}</h4>
+            <div class="weightage-input">
+              <input type="number" ng-model="vm.weightages[1].percent" min="0" max="100" placeholder="0" />
+              <span>%</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Classes</th><th>Points</th></tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="r in vm.activenessScale">
+                  <td>{{ r.range }}</td>
+                  <td>{{ r.points }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h4>{{ vm.weightages[2].label }}</h4>
+            <div class="weightage-input">
+              <input type="number" ng-model="vm.weightages[2].percent" min="0" max="100" placeholder="0" />
+              <span>%</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Disputes</th><th>Points</th></tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="r in vm.disputesScale">
+                  <td>{{ r.range }}</td>
+                  <td>{{ r.points }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h4>{{ vm.weightages[3].label }}</h4>
+            <div class="weightage-input">
+              <input type="number" ng-model="vm.weightages[3].percent" min="0" max="100" placeholder="0" />
+              <span>%</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Experience</th><th>Points</th></tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="r in vm.experienceScale">
+                  <td>{{ r.range }}</td>
+                  <td>{{ r.points }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" ng-repeat="w in vm.weightages" ng-if="$index > 3">
+          <div class="card-header">
+            <h4>{{ w.label }}</h4>
+            <div class="weightage-input">
+              <input type="number" ng-model="w.percent" min="0" max="100" placeholder="0" />
+              <span>%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-primary" style="margin-top:20px" ng-click="vm.saveWeightages()">💾 Save Weightage</button>
+    </div>
+
+  </main>
+</div>

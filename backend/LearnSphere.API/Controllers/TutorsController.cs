@@ -94,6 +94,23 @@ public class TutorsController : ControllerBase
         return Ok(slots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }));
     }
 
+    // Date/time of this tutor's confirmed classes only — lets parents avoid booking
+    // an overlapping slot without seeing which other family/subject occupies it.
+    [HttpGet("{id}/busy-times")]
+    public async Task<IActionResult> GetBusyTimes(int id)
+    {
+        var exists = await _context.Tutors.AnyAsync(t => t.Id == id);
+        if (!exists) return NotFound();
+
+        var busyTimes = await _context.Bookings
+            .Where(b => b.TutorId == id && b.Status == "confirmed")
+            .SelectMany(b => b.Classes)
+            .Select(c => new BusyTimeDto { Date = c.Date, Time = c.Time })
+            .ToListAsync();
+
+        return Ok(busyTimes);
+    }
+
     [HttpPost]
     [Authorize]
     public async Task<IActionResult> Register()
@@ -164,7 +181,7 @@ public class TutorsController : ControllerBase
             _context.RemoveRange(tutor.Offerings);
             tutor.Offerings = dto.Offerings.Select(o => new TutorOffering
             {
-                TutorId = id, Subject = o.Subject, Level = o.Level,
+                TutorId = id, Country = o.Country, Subject = o.Subject, Level = o.Level,
                 Mode = o.Mode, Qualification = o.Qualification, Price = o.Price
             }).ToList();
 
@@ -338,6 +355,6 @@ public class TutorsController : ControllerBase
         IsVerified = t.IsVerified,
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }).ToList(),
-        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
+        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
     };
 }

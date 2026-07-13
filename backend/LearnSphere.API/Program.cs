@@ -102,6 +102,8 @@ using (var scope = app.Services.CreateScope())
             );");
     } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorOfferings` ADD COLUMN `Country` VARCHAR(50) NOT NULL DEFAULT 'Singapore'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Bookings` ADD COLUMN `BookingNumber` VARCHAR(20) NOT NULL DEFAULT ''"); } catch { }
     // Date/Time moved to BookingClasses — make legacy columns nullable so existing schema doesn't break INSERTs
     try { await context.Database.ExecuteSqlRawAsync(
@@ -112,6 +114,11 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE `Bookings` MODIFY COLUMN `SlotId` int NULL"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Invoices` ADD COLUMN `InvoiceNumber` VARCHAR(20) NOT NULL DEFAULT ''"); } catch { }
+    // TutorReview.BookingId links a review to a specific completed booking
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorReviews` ADD COLUMN `BookingId` INT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "CREATE UNIQUE INDEX `UQ_TutorReviews_TutorBooking` ON `TutorReviews` (`TutorId`, `BookingId`)"); } catch { }
     // CounterProposal.Date/Time moved to per-class CounterProposalClasses
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `CounterProposals` MODIFY COLUMN `Date` longtext NULL"); } catch { }

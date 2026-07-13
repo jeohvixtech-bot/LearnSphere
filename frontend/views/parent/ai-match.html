@@ -1,0 +1,115 @@
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
+      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
+      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
+      <a href="#!/parent/ai-match" class="nav-item active">🤖 AI Speed Match</a>
+      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
+      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
+      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
+      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    </nav>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <!-- ── Page Hero ──────────────────────────────── -->
+    <div class="profile-hero">
+      <div class="profile-hero-left">
+        <div class="profile-hero-icon">🤖</div>
+        <div>
+          <h2 class="profile-hero-title">AI Speed Match</h2>
+          <p class="profile-hero-sub">Select a student profile to find their best-matched tutors</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Student profile picker ─────────────────── -->
+    <div class="profile-empty-state" ng-if="!vm.students.length">
+      <div class="profile-empty-icon">👤</div>
+      <h4>No Profiles Yet</h4>
+      <p>Add a child's profile under Student Profiles to start matching.</p>
+    </div>
+
+    <div class="ai-match-grid-3" ng-if="vm.students.length">
+      <div class="profile-card" ng-repeat="s in vm.students"
+        ng-class="{'profile-card--selected': vm.aiMatchSelectedStudentId === s.id}"
+        ng-click="vm.selectAiMatchStudent(s.id)" style="cursor:pointer">
+        <span class="profile-selected-badge" ng-if="vm.aiMatchSelectedStudentId === s.id">✓ SELECTED</span>
+        <div class="profile-card-top">
+          <div class="profile-avatar">{{ s.name[0] }}</div>
+          <div class="profile-card-body">
+            <div class="profile-card-name">{{ s.name }}</div>
+            <span class="profile-card-level">{{ s.educationLevel }}</span>
+            <div class="profile-card-school" ng-if="s.school">🏫 {{ s.school }}</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:14px" ng-if="s.subjectSelect" ng-click="$event.stopPropagation()">
+          <label>Subject</label>
+          <select ng-model="vm.aiMatchSubjectChoice[s.id]">
+            <option value="">— Select subject —</option>
+            <option ng-repeat="c in s.subjectCombos"
+              value="{{ c.country }} · {{ c.level }} · {{ c.subject }}">{{ c.country }} · {{ c.level }} · {{ c.subject }}</option>
+          </select>
+        </div>
+
+        <button type="button" class="btn-primary full-width" style="margin-top:10px"
+          ng-click="$event.stopPropagation(); vm.applyAiMatch(s)"
+          ng-disabled="!vm.aiMatchSubjectChoice[s.id]">Apply</button>
+      </div>
+    </div>
+
+    <!-- ── Match results ──────────────────────────── -->
+    <div class="card" style="margin-top:20px" ng-if="vm.aiMatchAppliedStudentId">
+      <h3>Tutors offering {{ vm.aiMatchAppliedSubject }}</h3>
+
+      <p class="empty-state" ng-if="!vm.aiMatchResults.length">
+        No tutors currently offer this subject. Try another subject or check back later.
+      </p>
+
+      <div class="tutor-card" ng-repeat="t in vm.aiMatchResults">
+        <div class="tutor-card-main">
+          <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+          <div class="tutor-card-body">
+            <div class="tutor-card-name-row">
+              <h4>{{ t.name }}</h4>
+              <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
+            </div>
+            <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
+            <div class="qual-tags">
+              <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
+            </div>
+            <div class="tutor-card-subjects-label">Teaches</div>
+            <div class="subject-list">
+              <button ng-repeat="sub in t.subjects" class="subject-chip">{{ sub }}</button>
+            </div>
+            <p class="tutor-bio">"{{ t.bio }}"</p>
+          </div>
+        </div>
+
+        <div class="tutor-card-bar">
+          <div class="tutor-card-rating">
+            <span class="tutor-rating-star">⭐</span>
+            <span class="tutor-rating-value">{{ t.rating }}</span>
+            <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
+          </div>
+          <div class="tutor-card-modes">
+            <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
+          </div>
+          <div class="tutor-card-bar-spacer"></div>
+          <div class="tutor-card-price">
+            <small>Trial Rate</small>
+            <strong class="price">${{ t.pricePerSession }}/hr</strong>
+          </div>
+          <button class="btn-primary" ng-click="vm.goToBookTutor(t)">View &amp; Book →</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>

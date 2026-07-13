@@ -8,6 +8,8 @@
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
       <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
       <a href="#!/parent/search" class="nav-item active">🔍 Find Tutors Catalog</a>
+      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
+      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
       <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
       <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
       <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
@@ -236,6 +238,47 @@
         </div>
 
       </div><!-- end tutor-detail-card -->
+
+      <!-- ── Tutor availability calendar (dates/times only, no booking details) ── -->
+      <div class="card" ng-if="!vm.bookingSuccess">
+        <div class="cal-nav-row" style="justify-content:space-between;margin-bottom:12px">
+          <div>
+            <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">📅 {{ vm.selectedTutor.name }}'s Availability</h3>
+            <p class="text-muted" style="margin:0">Grayed-out times are already booked — pick a different time to avoid overlap</p>
+          </div>
+          <div class="cal-nav-row">
+            <button class="btn-outline sm" ng-click="vm.tutorCalPrevMonth()">‹ Prev</button>
+            <span class="cal-month-label">{{ vm.tutorCalMonthName() }} {{ vm.tutorCal.year }}</span>
+            <button class="btn-outline sm" ng-click="vm.tutorCalNextMonth()">Next ›</button>
+          </div>
+        </div>
+
+        <div class="cal-weekdays">
+          <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+        </div>
+        <div class="cal-grid">
+          <span class="cal-day-empty" ng-repeat="_ in vm.tutorCalOffsetArray() track by $index"></span>
+          <button class="cal-day" ng-repeat="d in vm.tutorCalDaysArray() track by $index"
+            ng-click="vm.tutorCal.selectedDay = d"
+            ng-class="{
+              'selected': vm.tutorCal.selectedDay === d,
+              'has-unpaid': vm.dayHasBusyTimes(d)
+            }">
+            <span class="day-num">{{ d }}</span>
+            <span class="day-dot" ng-if="vm.dayHasBusyTimes(d)"></span>
+          </button>
+        </div>
+
+        <div class="day-detail" ng-if="vm.tutorCal.selectedDay">
+          <h4>{{ vm.tutorCalMonthName() }} {{ vm.tutorCal.selectedDay }}, {{ vm.tutorCal.year }}</h4>
+          <p ng-if="!vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length" class="empty-state">✓ Fully available this day.</p>
+          <div class="chip-list" ng-if="vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length">
+            <span class="chip" ng-repeat="b in vm.getBusyTimesForDay(vm.tutorCal.selectedDay)" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">
+              🚫 {{ b.time }}
+            </span>
+          </div>
+        </div>
+      </div>
 
       <!-- ── Booking form (full width below profile) -->
       <div class="booking-form-single card" ng-if="!vm.bookingSuccess">

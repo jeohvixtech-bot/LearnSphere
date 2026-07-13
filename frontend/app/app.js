@@ -8,6 +8,11 @@ angular.module('learnSphereApp', ['ngRoute'])
   $locationProvider.hashPrefix('!');
 
   $routeProvider
+    .when('/welcome', {
+      templateUrl: 'views/welcome.html',
+      controller: 'WelcomeCtrl',
+      controllerAs: 'vm'
+    })
     .when('/login', {
       templateUrl: 'views/login.html',
       controller: 'AuthCtrl',
@@ -49,6 +54,18 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('parent') }
     })
+    .when('/parent/ai-match', {
+      templateUrl: 'views/parent/ai-match.html',
+      controller: 'ParentCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('parent') }
+    })
+    .when('/parent/personalize', {
+      templateUrl: 'views/parent/personalize.html',
+      controller: 'ParentCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('parent') }
+    })
     .when('/tutor/overview', {
       templateUrl: 'views/tutor/overview.html',
       controller: 'TutorCtrl',
@@ -79,7 +96,13 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
     })
-    .otherwise({ redirectTo: '/login' });
+    .when('/admin/scoring', {
+      templateUrl: 'views/admin/scoring.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
+    .otherwise({ redirectTo: '/welcome' });
 
   function authGuard(requiredRole) {
     return ['$q', '$location', 'AuthService', function ($q, $location, AuthService) {
