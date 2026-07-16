@@ -24,6 +24,25 @@ angular.module('learnSphereApp')
       });
   };
 
+  self.forgotPassword = function (email) {
+    return $http.post(API_URL + '/auth/forgot-password', { email: email })
+      .then(function (res) { return res.data; });
+  };
+
+  self.changePassword = function (currentPassword, newPassword) {
+    return $http.post(API_URL + '/auth/change-password',
+      { currentPassword: currentPassword, newPassword: newPassword },
+      { headers: self.authHeader() }
+    ).then(function (res) {
+      var user = self.getCurrentUser();
+      if (user) {
+        user.mustChangePassword = false;
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+      }
+      return res.data;
+    });
+  };
+
   self.logout = function () {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);

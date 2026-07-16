@@ -35,6 +35,7 @@ builder.Services.AddAuthorization();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 
 // CORS — allow the AngularJS frontend on any localhost port
 builder.Services.AddCors(options =>
@@ -148,6 +149,20 @@ using (var scope = app.Services.CreateScope())
             KEY `IX_BookingClasses_BookingId` (`BookingId`),
             CONSTRAINT `FK_BookingClasses_Bookings_BookingId`
                 FOREIGN KEY (`BookingId`) REFERENCES `Bookings` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Users` ADD COLUMN `MustChangePassword` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `FavoriteTutors` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `ParentUserId` INT NOT NULL,
+            `TutorId` INT NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_FavoriteTutors_Parent_Tutor` (`ParentUserId`, `TutorId`),
+            CONSTRAINT `FK_FavoriteTutors_Users` FOREIGN KEY (`ParentUserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_FavoriteTutors_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
     await context.Database.ExecuteSqlRawAsync(

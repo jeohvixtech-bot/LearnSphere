@@ -18,6 +18,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controller: 'AuthCtrl',
       controllerAs: 'auth'
     })
+    .when('/change-password', {
+      templateUrl: 'views/change-password.html',
+      controller: 'ChangePasswordCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: loggedInGuard() }
+    })
     .when('/parent/dashboard', {
       templateUrl: 'views/parent/dashboard.html',
       controller: 'ParentCtrl',
@@ -109,6 +115,25 @@ angular.module('learnSphereApp', ['ngRoute'])
       var deferred = $q.defer();
       var user = AuthService.getCurrentUser();
       if (user && (!requiredRole || user.role === requiredRole)) {
+        if (user.mustChangePassword) {
+          $location.path('/change-password');
+          deferred.reject('MustChangePassword');
+        } else {
+          deferred.resolve(user);
+        }
+      } else {
+        $location.path('/login');
+        deferred.reject('Unauthorized');
+      }
+      return deferred.promise;
+    }];
+  }
+
+  function loggedInGuard() {
+    return ['$q', '$location', 'AuthService', function ($q, $location, AuthService) {
+      var deferred = $q.defer();
+      var user = AuthService.getCurrentUser();
+      if (user) {
         deferred.resolve(user);
       } else {
         $location.path('/login');

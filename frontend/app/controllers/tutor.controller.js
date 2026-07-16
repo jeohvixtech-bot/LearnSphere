@@ -181,6 +181,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.blockForm = { startDate: '', endDate: '' };
   self.blockedRanges = [];
   self.blockConflicts = [];
+  self.blockOverlapError = '';
 
   function parseLocalDate(val) {
     if (!val) return new Date(NaN);
@@ -195,12 +196,59 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     var d = new Date(s); d.setHours(0, 0, 0, 0); return d;
   }
 
+  // Minimum lead time before a class can be booked/changed, to avoid urgent last-minute changes.
+  var MIN_LEAD_HOURS = 6;
+
+  function combineDateTime(dateVal, timeStr) {
+    var d = parseLocalDate(dateVal);
+    if (isNaN(d.getTime())) return null;
+    var m = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return d;
+    var h = parseInt(m[1], 10);
+    var min = parseInt(m[2], 10);
+    var ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    d.setHours(h, min, 0, 0);
+    return d;
+  }
+
+  self.isTooSoon = function (dateVal, timeStr) {
+    var dt = combineDateTime(dateVal, timeStr);
+    if (!dt || isNaN(dt.getTime())) return false;
+    var minAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
+    return dt < minAllowed;
+  };
+
+  self.hasTooSoonCounter = function () {
+    return (self.counterForm.classes || []).some(function (c) {
+      return c.proposedDate && self.isTooSoon(c.proposedDate, c.proposedTime);
+    });
+  };
+
+  self.hasTooSoonTutorReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      return c.proposedDate && self.isTooSoon(c.proposedDate, c.proposedTime);
+    });
+  };
+
   self.confirmBlock = function () {
     var s = self.blockForm.startDate, e = self.blockForm.endDate;
     if (!s || !e) return;
     var start = parseLocalDate(s);
     var end   = parseLocalDate(e);
     if (end < start) return;
+
+    self.blockOverlapError = '';
+
+    var overlapsExisting = self.blockedRanges.some(function (r) {
+      var rs = parseLocalDate(r.start), re = parseLocalDate(r.end);
+      return start <= re && rs <= end;
+    });
+    if (overlapsExisting) {
+      self.blockOverlapError = 'This date range overlaps with a period you already blocked. Remove or adjust it first.';
+      return;
+    }
 
     var conflicts = [];
     self.confirmedClasses().forEach(function (b) {
@@ -229,7 +277,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     self.blockForm.endDate = '';
   };
 
-  self.clearBlockConflicts = function () { self.blockConflicts = []; };
+  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; };
 
   self.removeBlock = function (idx) {
     self.blockedRanges.splice(idx, 1);
@@ -244,6 +292,15 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       var e = new Date(r.end);   e.setHours(0, 0, 0, 0);
       return d >= s && d <= e;
     });
+  };
+
+  self.isPastDay = function (dayNum) {
+    if (!dayNum) return false;
+    var d = new Date(self.calYear, self.calMonth, dayNum);
+    d.setHours(0, 0, 0, 0);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
   };
 
   // ── Monthly calendar ────────────────────────────────────────────────
@@ -334,6 +391,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitCounter = function () {
     if (!self.counterBooking) return;
+    if (self.hasTooSoonCounter()) return;
     BookingService.updateStatus(self.counterBooking.id, 'countered', {
       message: self.counterForm.message,
       classes: self.counterForm.classes.map(function (c) {
@@ -423,6 +481,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitTutorReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasTooSoonTutorReschedule()) return;
     BookingService.updateStatus(self.rescheduleBooking.id, 'countered', {
       message: 'Tutor proposed reschedule',
       classes: self.rescheduleForm.classes.map(function (c) {

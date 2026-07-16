@@ -16,6 +16,18 @@ angular.module('learnSphereApp')
     return $http.get(API_URL + '/tutors/' + id + '/busy-times');
   };
 
+  self.getFavorites = function () {
+    return $http.get(API_URL + '/tutors/favorites', { headers: AuthService.authHeader() });
+  };
+
+  self.addFavorite = function (id) {
+    return $http.post(API_URL + '/tutors/' + id + '/favorite', null, { headers: AuthService.authHeader() });
+  };
+
+  self.removeFavorite = function (id) {
+    return $http.delete(API_URL + '/tutors/' + id + '/favorite', { headers: AuthService.authHeader() });
+  };
+
   self.getByUser = function (userId) {
     return $http.get(API_URL + '/tutors/by-user/' + userId, {
       headers: AuthService.authHeader()

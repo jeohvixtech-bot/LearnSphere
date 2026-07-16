@@ -9,6 +9,7 @@ angular.module('learnSphereApp')
       var fp = flatpickr(element[0], {
         dateFormat: 'd-m-Y',
         allowInput: true,
+        minDate: 'today',
         onChange: function (selectedDates, dateStr) {
           scope.$apply(function () {
             ngModel.$setViewValue(dateStr || '');

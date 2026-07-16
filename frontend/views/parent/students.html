@@ -18,6 +18,59 @@
 
   <main class="dashboard-main">
 
+    <!-- ── Parent Profile Panel ─────────────────────── -->
+    <div class="card" style="margin-bottom:20px" ng-if="vm.parentProfile">
+
+      <!-- View mode -->
+      <div ng-if="!vm.editingParentProfile" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px">
+        <div style="display:flex; align-items:center; gap:14px">
+          <div class="profile-avatar">{{ vm.parentProfile.name[0] }}</div>
+          <div>
+            <div class="profile-card-name">{{ vm.parentProfile.name }}</div>
+            <div class="text-muted">{{ vm.parentProfile.email }}</div>
+            <span class="profile-card-level">Parent Account</span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn-outline-sm" ng-click="vm.startEditParentProfile()">✏️ Edit Profile</button>
+          <button type="button" class="btn-danger btn-sm" ng-click="vm.closeParentProfilePermanently()">Permanently Close Profile</button>
+        </div>
+      </div>
+
+      <!-- Edit mode -->
+      <div ng-if="vm.editingParentProfile">
+        <div class="profile-edit-header">
+          <div class="profile-avatar profile-avatar--sm">{{ vm.parentProfile.name[0] }}</div>
+          <div>
+            <strong>Editing Parent Profile</strong>
+            <p class="text-muted">Update your account details below</p>
+          </div>
+          <button type="button" class="btn-link" ng-click="vm.cancelEditParentProfile()" style="margin-left:auto">✕ Cancel</button>
+        </div>
+        <div class="alert-error" ng-if="vm.parentProfileError">{{ vm.parentProfileError }}</div>
+        <form ng-submit="vm.saveParentProfile()" class="form-stack" style="margin-top:14px">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" ng-model="vm.parentProfileForm.name" required />
+            </div>
+            <div class="form-group">
+              <label>Email Address</label>
+              <input type="email" ng-model="vm.parentProfileForm.email" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>New Password <span style="font-weight:400;color:#94a3b8">(leave blank to keep current)</span></label>
+            <input type="password" ng-model="vm.parentProfileForm.password" placeholder="••••••••" />
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn-outline" ng-click="vm.cancelEditParentProfile()">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- ── Page Hero ──────────────────────────────── -->
     <div class="profile-hero">
       <div class="profile-hero-left">
@@ -76,6 +129,7 @@
                 <div class="profile-card-school">🏫 {{ s.school }}</div>
               </div>
               <button type="button" class="btn-outline-sm" ng-click="$event.stopPropagation(); vm.startEditStudent(s)">✏️ Edit</button>
+              <button type="button" class="btn-danger btn-sm" ng-click="$event.stopPropagation(); vm.deleteStudent(s)">🗑️ Delete</button>
             </div>
 
             <div class="profile-subjects" ng-if="s.subjectSelect">
@@ -102,12 +156,14 @@
                 <span class="cal-day-empty" ng-repeat="_ in vm.studCalOffsetArray() track by $index"></span>
                 <button class="cal-day" ng-repeat="d in vm.studCalDaysArray() track by $index"
                   ng-click="vm.studCal.selectedDay = d"
+                  ng-disabled="vm.isStudCalPastDay(d)"
                   ng-class="{
                     'selected': vm.studCal.selectedDay === d,
-                    'stud-has-class': vm.getBookingsForStudentOnDay(s.id, d).length > 0
+                    'past-day': vm.isStudCalPastDay(d),
+                    'stud-has-class': !vm.isStudCalPastDay(d) && vm.getBookingsForStudentOnDay(s.id, d).length > 0
                   }">
                   <span class="day-num">{{ d }}</span>
-                  <span class="day-dot" ng-if="vm.getBookingsForStudentOnDay(s.id, d).length > 0"></span>
+                  <span class="day-dot" ng-if="!vm.isStudCalPastDay(d) && vm.getBookingsForStudentOnDay(s.id, d).length > 0"></span>
                 </button>
               </div>
 
@@ -219,10 +275,10 @@
               placeholder="Search school in SG / MY..." />
             <div class="school-dropdown" ng-if="vm.schoolDropdownOpen">
               <div class="school-filters">
-                <button type="button" ng-repeat="c in ['All','Singapore','Malaysia']"
+                <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
                   ng-click="vm.countryFilter = c; vm.searchSchools()"
                   ng-class="{active: vm.countryFilter === c}" class="filter-chip">
-                  {{ c === 'Singapore' ? 'SG 🇸🇬' : c === 'Malaysia' ? 'MY 🇲🇾' : 'All' }}
+                  {{ c === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}
                 </button>
               </div>
               <select ng-model="vm.typeFilter" ng-change="vm.searchSchools()" class="filter-select">

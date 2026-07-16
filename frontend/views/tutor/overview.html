@@ -51,6 +51,20 @@
       </div>
     </div>
 
+    <!-- Calendar Legend -->
+    <div class="card calendar-legend">
+      <h4>📖 Calendar Legend</h4>
+      <div class="legend-grid">
+        <div class="legend-item"><span class="legend-swatch legend-selected"></span> Selected Day</div>
+        <div class="legend-item"><span class="legend-swatch legend-paid"></span> Paid Session</div>
+        <div class="legend-item"><span class="legend-swatch legend-unpaid"></span> Unpaid Session</div>
+        <div class="legend-item"><span class="legend-swatch legend-holiday"></span> Public Holiday</div>
+        <div class="legend-item"><span class="legend-swatch legend-holiday-sg"></span> SG Public Holiday</div>
+        <div class="legend-item"><span class="legend-swatch legend-blocked">🚫</span> Blocked by You</div>
+        <div class="legend-item"><span class="legend-swatch legend-past"></span> Past Date</div>
+      </div>
+    </div>
+
     <!-- Pending Booking Requests -->
     <div class="card" ng-if="vm.pendingRequests().length">
       <h3><span class="dot-amber"></span> Parents Booking Requests ({{ vm.pendingRequests().length }})</h3>
@@ -107,13 +121,16 @@
                 <input type="text" ng-model="c.proposedTime" placeholder="05:00 PM"
                   ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
               </div>
+              <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
+                ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
+              </span>
             </div>
           </div>
           <div class="form-group mt-3">
             <label>Explanation to Parent</label>
             <textarea ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
           </div>
-          <button type="submit" class="btn-primary full-width">Dispatch Counter Proposal</button>
+          <button type="submit" class="btn-primary full-width" ng-disabled="vm.hasTooSoonCounter()">Dispatch Counter Proposal</button>
         </form>
       </div>
     </div>
@@ -148,18 +165,20 @@
         <span class="cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
         <button class="cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
           ng-click="vm.selectedCalDay = d"
+          ng-disabled="vm.isPastDay(d)"
           ng-class="{
             'selected': vm.selectedCalDay === d,
-            'blocked': vm.isBlocked(d),
-            'public-holiday-sg': !vm.isBlocked(d) && vm.isSgHoliday(d),
-            'public-holiday': !vm.isBlocked(d) && vm.isPublicHoliday(d) && !vm.isSgHoliday(d),
-            'has-paid': !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.isPaid(vm.bookingsOnDay(d)[0].id),
-            'has-unpaid': !vm.isBlocked(d) && vm.bookingsOnDay(d).length && !vm.isPaid(vm.bookingsOnDay(d)[0].id)
+            'past-day': vm.isPastDay(d),
+            'blocked': !vm.isPastDay(d) && vm.isBlocked(d),
+            'public-holiday-sg': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
+            'public-holiday': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d) && !vm.isSgHoliday(d),
+            'has-paid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.isPaid(vm.bookingsOnDay(d)[0].id),
+            'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && !vm.isPaid(vm.bookingsOnDay(d)[0].id)
           }">
           <span class="day-num">{{ d }}</span>
-          <span class="day-blocked-label" ng-if="vm.isBlocked(d)">Blocked</span>
-          <span class="day-holiday-name" ng-if="!vm.isBlocked(d) && vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
-          <span class="day-label" ng-if="!vm.isBlocked(d) && vm.bookingsOnDay(d).length">
+          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)">🚫</span>
+          <span class="day-holiday-name" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
+          <span class="day-label" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length">
             {{ vm.isPaid(vm.bookingsOnDay(d)[0].id) ? '🟢' : '🔒' }}
           </span>
         </button>
@@ -198,6 +217,14 @@
             ng-disabled="!vm.blockForm.startDate || !vm.blockForm.endDate">
             Confirm Block
           </button>
+        </div>
+
+        <!-- Overlap with an existing blocked range -->
+        <div class="block-conflict-alert" ng-if="vm.blockOverlapError">
+          <div class="block-conflict-header">
+            ⚠️ Already Blocked
+          </div>
+          <p class="block-conflict-sub">{{ vm.blockOverlapError }}</p>
         </div>
 
         <!-- Conflict alert -->
@@ -276,10 +303,13 @@
                 ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
             </div>
           </div>
+          <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
+            ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
+          </span>
         </div>
         <div class="btn-row" style="margin-top:4px">
           <button type="button" class="btn-outline" ng-click="vm.cancelTutorReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary">Send Reschedule Proposal →</button>
+          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonTutorReschedule()">Send Reschedule Proposal →</button>
         </div>
       </form>
     </div>

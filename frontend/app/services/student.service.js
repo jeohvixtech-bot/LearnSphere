@@ -15,4 +15,8 @@ angular.module('learnSphereApp')
   self.update = function (id, data) {
     return $http.put(API_URL + '/students/' + id, data, { headers: AuthService.authHeader() });
   };
+
+  self.delete = function (id) {
+    return $http.delete(API_URL + '/students/' + id, { headers: AuthService.authHeader() });
+  };
 }]);

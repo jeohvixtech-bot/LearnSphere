@@ -135,10 +135,13 @@
                 ng-class="{'input-blocked': c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)}" />
             </div>
           </div>
+          <span class="blocked-date-hint" ng-if="c.date && vm.isTooSoon(c.date, c.time)">
+            ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
+          </span>
         </div>
         <div class="btn-row" style="margin-top:4px">
           <button type="button" class="btn-outline" ng-click="vm.cancelReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary">Confirm Reschedule →</button>
+          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonReschedule()">Confirm Reschedule →</button>
         </div>
       </form>
     </div>

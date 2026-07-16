@@ -51,6 +51,48 @@ public class TutorsController : ControllerBase
         return Ok(tutors.Select(MapToDto));
     }
 
+    [HttpGet("favorites")]
+    [Authorize]
+    public async Task<IActionResult> GetFavorites()
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutorIds = await _context.FavoriteTutors
+            .Where(f => f.ParentUserId == userId)
+            .Select(f => f.TutorId)
+            .ToListAsync();
+        return Ok(tutorIds);
+    }
+
+    [HttpPost("{id}/favorite")]
+    [Authorize]
+    public async Task<IActionResult> AddFavorite(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (!await _context.Tutors.AnyAsync(t => t.Id == id)) return NotFound();
+
+        var already = await _context.FavoriteTutors.AnyAsync(f => f.ParentUserId == userId && f.TutorId == id);
+        if (!already)
+        {
+            _context.FavoriteTutors.Add(new FavoriteTutor { ParentUserId = userId, TutorId = id });
+            await _context.SaveChangesAsync();
+        }
+        return Ok();
+    }
+
+    [HttpDelete("{id}/favorite")]
+    [Authorize]
+    public async Task<IActionResult> RemoveFavorite(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var fav = await _context.FavoriteTutors.FirstOrDefaultAsync(f => f.ParentUserId == userId && f.TutorId == id);
+        if (fav != null)
+        {
+            _context.FavoriteTutors.Remove(fav);
+            await _context.SaveChangesAsync();
+        }
+        return Ok();
+    }
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {

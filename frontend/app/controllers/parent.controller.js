@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService',
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -18,6 +18,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   self.tutors = [];
+  self.favoriteTutorIds = [];
   self.students = [];
   self.bookings = [];
   self.invoices = [];
@@ -91,9 +92,17 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Search / filter state
   self.searchQuery = '';
+  self.selectedCountry = 'Singapore';
   self.selectedSubject = 'All';
   self.selectedMode = 'All';
   self.minRating = 0;
+  self.minExperience = 0;
+  self.filtersExpanded = true;
+
+  self.selectSearchCountry = function (c) {
+    self.selectedCountry = c;
+    self.selectedSubject = 'All';
+  };
 
   // Booking form
   self.bookingForm = {
@@ -125,11 +134,50 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.editStudentSubjects = []; // [{country, level, subject}]
   self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
 
+  // Parent profile panel
+  self.parentProfile = null;
+  self.editingParentProfile = false;
+  self.parentProfileForm = {};
+  self.parentProfileError = '';
+
+  self.startEditParentProfile = function () {
+    self.parentProfileForm = { name: self.parentProfile.name, email: self.parentProfile.email, password: '' };
+    self.parentProfileError = '';
+    self.editingParentProfile = true;
+  };
+
+  self.cancelEditParentProfile = function () {
+    self.editingParentProfile = false;
+    self.parentProfileForm = {};
+    self.parentProfileError = '';
+  };
+
+  self.saveParentProfile = function () {
+    var payload = { name: self.parentProfileForm.name, email: self.parentProfileForm.email };
+    if (self.parentProfileForm.password) payload.password = self.parentProfileForm.password;
+
+    ParentProfileService.update(self.parentProfile.id, payload).then(function (res) {
+      self.parentProfile = res.data;
+      self.editingParentProfile = false;
+      self.parentProfileForm = {};
+    }).catch(function (err) {
+      self.parentProfileError = (err.data && err.data.message) || 'Could not update profile.';
+    });
+  };
+
+  self.closeParentProfilePermanently = function () {
+    if (!confirm('This will permanently close your account and cannot be undone. Continue?')) return;
+    ParentProfileService.close(self.parentProfile.id).then(function () {
+      AuthService.logout();
+      $location.path('/login');
+    });
+  };
+
   // School dropdown
   self.schoolSearch = '';
   self.schoolDropdownOpen = false;
   self.institutions = [];
-  self.countryFilter = 'All';
+  self.countryFilter = 'Singapore';
   self.typeFilter = 'All';
 
   // Issue report
@@ -191,6 +239,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.studCal.selectedDay = 0;
   };
 
+  function isPastCalDay(year, month, day) {
+    if (!day) return false;
+    var d = new Date(year, month, day);
+    d.setHours(0, 0, 0, 0);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
+  }
+
+  self.isStudCalPastDay = function (day) {
+    return isPastCalDay(self.studCal.year, self.studCal.month, day);
+  };
+
   // Tutor busy-times calendar (booking page) — dates/times only, no booking details,
   // so parents can avoid picking an overlapping slot.
   self.tutorCal = { year: _scNow.getFullYear(), month: _scNow.getMonth(), selectedDay: 0, busyTimes: [] };
@@ -228,6 +289,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return self.getBusyTimesForDay(day).length > 0;
   };
 
+  self.isTutorCalPastDay = function (day) {
+    return isPastCalDay(self.tutorCal.year, self.tutorCal.month, day);
+  };
+
   // Reschedule
   self.rescheduleBooking = null;
   self.rescheduleForm = { classes: [] };
@@ -255,6 +320,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.submitReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasTooSoonReschedule()) return;
     var newClasses = self.rescheduleForm.classes.map(function (c) {
       return { date: toDateStr(toDateObj(c.date)), time: c.time };
     });
@@ -303,19 +369,44 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
     BookingService.getAll().then(function (res) { self.bookings = res.data; });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
+    TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
   }
   init();
+
+  // Favorite tutors
+  self.isFavorited = function (tutorId) {
+    return self.favoriteTutorIds.indexOf(tutorId) >= 0;
+  };
+
+  self.toggleFavorite = function (tutor, $event) {
+    if ($event) $event.stopPropagation();
+    if (self.isFavorited(tutor.id)) {
+      TutorService.removeFavorite(tutor.id).then(function () {
+        self.favoriteTutorIds = self.favoriteTutorIds.filter(function (id) { return id !== tutor.id; });
+      });
+    } else {
+      TutorService.addFavorite(tutor.id).then(function () {
+        self.favoriteTutorIds.push(tutor.id);
+      });
+    }
+  };
 
   // Filtered tutors
   self.filteredTutors = function () {
     return self.tutors.filter(function (t) {
       var q = self.searchQuery.toLowerCase();
       var matchQuery = !q || t.name.toLowerCase().indexOf(q) >= 0 ||
-        t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; });
+        t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; }) ||
+        (t.qualifications || []).some(function (ql) { return ql.toLowerCase().indexOf(q) >= 0; });
+      var matchCountry = (t.offerings || []).some(function (o) { return o.country === self.selectedCountry; });
       var matchSub = self.selectedSubject === 'All' || t.subjects.indexOf(self.selectedSubject) >= 0;
       var matchMode = self.selectedMode === 'All' || t.modes.indexOf(self.selectedMode) >= 0;
       var matchRating = !self.minRating || t.rating >= self.minRating;
-      return matchQuery && matchSub && matchMode && matchRating;
+      var matchExperience = !self.minExperience || t.experienceYears >= self.minExperience;
+      return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience;
+    }).sort(function (a, b) {
+      return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
     });
   };
 
@@ -379,6 +470,42 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return d.getFullYear() + '-' + mm + '-' + dd;
   }
 
+  // Minimum lead time before a class can be booked/changed, to avoid urgent last-minute changes.
+  var MIN_LEAD_HOURS = 6;
+
+  function combineDateTime(dateVal, timeStr) {
+    var d = toDateObj(dateVal);
+    if (!d) return null;
+    var m = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return d;
+    var h = parseInt(m[1], 10);
+    var min = parseInt(m[2], 10);
+    var ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    d.setHours(h, min, 0, 0);
+    return d;
+  }
+
+  self.isTooSoon = function (dateVal, timeStr) {
+    var dt = combineDateTime(dateVal, timeStr);
+    if (!dt || isNaN(dt.getTime())) return false;
+    var minAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
+    return dt < minAllowed;
+  };
+
+  self.hasTooSoonSession = function () {
+    return (self.bookingForm.sessions || []).some(function (s) {
+      return s.date && self.isTooSoon(s.date, s.startTime);
+    });
+  };
+
+  self.hasTooSoonReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      return c.date && self.isTooSoon(c.date, c.time);
+    });
+  };
+
   self.applyRecurring = function () {
     var sessions = self.bookingForm.sessions;
     if (!sessions || sessions.length < 2 || !sessions[0].recurring || !sessions[0].date) return;
@@ -418,6 +545,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Book a tutor
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
+    if (self.hasTooSoonSession()) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
     var classes = self.bookingForm.sessions.map(function (session) {
       return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
@@ -498,6 +626,14 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       var idx = self.students.findIndex(function (s) { return s.id === self.editingStudent.id; });
       if (idx >= 0) self.students[idx] = res.data;
       self.cancelEditStudent();
+    });
+  };
+
+  self.deleteStudent = function (s) {
+    if (!confirm('Delete ' + s.name + '\'s profile? This cannot be undone.')) return;
+    StudentService.delete(s.id).then(function () {
+      self.students = self.students.filter(function (x) { return x.id !== s.id; });
+      if (self.editingStudent && self.editingStudent.id === s.id) self.cancelEditStudent();
     });
   };
 
@@ -590,7 +726,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.schoolDropdownOpen = true;
     AdminService.getInstitutions({
       search: self.schoolSearch,
-      country: self.countryFilter !== 'All' ? self.countryFilter : '',
+      country: self.countryFilter,
       type: self.typeFilter !== 'All' ? self.typeFilter : ''
     }).then(function (res) { self.institutions = res.data; });
   };
@@ -598,7 +734,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.searchSchools = function () {
     AdminService.getInstitutions({
       search: self.schoolSearch,
-      country: self.countryFilter !== 'All' ? self.countryFilter : '',
+      country: self.countryFilter,
       type: self.typeFilter !== 'All' ? self.typeFilter : ''
     }).then(function (res) { self.institutions = res.data; });
   };
