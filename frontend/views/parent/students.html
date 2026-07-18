@@ -6,7 +6,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item active">👤 Student Profiles</a>
+      <a href="#!/parent/students" class="nav-item active">👤 Children Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
       <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
@@ -76,13 +76,13 @@
       <div class="profile-hero-left">
         <div class="profile-hero-icon">👨‍👩‍👧</div>
         <div>
-          <h2 class="profile-hero-title">Student Profiles</h2>
+          <h2 class="profile-hero-title">Children Profiles</h2>
           <p class="profile-hero-sub">Manage your children's learning profiles and match them with expert tutors</p>
         </div>
       </div>
       <div class="profile-hero-right">
         <div class="profile-hero-stat">
-          <strong>{{ vm.students.length }}</strong>
+          <strong>{{ vm.activeStudents().length }}</strong>
           <small>Active Profiles</small>
         </div>
         <div class="profile-hero-divider"></div>
@@ -98,24 +98,37 @@
 
       <!-- ── Left: Student Registry ─────────────── -->
       <div class="profile-registry">
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <button class="tab-btn" ng-class="{'active': vm.studentsTab === 'active'}" ng-click="vm.studentsTab = 'active'">
+            📋 Active ({{ vm.activeStudents().length }})
+          </button>
+          <button class="tab-btn" ng-class="{'active': vm.studentsTab === 'archived'}" ng-click="vm.studentsTab = 'archived'">
+            🗄️ Archived ({{ vm.archivedStudents().length }})
+          </button>
+        </div>
+
         <span class="profile-registry-label">
-          {{ vm.students.length }} Profile{{ vm.students.length !== 1 ? 's' : '' }} Registered
+          {{ vm.visibleStudents().length }} Profile{{ vm.visibleStudents().length !== 1 ? 's' : '' }} {{ vm.studentsTab === 'archived' ? 'Archived' : 'Registered' }}
         </span>
 
         <!-- Success toast -->
         <div class="alert-success" ng-if="vm.studentSuccess" style="margin-bottom:12px">
-          ✓ New student profile has been created successfully!
+          ✓ New child profile has been created successfully!
         </div>
 
         <!-- Empty state -->
-        <div class="profile-empty-state" ng-if="!vm.students.length">
+        <div class="profile-empty-state" ng-if="!vm.visibleStudents().length">
           <div class="profile-empty-icon">👤</div>
-          <h4>No Profiles Yet</h4>
-          <p>Add your first child's profile using the form on the right to get started.</p>
+          <h4 ng-if="vm.studentsTab === 'active'">No Profiles Yet</h4>
+          <h4 ng-if="vm.studentsTab === 'archived'">No Archived Profiles</h4>
+          <p ng-if="vm.studentsTab === 'active'">Add your first child's profile using the form on the right to get started.</p>
+          <p ng-if="vm.studentsTab === 'archived'">Profiles you archive instead of deleting will show up here.</p>
         </div>
 
         <!-- ── Student cards ── -->
-        <div class="profile-card" ng-repeat="s in vm.students"
+        <div class="profile-card" ng-repeat="s in vm.visibleStudents()"
           ng-class="{'profile-card--new': s.id === vm.newlyAddedStudentId, 'profile-card--editing': vm.editingStudent && vm.editingStudent.id === s.id}">
 
           <!-- View mode -->
@@ -128,8 +141,31 @@
                 <span class="profile-card-level">{{ s.educationLevel }}</span>
                 <div class="profile-card-school">🏫 {{ s.school }}</div>
               </div>
-              <button type="button" class="btn-outline-sm" ng-click="$event.stopPropagation(); vm.startEditStudent(s)">✏️ Edit</button>
-              <button type="button" class="btn-danger btn-sm" ng-click="$event.stopPropagation(); vm.deleteStudent(s)">🗑️ Delete</button>
+              <button type="button" ng-if="!s.isArchived" class="btn-outline-sm" ng-click="$event.stopPropagation(); vm.startEditStudent(s)">✏️ Edit</button>
+              <button type="button" ng-if="!s.isArchived" class="btn-outline-sm" ng-click="$event.stopPropagation(); vm.archiveStudent(s)">🗄️ Archive</button>
+              <button type="button" ng-if="!s.isArchived" class="btn-danger btn-sm" ng-click="$event.stopPropagation(); vm.deleteStudent(s)">🗑️ Delete</button>
+              <button type="button" ng-if="s.isArchived" class="btn-outline-sm" ng-click="$event.stopPropagation(); vm.unarchiveStudent(s)">♻️ Restore</button>
+            </div>
+
+            <div class="alert-error" ng-if="vm.deleteBlockedStudentId === s.id" ng-click="$event.stopPropagation()">
+              <strong>⚠️ Cannot delete this profile yet</strong>
+              <p style="margin-top:4px">{{ vm.deleteBlockedInfo.message }}</p>
+              <div ng-if="vm.deleteBlockedInfo.activeBookings.length">
+                <p style="margin-top:8px;font-weight:700">Pending classes / tutor agreements:</p>
+                <ul style="margin:4px 0 0 18px">
+                  <li ng-repeat="b in vm.deleteBlockedInfo.activeBookings">
+                    {{ b.subject }} with {{ b.tutorName }} — {{ b.status | uppercase }} ({{ b.bookingNumber }})
+                  </li>
+                </ul>
+              </div>
+              <div ng-if="vm.deleteBlockedInfo.unpaidInvoices.length">
+                <p style="margin-top:8px;font-weight:700">Pending payments:</p>
+                <ul style="margin:4px 0 0 18px">
+                  <li ng-repeat="inv in vm.deleteBlockedInfo.unpaidInvoices">
+                    {{ inv.invoiceNumber }} — ${{ inv.amount }}.00 ({{ inv.tutorName }})
+                  </li>
+                </ul>
+              </div>
             </div>
 
             <div class="profile-subjects" ng-if="s.subjectSelect">
@@ -253,7 +289,7 @@
         <div class="profile-form-header">
           <div class="profile-form-icon">✚</div>
           <div>
-            <h3>Add New Student</h3>
+            <h3>Add New Child</h3>
             <p>Fill in your child's details to find the right tutor match</p>
           </div>
         </div>
@@ -268,40 +304,49 @@
 
           <div class="form-group" style="position:relative">
             <label>Education Institution</label>
-            <input type="text" ng-model="vm.schoolSearch"
-              ng-change="vm.searchSchools()"
-              ng-focus="vm.openSchoolDropdown()"
-              ng-blur="vm.closeSchoolDropdown()"
-              placeholder="Search school in SG / MY..." />
-            <div class="school-dropdown" ng-if="vm.schoolDropdownOpen">
-              <div class="school-filters">
-                <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
-                  ng-click="vm.countryFilter = c; vm.searchSchools()"
-                  ng-class="{active: vm.countryFilter === c}" class="filter-chip">
-                  {{ c === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}
-                </button>
-              </div>
-              <select ng-model="vm.typeFilter" ng-change="vm.searchSchools()" class="filter-select">
-                <option value="All">All Types</option>
-                <option value="Primary">Primary</option>
-                <option value="Secondary">Secondary</option>
-                <option value="Junior College">Junior College</option>
-                <option value="Polytechnic/Vocational">Polytechnic/Vocational</option>
-                <option value="University/Tertiary">University/Tertiary</option>
-              </select>
-              <div class="school-list">
-                <button type="button" class="school-option"
-                  ng-repeat="inst in vm.institutions"
-                  ng-click="vm.selectSchool(inst.name)">
-                  <span>{{ inst.name }}</span>
-                  <div>
-                    <span class="badge-country">{{ inst.country === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}</span>
-                    <span class="badge-type">{{ inst.type }}</span>
-                  </div>
-                </button>
-                <p ng-if="!vm.institutions.length" class="empty-state">No matching institutions found.</p>
+
+            <div class="school-field-wrap" ng-if="!vm.schoolIsOther">
+              <input type="text" ng-model="vm.schoolSearch"
+                ng-change="vm.searchSchools()"
+                ng-focus="vm.openSchoolDropdown()"
+                ng-blur="vm.closeSchoolDropdown()"
+                placeholder="Search school in SG / MY..." />
+              <div class="school-dropdown" ng-if="vm.schoolDropdownOpen">
+                <div class="school-filters">
+                  <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
+                    ng-mousedown="$event.preventDefault()"
+                    ng-click="vm.countryFilter = c; vm.searchSchools()"
+                    ng-class="{active: vm.countryFilter === c}" class="filter-chip">
+                    {{ c === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}
+                  </button>
+                </div>
+                <div class="school-list">
+                  <button type="button" class="school-option"
+                    ng-repeat="inst in vm.institutions"
+                    ng-mousedown="$event.preventDefault()"
+                    ng-click="vm.selectSchool(inst.name)">
+                    <span>{{ inst.name }}</span>
+                    <div>
+                      <span class="badge-country">{{ inst.country === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}</span>
+                      <span class="badge-type">{{ inst.type }}</span>
+                    </div>
+                  </button>
+                  <p ng-if="!vm.institutions.length" class="empty-state">No matching institutions found.</p>
+                  <button type="button" class="school-option school-option-other"
+                    ng-mousedown="$event.preventDefault()"
+                    ng-click="vm.selectSchoolOther()">
+                    <span>➕ Others (institution not listed)</span>
+                  </button>
+                </div>
               </div>
             </div>
+
+            <div class="school-field-wrap" ng-if="vm.schoolIsOther">
+              <input type="text" ng-model="vm.studentForm.school" placeholder="Enter your institution's name" />
+              <button type="button" class="btn-link" ng-click="vm.backToSchoolSearch()">← Back to search</button>
+            </div>
+
+            <p class="field-error" ng-if="vm.schoolError">{{ vm.schoolError }}</p>
           </div>
 
           <div class="profile-form-section">Academic Details</div>
@@ -342,7 +387,7 @@
           </div>
 
           <button type="submit" class="btn-primary full-width" style="margin-top:4px">
-            Create Student Profile →
+            Create Child Profile →
           </button>
 
         </form>

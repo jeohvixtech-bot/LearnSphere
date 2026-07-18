@@ -9,7 +9,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item active">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
+      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
       <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
@@ -36,7 +36,7 @@
       <div class="dash-hero-stats">
         <div class="dash-hero-stat">
           <strong>{{ vm.students.length }}</strong>
-          <small>Students</small>
+          <small>Children</small>
         </div>
         <div class="dash-hero-stat">
           <strong>{{ vm.confirmedAndCounteredBookings().length }}</strong>
@@ -90,45 +90,11 @@
             <div class="session-info">
               <span class="badge-subject">{{ b.subject }}</span>
               <strong>{{ b.tutorName }}</strong>
-              <small>🕐 {{ b.classes[0].date | dmy }} &bull; {{ b.classes[0].time }}
+              <small>🕐 {{ b.classes[0].date | dmy }} &bull; {{ b.classes[0].time }} ({{ b.durationHours }}h)
                 <span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span>
               </small>
             </div>
             <span class="status-badge" ng-class="b.status">{{ b.status | uppercase }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Progress Breakdown -->
-      <div class="card">
-        <div class="dash-section-header">
-          <div style="display:flex;align-items:center">
-            <span class="dash-section-icon teal">📈</span>
-            <span class="dash-section-title">Progress Breakdown</span>
-          </div>
-        </div>
-
-        <div class="progress-list">
-          <div class="progress-item">
-            <div class="progress-label">
-              <span>Secondary Geometry &amp; Shapes</span>
-              <strong>85%</strong>
-            </div>
-            <div class="progress-bar"><div class="progress-fill blue" style="width:85%"></div></div>
-          </div>
-          <div class="progress-item">
-            <div class="progress-label">
-              <span>Linear Algebra &amp; Graph Solutions</span>
-              <strong>76%</strong>
-            </div>
-            <div class="progress-bar"><div class="progress-fill green" style="width:76%"></div></div>
-          </div>
-          <div class="progress-item">
-            <div class="progress-label">
-              <span>Quadratic Calculations Speed</span>
-              <strong>62%</strong>
-            </div>
-            <div class="progress-bar"><div class="progress-fill amber" style="width:62%"></div></div>
           </div>
         </div>
       </div>
@@ -142,7 +108,7 @@
           <span class="dash-section-icon green">👨‍👩‍👧</span>
           <span class="dash-section-title">Active Children Profiles</span>
         </div>
-        <a href="#!/parent/students" class="link-sm">+ Add Student</a>
+        <a href="#!/parent/students" class="link-sm">+ Add Child</a>
       </div>
 
       <div class="student-grid">
@@ -156,7 +122,7 @@
           </div>
         </div>
         <div class="student-mini-empty" ng-if="!vm.students.length">
-          No student profiles yet. <a href="#!/parent/students">Add one now →</a>
+          No child profiles yet. <a href="#!/parent/students">Add one now →</a>
         </div>
       </div>
     </div>

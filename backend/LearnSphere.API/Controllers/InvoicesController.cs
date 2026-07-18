@@ -47,6 +47,10 @@ public class InvoicesController : ControllerBase
             .FirstOrDefaultAsync(i => i.Id == id);
 
         if (invoice == null) return NotFound();
+        if (invoice.Status != "Unpaid")
+            return BadRequest(new { message = $"This invoice is {invoice.Status.ToLower()} and can no longer be paid." });
+        if (invoice.Booking.Status == "cancelled")
+            return BadRequest(new { message = "This booking has been cancelled and its invoice can no longer be paid." });
 
         invoice.Status = "Paid";
 

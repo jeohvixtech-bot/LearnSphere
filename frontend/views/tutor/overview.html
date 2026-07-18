@@ -1,15 +1,31 @@
 <div class="dashboard-layout">
-  <aside class="sidebar sidebar-indigo">
-    <div class="sidebar-user">
-      <div class="avatar-circle indigo">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
+  <div class="sidebar-col">
+    <aside class="sidebar sidebar-indigo">
+      <div class="sidebar-user">
+        <div class="avatar-circle indigo">{{ vm.user.name[0] }}</div>
+        <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#!/tutor/overview" class="nav-item active">📋 Overview & Schedules</a>
+        <a href="#!/tutor/chat" class="nav-item">💬 Direct Messages</a>
+      </nav>
+      <div class="status-live">Status: <span class="dot-green">● LIVE ON DUTY</span></div>
+    </aside>
+
+    <!-- Calendar Legend -->
+    <div class="card calendar-legend" ng-if="vm.activeTab === 'overview'">
+      <h4>📖 Calendar Legend</h4>
+      <div class="legend-grid">
+        <div class="legend-item"><span class="legend-swatch legend-selected"></span> Selected Day</div>
+        <div class="legend-item"><span class="legend-swatch legend-paid"></span> Paid Session</div>
+        <div class="legend-item"><span class="legend-swatch legend-unpaid"></span> Unpaid Session</div>
+        <div class="legend-item"><span class="legend-swatch legend-holiday"></span> MY Public Holiday</div>
+        <div class="legend-item"><span class="legend-swatch legend-holiday-sg"></span> SG Public Holiday</div>
+        <div class="legend-item"><span class="legend-swatch legend-blocked">🚫</span> Blocked by You</div>
+        <div class="legend-item"><span class="legend-swatch legend-past"></span> Past Date</div>
+      </div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/tutor/overview" class="nav-item active">📋 Overview & Schedules</a>
-      <a href="#!/tutor/chat" class="nav-item">💬 Direct Messages</a>
-    </nav>
-    <div class="status-live">Status: <span class="dot-green">● LIVE ON DUTY</span></div>
-  </aside>
+  </div>
 
   <main class="dashboard-main">
 
@@ -51,20 +67,6 @@
       </div>
     </div>
 
-    <!-- Calendar Legend -->
-    <div class="card calendar-legend">
-      <h4>📖 Calendar Legend</h4>
-      <div class="legend-grid">
-        <div class="legend-item"><span class="legend-swatch legend-selected"></span> Selected Day</div>
-        <div class="legend-item"><span class="legend-swatch legend-paid"></span> Paid Session</div>
-        <div class="legend-item"><span class="legend-swatch legend-unpaid"></span> Unpaid Session</div>
-        <div class="legend-item"><span class="legend-swatch legend-holiday"></span> Public Holiday</div>
-        <div class="legend-item"><span class="legend-swatch legend-holiday-sg"></span> SG Public Holiday</div>
-        <div class="legend-item"><span class="legend-swatch legend-blocked">🚫</span> Blocked by You</div>
-        <div class="legend-item"><span class="legend-swatch legend-past"></span> Past Date</div>
-      </div>
-    </div>
-
     <!-- Pending Booking Requests -->
     <div class="card" ng-if="vm.pendingRequests().length">
       <h3><span class="dot-amber"></span> Parents Booking Requests ({{ vm.pendingRequests().length }})</h3>
@@ -73,7 +75,7 @@
           <div>
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>{{ b.studentName }}</strong>
-            <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time }}</p>
+            <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time }} ({{ b.durationHours }}h)</p>
             <em ng-if="b.message">"{{ b.message }}"</em>
           </div>
           <div class="btn-row">
@@ -108,7 +110,7 @@
               <span class="counter-original">
                 <strong>{{ c.originalDate | dmy }}</strong>
                 <span class="badge-blocked" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
-                <small>{{ c.originalTime }}</small>
+                <small>{{ c.originalTime }} ({{ vm.counterBooking.durationHours }}h)</small>
               </span>
               <div class="form-group mb-0">
                 <input type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
@@ -118,19 +120,24 @@
                 </span>
               </div>
               <div class="form-group mb-0">
-                <input type="text" ng-model="c.proposedTime" placeholder="05:00 PM"
+                <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+                  ng-change="vm.onCounterStartTimeChange(c)"
                   ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
+                <small class="text-muted" style="font-size:11px;display:block">→ {{ vm.counterEndTime(c) || '—' }} ({{ vm.counterBooking.durationHours }}h)</small>
               </div>
               <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
                 ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
               </span>
             </div>
           </div>
+          <span class="blocked-date-hint" ng-if="vm.hasDuplicateCounter()">
+            ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+          </span>
           <div class="form-group mt-3">
             <label>Explanation to Parent</label>
             <textarea ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
           </div>
-          <button type="submit" class="btn-primary full-width" ng-disabled="vm.hasTooSoonCounter()">Dispatch Counter Proposal</button>
+          <button type="submit" class="btn-primary full-width" ng-disabled="vm.hasTooSoonCounter() || vm.hasDuplicateCounter()">Dispatch Counter Proposal</button>
         </form>
       </div>
     </div>
@@ -190,7 +197,7 @@
         <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(vm.selectedCalDay)">
           <div class="booking-detail-header">
             <span class="badge-subject">{{ b.subject }}</span>
-            <strong>Student: {{ b.studentName }}</strong>
+            <strong>Child: {{ b.studentName }}</strong>
             <p>{{ vm.classOnDay(b, vm.selectedCalDay).time }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
           </div>
           <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
@@ -237,7 +244,7 @@
             <div class="block-conflict-item" ng-repeat="c in vm.blockConflicts">
               <span class="badge-subject">{{ c.subject }}</span>
               <span>{{ c.student }}</span>
-              <span class="block-conflict-date">📅 {{ c.date | dmy }} &bull; {{ c.time }}</span>
+              <span class="block-conflict-date">📅 {{ c.date | dmy }} &bull; {{ c.time }} ({{ c.duration }}h)</span>
               <button class="btn-warning sm" ng-click="vm.startTutorRescheduleById(c.bookingId)">
                 Reschedule →
               </button>
@@ -267,7 +274,7 @@
           <span class="reschedule-icon">📅</span>
           <div>
             <h3>Propose Reschedule</h3>
-            <p>{{ vm.rescheduleBooking.subject }} &bull; Student: {{ vm.rescheduleBooking.studentName }}</p>
+            <p>{{ vm.rescheduleBooking.subject }} &bull; Child: {{ vm.rescheduleBooking.studentName }}</p>
           </div>
         </div>
         <button class="btn-link" ng-click="vm.cancelTutorReschedule()">✕ Cancel</button>
@@ -286,9 +293,9 @@
             <span class="badge-blocked" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
           </div>
           <div class="reschedule-orig-date">
-            Original: <strong>{{ c.originalDate | dmy }}</strong>
+            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
-          <div class="form-row">
+          <div class="form-row-3">
             <div class="form-group">
               <label>New Date</label>
               <input type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
@@ -298,18 +305,26 @@
               </span>
             </div>
             <div class="form-group">
-              <label>New Time</label>
-              <input type="text" ng-model="c.proposedTime" placeholder="04:00 PM - 05:00 PM"
+              <label>New Start Time</label>
+              <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+                ng-change="vm.onTutorRescheduleStartTimeChange(c)"
                 ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
+            </div>
+            <div class="form-group">
+              <label>New End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
+              <input type="text" value="{{ vm.rescheduleEndTime(c) }}" readonly disabled placeholder="Auto-calculated" />
             </div>
           </div>
           <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
             ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
           </span>
         </div>
+        <p class="reschedule-sub" ng-if="vm.hasDuplicateTutorReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+          ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+        </p>
         <div class="btn-row" style="margin-top:4px">
           <button type="button" class="btn-outline" ng-click="vm.cancelTutorReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonTutorReschedule()">Send Reschedule Proposal →</button>
+          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
         </div>
       </form>
     </div>
@@ -322,12 +337,12 @@
         ng-class="{'session-conflicted': vm.isTutorBookingConflicted(b)}">
         <div style="flex:1">
           <span class="badge-subject">{{ b.subject }}</span>
-          <strong>Student: {{ b.studentName }}</strong>
+          <strong>Child: {{ b.studentName }}</strong>
           <!-- Countered: show proposed dates, pending parent acceptance -->
           <div ng-if="b.status === 'countered' && b.counterProposal">
             <div class="class-date-row" ng-repeat="c in b.counterProposal.classes track by $index">
               <p style="text-decoration:line-through;color:#94a3b8;font-size:12px">{{ c.originalDate | dmy }}</p>
-              <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime }}
+              <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime }} ({{ b.durationHours }}h)
                 <span class="badge-amber" style="font-size:10px;margin-left:4px">⏳ Awaiting acceptance</span>
               </p>
             </div>
@@ -335,7 +350,7 @@
           <!-- Confirmed: show actual booking classes -->
           <div ng-if="b.status !== 'countered' || !b.counterProposal">
             <div class="class-date-row" ng-repeat="c in b.classes track by $index">
-              <p>{{ c.date | dmy }} • {{ c.time }}</p>
+              <p>{{ c.date | dmy }} • {{ c.time }} ({{ b.durationHours }}h)</p>
               <span class="status-badge confirmed" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
             </div>
           </div>
@@ -358,7 +373,7 @@
           <div>
             <span class="badge-amber">REPORT REQUIRED</span>
             <strong>{{ b.subject }} — {{ b.classes.length }} class(es)</strong>
-            <p>Student: {{ b.studentName }}</p>
+            <p>Child: {{ b.studentName }}</p>
           </div>
           <button class="btn-indigo" ng-click="vm.startReport(b)">Submit Lesson Report</button>
         </div>
@@ -398,7 +413,7 @@
               placeholder="e.g. Solving simultaneous quadratic equations..."></textarea>
           </div>
           <div class="form-group">
-            <label>Student Performance & Classroom Alignment</label>
+            <label>Child Performance & Classroom Alignment</label>
             <textarea ng-model="vm.reportForm.performance" rows="3" required
               placeholder="e.g. Excellent focus. Solved algebraic tasks correctly..."></textarea>
           </div>
@@ -427,7 +442,7 @@
             <textarea ng-model="vm.editForm.covered" rows="2" required></textarea>
           </div>
           <div class="form-group">
-            <label>Student Performance</label>
+            <label>Child Performance</label>
             <textarea ng-model="vm.editForm.performance" rows="2" required></textarea>
           </div>
           <div class="form-group">
