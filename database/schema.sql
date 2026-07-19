@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS Users (
     PasswordHash LONGTEXT        NOT NULL,
     Role         LONGTEXT        NOT NULL DEFAULT 'parent',  -- parent | tutor | admin
     Name         LONGTEXT        NOT NULL,
-    CreatedAt    DATETIME(6)     NOT NULL
+    CreatedAt    DATETIME(6)     NOT NULL,
+    MustChangePassword TINYINT(1) NOT NULL DEFAULT 0
 );
 
 -- ============================================================
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS Students (
     SubjectSelect   LONGTEXT    NOT NULL,
     LearningGoal    LONGTEXT    NULL,
     PhotoUrl        LONGTEXT    NULL,
+    IsArchived      TINYINT(1)  NOT NULL DEFAULT 0,
     CONSTRAINT FK_Students_Users FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -239,7 +241,7 @@ CREATE TABLE IF NOT EXISTS Invoices (
     BookingId       INT             NOT NULL UNIQUE,
     Date            LONGTEXT        NOT NULL,
     Amount          DECIMAL(10,2)   NOT NULL,
-    Status          LONGTEXT        NOT NULL DEFAULT 'Unpaid', -- Paid | Unpaid
+    Status          LONGTEXT        NOT NULL DEFAULT 'Unpaid', -- Paid | Unpaid | Refunded | Cancelled
     Subject         LONGTEXT        NULL,
     InvoiceNumber   LONGTEXT        NOT NULL,
     CONSTRAINT FK_Invoices_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
