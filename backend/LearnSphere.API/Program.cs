@@ -37,13 +37,21 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 
-// CORS — allow all origins for local development
+// CORS — origins configurable via appsettings.json "AllowedOrigins"
+// Set to ["*"] to allow all, or list specific origins e.g. ["http://localhost:4200","http://myserver:1002"]
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    {
+        if (allowedOrigins == null || allowedOrigins.Length == 0 || allowedOrigins.Contains("*"))
+            policy.SetIsOriginAllowed(_ => true);
+        else
+            policy.WithOrigins(allowedOrigins);
+
+        policy.AllowAnyHeader().AllowAnyMethod();
+    });
 });
 
 builder.Services.AddControllers();
