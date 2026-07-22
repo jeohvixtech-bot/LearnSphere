@@ -7,7 +7,8 @@ angular.module('learnSphereApp')
   // Redirect if already logged in
   if (AuthService.isLoggedIn()) {
     var user = AuthService.getCurrentUser();
-    redirectByRole(user.role);
+    if (user.mustChangePassword) $location.path('/change-password');
+    else redirectByRole(user.role);
   }
 
   self.mode = 'login';  // login | register
@@ -16,6 +17,40 @@ angular.module('learnSphereApp')
   self.showTerms = false;
   self.errorMsg = '';
   self.loading = false;
+
+  // Forgot password
+  self.showForgotPassword = false;
+  self.forgotEmail = '';
+  self.forgotLoading = false;
+  self.forgotMsg = '';
+  self.forgotErrorMsg = '';
+
+  self.openForgotPassword = function () {
+    self.showForgotPassword = true;
+    self.forgotEmail = self.loginData.email || '';
+    self.forgotMsg = '';
+    self.forgotErrorMsg = '';
+  };
+
+  self.closeForgotPassword = function () {
+    self.showForgotPassword = false;
+  };
+
+  self.submitForgotPassword = function () {
+    self.forgotMsg = '';
+    self.forgotErrorMsg = '';
+    self.forgotLoading = true;
+    AuthService.forgotPassword(self.forgotEmail)
+      .then(function (result) {
+        self.forgotMsg = 'A temporary password has been sent to your email. Use it to log in, then you can change your password.';
+      })
+      .catch(function () {
+        self.forgotErrorMsg = 'Something went wrong. Please try again.';
+      })
+      .finally(function () {
+        self.forgotLoading = false;
+      });
+  };
 
   self.login = function () {
     self.errorMsg = '';
@@ -26,7 +61,8 @@ angular.module('learnSphereApp')
           self.errorMsg = 'Unexpected response from server. Please try again.';
           return;
         }
-        redirectByRole(user.role);
+        if (user.mustChangePassword) $location.path('/change-password');
+        else redirectByRole(user.role);
       })
       .catch(function (err) {
         if (err && err.status === 401) {

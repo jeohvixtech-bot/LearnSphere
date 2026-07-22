@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<Payout> Payouts { get; set; }
     public DbSet<Institution> Institutions { get; set; }
     public DbSet<TutorOffering> TutorOfferings { get; set; }
+    public DbSet<FavoriteTutor> FavoriteTutors { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

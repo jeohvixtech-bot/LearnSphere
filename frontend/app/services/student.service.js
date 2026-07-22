@@ -15,4 +15,16 @@ angular.module('learnSphereApp')
   self.update = function (id, data) {
     return $http.put(API_URL + '/students/' + id, data, { headers: AuthService.authHeader() });
   };
+
+  self.delete = function (id) {
+    return $http.delete(API_URL + '/students/' + id, { headers: AuthService.authHeader() });
+  };
+
+  self.archive = function (id) {
+    return $http.post(API_URL + '/students/' + id + '/archive', {}, { headers: AuthService.authHeader() });
+  };
+
+  self.unarchive = function (id) {
+    return $http.post(API_URL + '/students/' + id + '/unarchive', {}, { headers: AuthService.authHeader() });
+  };
 }]);

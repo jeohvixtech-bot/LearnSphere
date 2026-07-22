@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
@@ -13,11 +14,13 @@ public class AuthService : IAuthService
 {
     private readonly AppDbContext _context;
     private readonly IConfiguration _config;
+    private readonly IEmailService _emailService;
 
-    public AuthService(AppDbContext context, IConfiguration config)
+    public AuthService(AppDbContext context, IConfiguration config, IEmailService emailService)
     {
         _context = context;
         _config = config;
+        _emailService = emailService;
     }
 
     public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
@@ -26,7 +29,7 @@ public class AuthService : IAuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return null;
 
-        return new AuthResponseDto(GenerateToken(user), user.Role, user.Name, user.Id);
+        return new AuthResponseDto(GenerateToken(user), user.Role, user.Name, user.Id, user.MustChangePassword);
     }
 
     public async Task<AuthResponseDto?> RegisterAsync(RegisterDto dto)
@@ -58,7 +61,45 @@ public class AuthService : IAuthService
             await _context.SaveChangesAsync();
         }
 
-        return new AuthResponseDto(GenerateToken(user), user.Role, user.Name, user.Id);
+        return new AuthResponseDto(GenerateToken(user), user.Role, user.Name, user.Id, user.MustChangePassword);
+    }
+
+    public async Task<string?> ForgotPasswordAsync(string email)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null) return null;
+
+        var tempPassword = GenerateTempPassword();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+        user.MustChangePassword = true;
+        await _context.SaveChangesAsync();
+
+        await _emailService.SendAsync(user.Email, "Your LearnSphere temporary password",
+            $"Your temporary password is: {tempPassword}\nPlease sign in and change it as soon as possible. " +
+            "You will be required to set a new password immediately after logging in.");
+
+        return tempPassword;
+    }
+
+    public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null || !BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            return false;
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.MustChangePassword = false;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    private static string GenerateTempPassword()
+    {
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+        var bytes = RandomNumberGenerator.GetBytes(15);
+        var sb = new StringBuilder();
+        foreach (var b in bytes) sb.Append(chars[b % chars.Length]);
+        return sb.ToString();
     }
 
     private string GenerateToken(User user)

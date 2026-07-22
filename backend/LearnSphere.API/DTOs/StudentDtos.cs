@@ -11,6 +11,7 @@ public class StudentDto
     public string SubjectSelect { get; set; } = string.Empty;
     public string? LearningGoal { get; set; }
     public string? PhotoUrl { get; set; }
+    public bool IsArchived { get; set; }
 }
 
 public class CreateStudentDto

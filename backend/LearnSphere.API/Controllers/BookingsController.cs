@@ -17,6 +17,53 @@ public class BookingsController : ControllerBase
 
     public BookingsController(AppDbContext context) => _context = context;
 
+    // Parses "04:00 PM - 05:00 PM" into (startMinutes, endMinutes) since midnight. Returns
+    // null if the string doesn't contain two recognizable times.
+    private static (int Start, int End)? ParseTimeRangeMinutes(string? timeStr)
+    {
+        var matches = System.Text.RegularExpressions.Regex.Matches(
+            timeStr ?? string.Empty, @"(\d{1,2}):(\d{2})\s*(AM|PM)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (matches.Count < 2) return null;
+
+        int ToMinutes(System.Text.RegularExpressions.Match m)
+        {
+            var h = int.Parse(m.Groups[1].Value);
+            var min = int.Parse(m.Groups[2].Value);
+            var ampm = m.Groups[3].Value.ToUpperInvariant();
+            if (ampm == "PM" && h != 12) h += 12;
+            if (ampm == "AM" && h == 12) h = 0;
+            return h * 60 + min;
+        }
+
+        var start = ToMinutes(matches[0]);
+        var end = ToMinutes(matches[1]);
+        if (end <= start) end += 24 * 60;
+        return (start, end);
+    }
+
+    // A booking's classes can't overlap each other — same date, and their time ranges
+    // intersect (this also catches exact-duplicate date+time as the simplest case of overlap).
+    // Applied at every path that builds a booking's class list: new booking, reschedule,
+    // counter proposal, accepting a counter.
+    private static bool HasOverlappingClasses(IEnumerable<(string Date, string Time)> classes)
+    {
+        var list = classes.Where(c => !string.IsNullOrEmpty(c.Date) && !string.IsNullOrEmpty(c.Time)).ToList();
+        for (int i = 0; i < list.Count; i++)
+        {
+            var r1 = ParseTimeRangeMinutes(list[i].Time);
+            if (r1 == null) continue;
+            for (int j = i + 1; j < list.Count; j++)
+            {
+                if (list[i].Date != list[j].Date) continue;
+                var r2 = ParseTimeRangeMinutes(list[j].Time);
+                if (r2 == null) continue;
+                if (r1.Value.Start < r2.Value.End && r2.Value.Start < r1.Value.End) return true;
+            }
+        }
+        return false;
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -41,12 +88,36 @@ public class BookingsController : ControllerBase
         }
 
         var bookings = await query.ToListAsync();
+
+        // A confirmed booking whose classes have all already happened auto-transitions to
+        // completed — this is what unlocks lesson reports and tutor reviews for it.
+        var today = DateTime.Today.ToString("yyyy-MM-dd");
+        var anyAutoCompleted = false;
+        foreach (var b in bookings)
+        {
+            if (b.Status == "confirmed" && b.Classes.Count > 0
+                && b.Classes.All(c => string.Compare(c.Date, today, StringComparison.Ordinal) < 0))
+            {
+                b.Status = "completed";
+                anyAutoCompleted = true;
+            }
+        }
+        if (anyAutoCompleted) await _context.SaveChangesAsync();
+
         return Ok(bookings.Select(MapToDto));
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBookingDto dto)
     {
+        var student = await _context.Students.FindAsync(dto.StudentId);
+        if (student == null) return BadRequest(new { message = "The specified student does not exist." });
+        if (student.IsArchived)
+            return BadRequest(new { message = "This profile is archived and can't be booked for. Restore it first." });
+
+        if (HasOverlappingClasses(dto.Classes.Select(c => (c.Date, c.Time))))
+            return BadRequest(new { message = "Two or more classes in this booking overlap on the same date and time." });
+
         if (dto.SlotId.HasValue)
         {
             var slot = await _context.TutorTimeSlots.FindAsync(dto.SlotId.Value);
@@ -83,7 +154,6 @@ public class BookingsController : ControllerBase
         await _context.SaveChangesAsync();
 
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == dto.TutorId);
-        var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == dto.StudentId);
         var firstDate = dto.Classes.FirstOrDefault()?.Date ?? "TBD";
 
         var parentUserId = student?.ParentUserId ?? 0;
@@ -121,6 +191,14 @@ public class BookingsController : ControllerBase
 
         if (booking == null) return NotFound();
 
+        if (dto.Status == "countered" && dto.CounterProposal != null
+            && HasOverlappingClasses(dto.CounterProposal.Classes.Select(c =>
+                (string.IsNullOrEmpty(c.ProposedDate) ? c.OriginalDate : c.ProposedDate,
+                 string.IsNullOrEmpty(c.ProposedTime) ? c.OriginalTime : c.ProposedTime))))
+        {
+            return BadRequest(new { message = "Two or more classes in this proposal overlap on the same date and time." });
+        }
+
         var previousStatus = booking.Status;
         booking.Status = dto.Status;
 
@@ -128,15 +206,18 @@ public class BookingsController : ControllerBase
         if (dto.Status == "confirmed" && previousStatus == "countered"
             && booking.CounterProposal?.Classes?.Count > 0)
         {
+            var finalClasses = booking.CounterProposal.Classes.Select(cp => (
+                Date: string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
+                Time: string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
+            )).ToList();
+
+            if (HasOverlappingClasses(finalClasses))
+                return BadRequest(new { message = "Two or more classes in this proposal overlap on the same date and time." });
+
             _context.BookingClasses.RemoveRange(booking.Classes);
-            foreach (var cp in booking.CounterProposal.Classes)
+            foreach (var c in finalClasses)
             {
-                _context.BookingClasses.Add(new BookingClass
-                {
-                    BookingId = id,
-                    Date = string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
-                    Time = string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
-                });
+                _context.BookingClasses.Add(new BookingClass { BookingId = id, Date = c.Date, Time = c.Time });
             }
         }
 
@@ -219,6 +300,58 @@ public class BookingsController : ControllerBase
             .FirstOrDefaultAsync(b => b.Id == id);
 
         return Ok(MapToDto(updated!));
+    }
+
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> CancelBooking(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var booking = await _context.Bookings
+            .Include(b => b.Tutor).ThenInclude(t => t.User)
+            .Include(b => b.Student)
+            .Include(b => b.Classes)
+            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
+            .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
+            .Include(b => b.IssueReport)
+            .Include(b => b.Invoice)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking == null || booking.Student == null || booking.Student.ParentUserId != userId)
+            return NotFound();
+
+        if (booking.Status == "completed" || booking.Status == "cancelled")
+            return BadRequest(new { message = "This booking can no longer be cancelled." });
+
+        if (booking.Invoice?.Status == "Paid")
+            return BadRequest(new { message = "This booking has already been paid for and can no longer be cancelled." });
+
+        var wasPendingTutorApproval = booking.Status == "pending";
+        booking.Status = "cancelled";
+
+        // Void any outstanding invoice so Billing & Invoices stops offering to pay for a cancelled class.
+        if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
+        {
+            booking.Invoice.Status = "Cancelled";
+        }
+
+        // Tutor already responded (countered) or accepted (confirmed) — let them know it's off.
+        // Still-pending requests are cancelled silently since the tutor hasn't acted on them yet.
+        if (!wasPendingTutorApproval && booking.Tutor?.User != null)
+        {
+            _context.Notifications.Add(new Notification
+            {
+                UserId = booking.Tutor.User.Id,
+                Title = "Booking Cancelled by Parent",
+                Message = $"{booking.Student.Name}'s {booking.Subject} booking ({booking.BookingNumber}) was cancelled by the parent.",
+                Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+                Type = "booking",
+                IsRead = false
+            });
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(MapToDto(booking));
     }
 
     [HttpPost("{id}/lesson-report")]

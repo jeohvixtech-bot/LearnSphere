@@ -6,7 +6,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
+      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
       <a href="#!/parent/search" class="nav-item active">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
       <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
@@ -29,112 +29,83 @@
         <p class="search-hero-sub">Browse verified NIE-trained tutors across Singapore &amp; Malaysia</p>
         <div class="search-hero-bar">
           <span class="search-icon">🔍</span>
-          <input type="text" ng-model="vm.searchQuery" placeholder="Search by name, subject, or qualification..." />
+          <input type="text" ng-model="vm.searchQuery" placeholder="Search tutor name" />
         </div>
       </div>
 
       <!-- ── Filter Bar ──────────────────────────── -->
       <div class="filter-bar">
-        <span class="filter-bar-label">Filter</span>
 
-        <div class="filter-bar-divider"></div>
+        <div class="filter-bar-header" ng-click="vm.filtersExpanded = !vm.filtersExpanded">
+          <span class="filter-bar-label">🔧 Filter</span>
+          <span class="filter-toggle-icon" ng-class="{open: vm.filtersExpanded}">▾</span>
+          <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+        </div>
 
-        <span class="filter-bar-label">Subject</span>
-        <select class="filter-select-sm" ng-model="vm.selectedSubject">
-          <option value="All">All Subjects</option>
-          <optgroup label="PSLE">
-            <option>English Language</option>
-            <option>Mother Tongue (Chinese)</option>
-            <option>Mother Tongue (Malay)</option>
-            <option>Mother Tongue (Tamil)</option>
-            <option>Mathematics</option>
-            <option>Science</option>
-          </optgroup>
-          <optgroup label="UPSR">
-            <option>Bahasa Malaysia</option>
-            <option>English</option>
-            <option>Mathematics</option>
-            <option>Science</option>
-            <option>History</option>
-          </optgroup>
-          <optgroup label="O-Level">
-            <option>English Language</option>
-            <option>Elementary Mathematics</option>
-            <option>Additional Mathematics</option>
-            <option>Physics</option>
-            <option>Chemistry</option>
-            <option>Biology</option>
-            <option>Combined Science</option>
-            <option>History</option>
-            <option>Social Studies</option>
-            <option>Geography</option>
-            <option>Literature in English</option>
-            <option>Principles of Accounts</option>
-            <option>Design &amp; Technology</option>
-            <option>Computing</option>
-            <option>Food &amp; Nutrition</option>
-            <option>Art</option>
-            <option>Music</option>
-          </optgroup>
-          <optgroup label="SPM">
-            <option>Bahasa Malaysia</option>
-            <option>English</option>
-            <option>Mathematics</option>
-            <option>Additional Mathematics</option>
-            <option>Physics</option>
-            <option>Chemistry</option>
-            <option>Biology</option>
-            <option>History</option>
-            <option>Geography</option>
-            <option>Economics</option>
-            <option>Accounting</option>
-            <option>Commerce</option>
-            <option>Business Studies</option>
-            <option>Information Technology</option>
-            <option>Moral Education</option>
-            <option>Islamic Studies</option>
-            <option>Art &amp; Design</option>
-          </optgroup>
-          <optgroup label="A-Level">
-            <option>General Paper</option>
-            <option>Mathematics</option>
-            <option>Further Mathematics</option>
-            <option>Physics</option>
-            <option>Chemistry</option>
-            <option>Biology</option>
-            <option>Computing</option>
-            <option>Economics</option>
-            <option>History</option>
-            <option>Geography</option>
-            <option>Literature in English</option>
-            <option>Art</option>
-            <option>Music</option>
-          </optgroup>
-        </select>
+        <div class="filter-bar-panel" ng-show="vm.filtersExpanded">
 
-        <div class="filter-bar-divider"></div>
+          <div class="filter-bar-group">
+            <span class="filter-bar-label">Country</span>
+            <div class="filter-country-switch">
+              <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
+                ng-click="vm.selectSearchCountry(c)"
+                ng-class="{active: vm.selectedCountry === c}" class="filter-chip">
+                {{ c === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}
+              </button>
+            </div>
+          </div>
 
-        <span class="filter-bar-label">Mode</span>
-        <select class="filter-select-sm" ng-model="vm.selectedMode">
-          <option value="All">All Modes</option>
-          <option value="Online">Online</option>
-          <option value="Home Visit">Home Visit</option>
-          <option value="Tutor Place">Tutor Place</option>
-        </select>
+          <div class="filter-bar-divider"></div>
 
-        <div class="filter-bar-divider"></div>
+          <div class="filter-bar-group">
+            <span class="filter-bar-label">Subject</span>
+            <select class="filter-select-sm" ng-model="vm.selectedSubject"
+              ng-options="opt.subject as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
+              <option value="All">All Subjects</option>
+            </select>
+          </div>
 
-        <span class="filter-bar-label">Rating</span>
-        <select class="filter-select-sm" ng-model="vm.minRating"
-          ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
-        </select>
+          <div class="filter-bar-divider"></div>
 
-        <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+          <div class="filter-bar-group">
+            <span class="filter-bar-label">Mode</span>
+            <select class="filter-select-sm" ng-model="vm.selectedMode">
+              <option value="All">All Modes</option>
+              <option value="Online">Online</option>
+              <option value="Home Visit">Home Visit</option>
+              <option value="Tutor Place">Tutor Place</option>
+            </select>
+          </div>
+
+          <div class="filter-bar-divider"></div>
+
+          <div class="filter-bar-group">
+            <span class="filter-bar-label">Experience</span>
+            <select class="filter-select-sm" ng-model="vm.minExperience"
+              ng-options="e.value as e.label for e in [{value:0,label:'All Experience'},{value:15,label:'> 15 years'},{value:10,label:'> 10 years'},{value:5,label:'> 5 years'},{value:3,label:'> 3 years'},{value:1,label:'> 1 year'}]">
+            </select>
+          </div>
+
+          <div class="filter-bar-divider"></div>
+
+          <div class="filter-bar-group">
+            <span class="filter-bar-label">Rating</span>
+            <select class="filter-select-sm" ng-model="vm.minRating"
+              ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
+            </select>
+          </div>
+
+        </div>
       </div>
 
       <!-- ── Tutor Grid ───────────────────────────── -->
       <div class="tutor-grid">
-        <div class="tutor-card" ng-repeat="t in vm.filteredTutors()">
+        <div class="tutor-card" ng-repeat="t in vm.filteredTutors()" ng-class="{'tutor-card--favorited': vm.isFavorited(t.id)}">
+
+          <button type="button" class="favorite-btn" ng-class="{active: vm.isFavorited(t.id)}"
+            ng-click="vm.toggleFavorite(t, $event)" title="Like this tutor">
+            {{ vm.isFavorited(t.id) ? '♥' : '♡' }}
+          </button>
 
           <!-- ── Top row: avatar + info ── -->
           <div class="tutor-card-main">
@@ -150,7 +121,10 @@
               </div>
               <div class="tutor-card-subjects-label">Teaches</div>
               <div class="subject-list">
-                <button ng-repeat="s in t.subjects" ng-click="vm.selectedSubject = s" class="subject-chip">{{ s }}</button>
+                <button ng-repeat="o in t.offerings" class="subject-chip"
+                  ng-click="vm.selectedCountry = o.country; vm.selectedSubject = o.subject">
+                  {{ o.country }} · {{ o.level }} · {{ o.subject }}
+                </button>
               </div>
               <p class="tutor-bio">"{{ t.bio }}"</p>
             </div>
@@ -205,6 +179,10 @@
             <div class="tutor-detail-name">
               {{ vm.selectedTutor.name }}
               <span ng-if="vm.selectedTutor.isVerified" class="badge-verified">✓ Verified</span>
+              <button type="button" class="favorite-btn inline" ng-class="{active: vm.isFavorited(vm.selectedTutor.id)}"
+                ng-click="vm.toggleFavorite(vm.selectedTutor, $event)" title="Like this tutor">
+                {{ vm.isFavorited(vm.selectedTutor.id) ? '♥' : '♡' }}
+              </button>
             </div>
             <p class="tutor-detail-meta">
               {{ vm.selectedTutor.experienceYears }} yrs experience &bull; {{ vm.selectedTutor.modes.join(' / ') }}
@@ -226,7 +204,10 @@
           <div class="tutor-detail-footer-section">
             <span class="tutor-detail-footer-label">Subjects Offered</span>
             <div class="subject-list">
-              <button ng-repeat="s in vm.selectedTutor.subjects" ng-click="vm.selectedSubject = s" class="subject-chip">{{ s }}</button>
+              <button ng-repeat="o in vm.selectedTutor.offerings" class="subject-chip"
+                ng-click="vm.selectedCountry = o.country; vm.selectedSubject = o.subject">
+                {{ o.country }} · {{ o.level }} · {{ o.subject }}
+              </button>
             </div>
           </div>
           <div class="tutor-detail-footer-section">
@@ -260,12 +241,14 @@
           <span class="cal-day-empty" ng-repeat="_ in vm.tutorCalOffsetArray() track by $index"></span>
           <button class="cal-day" ng-repeat="d in vm.tutorCalDaysArray() track by $index"
             ng-click="vm.tutorCal.selectedDay = d"
+            ng-disabled="vm.isTutorCalPastDay(d)"
             ng-class="{
               'selected': vm.tutorCal.selectedDay === d,
-              'has-unpaid': vm.dayHasBusyTimes(d)
+              'past-day': vm.isTutorCalPastDay(d),
+              'has-unpaid': !vm.isTutorCalPastDay(d) && vm.dayHasBusyTimes(d)
             }">
             <span class="day-num">{{ d }}</span>
-            <span class="day-dot" ng-if="vm.dayHasBusyTimes(d)"></span>
+            <span class="day-dot" ng-if="!vm.isTutorCalPastDay(d) && vm.dayHasBusyTimes(d)"></span>
           </button>
         </div>
 
@@ -290,13 +273,13 @@
 
         <form ng-submit="vm.submitBooking()" class="form-stack">
 
-          <div class="booking-form-section">Student &amp; Subject</div>
+          <div class="booking-form-section">Child &amp; Subject</div>
 
           <div class="form-row">
             <div class="form-group">
-              <label>Select Student</label>
+              <label>Select Child</label>
               <select ng-model="vm.bookingForm.studentId">
-                <option ng-repeat="s in vm.students" value="{{ s.id }}">{{ s.name }}</option>
+                <option ng-repeat="s in vm.activeStudents()" value="{{ s.id }}">{{ s.name }}</option>
               </select>
             </div>
             <div class="form-group">
@@ -347,6 +330,9 @@
                 <input type="text" ng-model="session.endTime" placeholder="05:00 PM" />
               </div>
             </div>
+            <span class="blocked-date-hint" ng-if="session.date && vm.isTooSoon(session.date, session.startTime)">
+              ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
+            </span>
             <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" class="recurring-label">
               <input type="checkbox" ng-model="session.recurring" ng-change="vm.applyRecurring()" />
               Recurring class every week
@@ -371,8 +357,18 @@
             <p class="block-conflict-sub">One or more class dates fall within the tutor's blocked period. Please change the highlighted dates.</p>
           </div>
 
+          <div class="block-conflict-alert" ng-if="vm.hasTooSoonSession()">
+            <div class="block-conflict-header">⚠️ Session too soon</div>
+            <p class="block-conflict-sub">One or more class times are less than 6 hours from now. Please choose a later time to avoid urgent changes.</p>
+          </div>
+
+          <div class="block-conflict-alert" ng-if="vm.hasDuplicateSessions()">
+            <div class="block-conflict-header">⚠️ Overlapping class times</div>
+            <p class="block-conflict-sub">Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.</p>
+          </div>
+
           <button type="submit" class="btn-primary full-width"
-            ng-disabled="vm.hasBlockedSessionDate()">
+            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions()">
             Dispatch Booking Request →
           </button>
 

@@ -63,11 +63,15 @@ a { text-decoration: none; color: inherit; }
 
 /* ---- Dashboard Layout ---- */
 .main-content { padding-top: 0; }
-.dashboard-layout { display: flex; max-width: 1280px; margin: 0 auto; padding: 24px 16px; gap: 24px; }
+.dashboard-layout { display: flex; align-items: flex-start; max-width: 1280px; margin: 0 auto; padding: 24px 16px; gap: 24px; }
 .dashboard-main { flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 
 /* ---- Sidebar ---- */
-.sidebar { width: 220px; flex-shrink: 0; }
+/* Sticks under the sticky header (.main-header) so it stays in view while dashboard-main scrolls */
+.sidebar { width: 220px; flex-shrink: 0; position: sticky; top: 80px; }
+.sidebar-col { display: flex; flex-direction: column; gap: 20px; flex-shrink: 0; width: 240px; position: sticky; top: 80px; }
+.sidebar-col .sidebar { width: 100%; position: static; }
+.sidebar-col .calendar-legend { align-self: stretch; width: 100%; max-width: none; }
 .sidebar > div, .sidebar > nav { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.04); margin-bottom: 12px; border-top: 2px solid #a7f3d0; }
 .sidebar-indigo > div, .sidebar-indigo > nav { border-color: #ccfbf1; }
 .sidebar-dark > div, .sidebar-dark > nav { border-color: #1e293b; background: #0f172a; }
@@ -118,6 +122,8 @@ a { text-decoration: none; color: inherit; }
 .btn-primary.full-width { width: 100%; padding: 11px; }
 .btn-outline { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
 .btn-outline:hover { background: #f1f5f9; }
+.btn-outline:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+.btn-outline:disabled:hover { background: #f1f5f9; }
 .btn-success { background: #16a34a; color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer; }
 .btn-success:hover { background: #15803d; }
 .btn-danger { background: #dc2626; color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer; }
@@ -150,6 +156,7 @@ a { text-decoration: none; color: inherit; }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
   outline: none; border-color: #059669; background: #fff;
 }
+.form-group input:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .form-group.half { width: 50%; }
@@ -164,6 +171,7 @@ a { text-decoration: none; color: inherit; }
 .label-tag.amber { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 .label-tag.red { background: #fef2f2; color: #b91c1c; }
 .badge-subject { display: inline-block; background: #ecfdf5; color: #0d9488; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-family: monospace; text-transform: uppercase; }
+.booking-id-tag { font-size: 11px; font-family: monospace; color: #94a3b8; font-weight: 600; }
 .badge-gold { background: #fef3c7; color: #78350f; font-size: 12px; padding: 2px 8px; border-radius: 6px; font-weight: 700; }
 .badge-month { background: #f0fdfa; color: #134e4a; font-size: 13px; font-weight: 700; font-family: monospace; padding: 4px 12px; border-radius: 8px; }
 .badge-verified { background: #dcfce7; color: #15803d; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
@@ -420,6 +428,7 @@ a { text-decoration: none; color: inherit; }
 .result-count { font-family: monospace; font-size: 12px; color: #94a3b8; font-weight: 700; margin-left: auto; }
 
 /* ---- School Dropdown ---- */
+.school-field-wrap { display: contents; }
 .school-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.1); z-index: 50; padding: 12px; max-height: 320px; overflow-y: auto; }
 .school-filters { display: flex; gap: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 8px; flex-wrap: wrap; }
 .filter-chip { background: #f1f5f9; border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -428,6 +437,7 @@ a { text-decoration: none; color: inherit; }
 .school-list { display: flex; flex-direction: column; gap: 2px; }
 .school-option { text-align: left; width: 100%; background: none; border: none; border-radius: 8px; padding: 8px; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .school-option:hover { background: #ecfdf5; }
+.school-option-other { margin-top: 4px; border-top: 1px dashed #e2e8f0; border-radius: 0; padding-top: 10px; color: #0d9488; font-weight: 600; }
 
 /* ---- Session / Booking Table ---- */
 .table-wrap { overflow-x: auto; }
@@ -757,11 +767,35 @@ a { text-decoration: none; color: inherit; }
 .cal-day.public-holiday.selected .day-holiday-name { color: #e0f7fe; }
 
 /* ---- Blocked days ---- */
-.cal-day.blocked { background: #e2e8f0; border-color: #cbd5e1; border-width: 2px; cursor: not-allowed; }
-.cal-day.blocked .day-num { color: #94a3b8; font-weight: 400; }
-.cal-day.blocked.selected { background: #94a3b8; border-color: #64748b; }
-.cal-day.blocked.selected .day-num { color: #fff; }
-.day-blocked-label { font-size: 8px; color: #94a3b8; display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.cal-day.blocked { position: relative; background: #fff; border-color: #fca5a5; border-width: 2px; border-style: dashed; cursor: not-allowed; overflow: visible; }
+.cal-day.blocked .day-num { color: #64748b; font-weight: 400; }
+.cal-day.blocked.selected { background: #fee2e2; border-color: #ef4444; border-style: solid; }
+.day-blocked-icon {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 39px; opacity: .5; line-height: 1; pointer-events: none; z-index: 1;
+}
+
+/* ---- Past days (read-only calendars) ---- */
+.cal-day.past-day { background: #e2e8f0; border-color: #cbd5e1; cursor: not-allowed; opacity: .6; }
+.cal-day.past-day .day-num { color: #94a3b8; font-weight: 400; }
+.cal-day:disabled { cursor: not-allowed; }
+
+/* ---- Calendar legend ---- */
+.calendar-legend { align-self: flex-start; width: auto; max-width: 560px; }
+.calendar-legend h4 { font-size: 14px; font-weight: 700; color: #334155; margin: 0 0 12px; }
+.legend-grid { display: flex; flex-wrap: wrap; gap: 14px 24px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; font-weight: 500; }
+.legend-swatch {
+  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1;
+}
+.legend-swatch.legend-selected { background: #fff; border: 2px solid #0d9488; }
+.legend-swatch.legend-paid { background: #f0fdf4; border: 2px solid #22c55e; }
+.legend-swatch.legend-unpaid { background: #fffbeb; border: 2px dashed #f59e0b; }
+.legend-swatch.legend-holiday { background: #e0f7fe; border: 2px solid #38bdf8; }
+.legend-swatch.legend-holiday-sg { background: #fce7f3; border: 2px solid #f472b6; }
+.legend-swatch.legend-blocked { background: #fff; border: 2px dashed #fca5a5; }
+.legend-swatch.legend-past { background: #e2e8f0; border: 1px solid #cbd5e1; opacity: .8; }
 
 /* ---- Block dates panel ---- */
 .block-dates-panel { margin-top: 20px; padding: 16px 18px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
@@ -1321,6 +1355,19 @@ a { text-decoration: none; color: inherit; }
   background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px;
   padding: 14px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
+.filter-bar-header {
+  display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; user-select: none;
+}
+.filter-toggle-icon {
+  font-size: 12px; color: #94a3b8; transition: transform .15s;
+}
+.filter-toggle-icon.open { transform: rotate(180deg); }
+.filter-bar-panel {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  width: 100%; padding-top: 14px; margin-top: 10px; border-top: 1px solid #f1f5f9;
+}
+.filter-country-switch { display: flex; gap: 6px; }
+.filter-bar-group { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .filter-bar-label {
   font-size: 12px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .06em; color: #94a3b8; white-space: nowrap;
@@ -1344,12 +1391,29 @@ a { text-decoration: none; color: inherit; }
 
 /* ── Tutor card — column layout ───────────────────── */
 .tutor-card {
+  position: relative;
   background: #fff; border: 1.5px solid #e2e8f0; border-radius: 18px;
   padding: 20px 24px; display: flex; flex-direction: column; gap: 0;
   transition: border-color .2s, box-shadow .2s;
 }
 .tutor-card:hover {
   border-color: #6ee7b7; box-shadow: 0 6px 24px rgba(5,150,105,0.10);
+}
+.tutor-card--favorited { border-color: #fca5b5; box-shadow: 0 4px 16px rgba(225,29,72,0.12); }
+
+/* ── Favorite (like) icon ───────────────────────────── */
+.favorite-btn {
+  position: absolute; top: 16px; right: 18px; z-index: 1;
+  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 50%;
+  width: 36px; height: 36px; font-size: 20px; line-height: 1; color: #cbd5e1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform .12s, color .15s, border-color .15s;
+}
+.favorite-btn:hover { transform: scale(1.08); border-color: #fca5b5; }
+.favorite-btn.active { color: #e11d48; border-color: #fecdd3; background: #fff1f2; }
+.favorite-btn.inline {
+  position: static; width: 26px; height: 26px; font-size: 15px;
+  margin-left: 6px; vertical-align: middle;
 }
 /* Top row: avatar + body */
 .tutor-card-main { display: flex; align-items: flex-start; gap: 18px; padding-bottom: 16px; }
@@ -1693,6 +1757,7 @@ a { text-decoration: none; color: inherit; }
 }
 .invoice-card-icon.paid   { background: #ecfdf5; }
 .invoice-card-icon.unpaid { background: #fffbeb; }
+.invoice-card-icon.cancelled { background: #fef2f2; }
 .invoice-number { font-family: monospace; font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
 .invoice-booking-ref { font-size: 13px; color: #94a3b8; }
 .invoice-card-subject { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
@@ -1702,4 +1767,5 @@ a { text-decoration: none; color: inherit; }
 }
 .invoice-amount.paid   { color: #059669; }
 .invoice-amount.unpaid { color: #0f172a; }
+.invoice-amount.cancelled { color: #94a3b8; text-decoration: line-through; }
 .text-success { font-size: 14px; font-weight: 700; color: #059669; display: flex; align-items: center; gap: 4px; }

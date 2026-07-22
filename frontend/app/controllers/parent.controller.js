@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService',
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -18,6 +18,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   self.tutors = [];
+  self.favoriteTutorIds = [];
   self.students = [];
   self.bookings = [];
   self.invoices = [];
@@ -91,9 +92,17 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Search / filter state
   self.searchQuery = '';
+  self.selectedCountry = 'Singapore';
   self.selectedSubject = 'All';
   self.selectedMode = 'All';
   self.minRating = 0;
+  self.minExperience = 0;
+  self.filtersExpanded = true;
+
+  self.selectSearchCountry = function (c) {
+    self.selectedCountry = c;
+    self.selectedSubject = 'All';
+  };
 
   // Booking form
   self.bookingForm = {
@@ -125,12 +134,52 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.editStudentSubjects = []; // [{country, level, subject}]
   self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
 
+  // Parent profile panel
+  self.parentProfile = null;
+  self.editingParentProfile = false;
+  self.parentProfileForm = {};
+  self.parentProfileError = '';
+
+  self.startEditParentProfile = function () {
+    self.parentProfileForm = { name: self.parentProfile.name, email: self.parentProfile.email, password: '' };
+    self.parentProfileError = '';
+    self.editingParentProfile = true;
+  };
+
+  self.cancelEditParentProfile = function () {
+    self.editingParentProfile = false;
+    self.parentProfileForm = {};
+    self.parentProfileError = '';
+  };
+
+  self.saveParentProfile = function () {
+    var payload = { name: self.parentProfileForm.name, email: self.parentProfileForm.email };
+    if (self.parentProfileForm.password) payload.password = self.parentProfileForm.password;
+
+    ParentProfileService.update(self.parentProfile.id, payload).then(function (res) {
+      self.parentProfile = res.data;
+      self.editingParentProfile = false;
+      self.parentProfileForm = {};
+    }).catch(function (err) {
+      self.parentProfileError = (err.data && err.data.message) || 'Could not update profile.';
+    });
+  };
+
+  self.closeParentProfilePermanently = function () {
+    if (!confirm('This will permanently close your account and cannot be undone. Continue?')) return;
+    ParentProfileService.close(self.parentProfile.id).then(function () {
+      AuthService.logout();
+      $location.path('/login');
+    });
+  };
+
   // School dropdown
   self.schoolSearch = '';
   self.schoolDropdownOpen = false;
   self.institutions = [];
-  self.countryFilter = 'All';
-  self.typeFilter = 'All';
+  self.schoolIsOther = false;
+  self.schoolError = null;
+  self.countryFilter = 'Singapore';
 
   // Issue report
   self.issueForm = { bookingId: null, issueType: 'Tutor was absent (No show)', details: '' };
@@ -191,6 +240,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.studCal.selectedDay = 0;
   };
 
+  function isPastCalDay(year, month, day) {
+    if (!day) return false;
+    var d = new Date(year, month, day);
+    d.setHours(0, 0, 0, 0);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
+  }
+
+  self.isStudCalPastDay = function (day) {
+    return isPastCalDay(self.studCal.year, self.studCal.month, day);
+  };
+
   // Tutor busy-times calendar (booking page) — dates/times only, no booking details,
   // so parents can avoid picking an overlapping slot.
   self.tutorCal = { year: _scNow.getFullYear(), month: _scNow.getMonth(), selectedDay: 0, busyTimes: [] };
@@ -228,6 +290,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return self.getBusyTimesForDay(day).length > 0;
   };
 
+  self.isTutorCalPastDay = function (day) {
+    return isPastCalDay(self.tutorCal.year, self.tutorCal.month, day);
+  };
+
   // Reschedule
   self.rescheduleBooking = null;
   self.rescheduleForm = { classes: [] };
@@ -240,10 +306,44 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  // Extracts just the start time ("04:00 PM") out of a "04:00 PM - 05:00 PM" range.
+  function extractStartTime(rangeStr) {
+    var m = String(rangeStr || '').match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+    return m ? m[1] : '';
+  }
+
+  // Given a start time and a duration in hours, computes the end time ("05:30 PM").
+  // Returns '' if startTime isn't a recognizable "H:MM AM/PM" value.
+  function calcEndTimeFromDuration(startTime, durationHours) {
+    var m = String(startTime || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return '';
+    var h = parseInt(m[1], 10);
+    var min = parseInt(m[2], 10);
+    var ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    var total = h * 60 + min + Math.round((durationHours || 1) * 60);
+    var endH = Math.floor(total / 60) % 24;
+    var endM = total % 60;
+    var endAmpm = endH >= 12 ? 'PM' : 'AM';
+    var displayH = endH % 12;
+    if (displayH === 0) displayH = 12;
+    return displayH + ':' + (endM < 10 ? '0' + endM : endM) + ' ' + endAmpm;
+  }
+
+  self.rescheduleEndTime = function (c) {
+    return calcEndTimeFromDuration(c.proposedStartTime, self.rescheduleBooking && self.rescheduleBooking.durationHours);
+  };
+
+  self.onRescheduleStartTimeChange = function (c) {
+    var end = self.rescheduleEndTime(c);
+    c.time = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
+  };
+
   self.startReschedule = function (booking) {
     self.rescheduleBooking = booking;
     self.rescheduleForm.classes = (booking.classes || []).map(function (c) {
-      return { originalDate: c.date, date: c.date, time: c.time };
+      return { originalDate: c.date, originalTime: c.time, date: c.date, time: c.time, proposedStartTime: extractStartTime(c.time) };
     });
     self.rescheduleSuccess = false;
   };
@@ -255,6 +355,9 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.submitReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasTooSoonReschedule()) return;
+    if (self.hasDurationMismatchReschedule()) return;
+    if (self.hasDuplicateReschedule()) return;
     var newClasses = self.rescheduleForm.classes.map(function (c) {
       return { date: toDateStr(toDateObj(c.date)), time: c.time };
     });
@@ -297,25 +400,51 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     StudentService.getMyStudents().then(function (res) {
       self.students = res.data;
       self.students.forEach(function (s) { s.subjectCombos = self.parseSubjectCombos(s.subjectSelect, s.educationLevel); });
-      if (res.data.length) {
-        self.bookingForm.studentId = res.data[0].id;
+      var firstActive = self.students.find(function (s) { return !s.isArchived; });
+      if (firstActive) {
+        self.bookingForm.studentId = firstActive.id;
       }
     });
     BookingService.getAll().then(function (res) { self.bookings = res.data; });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
+    TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
   }
   init();
+
+  // Favorite tutors
+  self.isFavorited = function (tutorId) {
+    return self.favoriteTutorIds.indexOf(tutorId) >= 0;
+  };
+
+  self.toggleFavorite = function (tutor, $event) {
+    if ($event) $event.stopPropagation();
+    if (self.isFavorited(tutor.id)) {
+      TutorService.removeFavorite(tutor.id).then(function () {
+        self.favoriteTutorIds = self.favoriteTutorIds.filter(function (id) { return id !== tutor.id; });
+      });
+    } else {
+      TutorService.addFavorite(tutor.id).then(function () {
+        self.favoriteTutorIds.push(tutor.id);
+      });
+    }
+  };
 
   // Filtered tutors
   self.filteredTutors = function () {
     return self.tutors.filter(function (t) {
       var q = self.searchQuery.toLowerCase();
       var matchQuery = !q || t.name.toLowerCase().indexOf(q) >= 0 ||
-        t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; });
+        t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; }) ||
+        (t.qualifications || []).some(function (ql) { return ql.toLowerCase().indexOf(q) >= 0; });
+      var matchCountry = (t.offerings || []).some(function (o) { return o.country === self.selectedCountry; });
       var matchSub = self.selectedSubject === 'All' || t.subjects.indexOf(self.selectedSubject) >= 0;
       var matchMode = self.selectedMode === 'All' || t.modes.indexOf(self.selectedMode) >= 0;
       var matchRating = !self.minRating || t.rating >= self.minRating;
-      return matchQuery && matchSub && matchMode && matchRating;
+      var matchExperience = !self.minExperience || t.experienceYears >= self.minExperience;
+      return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience;
+    }).sort(function (a, b) {
+      return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
     });
   };
 
@@ -379,6 +508,115 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return d.getFullYear() + '-' + mm + '-' + dd;
   }
 
+  // Minimum lead time before a class can be booked/changed, to avoid urgent last-minute changes.
+  var MIN_LEAD_HOURS = 6;
+
+  function combineDateTime(dateVal, timeStr) {
+    var d = toDateObj(dateVal);
+    if (!d) return null;
+    var m = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return d;
+    var h = parseInt(m[1], 10);
+    var min = parseInt(m[2], 10);
+    var ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    d.setHours(h, min, 0, 0);
+    return d;
+  }
+
+  self.isTooSoon = function (dateVal, timeStr) {
+    var dt = combineDateTime(dateVal, timeStr);
+    if (!dt || isNaN(dt.getTime())) return false;
+    var minAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
+    return dt < minAllowed;
+  };
+
+  self.hasTooSoonSession = function () {
+    return (self.bookingForm.sessions || []).some(function (s) {
+      return s.date && self.isTooSoon(s.date, s.startTime);
+    });
+  };
+
+  self.hasTooSoonReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      return c.date && self.isTooSoon(c.date, c.time);
+    });
+  };
+
+  // A booking's classes can't overlap each other — same date, and their time ranges intersect
+  // (this also catches exact-duplicate date+time as the simplest case of overlap).
+  function parseTimeRangeMinutes(timeStr) {
+    var matches = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi);
+    if (!matches || matches.length < 2) return null;
+    function toMinutes(t) {
+      var m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + min;
+    }
+    var start = toMinutes(matches[0]);
+    var end = toMinutes(matches[1]);
+    if (end <= start) end += 24 * 60;
+    return { start: start, end: end };
+  }
+
+  function hasOverlappingDateTimes(items, dateKey, timeKey) {
+    var list = items.filter(function (item) { return item[dateKey] && item[timeKey]; });
+    for (var i = 0; i < list.length; i++) {
+      var r1 = parseTimeRangeMinutes(list[i][timeKey]);
+      if (!r1) continue;
+      var d1 = toDateStr(list[i][dateKey]);
+      for (var j = i + 1; j < list.length; j++) {
+        if (toDateStr(list[j][dateKey]) !== d1) continue;
+        var r2 = parseTimeRangeMinutes(list[j][timeKey]);
+        if (!r2) continue;
+        if (r1.start < r2.end && r2.start < r1.end) return true;
+      }
+    }
+    return false;
+  }
+
+  self.hasDuplicateSessions = function () {
+    return hasOverlappingDateTimes((self.bookingForm.sessions || []).map(function (s) {
+      return { date: s.date, time: s.startTime + ' - ' + s.endTime };
+    }), 'date', 'time');
+  };
+
+  self.hasDuplicateReschedule = function () {
+    return hasOverlappingDateTimes(self.rescheduleForm.classes || [], 'date', 'time');
+  };
+
+  // A reschedule must keep the same session length as the original booking — parses a
+  // "04:00 PM - 05:00 PM" range into hours and compares against the booking's durationHours.
+  function parseTimeRangeHours(timeStr) {
+    var matches = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi);
+    if (!matches || matches.length < 2) return null;
+    function toMinutes(t) {
+      var m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + min;
+    }
+    var diff = toMinutes(matches[1]) - toMinutes(matches[0]);
+    if (diff <= 0) diff += 24 * 60;
+    return diff / 60;
+  }
+
+  self.isDurationMismatch = function (timeStr, expectedHours) {
+    var hrs = parseTimeRangeHours(timeStr);
+    return hrs !== null && Math.abs(hrs - expectedHours) > 0.001;
+  };
+
+  self.hasDurationMismatchReschedule = function () {
+    if (!self.rescheduleBooking) return false;
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      return self.isDurationMismatch(c.time, self.rescheduleBooking.durationHours);
+    });
+  };
+
   self.applyRecurring = function () {
     var sessions = self.bookingForm.sessions;
     if (!sessions || sessions.length < 2 || !sessions[0].recurring || !sessions[0].date) return;
@@ -418,6 +656,8 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Book a tutor
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
+    if (self.hasTooSoonSession()) return;
+    if (self.hasDuplicateSessions()) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
     var classes = self.bookingForm.sessions.map(function (session) {
       return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
@@ -439,6 +679,8 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         self.selectedTutor = null;
         $location.path('/parent/sessions');
       }, 2000);
+    }).catch(function (err) {
+      alert((err.data && err.data.message) || 'Could not create this booking. Please try again.');
     });
   };
 
@@ -501,6 +743,61 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  self.deleteBlockedStudentId = null;
+  self.deleteBlockedInfo = null;
+
+  self.studentsTab = 'active';
+
+  self.activeStudents = function () {
+    return self.students.filter(function (s) { return !s.isArchived; });
+  };
+
+  self.archivedStudents = function () {
+    return self.students.filter(function (s) { return s.isArchived; });
+  };
+
+  self.visibleStudents = function () {
+    return self.studentsTab === 'archived' ? self.archivedStudents() : self.activeStudents();
+  };
+
+  self.deleteStudent = function (s) {
+    if (!confirm('Delete ' + s.name + '\'s profile? This permanently erases all their past session and billing history too. This cannot be undone — archive instead if you want to keep those records.')) return;
+    self.deleteBlockedStudentId = null;
+    self.deleteBlockedInfo = null;
+    StudentService.delete(s.id).then(function () {
+      self.students = self.students.filter(function (x) { return x.id !== s.id; });
+      if (self.editingStudent && self.editingStudent.id === s.id) self.cancelEditStudent();
+    }).catch(function (err) {
+      if (err.status === 400 && err.data) {
+        self.deleteBlockedStudentId = s.id;
+        self.deleteBlockedInfo = err.data;
+      } else {
+        alert('Could not delete this profile. Please try again.');
+      }
+    });
+  };
+
+  self.archiveStudent = function (s) {
+    if (!confirm('Archive ' + s.name + '\'s profile? It will be hidden from your active roster but its history is kept, and you can restore it anytime.')) return;
+    StudentService.archive(s.id).then(function (res) {
+      var idx = self.students.findIndex(function (x) { return x.id === s.id; });
+      if (idx >= 0) self.students[idx] = res.data;
+      self.deleteBlockedStudentId = null;
+      self.deleteBlockedInfo = null;
+    }).catch(function (err) {
+      alert((err.data && err.data.message) || 'Could not archive this profile. Please try again.');
+    });
+  };
+
+  self.unarchiveStudent = function (s) {
+    StudentService.unarchive(s.id).then(function (res) {
+      var idx = self.students.findIndex(function (x) { return x.id === s.id; });
+      if (idx >= 0) self.students[idx] = res.data;
+    }).catch(function () {
+      alert('Could not restore this profile. Please try again.');
+    });
+  };
+
   self.addStudentSubject = function () {
     var c = self.newStudentSubjectCombo;
     var opt = c.selectedOption;
@@ -515,29 +812,80 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Add student
   self.createStudent = function () {
     if (!self.studentForm.name.trim()) return;
-    var payload = {
-      name: self.studentForm.name,
-      birthDate: self.studentForm.birthDate || null,
-      school: self.studentForm.school || '',
-      educationLevel: self.studentSubjects.length ? self.studentSubjects[0].level : '',
-      subjectSelect: self.formatSubjectCombos(self.studentSubjects),
-      learningGoal: self.studentForm.learningGoal,
-      photoUrl: self.studentForm.photoUrl || null
+
+    var save = function (schoolName) {
+      var payload = {
+        name: self.studentForm.name,
+        birthDate: self.studentForm.birthDate || null,
+        school: schoolName,
+        educationLevel: self.studentSubjects.length ? self.studentSubjects[0].level : '',
+        subjectSelect: self.formatSubjectCombos(self.studentSubjects),
+        learningGoal: self.studentForm.learningGoal,
+        photoUrl: self.studentForm.photoUrl || null
+      };
+      StudentService.create(payload).then(function (res) {
+        res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
+        self.students.push(res.data);
+        self.newlyAddedStudentId = res.data.id;
+        self.studentSuccess = true;
+        self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
+        self.studentSubjects = [];
+        self.newStudentSubjectCombo = { country: '', selectedOption: null };
+        self.schoolSearch = '';
+        self.institutions = [];
+        self.schoolDropdownOpen = false;
+        self.schoolIsOther = false;
+        self.schoolError = null;
+        $timeout(function () { self.studentSuccess = false; }, 5000);
+      });
     };
-    StudentService.create(payload).then(function (res) {
-      res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
-      self.students.push(res.data);
-      self.newlyAddedStudentId = res.data.id;
-      self.studentSuccess = true;
-      self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
-      self.studentSubjects = [];
-      self.newStudentSubjectCombo = { country: '', selectedOption: null };
-      $timeout(function () { self.studentSuccess = false; }, 5000);
+
+    if (self.schoolIsOther) {
+      var otherName = (self.studentForm.school || '').trim();
+      if (!otherName) {
+        self.schoolError = 'Please enter your institution\'s name.';
+        return;
+      }
+      self.schoolError = null;
+      save(otherName);
+      return;
+    }
+
+    var enteredName = (self.schoolSearch || '').trim();
+    if (!enteredName) {
+      self.schoolError = 'Please select an education institution, or choose "Others" if it isn\'t listed.';
+      return;
+    }
+
+    AdminService.getInstitutions({ search: enteredName }).then(function (res) {
+      var match = (res.data || []).find(function (inst) {
+        return inst.name.toLowerCase() === enteredName.toLowerCase();
+      });
+      if (!match) {
+        self.schoolError = 'We couldn\'t match "' + enteredName + '" to a listed institution. Please pick one from the dropdown, or choose "Others" if it isn\'t listed.';
+        return;
+      }
+      self.schoolError = null;
+      save(match.name);
     });
   };
 
   // Pay an invoice
   self.paySuccess = false;
+
+  self.invoicesTab = 'active';
+
+  self.nonCancelledInvoices = function () {
+    return self.invoices.filter(function (inv) { return inv.status !== 'Cancelled'; });
+  };
+
+  self.cancelledInvoices = function () {
+    return self.invoices.filter(function (inv) { return inv.status === 'Cancelled'; });
+  };
+
+  self.visibleInvoices = function () {
+    return self.invoicesTab === 'cancelled' ? self.cancelledInvoices() : self.nonCancelledInvoices();
+  };
 
   self.payInvoice = function (invoiceId) {
     InvoiceService.pay(invoiceId).then(function () {
@@ -546,6 +894,9 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       $timeout(function () {
         self.paySuccess = false;
       }, 2500);
+    }).catch(function (err) {
+      alert((err.data && err.data.message) || 'Could not process this payment. Please try again.');
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     });
   };
 
@@ -590,16 +941,14 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.schoolDropdownOpen = true;
     AdminService.getInstitutions({
       search: self.schoolSearch,
-      country: self.countryFilter !== 'All' ? self.countryFilter : '',
-      type: self.typeFilter !== 'All' ? self.typeFilter : ''
+      country: self.countryFilter
     }).then(function (res) { self.institutions = res.data; });
   };
 
   self.searchSchools = function () {
     AdminService.getInstitutions({
       search: self.schoolSearch,
-      country: self.countryFilter !== 'All' ? self.countryFilter : '',
-      type: self.typeFilter !== 'All' ? self.typeFilter : ''
+      country: self.countryFilter
     }).then(function (res) { self.institutions = res.data; });
   };
 
@@ -607,6 +956,21 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.studentForm.school = name;
     self.schoolSearch = name;
     self.schoolDropdownOpen = false;
+    self.schoolError = null;
+  };
+
+  self.selectSchoolOther = function () {
+    self.schoolIsOther = true;
+    self.studentForm.school = '';
+    self.schoolDropdownOpen = false;
+    self.schoolError = null;
+  };
+
+  self.backToSchoolSearch = function () {
+    self.schoolIsOther = false;
+    self.studentForm.school = '';
+    self.schoolSearch = '';
+    self.schoolError = null;
   };
 
   self.closeSchoolDropdown = function () {
@@ -642,6 +1006,48 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   self.counterAcceptSuccess = false;
+
+  self.sessionsTab = 'active';
+
+  self.nonCancelledBookings = function () {
+    return self.bookings.filter(function (b) { return b.status !== 'cancelled'; });
+  };
+
+  self.cancelledBookings = function () {
+    return self.bookings.filter(function (b) { return b.status === 'cancelled'; });
+  };
+
+  self.visibleBookings = function () {
+    return self.sessionsTab === 'cancelled' ? self.cancelledBookings() : self.nonCancelledBookings();
+  };
+
+  self.cancelSuccess = false;
+
+  // A paid invoice is a permanent payment record — a booking that's already been paid for can't be cancelled.
+  self.bookingHasPaidInvoice = function (bookingId) {
+    return self.invoices.some(function (inv) {
+      return inv.bookingId === bookingId && inv.status === 'Paid';
+    });
+  };
+
+  self.cancelBooking = function (booking) {
+    if (self.bookingHasPaidInvoice(booking.id)) return;
+    var msg = booking.status === 'pending'
+      ? 'Cancel this booking request? The tutor hasn\'t responded yet, so no notification will be sent.'
+      : 'Cancel this booking? The tutor will be notified since they\'ve already responded to it.';
+    if (!confirm(msg)) return;
+
+    BookingService.cancel(booking.id).then(function () {
+      self.cancelSuccess = true;
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+      $timeout(function () {
+        self.cancelSuccess = false;
+      }, 3000);
+    }).catch(function (err) {
+      alert((err.data && err.data.message) || 'Could not cancel this booking. Please try again.');
+    });
+  };
 
   self.acceptCounterProposal = function (booking) {
     BookingService.updateStatus(booking.id, 'confirmed', null)

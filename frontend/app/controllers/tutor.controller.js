@@ -181,6 +181,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.blockForm = { startDate: '', endDate: '' };
   self.blockedRanges = [];
   self.blockConflicts = [];
+  self.blockOverlapError = '';
 
   function parseLocalDate(val) {
     if (!val) return new Date(NaN);
@@ -195,12 +196,132 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     var d = new Date(s); d.setHours(0, 0, 0, 0); return d;
   }
 
+  // Minimum lead time before a class can be booked/changed, to avoid urgent last-minute changes.
+  var MIN_LEAD_HOURS = 6;
+
+  function combineDateTime(dateVal, timeStr) {
+    var d = parseLocalDate(dateVal);
+    if (isNaN(d.getTime())) return null;
+    var m = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return d;
+    var h = parseInt(m[1], 10);
+    var min = parseInt(m[2], 10);
+    var ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    d.setHours(h, min, 0, 0);
+    return d;
+  }
+
+  self.isTooSoon = function (dateVal, timeStr) {
+    var dt = combineDateTime(dateVal, timeStr);
+    if (!dt || isNaN(dt.getTime())) return false;
+    var minAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
+    return dt < minAllowed;
+  };
+
+  self.hasTooSoonCounter = function () {
+    return (self.counterForm.classes || []).some(function (c) {
+      return c.proposedDate && self.isTooSoon(c.proposedDate, c.proposedTime);
+    });
+  };
+
+  self.hasTooSoonTutorReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      return c.proposedDate && self.isTooSoon(c.proposedDate, c.proposedTime);
+    });
+  };
+
+  // A booking's classes can't overlap each other — same date, and their time ranges intersect
+  // (this also catches exact-duplicate date+time as the simplest case of overlap).
+  function parseTimeRangeMinutes(timeStr) {
+    var matches = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi);
+    if (!matches || matches.length < 2) return null;
+    function toMinutes(t) {
+      var m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + min;
+    }
+    var start = toMinutes(matches[0]);
+    var end = toMinutes(matches[1]);
+    if (end <= start) end += 24 * 60;
+    return { start: start, end: end };
+  }
+
+  function hasOverlappingDateTimes(items, dateKey, timeKey) {
+    var list = items.filter(function (item) { return item[dateKey] && item[timeKey]; });
+    for (var i = 0; i < list.length; i++) {
+      var r1 = parseTimeRangeMinutes(list[i][timeKey]);
+      if (!r1) continue;
+      var d1 = parseLocalDate(list[i][dateKey]);
+      if (isNaN(d1.getTime())) continue;
+      for (var j = i + 1; j < list.length; j++) {
+        var d2 = parseLocalDate(list[j][dateKey]);
+        if (isNaN(d2.getTime()) || d2.getTime() !== d1.getTime()) continue;
+        var r2 = parseTimeRangeMinutes(list[j][timeKey]);
+        if (!r2) continue;
+        if (r1.start < r2.end && r2.start < r1.end) return true;
+      }
+    }
+    return false;
+  }
+
+  self.hasDuplicateCounter = function () {
+    return hasOverlappingDateTimes(self.counterForm.classes || [], 'proposedDate', 'proposedTime');
+  };
+
+  self.hasDuplicateTutorReschedule = function () {
+    return hasOverlappingDateTimes(self.rescheduleForm.classes || [], 'proposedDate', 'proposedTime');
+  };
+
+  // A reschedule must keep the same session length as the original booking — parses a
+  // "04:00 PM - 05:00 PM" range into hours and compares against the booking's durationHours.
+  function parseTimeRangeHours(timeStr) {
+    var matches = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi);
+    if (!matches || matches.length < 2) return null;
+    function toMinutes(t) {
+      var m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + min;
+    }
+    var diff = toMinutes(matches[1]) - toMinutes(matches[0]);
+    if (diff <= 0) diff += 24 * 60;
+    return diff / 60;
+  }
+
+  self.isDurationMismatch = function (timeStr, expectedHours) {
+    var hrs = parseTimeRangeHours(timeStr);
+    return hrs !== null && Math.abs(hrs - expectedHours) > 0.001;
+  };
+
+  self.hasDurationMismatchTutorReschedule = function () {
+    if (!self.rescheduleBooking) return false;
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      return self.isDurationMismatch(c.proposedTime, self.rescheduleBooking.durationHours);
+    });
+  };
+
   self.confirmBlock = function () {
     var s = self.blockForm.startDate, e = self.blockForm.endDate;
     if (!s || !e) return;
     var start = parseLocalDate(s);
     var end   = parseLocalDate(e);
     if (end < start) return;
+
+    self.blockOverlapError = '';
+
+    var overlapsExisting = self.blockedRanges.some(function (r) {
+      var rs = parseLocalDate(r.start), re = parseLocalDate(r.end);
+      return start <= re && rs <= end;
+    });
+    if (overlapsExisting) {
+      self.blockOverlapError = 'This date range overlaps with a period you already blocked. Remove or adjust it first.';
+      return;
+    }
 
     var conflicts = [];
     self.confirmedClasses().forEach(function (b) {
@@ -213,7 +334,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       classesToCheck.forEach(function (c) {
         var d = parseLocalDate(c.date);
         if (d >= start && d <= end) {
-          conflicts.push({ bookingId: b.id, subject: b.subject, student: b.studentName, date: c.date, time: c.time });
+          conflicts.push({ bookingId: b.id, subject: b.subject, student: b.studentName, date: c.date, time: c.time, duration: b.durationHours });
         }
       });
     });
@@ -229,7 +350,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     self.blockForm.endDate = '';
   };
 
-  self.clearBlockConflicts = function () { self.blockConflicts = []; };
+  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; };
 
   self.removeBlock = function (idx) {
     self.blockedRanges.splice(idx, 1);
@@ -244,6 +365,15 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       var e = new Date(r.end);   e.setHours(0, 0, 0, 0);
       return d >= s && d <= e;
     });
+  };
+
+  self.isPastDay = function (dayNum) {
+    if (!dayNum) return false;
+    var d = new Date(self.calYear, self.calMonth, dayNum);
+    d.setHours(0, 0, 0, 0);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
   };
 
   // ── Monthly calendar ────────────────────────────────────────────────
@@ -321,12 +451,55 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     });
   };
 
+  // Extracts just the start time ("04:00 PM") out of a "04:00 PM - 05:00 PM" range.
+  function extractStartTime(rangeStr) {
+    var m = String(rangeStr || '').match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+    return m ? m[1] : '';
+  }
+
+  // Given a start time and a duration in hours, computes the end time ("05:30 PM").
+  // Returns '' if startTime isn't a recognizable "H:MM AM/PM" value.
+  function calcEndTimeFromDuration(startTime, durationHours) {
+    var m = String(startTime || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return '';
+    var h = parseInt(m[1], 10);
+    var min = parseInt(m[2], 10);
+    var ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    var total = h * 60 + min + Math.round((durationHours || 1) * 60);
+    var endH = Math.floor(total / 60) % 24;
+    var endM = total % 60;
+    var endAmpm = endH >= 12 ? 'PM' : 'AM';
+    var displayH = endH % 12;
+    if (displayH === 0) displayH = 12;
+    return displayH + ':' + (endM < 10 ? '0' + endM : endM) + ' ' + endAmpm;
+  }
+
+  self.counterEndTime = function (c) {
+    return calcEndTimeFromDuration(c.proposedStartTime, self.counterBooking && self.counterBooking.durationHours);
+  };
+
+  self.onCounterStartTimeChange = function (c) {
+    var end = self.counterEndTime(c);
+    c.proposedTime = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
+  };
+
+  self.rescheduleEndTime = function (c) {
+    return calcEndTimeFromDuration(c.proposedStartTime, self.rescheduleBooking && self.rescheduleBooking.durationHours);
+  };
+
+  self.onTutorRescheduleStartTimeChange = function (c) {
+    var end = self.rescheduleEndTime(c);
+    c.proposedTime = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
+  };
+
   self.startCounter = function (booking) {
     self.counterBooking = booking;
     self.counterForm = {
       message: '',
       classes: (booking.classes || []).map(function (c) {
-        return { originalDate: c.date, originalTime: c.time, proposedDate: c.date, proposedTime: c.time };
+        return { originalDate: c.date, originalTime: c.time, proposedDate: c.date, proposedTime: c.time, proposedStartTime: extractStartTime(c.time) };
       })
     };
     self.counterSuccess = false;
@@ -334,6 +507,8 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitCounter = function () {
     if (!self.counterBooking) return;
+    if (self.hasTooSoonCounter()) return;
+    if (self.hasDuplicateCounter()) return;
     BookingService.updateStatus(self.counterBooking.id, 'countered', {
       message: self.counterForm.message,
       classes: self.counterForm.classes.map(function (c) {
@@ -377,7 +552,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.startTutorReschedule = function (booking) {
     self.rescheduleBooking = booking;
     self.rescheduleForm.classes = (booking.classes || []).map(function (c) {
-      return { originalDate: c.date, proposedDate: c.date, proposedTime: c.time };
+      return { originalDate: c.date, originalTime: c.time, proposedDate: c.date, proposedTime: c.time, proposedStartTime: extractStartTime(c.time) };
     });
     self.rescheduleSuccess = false;
   };
@@ -423,6 +598,9 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitTutorReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasTooSoonTutorReschedule()) return;
+    if (self.hasDurationMismatchTutorReschedule()) return;
+    if (self.hasDuplicateTutorReschedule()) return;
     BookingService.updateStatus(self.rescheduleBooking.id, 'countered', {
       message: 'Tutor proposed reschedule',
       classes: self.rescheduleForm.classes.map(function (c) {

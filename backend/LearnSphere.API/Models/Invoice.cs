@@ -7,7 +7,7 @@ public class Invoice
     public Booking Booking { get; set; } = null!;
     public string Date { get; set; } = string.Empty;
     public decimal Amount { get; set; }
-    public string Status { get; set; } = "Unpaid"; // Paid | Unpaid
+    public string Status { get; set; } = "Unpaid"; // Paid | Unpaid | Refunded | Cancelled
     public string? Subject { get; set; }
     public string InvoiceNumber { get; set; } = string.Empty;
 }

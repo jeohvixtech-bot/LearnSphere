@@ -35,22 +35,23 @@ builder.Services.AddAuthorization();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 
-// CORS — allow the AngularJS frontend on any localhost port
+// CORS — origins configurable via appsettings.json "AllowedOrigins"
+// Set to ["*"] to allow all, or list specific origins e.g. ["http://localhost:4200","http://myserver:1002"]
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-                "http://localhost:8080",
-                "http://127.0.0.1:8080",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:5500",
-                "http://127.0.0.1:5500",
-                "null"
-              )
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    {
+        if (allowedOrigins == null || allowedOrigins.Length == 0 || allowedOrigins.Contains("*"))
+            policy.SetIsOriginAllowed(_ => true);
+        else
+            policy.WithOrigins(allowedOrigins);
+
+        policy.AllowAnyHeader().AllowAnyMethod();
+    });
 });
 
 builder.Services.AddControllers();
@@ -148,6 +149,23 @@ using (var scope = app.Services.CreateScope())
             KEY `IX_BookingClasses_BookingId` (`BookingId`),
             CONSTRAINT `FK_BookingClasses_Bookings_BookingId`
                 FOREIGN KEY (`BookingId`) REFERENCES `Bookings` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Users` ADD COLUMN `MustChangePassword` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    // Archiving a student profile is the alternative to deleting one that still has booking history
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Students` ADD COLUMN `IsArchived` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `FavoriteTutors` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `ParentUserId` INT NOT NULL,
+            `TutorId` INT NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_FavoriteTutors_Parent_Tutor` (`ParentUserId`, `TutorId`),
+            CONSTRAINT `FK_FavoriteTutors_Users` FOREIGN KEY (`ParentUserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_FavoriteTutors_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
     await context.Database.ExecuteSqlRawAsync(

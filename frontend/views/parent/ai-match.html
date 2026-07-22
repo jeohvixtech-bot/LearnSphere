@@ -6,7 +6,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
+      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item active">🤖 AI Speed Match</a>
       <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
@@ -24,7 +24,7 @@
         <div class="profile-hero-icon">🤖</div>
         <div>
           <h2 class="profile-hero-title">AI Speed Match</h2>
-          <p class="profile-hero-sub">Select a student profile to find their best-matched tutors</p>
+          <p class="profile-hero-sub">Select a child profile to find their best-matched tutors</p>
         </div>
       </div>
     </div>
@@ -33,7 +33,7 @@
     <div class="profile-empty-state" ng-if="!vm.students.length">
       <div class="profile-empty-icon">👤</div>
       <h4>No Profiles Yet</h4>
-      <p>Add a child's profile under Student Profiles to start matching.</p>
+      <p>Add a child's profile under Children Profiles to start matching.</p>
     </div>
 
     <div class="ai-match-grid-3" ng-if="vm.students.length">

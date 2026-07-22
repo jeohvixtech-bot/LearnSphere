@@ -6,7 +6,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
+      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
       <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
@@ -76,14 +76,31 @@
     </div>
 
     <!-- ── Invoice List ───────────────────────────── -->
-    <div class="invoice-list" ng-if="vm.invoices.length">
-      <span class="profile-registry-label">{{ vm.invoices.length }} Invoice{{ vm.invoices.length !== 1 ? 's' : '' }}</span>
+    <div ng-if="vm.invoices.length">
 
-      <div class="invoice-card" ng-repeat="inv in vm.invoices">
+      <!-- Tab Bar -->
+      <div class="tab-bar">
+        <button class="tab-btn" ng-class="{'active': vm.invoicesTab === 'active'}" ng-click="vm.invoicesTab = 'active'">
+          📋 Non-Cancelled ({{ vm.nonCancelledInvoices().length }})
+        </button>
+        <button class="tab-btn" ng-class="{'active': vm.invoicesTab === 'cancelled'}" ng-click="vm.invoicesTab = 'cancelled'">
+          ✕ Cancelled ({{ vm.cancelledInvoices().length }})
+        </button>
+      </div>
+
+      <div class="invoice-list">
+        <span class="profile-registry-label">{{ vm.visibleInvoices().length }} Invoice{{ vm.visibleInvoices().length !== 1 ? 's' : '' }}</span>
+
+        <div class="empty-state-box" ng-if="!vm.visibleInvoices().length">
+          <p ng-if="vm.invoicesTab === 'active'">No non-cancelled invoices.</p>
+          <p ng-if="vm.invoicesTab === 'cancelled'">No cancelled invoices.</p>
+        </div>
+
+        <div class="invoice-card" ng-repeat="inv in vm.visibleInvoices()">
 
         <!-- Status icon -->
-        <div class="invoice-card-icon" ng-class="inv.status === 'Paid' ? 'paid' : 'unpaid'">
-          {{ inv.status === 'Paid' ? '✓' : '💳' }}
+        <div class="invoice-card-icon" ng-class="inv.status === 'Paid' ? 'paid' : (inv.status === 'Cancelled' ? 'cancelled' : 'unpaid')">
+          {{ inv.status === 'Paid' ? '✓' : (inv.status === 'Cancelled' ? '✕' : '💳') }}
         </div>
 
         <!-- Invoice & booking number -->
@@ -99,12 +116,12 @@
         </div>
 
         <!-- Amount -->
-        <div class="invoice-amount" ng-class="inv.status === 'Paid' ? 'paid' : 'unpaid'">
+        <div class="invoice-amount" ng-class="inv.status === 'Paid' ? 'paid' : (inv.status === 'Cancelled' ? 'cancelled' : 'unpaid')">
           ${{ inv.amount }}.00
         </div>
 
         <!-- Status badge -->
-        <span class="status-badge" ng-class="inv.status === 'Paid' ? 'confirmed' : 'pending'">
+        <span class="status-badge" ng-class="inv.status === 'Paid' ? 'confirmed' : (inv.status === 'Cancelled' ? 'cancelled' : 'pending')">
           {{ inv.status | uppercase }}
         </span>
 
@@ -115,10 +132,13 @@
             💳 Pay Now
           </button>
           <span class="text-success" ng-if="inv.status === 'Paid'">✓ Paid</span>
+          <span class="text-muted" ng-if="inv.status === 'Cancelled'">— Booking Cancelled —</span>
         </div>
 
-      </div><!-- end ng-repeat -->
-    </div>
+        </div><!-- end ng-repeat -->
+      </div><!-- end invoice-list -->
+
+    </div><!-- end tabbed invoice section -->
 
   </main>
 </div>

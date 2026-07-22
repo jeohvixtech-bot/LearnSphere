@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LearnSphere.API.Controllers;
@@ -26,5 +28,30 @@ public class AuthController : ControllerBase
         var result = await _authService.RegisterAsync(dto);
         if (result == null) return BadRequest(new { message = "Email already in use." });
         return Ok(result);
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        var tempPassword = await _authService.ForgotPasswordAsync(dto.Email);
+
+        // Always respond 200 regardless of whether the email was found, to avoid leaking
+        // which addresses are registered. devTempPassword is only present because SMTP
+        // isn't configured yet (see ConsoleEmailService) — remove it once real email is wired up.
+        return Ok(new
+        {
+            message = "If an account exists for that email, a temporary password has been generated.",
+            devTempPassword = tempPassword
+        });
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var success = await _authService.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
+        if (!success) return BadRequest(new { message = "Current password is incorrect." });
+        return Ok();
     }
 }

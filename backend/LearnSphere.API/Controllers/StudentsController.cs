@@ -73,9 +73,87 @@ public class StudentsController : ControllerBase
         var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
         if (student == null) return NotFound();
 
+        // Active bookings = still-live tutor agreements/classes (not yet completed or cancelled)
+        var activeBookings = await _context.Bookings
+            .Include(b => b.Tutor).ThenInclude(t => t.User)
+            .Where(b => b.StudentId == id && (b.Status == "pending" || b.Status == "countered" || b.Status == "confirmed"))
+            .ToListAsync();
+
+        var unpaidInvoices = await _context.Invoices
+            .Include(i => i.Booking).ThenInclude(b => b.Tutor).ThenInclude(t => t.User)
+            .Where(i => i.Booking.StudentId == id && i.Status == "Unpaid")
+            .ToListAsync();
+
+        if (activeBookings.Count > 0 || unpaidInvoices.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "This profile can't be deleted until all pending classes, payments, and tutor agreements are cleared.",
+                activeBookings = activeBookings.Select(b => new
+                {
+                    bookingNumber = b.BookingNumber,
+                    tutorName = b.Tutor?.User?.Name ?? string.Empty,
+                    subject = b.Subject,
+                    status = b.Status
+                }),
+                unpaidInvoices = unpaidInvoices.Select(i => new
+                {
+                    invoiceNumber = i.InvoiceNumber,
+                    amount = i.Amount,
+                    tutorName = i.Booking.Tutor?.User?.Name ?? string.Empty
+                })
+            });
+        }
+
+        // Every remaining booking (if any) is now guaranteed to be cancelled or completed —
+        // safe to clear along with the profile. Their classes/invoices/reports cascade-delete
+        // automatically at the database level (Bookings itself is the only FK that RESTRICTs,
+        // so it must be removed explicitly before the student row can go).
+        var pastBookings = await _context.Bookings.Where(b => b.StudentId == id).ToListAsync();
+        if (pastBookings.Count > 0)
+            _context.Bookings.RemoveRange(pastBookings);
+
         _context.Students.Remove(student);
         await _context.SaveChangesAsync();
         return Ok();
+    }
+
+    [HttpPost("{id}/archive")]
+    public async Task<IActionResult> Archive(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
+        if (student == null) return NotFound();
+
+        if (student.IsArchived) return BadRequest(new { message = "This profile is already archived." });
+
+        // Same active-obligation rule as deleting: archiving hides the profile from the active
+        // roster, so it shouldn't be used to sweep unresolved classes or payments out of sight.
+        var hasActiveBookings = await _context.Bookings.AnyAsync(b =>
+            b.StudentId == id && (b.Status == "pending" || b.Status == "countered" || b.Status == "confirmed"));
+        var hasUnpaidInvoices = await _context.Invoices.AnyAsync(i =>
+            i.Booking.StudentId == id && i.Status == "Unpaid");
+
+        if (hasActiveBookings || hasUnpaidInvoices)
+        {
+            return BadRequest(new { message = "This profile can't be archived until all pending classes, payments, and tutor agreements are cleared." });
+        }
+
+        student.IsArchived = true;
+        await _context.SaveChangesAsync();
+        return Ok(MapToDto(student));
+    }
+
+    [HttpPost("{id}/unarchive")]
+    public async Task<IActionResult> Unarchive(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
+        if (student == null) return NotFound();
+
+        student.IsArchived = false;
+        await _context.SaveChangesAsync();
+        return Ok(MapToDto(student));
     }
 
     [HttpGet("booking")]
@@ -190,6 +268,7 @@ public class StudentsController : ControllerBase
         EducationLevel = s.EducationLevel,
         SubjectSelect = s.SubjectSelect,
         LearningGoal = s.LearningGoal,
-        PhotoUrl = s.PhotoUrl
+        PhotoUrl = s.PhotoUrl,
+        IsArchived = s.IsArchived
     };
 }

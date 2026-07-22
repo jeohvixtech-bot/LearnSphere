@@ -8,6 +8,7 @@ public class User
     public string Role { get; set; } = "parent"; // parent | tutor | admin
     public string Name { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool MustChangePassword { get; set; } = false;
 
     public Tutor? TutorProfile { get; set; }
     public List<Student> Students { get; set; } = new();

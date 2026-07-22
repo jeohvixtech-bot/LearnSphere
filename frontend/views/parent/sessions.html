@@ -6,7 +6,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Student Profiles</a>
+      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
       <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
       <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
       <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
@@ -92,6 +92,11 @@
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
+    <!-- ── Cancel Success ───────────────────────────── -->
+    <div class="alert-success" ng-if="vm.cancelSuccess">
+      ✓ Booking cancelled.
+    </div>
+
     <!-- ── Reschedule Form ───────────────────────────── -->
     <div class="card reschedule-panel" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
       <div class="reschedule-header">
@@ -118,9 +123,9 @@
             <span class="badge-blocked" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">🚫 Blocked</span>
           </div>
           <div class="reschedule-orig-date">
-            Original: <strong>{{ c.originalDate | dmy }}</strong>
+            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
-          <div class="form-row">
+          <div class="form-row-3">
             <div class="form-group">
               <label>New Date</label>
               <input type="text" ng-model="c.date" required placeholder="DD-MM-YYYY" fp-date
@@ -130,15 +135,26 @@
               </span>
             </div>
             <div class="form-group">
-              <label>Time</label>
-              <input type="text" ng-model="c.time" placeholder="04:00 PM - 05:00 PM"
+              <label>Start Time</label>
+              <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+                ng-change="vm.onRescheduleStartTimeChange(c)"
                 ng-class="{'input-blocked': c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)}" />
             </div>
+            <div class="form-group">
+              <label>End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
+              <input type="text" value="{{ vm.rescheduleEndTime(c) }}" readonly disabled placeholder="Auto-calculated" />
+            </div>
           </div>
+          <span class="blocked-date-hint" ng-if="c.date && vm.isTooSoon(c.date, c.time)">
+            ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
+          </span>
         </div>
+        <p class="reschedule-sub" ng-if="vm.hasDuplicateReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+          ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+        </p>
         <div class="btn-row" style="margin-top:4px">
           <button type="button" class="btn-outline" ng-click="vm.cancelReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary">Confirm Reschedule →</button>
+          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonReschedule() || vm.hasDurationMismatchReschedule() || vm.hasDuplicateReschedule()">Confirm Reschedule →</button>
         </div>
       </form>
     </div>
@@ -146,26 +162,38 @@
     <!-- ── Sessions List ───────────────────────────── -->
     <div ng-if="(!vm.issueForm.bookingId && !vm.rescheduleBooking) || vm.issueSuccess">
 
+      <!-- Tab Bar -->
+      <div class="tab-bar">
+        <button class="tab-btn" ng-class="{'active': vm.sessionsTab === 'active'}" ng-click="vm.sessionsTab = 'active'">
+          📋 Active Bookings ({{ vm.nonCancelledBookings().length }})
+        </button>
+        <button class="tab-btn" ng-class="{'active': vm.sessionsTab === 'cancelled'}" ng-click="vm.sessionsTab = 'cancelled'">
+          ✕ Cancelled Bookings ({{ vm.cancelledBookings().length }})
+        </button>
+      </div>
+
       <div class="sessions-list-header">
         <span class="profile-registry-label">
-          {{ vm.bookings.length }} Booking{{ vm.bookings.length !== 1 ? 's' : '' }}
+          {{ vm.visibleBookings().length }} Booking{{ vm.visibleBookings().length !== 1 ? 's' : '' }}
         </span>
         <a href="#!/parent/search" class="btn-primary sm">+ New Booking</a>
       </div>
 
-      <div class="empty-state-box" ng-if="!vm.bookings.length">
-        <p>No bookings found. Start by finding a tutor!</p>
-        <a href="#!/parent/search" class="btn-primary sm" style="margin-top:10px;display:inline-block">Find a Tutor →</a>
+      <div class="empty-state-box" ng-if="!vm.visibleBookings().length">
+        <p ng-if="vm.sessionsTab === 'active'">No active bookings found. Start by finding a tutor!</p>
+        <p ng-if="vm.sessionsTab === 'cancelled'">No cancelled bookings.</p>
+        <a ng-if="vm.sessionsTab === 'active'" href="#!/parent/search" class="btn-primary sm" style="margin-top:10px;display:inline-block">Find a Tutor →</a>
       </div>
 
       <!-- ── Booking cards ── -->
-      <div class="booking-card" ng-repeat="b in vm.bookings"
+      <div class="booking-card" ng-repeat="b in vm.visibleBookings()"
         ng-class="{'conflicted': vm.isBookingConflicted(b)}">
 
         <!-- Top row: subject + parties + status -->
         <div class="booking-card-top">
           <div class="booking-card-left">
             <span class="badge-subject">{{ b.subject }}</span>
+            <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
             <div class="booking-card-parties">
               <span>👨‍🏫 {{ b.tutorName }}</span>
               <span class="sep">•</span>
@@ -181,7 +209,7 @@
         <div class="booking-card-schedule">
           <div class="booking-date-chip" ng-repeat="c in b.classes track by $index">
             <span class="booking-date">📅 {{ c.date | dmy }}</span>
-            <span class="booking-time">🕐 {{ c.time }}</span>
+            <span class="booking-time">🕐 {{ c.time }} ({{ b.durationHours }}h)</span>
           </div>
         </div>
 
@@ -214,6 +242,13 @@
               ng-click="vm.startReportIssue(b.id)">
               ⚠️ Report Issue
             </button>
+            <button class="btn-outline sm"
+              ng-if="b.status === 'pending' || b.status === 'countered' || b.status === 'confirmed'"
+              ng-click="vm.cancelBooking(b)"
+              ng-disabled="vm.bookingHasPaidInvoice(b.id)"
+              title="{{ vm.bookingHasPaidInvoice(b.id) ? 'Cannot cancel: this booking has already been paid for' : '' }}">
+              ✕ Cancel Booking
+            </button>
           </div>
         </div>
 
@@ -224,7 +259,7 @@
             <span>Class {{ $index + 1 }}:</span>
             <span class="text-muted">{{ c.originalDate | dmy }}</span>
             <span class="counter-arrow">→</span>
-            <strong>{{ c.proposedDate | dmy }} {{ c.proposedTime }}</strong>
+            <strong>{{ c.proposedDate | dmy }} {{ c.proposedTime }} ({{ b.durationHours }}h)</strong>
           </div>
           <p class="counter-message" ng-if="b.counterProposal.message">"{{ b.counterProposal.message }}"</p>
         </div>
