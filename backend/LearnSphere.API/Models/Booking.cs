@@ -16,7 +16,7 @@ public class Booking
     public string BookingNumber { get; set; } = string.Empty;
 
     public ICollection<BookingClass> Classes { get; set; } = new List<BookingClass>();
-    public CounterProposal? CounterProposal { get; set; }
+    public ICollection<CounterProposal> CounterProposals { get; set; } = new List<CounterProposal>();
     public LessonReport? LessonReport { get; set; }
     public IssueReport? IssueReport { get; set; }
     public Invoice? Invoice { get; set; }
@@ -37,6 +37,9 @@ public class CounterProposal
     public int BookingId { get; set; }
     public Booking Booking { get; set; } = null!;
     public string Message { get; set; } = string.Empty;
+    public string ProposedBy { get; set; } = string.Empty; // "parent" or "tutor"
+    public string Status { get; set; } = "pending"; // pending | accepted | superseded | cancelled
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<CounterProposalClass> Classes { get; set; } = new List<CounterProposalClass>();
 }
 

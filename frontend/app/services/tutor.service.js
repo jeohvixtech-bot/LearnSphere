@@ -40,6 +40,12 @@ angular.module('learnSphereApp')
     });
   };
 
+  self.updateOnlineStatus = function (id, isOnline) {
+    return $http.patch(API_URL + '/tutors/' + id + '/online-status', { isOnline: isOnline }, {
+      headers: AuthService.authHeader()
+    });
+  };
+
   self.uploadImage = function (file) {
     var fd = new FormData();
     fd.append('file', file);

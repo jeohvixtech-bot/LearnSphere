@@ -227,9 +227,14 @@
               💳 Pay Invoice
             </button>
             <button class="btn-outline sm"
-              ng-if="b.status === 'countered'"
+              ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor'"
               ng-click="vm.acceptCounterProposal(b)">
               ✓ Accept Counter
+            </button>
+            <button class="btn-outline sm"
+              ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor'"
+              ng-click="vm.startReschedule(b)">
+              🔁 Counter Propose Again
             </button>
             <button ng-if="b.status === 'confirmed'"
               ng-class="vm.isBookingConflicted(b) ? 'btn-warning sm' : 'btn-outline sm'"
@@ -254,7 +259,10 @@
 
         <!-- Counter proposal panel -->
         <div class="counter-panel" ng-if="b.counterProposal && b.status === 'countered'">
-          <div class="counter-panel-header">🔄 Tutor's Counter Proposal</div>
+          <div class="counter-panel-header">
+            🔄 <span ng-if="b.counterProposal.proposedBy === 'tutor'">Tutor's Counter Proposal</span>
+            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">Your Reschedule Proposal <span class="badge-amber" style="font-size:10px;margin-left:4px">⏳ Awaiting tutor's acceptance</span></span>
+          </div>
           <div class="counter-class-line" ng-repeat="c in b.counterProposal.classes track by $index">
             <span>Class {{ $index + 1 }}:</span>
             <span class="text-muted">{{ c.originalDate | dmy }}</span>

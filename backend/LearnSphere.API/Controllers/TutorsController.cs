@@ -28,6 +28,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Where(t => t.IsVerified && t.IsOnline)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(subject) && subject != "All")
@@ -107,7 +108,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Offerings)
             .FirstOrDefaultAsync(t => t.Id == id);
 
-        if (tutor == null) return NotFound();
+        if (tutor == null || !tutor.IsVerified || !tutor.IsOnline) return NotFound();
         return Ok(MapToDto(tutor));
     }
 
@@ -285,6 +286,32 @@ public class TutorsController : ControllerBase
         return Ok(MapToDto(updated!));
     }
 
+    [HttpPatch("{id}/online-status")]
+    [Authorize]
+    public async Task<IActionResult> UpdateOnlineStatus(int id, [FromBody] UpdateTutorOnlineStatusDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        tutor.IsOnline = dto.IsOnline;
+        await _context.SaveChangesAsync();
+
+        var updated = await _context.Tutors
+            .Include(t => t.User)
+            .Include(t => t.Subjects)
+            .Include(t => t.Levels)
+            .Include(t => t.Modes)
+            .Include(t => t.Qualifications)
+            .Include(t => t.Reviews)
+            .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        return Ok(MapToDto(updated!));
+    }
+
     [HttpPost("{id}/slots")]
     [Authorize]
     public async Task<IActionResult> AddSlot(int id, [FromBody] AddTimeSlotDto dto)
@@ -395,6 +422,7 @@ public class TutorsController : ControllerBase
         Bio = t.Bio,
         Qualifications = t.Qualifications.Select(q => q.Qualification).ToList(),
         IsVerified = t.IsVerified,
+        IsOnline = t.IsOnline,
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }).ToList(),
         Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()

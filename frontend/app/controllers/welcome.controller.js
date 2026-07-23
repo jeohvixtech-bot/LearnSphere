@@ -5,12 +5,10 @@ angular.module('learnSphereApp')
 function ($scope, $location, $interval, $timeout, $window, AuthService, TutorService) {
   var self = this;
 
-  // Skip the landing page if already signed in
+  // Navigating to the landing page while signed in ends the session — this is the
+  // public entry point, not a dashboard shortcut. Log out and show it plainly.
   if (AuthService.isLoggedIn()) {
-    var user = AuthService.getCurrentUser();
-    if (user.role === 'parent' || user.role === 'student') $location.path('/parent/dashboard');
-    else if (user.role === 'tutor') $location.path('/tutor/overview');
-    else if (user.role === 'admin') $location.path('/admin/overview');
+    AuthService.logout();
   }
 
   self.goToLogin = function () { $location.path('/login'); };

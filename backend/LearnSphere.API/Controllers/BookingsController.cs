@@ -74,7 +74,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
             .Include(b => b.Classes)
-            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
+            .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .AsQueryable();
@@ -114,6 +114,11 @@ public class BookingsController : ControllerBase
         if (student == null) return BadRequest(new { message = "The specified student does not exist." });
         if (student.IsArchived)
             return BadRequest(new { message = "This profile is archived and can't be booked for. Restore it first." });
+
+        var bookingTutor = await _context.Tutors.FindAsync(dto.TutorId);
+        if (bookingTutor == null) return BadRequest(new { message = "The specified tutor does not exist." });
+        if (!bookingTutor.IsVerified || !bookingTutor.IsOnline)
+            return BadRequest(new { message = "This tutor is not currently available for booking." });
 
         if (HasOverlappingClasses(dto.Classes.Select(c => (c.Date, c.Time))))
             return BadRequest(new { message = "Two or more classes in this booking overlap on the same date and time." });
@@ -183,13 +188,23 @@ public class BookingsController : ControllerBase
     [HttpPatch("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateBookingStatusDto dto)
     {
+        var callerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var callerRole = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
         var booking = await _context.Bookings
-            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
+            .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.Student)
+            .Include(b => b.Tutor)
             .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
+
+        var isOwningParent = callerRole == "parent" && booking.Student?.ParentUserId == callerId;
+        var isOwningTutor = callerRole == "tutor" && booking.Tutor?.UserId == callerId;
+        if (!isOwningParent && !isOwningTutor) return Forbid();
+
+        var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
 
         if (dto.Status == "countered" && dto.CounterProposal != null
             && HasOverlappingClasses(dto.CounterProposal.Classes.Select(c =>
@@ -202,11 +217,11 @@ public class BookingsController : ControllerBase
         var previousStatus = booking.Status;
         booking.Status = dto.Status;
 
-        // When parent accepts a counter proposal, update the actual booking classes
+        // When the other party accepts a pending counter proposal, apply it to the actual booking classes
         if (dto.Status == "confirmed" && previousStatus == "countered"
-            && booking.CounterProposal?.Classes?.Count > 0)
+            && pendingProposal?.Classes?.Count > 0)
         {
-            var finalClasses = booking.CounterProposal.Classes.Select(cp => (
+            var finalClasses = pendingProposal.Classes.Select(cp => (
                 Date: string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
                 Time: string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
             )).ToList();
@@ -219,34 +234,38 @@ public class BookingsController : ControllerBase
             {
                 _context.BookingClasses.Add(new BookingClass { BookingId = id, Date = c.Date, Time = c.Time });
             }
+
+            pendingProposal.Status = "accepted";
+        }
+
+        // A booking leaving "countered" any other way (e.g. cancelled) closes out a dangling pending proposal
+        if (previousStatus == "countered" && dto.Status != "countered" && dto.Status != "confirmed" && pendingProposal != null)
+        {
+            pendingProposal.Status = "cancelled";
         }
 
         if (dto.Status == "countered" && dto.CounterProposal != null)
         {
-            if (booking.CounterProposal != null)
+            // Never overwrite an existing proposal — each one is a new log entry, and the
+            // previous pending one (if any) is superseded rather than lost.
+            if (pendingProposal != null)
             {
-                booking.CounterProposal.Message = dto.CounterProposal.Message;
-                _context.CounterProposalClasses.RemoveRange(booking.CounterProposal.Classes);
-                foreach (var c in dto.CounterProposal.Classes)
-                    booking.CounterProposal.Classes.Add(new CounterProposalClass
-                    {
-                        OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
-                        ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
-                    });
+                pendingProposal.Status = "superseded";
             }
-            else
+
+            booking.CounterProposals.Add(new CounterProposal
             {
-                booking.CounterProposal = new CounterProposal
+                BookingId = id,
+                Message = dto.CounterProposal.Message,
+                ProposedBy = callerRole,
+                Status = "pending",
+                CreatedAt = DateTime.UtcNow,
+                Classes = dto.CounterProposal.Classes.Select(c => new CounterProposalClass
                 {
-                    BookingId = id,
-                    Message = dto.CounterProposal.Message,
-                    Classes = dto.CounterProposal.Classes.Select(c => new CounterProposalClass
-                    {
-                        OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
-                        ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
-                    }).ToList()
-                };
-            }
+                    OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
+                    ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
+                }).ToList()
+            });
         }
 
         Invoice? newInvoice = null;
@@ -294,7 +313,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
             .Include(b => b.Classes)
-            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
+            .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -311,7 +330,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
             .Include(b => b.Classes)
-            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
+            .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .Include(b => b.Invoice)
@@ -328,6 +347,9 @@ public class BookingsController : ControllerBase
 
         var wasPendingTutorApproval = booking.Status == "pending";
         booking.Status = "cancelled";
+
+        var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
+        if (pendingProposal != null) pendingProposal.Status = "cancelled";
 
         // Void any outstanding invoice so Billing & Invoices stops offering to pay for a cancelled class.
         if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
@@ -448,8 +470,11 @@ public class BookingsController : ControllerBase
         return Ok();
     }
 
-    private static BookingDto MapToDto(Booking b) => new()
+    private static BookingDto MapToDto(Booking b)
     {
+        var pendingProposal = b.CounterProposals?.FirstOrDefault(cp => cp.Status == "pending");
+        return new()
+        {
         Id = b.Id,
         TutorId = b.TutorId,
         TutorName = b.Tutor?.User?.Name ?? string.Empty,
@@ -464,10 +489,11 @@ public class BookingsController : ControllerBase
         Status = b.Status,
         BookingNumber = b.BookingNumber,
         Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
-        CounterProposal = b.CounterProposal == null ? null : new CounterProposalDto
+        CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {
-            Message = b.CounterProposal.Message,
-            Classes = b.CounterProposal.Classes?.Select(c => new CounterProposalClassDto
+            Message = pendingProposal.Message,
+            ProposedBy = pendingProposal.ProposedBy,
+            Classes = pendingProposal.Classes?.Select(c => new CounterProposalClassDto
             {
                 OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
                 ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
@@ -488,5 +514,6 @@ public class BookingsController : ControllerBase
             Details = b.IssueReport.Details,
             Timestamp = b.IssueReport.Timestamp
         }
-    };
+        };
+    }
 }

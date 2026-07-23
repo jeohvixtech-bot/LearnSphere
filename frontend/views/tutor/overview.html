@@ -9,7 +9,6 @@
         <a href="#!/tutor/overview" class="nav-item active">📋 Overview & Schedules</a>
         <a href="#!/tutor/chat" class="nav-item">💬 Direct Messages</a>
       </nav>
-      <div class="status-live">Status: <span class="dot-green">● LIVE ON DUTY</span></div>
     </aside>
 
     <!-- Calendar Legend -->
@@ -43,22 +42,27 @@
       <div class="tutor-banner-left">
         <img ng-src="{{ vm.tutor.imageUrl }}" class="avatar-lg" alt="{{ vm.tutor.name }}" />
         <div>
-          <h2>{{ vm.tutor.name }} <span class="badge-gold">🏆 Gold Teacher</span></h2>
+          <h2>
+            {{ vm.tutor.name }}
+            <span class="badge-gold">🏆 Gold Teacher</span>
+            <span class="badge-verified" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">✓ Verified</span>
+            <span class="badge-pending" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">⏳ Pending</span>
+            <button type="button" class="status-switch" ng-class="{'is-online': vm.tutor.isOnline}" ng-click="vm.toggleOnlineStatus()"
+              title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
+              <span class="status-switch-knob"></span>{{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
+            </button>
+          </h2>
           <p>{{ vm.tutor.experienceYears }} Years Active MOE Teacher</p>
         </div>
       </div>
       <div class="stats-grid">
         <div class="stat-card">
-          <small>COMPLETED</small>
-          <strong class="green">{{ vm.completedClasses().length }} sessions</strong>
+          <small>COMPLETED IN THIS MONTH</small>
+          <strong class="green">{{ vm.completedThisMonth().length }} sessions</strong>
         </div>
         <div class="stat-card">
-          <small>SATISFACTION</small>
+          <small>RATING</small>
           <strong class="amber">⭐ {{ vm.tutor.rating }}</strong>
-        </div>
-        <div class="stat-card">
-          <small>COMPLETION RATE</small>
-          <strong>98.5%</strong>
         </div>
         <div class="stat-card">
           <small>READY BALANCE</small>
@@ -73,6 +77,7 @@
       <div class="request-list">
         <div class="request-item" ng-repeat="b in vm.pendingRequests()">
           <div>
+            <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>{{ b.studentName }}</strong>
             <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time }} ({{ b.durationHours }}h)</p>
@@ -267,6 +272,11 @@
       ✓ Reschedule proposal sent. The parent will be notified to confirm the new dates.
     </div>
 
+    <!-- Accept Counter Success -->
+    <div class="alert-success" ng-if="vm.counterAcceptSuccess">
+      ✓ Reschedule accepted. The booking has been updated.
+    </div>
+
     <!-- Reschedule Form -->
     <div class="card reschedule-panel" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
       <div class="reschedule-header">
@@ -336,14 +346,16 @@
       <div class="session-item" ng-repeat="b in vm.confirmedClasses()"
         ng-class="{'session-conflicted': vm.isTutorBookingConflicted(b)}">
         <div style="flex:1">
+          <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
           <span class="badge-subject">{{ b.subject }}</span>
           <strong>Child: {{ b.studentName }}</strong>
-          <!-- Countered: show proposed dates, pending parent acceptance -->
+          <!-- Countered: show proposed dates, pending acceptance -->
           <div ng-if="b.status === 'countered' && b.counterProposal">
             <div class="class-date-row" ng-repeat="c in b.counterProposal.classes track by $index">
               <p style="text-decoration:line-through;color:#94a3b8;font-size:12px">{{ c.originalDate | dmy }}</p>
               <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime }} ({{ b.durationHours }}h)
-                <span class="badge-amber" style="font-size:10px;margin-left:4px">⏳ Awaiting acceptance</span>
+                <span class="badge-amber" style="font-size:10px;margin-left:4px" ng-if="b.counterProposal.proposedBy === 'tutor'">⏳ Awaiting parent's acceptance</span>
+                <span class="badge-amber" style="font-size:10px;margin-left:4px" ng-if="b.counterProposal.proposedBy !== 'tutor'">⏳ Parent proposed — awaiting your acceptance</span>
               </p>
             </div>
           </div>
@@ -355,6 +367,11 @@
             </div>
           </div>
         </div>
+        <button class="btn-primary sm"
+          ng-if="b.status === 'countered' && b.counterProposal && b.counterProposal.proposedBy !== 'tutor'"
+          ng-click="vm.acceptCounterProposal(b)">
+          ✓ Accept Proposal
+        </button>
         <button ng-class="vm.isTutorBookingConflicted(b) ? 'btn-warning sm' : 'btn-outline sm'"
           ng-click="vm.startTutorReschedule(b)">
           <span ng-if="vm.isTutorBookingConflicted(b)">⚠️ Reschedule Required</span>
@@ -466,13 +483,10 @@
       <span class="label-tag indigo">TUTOR PROFILE MANAGEMENT</span>
       <h3>Edit Profile Details</h3>
 
-      <div class="alert-success" ng-if="vm.profileSuccess">✓ Profile updated successfully.</div>
-      <div class="alert-error" ng-if="vm.profileError">{{ vm.profileError }}</div>
-
       <form ng-submit="vm.saveProfile()" class="profile-form">
 
         <div class="form-group">
-          <label>Profile Photo</label>
+          <label>Profile Photo <span class="text-danger">*</span></label>
           <div class="photo-upload-row">
             <img ng-if="vm.profileForm.imageUrl" ng-src="{{ vm.profileForm.imageUrl }}" class="preview-avatar" alt="Preview" />
             <div class="photo-upload-controls">
@@ -481,6 +495,7 @@
               <label for="photoUpload" class="btn-outline-sm photo-browse-btn">📁 Browse & Upload</label>
               <span ng-if="vm.uploading" class="text-muted">Uploading...</span>
               <span ng-if="!vm.uploading && vm.profileForm.imageUrl" class="text-success">✓ Photo ready</span>
+              <span ng-if="!vm.uploading && !vm.profileForm.imageUrl" class="field-error">Required</span>
             </div>
           </div>
         </div>
@@ -556,7 +571,10 @@
           <input type="number" ng-model="vm.profileForm.experienceYears" min="0" />
         </div>
 
-        <button type="submit" class="btn-indigo full-width">Save Profile</button>
+        <button type="submit" class="btn-indigo full-width" ng-disabled="!vm.profileForm.imageUrl || vm.uploading">Save Profile</button>
+
+        <div class="alert-success" style="margin-top:12px" ng-if="vm.profileSuccess">✓ Profile updated successfully.</div>
+        <div class="alert-error" style="margin-top:12px" ng-if="vm.profileError">{{ vm.profileError }}</div>
       </form>
     </div><!-- end profile tab -->
 

@@ -87,16 +87,30 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     return self.bookings.filter(function (b) { return b.tutorId === self.tutor.id && b.status === 'pending'; });
   };
 
+  var BOOKING_STATUS_ORDER = { pending: 0, countered: 1, confirmed: 2, completed: 3 };
+
   self.confirmedClasses = function () {
     if (!self.tutor) return [];
     return self.bookings.filter(function (b) {
       return b.tutorId === self.tutor.id && (b.status === 'confirmed' || b.status === 'countered');
+    }).sort(function (a, b) {
+      return BOOKING_STATUS_ORDER[a.status] - BOOKING_STATUS_ORDER[b.status];
     });
   };
 
   self.completedClasses = function () {
     if (!self.tutor) return [];
     return self.bookings.filter(function (b) { return b.tutorId === self.tutor.id && b.status === 'completed'; });
+  };
+
+  self.completedThisMonth = function () {
+    var now = new Date();
+    return self.completedClasses().filter(function (b) {
+      return (b.classes || []).some(function (c) {
+        var d = parseLocalDate(c.date);
+        return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      });
+    });
   };
 
   self.needsReport = function () {
@@ -621,6 +635,17 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     });
   };
 
+  self.counterAcceptSuccess = false;
+  self.acceptCounterProposal = function (booking) {
+    BookingService.updateStatus(booking.id, 'confirmed', null).then(function () {
+      self.counterAcceptSuccess = true;
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      $timeout(function () {
+        self.counterAcceptSuccess = false;
+      }, 2500);
+    });
+  };
+
   self.startReport = function (booking) {
     self.reportBooking = booking;
     self.reportForm = { covered: '', performance: '', homework: '' };
@@ -699,10 +724,21 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     });
   };
 
+  self.toggleOnlineStatus = function () {
+    if (!self.tutor) return;
+    TutorService.updateOnlineStatus(self.tutor.id, !self.tutor.isOnline).then(function (res) {
+      self.tutor = res.data;
+    });
+  };
+
   self.saveProfile = function () {
     if (!self.tutor) return;
     self.profileSuccess = false;
     self.profileError = '';
+    if (!self.profileForm.imageUrl) {
+      self.profileError = 'Please upload a profile photo before saving.';
+      return;
+    }
     var payload = {
       imageUrl: self.profileForm.imageUrl,
       bio: self.profileForm.bio,

@@ -49,6 +49,7 @@ public class UpdateBookingStatusDto
 public class CounterProposalDto
 {
     public string Message { get; set; } = string.Empty;
+    public string ProposedBy { get; set; } = string.Empty;
     public List<CounterProposalClassDto> Classes { get; set; } = new();
 }
 

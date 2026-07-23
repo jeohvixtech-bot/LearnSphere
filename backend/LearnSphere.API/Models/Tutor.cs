@@ -12,6 +12,7 @@ public class Tutor
     public int ExperienceYears { get; set; }
     public string Bio { get; set; } = string.Empty;
     public bool IsVerified { get; set; } = false;
+    public bool IsOnline { get; set; } = true; // Offline hides the profile from parent search entirely
 
     public List<TutorSubject> Subjects { get; set; } = new();
     public List<TutorLevel> Levels { get; set; } = new();

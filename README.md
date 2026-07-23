@@ -151,10 +151,11 @@ npx serve . -p 3000
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/tutors` | — | List all tutors (filter: `subject`, `mode`, `search`, `rating`) |
-| GET | `/api/tutors/{id}` | — | Get tutor by ID (public) |
+| GET | `/api/tutors` | — | List tutors — only `IsVerified && IsOnline` profiles are ever returned (filter: `subject`, `mode`, `search`, `rating`) |
+| GET | `/api/tutors/{id}` | — | Get tutor by ID (public) — same `IsVerified && IsOnline` gate; unverified/offline profiles 404 |
 | GET | `/api/tutors/by-user/{userId}` | JWT | Get tutor profile by user ID (self-retrieve) |
 | PUT | `/api/tutors/{id}` | JWT | Update tutor profile (bio, image, price, subjects, levels, modes, qualifications) |
+| PATCH | `/api/tutors/{id}/online-status` | JWT (owner) | Toggle a tutor's own online/offline visibility |
 | DELETE | `/api/tutors/{id}` | JWT | Delete tutor account |
 | GET | `/api/tutors/booking` | JWT | Get tutor's bookings |
 | GET | `/api/tutors/{id}/slots` | JWT | Get full timetable |
@@ -193,7 +194,7 @@ npx serve . -p 3000
 |--------|----------|------|-------------|
 | GET | `/api/bookings` | JWT | Get bookings (role-filtered: parent sees own students, tutor sees own) |
 | POST | `/api/bookings` | JWT | Create a booking — auto-assigns `BookingNumber` (BOK00001…) |
-| PATCH | `/api/bookings/{id}/status` | JWT | Update status: `confirmed` / `cancelled` / `countered` |
+| PATCH | `/api/bookings/{id}/status` | JWT (parent/tutor on that booking) | Update status: `confirmed` / `cancelled` / `countered`. A `countered` update inserts a new CounterProposals row rather than overwriting; either party can counter-propose in turn |
 | POST | `/api/bookings/{id}/lesson-report` | JWT | Submit a lesson report |
 | PATCH | `/api/bookings/{id}/lesson-report` | JWT | Edit an existing lesson report (audit trail saved) |
 | POST | `/api/bookings/{id}/issue` | JWT | Report an issue on a booking |
@@ -280,6 +281,7 @@ npx serve . -p 3000
 | `ExperienceYears` | INT | |
 | `Bio` | VARCHAR | Short biography |
 | `IsVerified` | TINYINT(1) | Admin-verified flag |
+| `IsOnline` | TINYINT(1) | Tutor-controlled switch; offline hides the profile from parent search/booking entirely (default `1`) |
 
 ### TutorOfferings
 
@@ -381,13 +383,18 @@ npx serve . -p 3000
 
 ### CounterProposals
 
+One-to-many log of every reschedule proposal made on a booking, by either party — not just the current one. A new proposal never overwrites an existing row: the previous `pending` row (if any) is marked `superseded` and a new row is inserted. At most one row per booking is ever `pending` at a time.
+
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | INT (PK, AUTO_INCREMENT) | |
-| `BookingId` | INT (FK → Bookings.Id) | One-to-one with Booking |
-| `Date` | VARCHAR | Counter-proposed date |
-| `Time` | VARCHAR | Counter-proposed time |
-| `Message` | VARCHAR | Tutor's explanation |
+| `BookingId` | INT (FK → Bookings.Id) | Many rows per booking (history) |
+| `Date` | VARCHAR | Legacy; superseded by CounterProposalClasses |
+| `Time` | VARCHAR | Legacy; superseded by CounterProposalClasses |
+| `Message` | VARCHAR | Proposer's explanation |
+| `ProposedBy` | VARCHAR(20) | `parent` \| `tutor` — derived server-side from the JWT, never trusted from the client |
+| `Status` | VARCHAR(20) | `pending` \| `accepted` \| `superseded` \| `cancelled` |
+| `CreatedAt` | DATETIME(6) | |
 
 ### LessonReports
 
@@ -488,11 +495,12 @@ npx serve . -p 3000
 
 ### Tutor
 - Interactive calendar (paid = green, unpaid = amber)
-- Accept or counter-propose booking requests
+- Accept or counter-propose booking requests; parents can counter-propose back in turn (no round limit)
 - Confirm bookings (auto-generates invoice with INV number)
 - Submit and edit lesson reports (with audit trail)
 - Teaching offerings builder (subject + level + mode + qualification + price)
-- Stats dashboard (sessions, rating, balance)
+- Online/offline visibility switch — going offline immediately hides the profile from parent search and blocks new bookings
+- Stats dashboard (sessions this month, rating, balance)
 - Direct parent-tutor chat
 
 ### Admin

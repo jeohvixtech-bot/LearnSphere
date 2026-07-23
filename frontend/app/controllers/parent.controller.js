@@ -358,15 +358,25 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     if (self.hasTooSoonReschedule()) return;
     if (self.hasDurationMismatchReschedule()) return;
     if (self.hasDuplicateReschedule()) return;
-    var newClasses = self.rescheduleForm.classes.map(function (c) {
-      return { date: toDateStr(toDateObj(c.date)), time: c.time };
+    var bookingId = self.rescheduleBooking.id;
+    BookingService.updateStatus(bookingId, 'countered', {
+      message: 'Parent proposed reschedule',
+      classes: self.rescheduleForm.classes.map(function (c) {
+        return {
+          originalDate: c.originalDate,
+          originalTime: c.originalTime,
+          proposedDate: toDateStr(toDateObj(c.date)),
+          proposedTime: c.time
+        };
+      })
+    }).then(function () {
+      self.rescheduleSuccess = true;
+      self.cancelReschedule();
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      $timeout(function () {
+        self.rescheduleSuccess = false;
+      }, 2500);
     });
-    self.rescheduleBooking.classes = newClasses;
-    self.rescheduleSuccess = true;
-    self.cancelReschedule();
-    $timeout(function () {
-      self.rescheduleSuccess = false;
-    }, 2500);
   };
 
   self.isDateBlockedForTutor = function (tutorId, dateVal) {
@@ -454,7 +464,8 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.bookingForm.subject = tutor.subjects[0] || '';
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
-    if (self.students.length) self.bookingForm.studentId = self.students[0].id;
+    var activeStudents = self.activeStudents();
+    if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
 
     self.tutorCal.year = _scNow.getFullYear();
     self.tutorCal.month = _scNow.getMonth();
@@ -1009,8 +1020,17 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.sessionsTab = 'active';
 
+  var BOOKING_STATUS_ORDER = { pending: 0, countered: 1, confirmed: 2, completed: 3 };
+
   self.nonCancelledBookings = function () {
-    return self.bookings.filter(function (b) { return b.status !== 'cancelled'; });
+    return self.bookings
+      .filter(function (b) { return b.status !== 'cancelled'; })
+      .slice()
+      .sort(function (a, b) {
+        var rankA = BOOKING_STATUS_ORDER.hasOwnProperty(a.status) ? BOOKING_STATUS_ORDER[a.status] : 99;
+        var rankB = BOOKING_STATUS_ORDER.hasOwnProperty(b.status) ? BOOKING_STATUS_ORDER[b.status] : 99;
+        return rankA - rankB;
+      });
   };
 
   self.cancelledBookings = function () {

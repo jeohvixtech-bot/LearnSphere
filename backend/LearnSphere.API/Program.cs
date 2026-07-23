@@ -156,6 +156,37 @@ using (var scope = app.Services.CreateScope())
     // Archiving a student profile is the alternative to deleting one that still has booking history
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Students` ADD COLUMN `IsArchived` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    // Tutor-controlled online/offline switch — offline hides the profile from parent search/booking entirely
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ADD COLUMN `IsOnline` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
+    // CounterProposals becomes a per-booking log (was 1-to-1) so every reschedule proposal —
+    // by either party — is kept instead of being overwritten by the next one.
+    // The old unique index backs a FK, so a replacement non-unique index must exist
+    // before it can be dropped, or MySQL refuses ("needed in a foreign key constraint").
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` ADD INDEX `IX_CounterProposals_BookingId_nonunique` (`BookingId`)"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` DROP INDEX `IX_CounterProposals_BookingId`"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` RENAME INDEX `IX_CounterProposals_BookingId_nonunique` TO `IX_CounterProposals_BookingId`"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` ADD COLUMN `ProposedBy` VARCHAR(20) NOT NULL DEFAULT ''"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` ADD COLUMN `Status` VARCHAR(20) NOT NULL DEFAULT 'pending'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CounterProposals` ADD COLUMN `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)"); } catch { }
+    // Pre-existing rows all default-backfilled to 'pending' above — but a row whose booking has
+    // already moved on (confirmed/completed/cancelled) was actually resolved, not left hanging.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        UPDATE `CounterProposals` cp
+        JOIN `Bookings` b ON b.`Id` = cp.`BookingId`
+        SET cp.`Status` = 'accepted'
+        WHERE cp.`Status` = 'pending' AND b.`Status` IN ('confirmed', 'completed')"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        UPDATE `CounterProposals` cp
+        JOIN `Bookings` b ON b.`Id` = cp.`BookingId`
+        SET cp.`Status` = 'cancelled'
+        WHERE cp.`Status` = 'pending' AND b.`Status` = 'cancelled'"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(@"
         CREATE TABLE IF NOT EXISTS `FavoriteTutors` (
             `Id` INT NOT NULL AUTO_INCREMENT,

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS Tutors (
     ExperienceYears  INT             NOT NULL DEFAULT 0,
     Bio              LONGTEXT        NOT NULL,
     IsVerified       TINYINT(1)      NOT NULL DEFAULT 0,
+    IsOnline         TINYINT(1)      NOT NULL DEFAULT 1,  -- offline hides the profile from parent search/booking entirely
     CONSTRAINT FK_Tutors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -167,17 +168,28 @@ CREATE TABLE IF NOT EXISTS BookingClasses (
 );
 
 -- ============================================================
--- CounterProposals  (1-to-1 with Booking)
+-- CounterProposals  (one-to-many log of every reschedule proposal on a booking)
 -- Date/Time moved to per-class CounterProposalClasses — the columns below
 -- are legacy, left NULLable rather than dropped, kept here to mirror the
 -- live database exactly.
+--
+-- BookingId is intentionally NOT unique: this table keeps a full history of
+-- every proposal made by either party, not just the current one. A new
+-- proposal never overwrites an existing row — the previous "pending" row (if
+-- any) is marked "superseded" and a new row is inserted. Status distinguishes
+-- pending | accepted | superseded | cancelled; only ever at most one row per
+-- booking is "pending" at a time.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS CounterProposals (
-    Id         INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId  INT         NOT NULL UNIQUE,
-    Date       LONGTEXT    NULL,                     -- legacy; superseded by CounterProposalClasses.ProposedDate
-    Time       LONGTEXT    NULL,                     -- legacy; superseded by CounterProposalClasses.ProposedTime
-    Message    LONGTEXT    NOT NULL,
+    Id          INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId   INT          NOT NULL,
+    Date        LONGTEXT     NULL,                     -- legacy; superseded by CounterProposalClasses.ProposedDate
+    Time        LONGTEXT     NULL,                     -- legacy; superseded by CounterProposalClasses.ProposedTime
+    Message     LONGTEXT     NOT NULL,
+    ProposedBy  VARCHAR(20)  NOT NULL DEFAULT '',       -- 'parent' or 'tutor' — derived server-side from the JWT, never trusted from the client
+    Status      VARCHAR(20)  NOT NULL DEFAULT 'pending', -- pending | accepted | superseded | cancelled
+    CreatedAt   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY IX_CounterProposals_BookingId (BookingId),
     CONSTRAINT FK_CounterProposals_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 

@@ -9,12 +9,14 @@ angular.module('learnSphereApp', ['ngRoute'])
 
   $routeProvider
     .when('/welcome', {
-      templateUrl: 'views/welcome.html',
+      // Cache-busted: the entry page must never be served from a stale cached
+      // response (e.g. a leftover redirect from a previous local dev server).
+      templateUrl: function () { return 'views/welcome.html?_=' + Date.now(); },
       controller: 'WelcomeCtrl',
       controllerAs: 'vm'
     })
     .when('/login', {
-      templateUrl: 'views/login.html',
+      templateUrl: function () { return 'views/login.html?_=' + Date.now(); },
       controller: 'AuthCtrl',
       controllerAs: 'auth'
     })

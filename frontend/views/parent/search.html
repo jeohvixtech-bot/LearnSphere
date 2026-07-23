@@ -279,18 +279,18 @@
             <div class="form-group">
               <label>Select Child</label>
               <select ng-model="vm.bookingForm.studentId">
-                <option ng-repeat="s in vm.activeStudents()" value="{{ s.id }}">{{ s.name }}</option>
+                <option ng-repeat="s in vm.activeStudents()" ng-value="s.id">{{ s.name }}</option>
               </select>
             </div>
             <div class="form-group">
               <label>Classes per Month</label>
               <select ng-model="vm.bookingForm.classesPerMonth" ng-change="vm.updateSessions()">
-                <option value="1">1 class per month</option>
-                <option value="2">2 classes per month</option>
-                <option value="3">3 classes per month</option>
-                <option value="4">4 classes per month</option>
-                <option value="8">8 classes per month</option>
-                <option value="12">12 classes per month</option>
+                <option ng-value="1">1 class per month</option>
+                <option ng-value="2">2 classes per month</option>
+                <option ng-value="3">3 classes per month</option>
+                <option ng-value="4">4 classes per month</option>
+                <option ng-value="8">8 classes per month</option>
+                <option ng-value="12">12 classes per month</option>
               </select>
             </div>
           </div>

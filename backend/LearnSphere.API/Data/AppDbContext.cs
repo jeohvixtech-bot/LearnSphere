@@ -64,8 +64,8 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<CounterProposal>()
             .HasOne(cp => cp.Booking)
-            .WithOne(b => b.CounterProposal)
-            .HasForeignKey<CounterProposal>(cp => cp.BookingId);
+            .WithMany(b => b.CounterProposals)
+            .HasForeignKey(cp => cp.BookingId);
 
         modelBuilder.Entity<CounterProposalClass>()
             .HasOne(c => c.CounterProposal)

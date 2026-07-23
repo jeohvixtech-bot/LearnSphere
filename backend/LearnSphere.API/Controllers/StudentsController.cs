@@ -169,52 +169,57 @@ public class StudentsController : ControllerBase
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
             .Include(b => b.Classes)
-            .Include(b => b.CounterProposal).ThenInclude(cp => cp!.Classes)
+            .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
             .Include(b => b.IssueReport)
             .Where(b => studentIds.Contains(b.StudentId))
             .ToListAsync();
 
-        return Ok(bookings.Select(b => new BookingDto
+        return Ok(bookings.Select(b =>
         {
-            Id = b.Id,
-            TutorId = b.TutorId,
-            TutorName = b.Tutor?.User?.Name ?? string.Empty,
-            TutorImageUrl = b.Tutor?.ImageUrl ?? string.Empty,
-            StudentId = b.StudentId,
-            StudentName = b.Student?.Name ?? string.Empty,
-            Subject = b.Subject,
-            Mode = b.Mode,
-            DurationHours = b.DurationHours,
-            Message = b.Message,
-            TotalPrice = b.TotalPrice,
-            Status = b.Status,
-            BookingNumber = b.BookingNumber,
-            Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
-            CounterProposal = b.CounterProposal == null ? null : new CounterProposalDto
+            var pendingProposal = b.CounterProposals?.FirstOrDefault(cp => cp.Status == "pending");
+            return new BookingDto
             {
-                Message = b.CounterProposal.Message,
-                Classes = b.CounterProposal.Classes?.Select(c => new CounterProposalClassDto
+                Id = b.Id,
+                TutorId = b.TutorId,
+                TutorName = b.Tutor?.User?.Name ?? string.Empty,
+                TutorImageUrl = b.Tutor?.ImageUrl ?? string.Empty,
+                StudentId = b.StudentId,
+                StudentName = b.Student?.Name ?? string.Empty,
+                Subject = b.Subject,
+                Mode = b.Mode,
+                DurationHours = b.DurationHours,
+                Message = b.Message,
+                TotalPrice = b.TotalPrice,
+                Status = b.Status,
+                BookingNumber = b.BookingNumber,
+                Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
+                CounterProposal = pendingProposal == null ? null : new CounterProposalDto
                 {
-                    OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
-                    ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
-                }).ToList() ?? new()
-            },
-            LessonReport = b.LessonReport == null ? null : new LessonReportDto
-            {
-                Id = b.LessonReport.Id,
-                Covered = b.LessonReport.Covered,
-                Performance = b.LessonReport.Performance,
-                Homework = b.LessonReport.Homework,
-                SubmitDate = b.LessonReport.SubmitDate,
-                EditHistory = b.LessonReport.EditHistory?.Select(e => new LessonReportEditDto { Date = e.Date, Changes = e.Changes }).ToList() ?? new()
-            },
-            IssueReport = b.IssueReport == null ? null : new IssueReportDto
-            {
-                IssueType = b.IssueReport.IssueType,
-                Details = b.IssueReport.Details,
-                Timestamp = b.IssueReport.Timestamp
-            }
+                    Message = pendingProposal.Message,
+                    ProposedBy = pendingProposal.ProposedBy,
+                    Classes = pendingProposal.Classes?.Select(c => new CounterProposalClassDto
+                    {
+                        OriginalDate = c.OriginalDate, OriginalTime = c.OriginalTime,
+                        ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
+                    }).ToList() ?? new()
+                },
+                LessonReport = b.LessonReport == null ? null : new LessonReportDto
+                {
+                    Id = b.LessonReport.Id,
+                    Covered = b.LessonReport.Covered,
+                    Performance = b.LessonReport.Performance,
+                    Homework = b.LessonReport.Homework,
+                    SubmitDate = b.LessonReport.SubmitDate,
+                    EditHistory = b.LessonReport.EditHistory?.Select(e => new LessonReportEditDto { Date = e.Date, Changes = e.Changes }).ToList() ?? new()
+                },
+                IssueReport = b.IssueReport == null ? null : new IssueReportDto
+                {
+                    IssueType = b.IssueReport.IssueType,
+                    Details = b.IssueReport.Details,
+                    Timestamp = b.IssueReport.Timestamp
+                }
+            };
         }));
     }
 

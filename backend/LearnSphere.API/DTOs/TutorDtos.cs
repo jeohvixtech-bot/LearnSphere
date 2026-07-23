@@ -33,6 +33,7 @@ public class TutorDto
     public string Bio { get; set; } = string.Empty;
     public List<string> Qualifications { get; set; } = new();
     public bool IsVerified { get; set; }
+    public bool IsOnline { get; set; }
     public List<ReviewDto> Reviews { get; set; } = new();
     public List<TimeSlotDto> Timetable { get; set; } = new();
     public List<TutorOfferingDto> Offerings { get; set; } = new();
@@ -57,6 +58,11 @@ public class TimeSlotDto
 public class VerifyTutorDto
 {
     public int TutorId { get; set; }
+}
+
+public class UpdateTutorOnlineStatusDto
+{
+    public bool IsOnline { get; set; }
 }
 
 public class UpdateTutorDto
