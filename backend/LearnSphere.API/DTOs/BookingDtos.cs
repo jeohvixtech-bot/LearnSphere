@@ -8,6 +8,8 @@ public class BookingDto
     public string TutorImageUrl { get; set; } = string.Empty;
     public int StudentId { get; set; }
     public string StudentName { get; set; } = string.Empty;
+    public int ParentUserId { get; set; }
+    public string ParentName { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
     public int DurationHours { get; set; }

@@ -6,6 +6,7 @@ angular.module('learnSphereApp')
   var tutorId = null;
 
   self.setTutor = function (id) { tutorId = id; };
+  self.hasPendingTutor = function () { return tutorId !== null; };
   self.consumeTutor = function () {
     var id = tutorId;
     tutorId = null;

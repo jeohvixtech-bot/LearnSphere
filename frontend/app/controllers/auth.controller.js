@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AuthCtrl', ['$location', 'AuthService', function ($location, AuthService) {
+.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', function ($location, AuthService, PendingMatchService) {
   var self = this;
 
   // Redirect if already logged in
@@ -110,7 +110,13 @@ angular.module('learnSphereApp')
   };
 
   function redirectByRole(role) {
-    if (role === 'parent' || role === 'student') $location.path('/parent/dashboard');
+    // A tutor clicked from the (signed-out) welcome page takes priority over the
+    // usual dashboard landing — send the parent straight to that tutor's booking
+    // page. ParentCtrl.init() consumes it once the tutor catalog has loaded.
+    if ((role === 'parent' || role === 'student') && PendingMatchService.hasPendingTutor()) {
+      $location.path('/parent/search');
+    }
+    else if (role === 'parent' || role === 'student') $location.path('/parent/dashboard');
     else if (role === 'tutor')                   $location.path('/tutor/overview');
     else if (role === 'admin')                   $location.path('/admin/overview');
     else                                         $location.path('/login');

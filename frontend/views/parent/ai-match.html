@@ -50,7 +50,7 @@
           </div>
         </div>
         <div class="form-group" style="margin-top:14px" ng-if="s.subjectSelect" ng-click="$event.stopPropagation()">
-          <label>Subject</label>
+          <label>Subject <span class="text-danger">*</span></label>
           <select ng-model="vm.aiMatchSubjectChoice[s.id]">
             <option value="">— Select subject —</option>
             <option ng-repeat="c in s.subjectCombos"
@@ -74,7 +74,8 @@
 
       <div class="tutor-card" ng-repeat="t in vm.aiMatchResults">
         <div class="tutor-card-main">
-          <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+          <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+          <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback" style="font-size:56px">{{ t.name[0] }}</div>
           <div class="tutor-card-body">
             <div class="tutor-card-name-row">
               <h4>{{ t.name }}</h4>

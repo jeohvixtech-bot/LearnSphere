@@ -24,11 +24,12 @@
 
   <!-- ── Tutor Grid (2 per row, read-only preview) ── -->
   <div class="welcome-tutor-grid">
-    <div class="tutor-card" ng-repeat="t in vm.tutors" ng-click="vm.goToLogin()" style="cursor:pointer">
+    <div class="tutor-card" ng-repeat="t in vm.tutors" ng-click="vm.goToLogin(t)" style="cursor:pointer">
 
       <!-- ── Top row: avatar + info ── -->
       <div class="tutor-card-main">
-        <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+        <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+        <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback" style="font-size:56px">{{ t.name[0] }}</div>
         <div class="tutor-card-body">
           <div class="tutor-card-name-row">
             <h4>{{ t.name }}</h4>

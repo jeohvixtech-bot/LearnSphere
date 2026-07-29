@@ -1,8 +1,8 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('WelcomeCtrl', ['$scope', '$location', '$interval', '$timeout', '$window', 'AuthService', 'TutorService',
-function ($scope, $location, $interval, $timeout, $window, AuthService, TutorService) {
+.controller('WelcomeCtrl', ['$scope', '$location', '$interval', '$timeout', '$window', 'AuthService', 'TutorService', 'PendingMatchService',
+function ($scope, $location, $interval, $timeout, $window, AuthService, TutorService, PendingMatchService) {
   var self = this;
 
   // Navigating to the landing page while signed in ends the session — this is the
@@ -11,7 +11,13 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
     AuthService.logout();
   }
 
-  self.goToLogin = function () { $location.path('/login'); };
+  // Clicking a tutor card while signed out stashes the tutor so that once the visitor
+  // signs in (or registers), they land straight on that tutor's booking page instead
+  // of a generic dashboard — see AuthCtrl.redirectByRole and ParentCtrl.init().
+  self.goToLogin = function (tutor) {
+    if (tutor) PendingMatchService.setTutor(tutor.id);
+    $location.path('/login');
+  };
 
   self.tutors = [];
   TutorService.getAll().then(function (res) {

@@ -9,8 +9,8 @@ angular.module('learnSphereApp')
   self.login = function (email, password) {
     return $http.post(API_URL + '/auth/login', { email: email, password: password })
       .then(function (res) {
-        localStorage.setItem(TOKEN_KEY, res.data.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.data));
+        sessionStorage.setItem(TOKEN_KEY, res.data.token);
+        sessionStorage.setItem(USER_KEY, JSON.stringify(res.data));
         return res.data;
       });
   };
@@ -18,8 +18,8 @@ angular.module('learnSphereApp')
   self.register = function (email, password, name, role) {
     return $http.post(API_URL + '/auth/register', { email: email, password: password, name: name, role: role })
       .then(function (res) {
-        localStorage.setItem(TOKEN_KEY, res.data.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.data));
+        sessionStorage.setItem(TOKEN_KEY, res.data.token);
+        sessionStorage.setItem(USER_KEY, JSON.stringify(res.data));
         return res.data;
       });
   };
@@ -37,23 +37,23 @@ angular.module('learnSphereApp')
       var user = self.getCurrentUser();
       if (user) {
         user.mustChangePassword = false;
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        sessionStorage.setItem(USER_KEY, JSON.stringify(user));
       }
       return res.data;
     });
   };
 
   self.logout = function () {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
   };
 
   self.getToken = function () {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   };
 
   self.getCurrentUser = function () {
-    var raw = localStorage.getItem(USER_KEY);
+    var raw = sessionStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
   };
 

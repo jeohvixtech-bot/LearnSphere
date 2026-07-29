@@ -90,7 +90,7 @@
             <div class="session-info">
               <span class="badge-subject">{{ b.subject }}</span>
               <strong>{{ b.tutorName }}</strong>
-              <small>🕐 {{ b.classes[0].date | dmy }} &bull; {{ b.classes[0].time }} ({{ b.durationHours }}h)
+              <small>🕐 {{ b.classes[0].date | dmy }} &bull; {{ b.classes[0].time | hhmma }} ({{ b.durationHours }}h)
                 <span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span>
               </small>
             </div>

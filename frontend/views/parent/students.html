@@ -51,11 +51,11 @@
         <form ng-submit="vm.saveParentProfile()" class="form-stack" style="margin-top:14px">
           <div class="form-row">
             <div class="form-group">
-              <label>Full Name</label>
+              <label>Full Name <span class="text-danger">*</span></label>
               <input type="text" ng-model="vm.parentProfileForm.name" required />
             </div>
             <div class="form-group">
-              <label>Email Address</label>
+              <label>Email Address <span class="text-danger">*</span></label>
               <input type="email" ng-model="vm.parentProfileForm.email" required />
             </div>
           </div>
@@ -213,7 +213,7 @@
                   <div class="booking-detail-header">
                     <span class="badge-subject">{{ b.subject }}</span>
                     <strong>👨‍🏫 {{ b.tutorName }}</strong>
-                    <p>{{ vm.studCalClassTime(b, vm.studCal.selectedDay) }}</p>
+                    <p>{{ vm.studCalClassTime(b, vm.studCal.selectedDay) | hhmma }}</p>
                   </div>
                 </div>
               </div>
@@ -233,7 +233,7 @@
             <form ng-submit="vm.saveEditStudent()" class="form-stack" style="margin-top:14px">
               <div class="form-row">
                 <div class="form-group">
-                  <label>Full Name</label>
+                  <label>Full Name <span class="text-danger">*</span></label>
                   <input type="text" ng-model="vm.editStudentForm.name" required />
                 </div>
                 <div class="form-group">
@@ -298,12 +298,12 @@
 
           <div class="profile-form-section">Basic Information</div>
           <div class="form-group">
-            <label>Child Full Name</label>
+            <label>Child Full Name <span class="text-danger">*</span></label>
             <input type="text" ng-model="vm.studentForm.name" required placeholder="e.g. Jessica Tan" />
           </div>
 
           <div class="form-group" style="position:relative">
-            <label>Education Institution</label>
+            <label>Education Institution <span class="text-danger">*</span></label>
 
             <div class="school-field-wrap" ng-if="!vm.schoolIsOther">
               <input type="text" ng-model="vm.schoolSearch"
@@ -351,8 +351,8 @@
 
           <div class="profile-form-section">Academic Details</div>
           <div class="form-group">
-            <label>Subjects Needed</label>
-            <p class="text-muted offering-hint">Select a country, then a subject, then click Add Subject.</p>
+            <label>Subjects Needed <span class="text-danger">*</span></label>
+            <p class="text-muted offering-hint">Select a country, then a subject, then click Add Subject. At least one subject is required.</p>
             <div class="offering-builder">
               <div class="form-group">
                 <label>Country</label>
@@ -377,6 +377,7 @@
                 <button type="button" class="chip-remove" ng-click="vm.removeStudentSubject($index)">×</button>
               </span>
             </div>
+            <p class="field-error" ng-if="vm.studentSubjectsError">{{ vm.studentSubjectsError }}</p>
           </div>
 
           <div class="profile-form-section">Learning Goals</div>

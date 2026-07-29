@@ -169,7 +169,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     if (!confirm('This will permanently close your account and cannot be undone. Continue?')) return;
     ParentProfileService.close(self.parentProfile.id).then(function () {
       AuthService.logout();
-      $location.path('/login');
+      $location.path('/welcome');
     });
   };
 
@@ -336,6 +336,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   self.onRescheduleStartTimeChange = function (c) {
+    c.proposedStartTime = normalizeTimeToAmPm(c.proposedStartTime);
     var end = self.rescheduleEndTime(c);
     c.time = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
   };
@@ -355,6 +356,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.submitReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasInvalidReschedule()) return;
     if (self.hasTooSoonReschedule()) return;
     if (self.hasDurationMismatchReschedule()) return;
     if (self.hasDuplicateReschedule()) return;
@@ -415,7 +417,16 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         self.bookingForm.studentId = firstActive.id;
       }
     });
-    BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    BookingService.getAll().then(function (res) {
+      self.bookings = res.data;
+      // A parent can only message a tutor they actually have a relationship with —
+      // pick the first contactable tutor once bookings are known, not an arbitrary
+      // one from the full public catalog.
+      computeContactableTutors();
+      if ($location.path() === '/parent/chat' && self.contactableTutors.length) {
+        self.loadChat(self.contactableTutors[0].id);
+      }
+    });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
     TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
@@ -549,6 +560,13 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  self.hasInvalidReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      if (c.date && !toDateObj(c.date)) return true;
+      return parseClockTimeMinutes(c.proposedStartTime) === null;
+    });
+  };
+
   self.hasTooSoonReschedule = function () {
     return (self.rescheduleForm.classes || []).some(function (c) {
       return c.date && self.isTooSoon(c.date, c.time);
@@ -595,6 +613,47 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     }), 'date', 'time');
   };
 
+  // Parses "H:MM AM/PM" into minutes since midnight, or null if unrecognizable OR the
+  // hour is out of the valid 1-12 range for 12-hour format (e.g. "19:00 PM" — a
+  // self-contradictory 24-hour hour with an AM/PM suffix tacked on; can't be auto-fixed
+  // since it's ambiguous what was actually meant, so it's rejected rather than converted).
+  function parseClockTimeMinutes(timeStr) {
+    var m = String(timeStr || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+    if (h < 1 || h > 12 || min < 0 || min > 59) return null;
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  }
+
+  // Converts a bare 24-hour "HH:MM" time (no AM/PM suffix) into 12-hour "H:MM AM/PM"
+  // format. Leaves anything else (already-AM/PM, or unparseable) unchanged, so this is
+  // safe to run on every time input's change event without fighting the user's typing.
+  function normalizeTimeToAmPm(raw) {
+    var s = String(raw || '').trim();
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return s;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    if (h < 0 || h > 23 || min < 0 || min > 59) return s;
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (min < 10 ? '0' + min : min) + ' ' + ampm;
+  }
+
+  // Every session's date and time must be a valid, fully-formed value — a malformed or
+  // partial entry (e.g. "05:00 A") is rejected outright, not silently skipped — and end
+  // time must be strictly after start time, same day (no overnight spans).
+  self.hasInvalidTimeRangeSession = function () {
+    return (self.bookingForm.sessions || []).some(function (s) {
+      if (s.date && !toDateObj(s.date)) return true;
+      var start = parseClockTimeMinutes(s.startTime);
+      var end = parseClockTimeMinutes(s.endTime);
+      if (start === null || end === null) return true;
+      return end <= start;
+    });
+  };
+
   self.hasDuplicateReschedule = function () {
     return hasOverlappingDateTimes(self.rescheduleForm.classes || [], 'date', 'time');
   };
@@ -628,6 +687,20 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  // A booking's classes must all be the same length — durationHours is a single value
+  // for the whole booking, so every session's actual (end - start) time span must match
+  // the first session's. There's no separate "duration" input for the user to get out of
+  // sync with the times themselves; it's always derived from what was actually entered.
+  self.hasDurationMismatchSession = function () {
+    var sessions = self.bookingForm.sessions || [];
+    if (sessions.length < 2) return false;
+    var first = parseTimeRangeHours(sessions[0].startTime + ' - ' + sessions[0].endTime);
+    if (first === null) return false;
+    return sessions.some(function (s) {
+      return self.isDurationMismatch(s.startTime + ' - ' + s.endTime, first);
+    });
+  };
+
   self.applyRecurring = function () {
     var sessions = self.bookingForm.sessions;
     if (!sessions || sessions.length < 2 || !sessions[0].recurring || !sessions[0].date) return;
@@ -647,6 +720,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.calcEndTime = function (session) {
     if (!session.startTime) return;
+    session.startTime = normalizeTimeToAmPm(session.startTime);
     var match = session.startTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (!match) return;
     var h = parseInt(match[1]);
@@ -662,24 +736,34 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     session.endTime = h + ':' + (m < 10 ? '0' + m : m) + ' ' + endAmpm;
   };
 
+  self.onEndTimeChange = function (session) {
+    session.endTime = normalizeTimeToAmPm(session.endTime);
+  };
+
   self.clearSelectedTutor = function () { self.selectedTutor = null; };
 
   // Book a tutor
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
     if (self.hasTooSoonSession()) return;
+    if (self.hasInvalidTimeRangeSession()) return;
+    if (self.hasDurationMismatchSession()) return;
     if (self.hasDuplicateSessions()) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
     var classes = self.bookingForm.sessions.map(function (session) {
       return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
     });
+    // durationHours is derived from what was actually entered, not a separate field the
+    // user never sees or edits — that disconnect is exactly how a booking could end up
+    // with a 2-hour time range stored against a 1-hour duration.
+    var derivedDuration = parseTimeRangeHours(classes[0].time);
     BookingService.create({
       tutorId: self.selectedTutor.id,
       studentId: self.bookingForm.studentId,
       subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : ''),
       mode: self.selectedTutor.modes[0],
       classes: classes,
-      durationHours: self.bookingForm.duration,
+      durationHours: derivedDuration !== null ? derivedDuration : 1,
       message: self.bookingForm.message,
       totalPrice: self.selectedTutor.pricePerSession * parseInt(self.bookingForm.classesPerMonth)
     }).then(function (res) {
@@ -821,8 +905,14 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.removeStudentSubject = function (i) { self.studentSubjects.splice(i, 1); };
 
   // Add student
+  self.studentSubjectsError = '';
   self.createStudent = function () {
+    self.studentSubjectsError = '';
     if (!self.studentForm.name.trim()) return;
+    if (!self.studentSubjects.length) {
+      self.studentSubjectsError = 'Please add at least one subject before creating the profile.';
+      return;
+    }
 
     var save = function (schoolName) {
       var payload = {
@@ -932,15 +1022,34 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
-  // Chat
+  // Chat — a parent can only contact tutors they have an accepted (confirmed or
+  // completed) booking with, not the entire public catalog. Computed once when
+  // bookings load (not a template-called function) — a function called from the
+  // view that allocates a new array/objects every digest never stabilizes and
+  // trips Angular's infinite-digest guard.
+  self.contactableTutors = [];
+  self.activeTutor = null;
+
+  function computeContactableTutors() {
+    var seen = {};
+    var list = [];
+    (self.bookings || []).forEach(function (b) {
+      if ((b.status !== 'confirmed' && b.status !== 'completed') || seen[b.tutorId]) return;
+      seen[b.tutorId] = true;
+      list.push({ id: b.tutorId, name: b.tutorName, imageUrl: b.tutorImageUrl });
+    });
+    self.contactableTutors = list;
+  }
+
   self.loadChat = function (tutorId) {
     self.activeTutorId = tutorId;
-    ChatService.getMessages(tutorId).then(function (res) { self.chatMessages = res.data; });
+    self.activeTutor = self.contactableTutors.find(function (t) { return t.id === tutorId; }) || null;
+    ChatService.getMessages(tutorId, self.user.userId).then(function (res) { self.chatMessages = res.data; });
   };
 
   self.sendMessage = function () {
     if (!self.chatText.trim() || !self.activeTutorId) return;
-    ChatService.send({ tutorId: self.activeTutorId, sender: 'parent', text: self.chatText })
+    ChatService.send({ tutorId: self.activeTutorId, parentUserId: self.user.userId, text: self.chatText })
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';

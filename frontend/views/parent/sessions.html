@@ -66,7 +66,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label>What happened?</label>
+          <label>What happened? <span class="text-danger">*</span></label>
           <textarea ng-model="vm.issueForm.details" rows="3" required
             placeholder="Provide details about wait times, response, or other issues..."></textarea>
         </div>
@@ -123,11 +123,11 @@
             <span class="badge-blocked" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">🚫 Blocked</span>
           </div>
           <div class="reschedule-orig-date">
-            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime }} ({{ vm.rescheduleBooking.durationHours }}h)
+            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
           <div class="form-row-3">
             <div class="form-group">
-              <label>New Date</label>
+              <label>New Date <span class="text-danger">*</span></label>
               <input type="text" ng-model="c.date" required placeholder="DD-MM-YYYY" fp-date
                 ng-class="{'input-blocked': c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)}" />
               <span class="blocked-date-hint" ng-if="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)">
@@ -135,14 +135,14 @@
               </span>
             </div>
             <div class="form-group">
-              <label>Start Time</label>
+              <label>Start Time <span class="text-danger">*</span></label>
               <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
                 ng-change="vm.onRescheduleStartTimeChange(c)"
                 ng-class="{'input-blocked': c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)}" />
             </div>
             <div class="form-group">
               <label>End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
-              <input type="text" value="{{ vm.rescheduleEndTime(c) }}" readonly disabled placeholder="Auto-calculated" />
+              <input type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
             </div>
           </div>
           <span class="blocked-date-hint" ng-if="c.date && vm.isTooSoon(c.date, c.time)">
@@ -152,9 +152,12 @@
         <p class="reschedule-sub" ng-if="vm.hasDuplicateReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
           ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
+        <p class="reschedule-sub" ng-if="vm.hasInvalidReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+          ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+        </p>
         <div class="btn-row" style="margin-top:4px">
           <button type="button" class="btn-outline" ng-click="vm.cancelReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonReschedule() || vm.hasDurationMismatchReschedule() || vm.hasDuplicateReschedule()">Confirm Reschedule →</button>
+          <button type="submit" class="btn-primary" ng-disabled="vm.hasInvalidReschedule() || vm.hasTooSoonReschedule() || vm.hasDurationMismatchReschedule() || vm.hasDuplicateReschedule()">Confirm Reschedule →</button>
         </div>
       </form>
     </div>
@@ -209,7 +212,7 @@
         <div class="booking-card-schedule">
           <div class="booking-date-chip" ng-repeat="c in b.classes track by $index">
             <span class="booking-date">📅 {{ c.date | dmy }}</span>
-            <span class="booking-time">🕐 {{ c.time }} ({{ b.durationHours }}h)</span>
+            <span class="booking-time">🕐 {{ c.time | hhmma }} ({{ b.durationHours }}h)</span>
           </div>
         </div>
 
@@ -267,7 +270,7 @@
             <span>Class {{ $index + 1 }}:</span>
             <span class="text-muted">{{ c.originalDate | dmy }}</span>
             <span class="counter-arrow">→</span>
-            <strong>{{ c.proposedDate | dmy }} {{ c.proposedTime }} ({{ b.durationHours }}h)</strong>
+            <strong>{{ c.proposedDate | dmy }} {{ c.proposedTime | hhmma }} ({{ b.durationHours }}h)</strong>
           </div>
           <p class="counter-message" ng-if="b.counterProposal.message">"{{ b.counterProposal.message }}"</p>
         </div>

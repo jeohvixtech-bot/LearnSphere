@@ -18,7 +18,7 @@ function ($scope, $location, AuthService, NotificationService) {
   self.logout = function () {
     AuthService.logout();
     self.currentUser = null;
-    $location.path('/login');
+    $location.path('/welcome');
   };
 
   self.toggleNotifDrawer = function () {

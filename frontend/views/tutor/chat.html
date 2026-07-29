@@ -12,42 +12,65 @@
   </aside>
 
   <main class="dashboard-main">
-    <div class="card chat-container">
-      <div class="chat-header">
-        <div>
-          <strong>Sarah Tan</strong>
-          <p class="online-status">● Mother of Jessica Tan • Online</p>
+    <div class="chat-layout">
+
+      <div class="card chat-tutor-list">
+        <h4>Your Parents</h4>
+        <div class="chat-tutor-item" ng-repeat="p in vm.contactableParents"
+          ng-class="{active: p.id === vm.activeParentUserId}"
+          ng-click="vm.loadChat(p.id)">
+          <div class="avatar-circle indigo" style="width:36px;height:36px;font-size:14px;flex-shrink:0">{{ p.name[0] }}</div>
+          <span>{{ p.name }}<br/><small class="text-muted">Parent of {{ p.studentName }}</small></span>
         </div>
-        <small>Direct Parent-Teacher Line</small>
+        <p ng-if="!vm.contactableParents.length" class="empty-state">
+          No confirmed bookings yet. Once you confirm a booking, you'll be able to message that parent here.
+        </p>
       </div>
 
-      <div class="chat-messages">
-        <div ng-repeat="msg in vm.chatMessages"
-          class="chat-message-wrap"
-          ng-class="{
-            'right': msg.sender === 'tutor',
-            'center': msg.sender === 'system',
-            'left': msg.sender === 'parent'
-          }">
-          <div ng-if="msg.sender === 'system'" class="system-msg">
-            ⚠️ LearnSphere: {{ msg.text }}
+      <div class="card chat-container flex-1" ng-if="vm.activeParent">
+        <div class="chat-header">
+          <div>
+            <strong>{{ vm.activeParent.name }}</strong>
+            <p class="online-status">● Parent of {{ vm.activeParent.studentName }} • Online</p>
           </div>
-          <div ng-if="msg.sender !== 'system'"
-            class="chat-bubble"
-            ng-class="{'bubble-tutor': msg.sender === 'tutor', 'bubble-parent': msg.sender === 'parent'}">
-            <p>{{ msg.text }}</p>
-            <small>{{ msg.timestamp }}</small>
-          </div>
+          <small>Direct Parent-Teacher Line</small>
         </div>
-        <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet.</p>
+
+        <div class="chat-messages">
+          <div ng-repeat="msg in vm.chatMessages"
+            class="chat-message-wrap"
+            ng-class="{
+              'right': msg.sender === 'tutor',
+              'center': msg.sender === 'system',
+              'left': msg.sender === 'parent'
+            }">
+            <div ng-if="msg.sender === 'system'" class="system-msg">
+              ⚠️ LearnSphere: {{ msg.text }}
+            </div>
+            <div ng-if="msg.sender !== 'system'"
+              class="chat-bubble"
+              ng-class="{'bubble-tutor': msg.sender === 'tutor', 'bubble-parent': msg.sender === 'parent'}">
+              <p>{{ msg.text }}</p>
+              <small>{{ msg.timestamp }}</small>
+            </div>
+          </div>
+          <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet.</p>
+        </div>
+
+        <form class="chat-input-row" ng-submit="vm.sendMessage()">
+          <input type="text" ng-model="vm.chatText"
+            placeholder="Draft a response to the parent..."
+            class="chat-input" />
+          <button type="submit" class="btn-indigo">Reply 📤</button>
+        </form>
       </div>
 
-      <form class="chat-input-row" ng-submit="vm.sendMessage()">
-        <input type="text" ng-model="vm.chatText"
-          placeholder="Draft a response to the parent..."
-          class="chat-input" />
-        <button type="submit" class="btn-indigo">Reply 📤</button>
-      </form>
+      <div class="card flex-1" ng-if="!vm.activeParent">
+        <p class="empty-state">
+          Select a parent on the left to start a conversation. You can message parents from bookings you've confirmed.
+        </p>
+      </div>
+
     </div>
   </main>
 </div>

@@ -26,7 +26,8 @@
       <div class="vetting-list">
         <div class="vetting-item" ng-repeat="t in vm.unverifiedTutors">
           <div class="vetting-info">
-            <img ng-src="{{ t.imageUrl }}" class="avatar" alt="{{ t.name }}" />
+            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="avatar" alt="{{ t.name }}" />
+            <div ng-if="!t.imageUrl" class="avatar avatar-fallback" style="font-size:15px">{{ t.name[0] }}</div>
             <div>
               <strong>{{ t.name }}</strong>
               <p>{{ t.subjects.join(' / ') }} • {{ t.experienceYears }} Years Exp</p>

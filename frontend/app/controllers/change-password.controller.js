@@ -26,7 +26,7 @@ angular.module('learnSphereApp')
         if (user.role === 'parent' || user.role === 'student') $location.path('/parent/dashboard');
         else if (user.role === 'tutor') $location.path('/tutor/overview');
         else if (user.role === 'admin') $location.path('/admin/overview');
-        else $location.path('/login');
+        else $location.path('/welcome');
       })
       .catch(function (err) {
         self.errorMsg = (err.data && err.data.message) || 'Could not change password. Please try again.';
@@ -38,6 +38,6 @@ angular.module('learnSphereApp')
 
   self.logout = function () {
     AuthService.logout();
-    $location.path('/login');
+    $location.path('/welcome');
   };
 }]);

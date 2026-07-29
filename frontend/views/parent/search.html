@@ -109,7 +109,8 @@
 
           <!-- ── Top row: avatar + info ── -->
           <div class="tutor-card-main">
-            <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+            <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback" style="font-size:56px">{{ t.name[0] }}</div>
             <div class="tutor-card-body">
               <div class="tutor-card-name-row">
                 <h4>{{ t.name }}</h4>
@@ -174,7 +175,8 @@
       <div class="tutor-detail-card" ng-if="!vm.bookingSuccess">
 
         <div class="tutor-detail-top">
-          <img ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-detail-avatar" alt="{{ vm.selectedTutor.name }}" />
+          <img ng-if="vm.selectedTutor.imageUrl" ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-detail-avatar" alt="{{ vm.selectedTutor.name }}" />
+          <div ng-if="!vm.selectedTutor.imageUrl" class="tutor-detail-avatar avatar-fallback" style="font-size:28px">{{ vm.selectedTutor.name[0] }}</div>
           <div class="tutor-detail-info">
             <div class="tutor-detail-name">
               {{ vm.selectedTutor.name }}
@@ -257,7 +259,7 @@
           <p ng-if="!vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length" class="empty-state">✓ Fully available this day.</p>
           <div class="chip-list" ng-if="vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length">
             <span class="chip" ng-repeat="b in vm.getBusyTimesForDay(vm.tutorCal.selectedDay)" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">
-              🚫 {{ b.time }}
+              🚫 {{ b.time | hhmma }}
             </span>
           </div>
         </div>
@@ -313,7 +315,7 @@
             </div>
             <div class="form-row-3">
               <div class="form-group">
-                <label>Date</label>
+                <label>Date <span class="text-danger">*</span></label>
                 <input type="text" ng-model="session.date" required ng-change="vm.onDateChange($index)"
                   placeholder="DD-MM-YYYY" fp-date
                   ng-class="{'input-blocked': session.date && vm.isSessionDateBlocked(session.date)}" />
@@ -322,12 +324,12 @@
                 </span>
               </div>
               <div class="form-group">
-                <label>Start Time</label>
+                <label>Start Time <span class="text-danger">*</span></label>
                 <input type="text" ng-model="session.startTime" placeholder="04:00 PM" ng-change="vm.calcEndTime(session)" />
               </div>
               <div class="form-group">
-                <label>End Time</label>
-                <input type="text" ng-model="session.endTime" placeholder="05:00 PM" />
+                <label>End Time <span class="text-danger">*</span></label>
+                <input type="text" ng-model="session.endTime" placeholder="05:00 PM" ng-change="vm.onEndTimeChange(session)" />
               </div>
             </div>
             <span class="blocked-date-hint" ng-if="session.date && vm.isTooSoon(session.date, session.startTime)">
@@ -367,8 +369,18 @@
             <p class="block-conflict-sub">Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.</p>
           </div>
 
+          <div class="block-conflict-alert" ng-if="vm.hasInvalidTimeRangeSession()">
+            <div class="block-conflict-header">⚠️ Invalid date or time</div>
+            <p class="block-conflict-sub">Every class needs a valid date and time (e.g. "04:00 PM"), and end time must be later than start time.</p>
+          </div>
+
+          <div class="block-conflict-alert" ng-if="vm.hasDurationMismatchSession()">
+            <div class="block-conflict-header">⚠️ Inconsistent class length</div>
+            <p class="block-conflict-sub">All classes in one booking must be the same length. Please make each class's start/end time span match the others.</p>
+          </div>
+
           <button type="submit" class="btn-primary full-width"
-            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions()">
+            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions() || vm.hasInvalidTimeRangeSession() || vm.hasDurationMismatchSession()">
             Dispatch Booking Request →
           </button>
 

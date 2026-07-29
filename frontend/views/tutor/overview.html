@@ -40,7 +40,8 @@
     <!-- Tutor Stats Banner -->
     <div class="tutor-banner" ng-if="vm.tutor">
       <div class="tutor-banner-left">
-        <img ng-src="{{ vm.tutor.imageUrl }}" class="avatar-lg" alt="{{ vm.tutor.name }}" />
+        <img ng-if="vm.tutor.imageUrl" ng-src="{{ vm.tutor.imageUrl }}" class="avatar-lg" alt="{{ vm.tutor.name }}" />
+        <div ng-if="!vm.tutor.imageUrl" class="avatar-lg avatar-fallback" style="font-size:22px">{{ vm.tutor.name[0] }}</div>
         <div>
           <h2>
             {{ vm.tutor.name }}
@@ -80,7 +81,7 @@
             <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>{{ b.studentName }}</strong>
-            <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time }} ({{ b.durationHours }}h)</p>
+            <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
             <em ng-if="b.message">"{{ b.message }}"</em>
           </div>
           <div class="btn-row">
@@ -106,8 +107,8 @@
             <div class="counter-class-row counter-class-header">
               <span>#</span>
               <span>Parent Requested</span>
-              <span>Your Proposed Date</span>
-              <span>Your Proposed Time</span>
+              <span>Your Proposed Date <span class="text-danger">*</span></span>
+              <span>Your Proposed Time <span class="text-danger">*</span></span>
             </div>
             <div class="counter-class-row" ng-repeat="c in vm.counterForm.classes track by $index"
               ng-class="{'counter-class-row-blocked': vm.isProposedDateBlocked(c.originalDate)}">
@@ -115,7 +116,7 @@
               <span class="counter-original">
                 <strong>{{ c.originalDate | dmy }}</strong>
                 <span class="badge-blocked" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
-                <small>{{ c.originalTime }} ({{ vm.counterBooking.durationHours }}h)</small>
+                <small>{{ c.originalTime | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
               </span>
               <div class="form-group mb-0">
                 <input type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
@@ -128,7 +129,7 @@
                 <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
                   ng-change="vm.onCounterStartTimeChange(c)"
                   ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
-                <small class="text-muted" style="font-size:11px;display:block">→ {{ vm.counterEndTime(c) || '—' }} ({{ vm.counterBooking.durationHours }}h)</small>
+                <small class="text-muted" style="font-size:11px;display:block">→ {{ (vm.counterEndTime(c) || '—') | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
               </div>
               <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
                 ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
@@ -138,11 +139,14 @@
           <span class="blocked-date-hint" ng-if="vm.hasDuplicateCounter()">
             ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
           </span>
+          <span class="blocked-date-hint" ng-if="vm.hasInvalidCounter()">
+            ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+          </span>
           <div class="form-group mt-3">
             <label>Explanation to Parent</label>
             <textarea ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
           </div>
-          <button type="submit" class="btn-primary full-width" ng-disabled="vm.hasTooSoonCounter() || vm.hasDuplicateCounter()">Dispatch Counter Proposal</button>
+          <button type="submit" class="btn-primary full-width" ng-disabled="vm.hasInvalidCounter() || vm.hasTooSoonCounter() || vm.hasDuplicateCounter()">Dispatch Counter Proposal</button>
         </form>
       </div>
     </div>
@@ -203,7 +207,7 @@
           <div class="booking-detail-header">
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>Child: {{ b.studentName }}</strong>
-            <p>{{ vm.classOnDay(b, vm.selectedCalDay).time }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
+            <p>{{ vm.classOnDay(b, vm.selectedCalDay).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
           </div>
           <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
           <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
@@ -215,12 +219,12 @@
         <div class="block-dates-title">🚫 Block Unavailable Date Range</div>
         <div class="block-dates-form">
           <div class="block-dates-field">
-            <label>Start Date</label>
+            <label>Start Date <span class="text-danger">*</span></label>
             <input type="text" ng-model="vm.blockForm.startDate" ng-change="vm.clearBlockConflicts()"
               placeholder="DD-MM-YYYY" fp-date />
           </div>
           <div class="block-dates-field">
-            <label>End Date</label>
+            <label>End Date <span class="text-danger">*</span></label>
             <input type="text" ng-model="vm.blockForm.endDate" ng-change="vm.clearBlockConflicts()"
               placeholder="DD-MM-YYYY" fp-date />
           </div>
@@ -249,7 +253,7 @@
             <div class="block-conflict-item" ng-repeat="c in vm.blockConflicts">
               <span class="badge-subject">{{ c.subject }}</span>
               <span>{{ c.student }}</span>
-              <span class="block-conflict-date">📅 {{ c.date | dmy }} &bull; {{ c.time }} ({{ c.duration }}h)</span>
+              <span class="block-conflict-date">📅 {{ c.date | dmy }} &bull; {{ c.time | hhmma }} ({{ c.duration }}h)</span>
               <button class="btn-warning sm" ng-click="vm.startTutorRescheduleById(c.bookingId)">
                 Reschedule →
               </button>
@@ -303,11 +307,11 @@
             <span class="badge-blocked" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
           </div>
           <div class="reschedule-orig-date">
-            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime }} ({{ vm.rescheduleBooking.durationHours }}h)
+            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
           <div class="form-row-3">
             <div class="form-group">
-              <label>New Date</label>
+              <label>New Date <span class="text-danger">*</span></label>
               <input type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
                 ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
               <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)">
@@ -315,14 +319,14 @@
               </span>
             </div>
             <div class="form-group">
-              <label>New Start Time</label>
+              <label>New Start Time <span class="text-danger">*</span></label>
               <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
                 ng-change="vm.onTutorRescheduleStartTimeChange(c)"
                 ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
             </div>
             <div class="form-group">
               <label>New End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
-              <input type="text" value="{{ vm.rescheduleEndTime(c) }}" readonly disabled placeholder="Auto-calculated" />
+              <input type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
             </div>
           </div>
           <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
@@ -332,9 +336,12 @@
         <p class="reschedule-sub" ng-if="vm.hasDuplicateTutorReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
           ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
+        <p class="reschedule-sub" ng-if="vm.hasInvalidTutorReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+          ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+        </p>
         <div class="btn-row" style="margin-top:4px">
           <button type="button" class="btn-outline" ng-click="vm.cancelTutorReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
+          <button type="submit" class="btn-primary" ng-disabled="vm.hasInvalidTutorReschedule() || vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
         </div>
       </form>
     </div>
@@ -353,7 +360,7 @@
           <div ng-if="b.status === 'countered' && b.counterProposal">
             <div class="class-date-row" ng-repeat="c in b.counterProposal.classes track by $index">
               <p style="text-decoration:line-through;color:#94a3b8;font-size:12px">{{ c.originalDate | dmy }}</p>
-              <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime }} ({{ b.durationHours }}h)
+              <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime | hhmma }} ({{ b.durationHours }}h)
                 <span class="badge-amber" style="font-size:10px;margin-left:4px" ng-if="b.counterProposal.proposedBy === 'tutor'">⏳ Awaiting parent's acceptance</span>
                 <span class="badge-amber" style="font-size:10px;margin-left:4px" ng-if="b.counterProposal.proposedBy !== 'tutor'">⏳ Parent proposed — awaiting your acceptance</span>
               </p>
@@ -362,7 +369,7 @@
           <!-- Confirmed: show actual booking classes -->
           <div ng-if="b.status !== 'countered' || !b.counterProposal">
             <div class="class-date-row" ng-repeat="c in b.classes track by $index">
-              <p>{{ c.date | dmy }} • {{ c.time }} ({{ b.durationHours }}h)</p>
+              <p>{{ c.date | dmy }} • {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
               <span class="status-badge confirmed" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
             </div>
           </div>
@@ -425,17 +432,17 @@
         <p class="text-muted">Class: {{ vm.reportBooking.subject }} — {{ vm.reportBooking.classes.length }} session(s)</p>
         <form ng-submit="vm.submitReport()">
           <div class="form-group">
-            <label>Syllabus Covered & Focus Areas</label>
+            <label>Syllabus Covered & Focus Areas <span class="text-danger">*</span></label>
             <textarea ng-model="vm.reportForm.covered" rows="3" required
               placeholder="e.g. Solving simultaneous quadratic equations..."></textarea>
           </div>
           <div class="form-group">
-            <label>Child Performance & Classroom Alignment</label>
+            <label>Child Performance & Classroom Alignment <span class="text-danger">*</span></label>
             <textarea ng-model="vm.reportForm.performance" rows="3" required
               placeholder="e.g. Excellent focus. Solved algebraic tasks correctly..."></textarea>
           </div>
           <div class="form-group">
-            <label>Homework Instructions</label>
+            <label>Homework Instructions <span class="text-danger">*</span></label>
             <input type="text" ng-model="vm.reportForm.homework" required
               placeholder="e.g. Worksheet 4 (Q1-10). Due next Friday." />
           </div>
@@ -455,19 +462,19 @@
         <h3>Modify Published Report</h3>
         <form ng-submit="vm.submitEdit()">
           <div class="form-group">
-            <label>Syllabus Covered</label>
+            <label>Syllabus Covered <span class="text-danger">*</span></label>
             <textarea ng-model="vm.editForm.covered" rows="2" required></textarea>
           </div>
           <div class="form-group">
-            <label>Child Performance</label>
+            <label>Child Performance <span class="text-danger">*</span></label>
             <textarea ng-model="vm.editForm.performance" rows="2" required></textarea>
           </div>
           <div class="form-group">
-            <label>Homework</label>
+            <label>Homework <span class="text-danger">*</span></label>
             <input type="text" ng-model="vm.editForm.homework" required />
           </div>
           <div class="form-group audit-reason">
-            <label>Reason for Modification (Public audit log)</label>
+            <label>Reason for Modification (Public audit log) <span class="text-danger">*</span></label>
             <input type="text" ng-model="vm.editForm.changesMade" required
               placeholder="e.g. Corrected typo in worksheet reference." />
           </div>

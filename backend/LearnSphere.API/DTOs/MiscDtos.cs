@@ -39,6 +39,7 @@ public class ChatMessageDto
 {
     public int Id { get; set; }
     public int TutorId { get; set; }
+    public int ParentUserId { get; set; }
     public string Sender { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
     public string Timestamp { get; set; } = string.Empty;
@@ -47,7 +48,7 @@ public class ChatMessageDto
 public class SendChatMessageDto
 {
     public int TutorId { get; set; }
-    public string Sender { get; set; } = string.Empty;
+    public int ParentUserId { get; set; }
     public string Text { get; set; } = string.Empty;
 }
 

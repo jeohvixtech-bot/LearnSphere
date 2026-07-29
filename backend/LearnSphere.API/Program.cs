@@ -199,6 +199,16 @@ using (var scope = app.Services.CreateScope())
             CONSTRAINT `FK_FavoriteTutors_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
+    // Chat conversations were keyed by TutorId alone, mixing every parent who messaged a
+    // given tutor into one thread. ParentUserId makes the key (TutorId, ParentUserId).
+    // Existing messages predate this and have no reliable parent attribution, so — this
+    // only runs the first time (the ALTER only succeeds once; afterwards it throws and
+    // the wipe below is skipped along with it) — they're cleared rather than guessed at.
+    try {
+        await context.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE `ChatMessages` ADD COLUMN `ParentUserId` INT NOT NULL DEFAULT 0");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM `ChatMessages`");
+    } catch { }
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(

@@ -72,7 +72,7 @@ public class BookingsController : ControllerBase
 
         var query = _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
@@ -178,7 +178,7 @@ public class BookingsController : ControllerBase
 
         var created = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == booking.Id);
 
@@ -193,7 +193,7 @@ public class BookingsController : ControllerBase
 
         var booking = await _context.Bookings
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Tutor)
             .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -311,7 +311,7 @@ public class BookingsController : ControllerBase
 
         var updated = await _context.Bookings.AsNoTracking()
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
@@ -328,7 +328,7 @@ public class BookingsController : ControllerBase
 
         var booking = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
@@ -381,7 +381,7 @@ public class BookingsController : ControllerBase
     {
         var booking = await _context.Bookings
             .Include(b => b.LessonReport)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
@@ -481,6 +481,8 @@ public class BookingsController : ControllerBase
         TutorImageUrl = b.Tutor?.ImageUrl ?? string.Empty,
         StudentId = b.StudentId,
         StudentName = b.Student?.Name ?? string.Empty,
+        ParentUserId = b.Student?.ParentUserId ?? 0,
+        ParentName = b.Student?.ParentUser?.Name ?? string.Empty,
         Subject = b.Subject,
         Mode = b.Mode,
         DurationHours = b.DurationHours,

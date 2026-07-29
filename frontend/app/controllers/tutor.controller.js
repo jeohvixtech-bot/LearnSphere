@@ -60,26 +60,48 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
             })
           : []
       };
+      maybeInitChat();
     });
-    BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    BookingService.getAll().then(function (res) {
+      self.bookings = res.data;
+      maybeInitChat();
+    });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
-    if ($location.path() === '/tutor/chat') {
-      loadChat();
-    }
   }
   init();
 
-  function loadChat() {
-    if (!self.tutor) {
-      $timeout(function () { if (self.tutor) loadChatById(self.tutor.id); }, 1000);
-    } else {
-      loadChatById(self.tutor.id);
+  // Chat — a tutor can only see one conversation per parent, not one shared thread
+  // mixing every parent who's ever messaged them. Requires both the tutor profile
+  // (for tutor.id) and bookings (to know which parents to list) to be loaded; whichever
+  // of the two async calls above finishes last is what actually triggers this.
+  self.contactableParents = [];
+  self.activeParent = null;
+
+  function computeContactableParents() {
+    var seen = {};
+    var list = [];
+    (self.bookings || []).forEach(function (b) {
+      if (!self.tutor || b.tutorId !== self.tutor.id) return;
+      if ((b.status !== 'confirmed' && b.status !== 'completed') || seen[b.parentUserId]) return;
+      seen[b.parentUserId] = true;
+      list.push({ id: b.parentUserId, name: b.parentName, studentName: b.studentName });
+    });
+    self.contactableParents = list;
+  }
+
+  function maybeInitChat() {
+    if ($location.path() !== '/tutor/chat' || !self.tutor) return;
+    computeContactableParents();
+    if (!self.activeParentUserId && self.contactableParents.length) {
+      self.loadChat(self.contactableParents[0].id);
     }
   }
 
-  function loadChatById(tutorId) {
-    ChatService.getMessages(tutorId).then(function (res) { self.chatMessages = res.data; });
-  }
+  self.loadChat = function (parentUserId) {
+    self.activeParentUserId = parentUserId;
+    self.activeParent = self.contactableParents.find(function (p) { return p.id === parentUserId; }) || null;
+    ChatService.getMessages(self.tutor.id, parentUserId).then(function (res) { self.chatMessages = res.data; });
+  };
 
   // Computed props
   self.pendingRequests = function () {
@@ -243,6 +265,44 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.hasTooSoonTutorReschedule = function () {
     return (self.rescheduleForm.classes || []).some(function (c) {
       return c.proposedDate && self.isTooSoon(c.proposedDate, c.proposedTime);
+    });
+  };
+
+  // A proposed date/time must be a valid, fully-formed value — a malformed or partial
+  // entry (e.g. "05:00 A"), or an out-of-range hour with an AM/PM suffix tacked on
+  // (e.g. "19:00 PM" — self-contradictory, can't be safely auto-fixed) is rejected
+  // outright, not silently skipped.
+  function isValidClockTime(timeStr) {
+    var m = String(timeStr || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return false;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    return h >= 1 && h <= 12 && min >= 0 && min <= 59;
+  }
+
+  // Converts a bare 24-hour "HH:MM" time (no AM/PM suffix) into 12-hour "H:MM AM/PM"
+  // format. Leaves anything else (already-AM/PM, or unparseable) unchanged.
+  function normalizeTimeToAmPm(raw) {
+    var s = String(raw || '').trim();
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return s;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    if (h < 0 || h > 23 || min < 0 || min > 59) return s;
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (min < 10 ? '0' + min : min) + ' ' + ampm;
+  }
+
+  self.hasInvalidCounter = function () {
+    return (self.counterForm.classes || []).some(function (c) {
+      if (c.proposedDate && isNaN(parseLocalDate(c.proposedDate).getTime())) return true;
+      return !isValidClockTime(c.proposedStartTime);
+    });
+  };
+
+  self.hasInvalidTutorReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      if (c.proposedDate && isNaN(parseLocalDate(c.proposedDate).getTime())) return true;
+      return !isValidClockTime(c.proposedStartTime);
     });
   };
 
@@ -433,7 +493,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     if (!self.tutor || !dayNum) return [];
     var s = calDayStr(dayNum);
     return self.bookings.filter(function (b) {
-      return b.tutorId === self.tutor.id &&
+      return b.tutorId === self.tutor.id && b.status !== 'cancelled' &&
         b.classes && b.classes.some(function (c) { return c.date === s; });
     });
   };
@@ -495,6 +555,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   };
 
   self.onCounterStartTimeChange = function (c) {
+    c.proposedStartTime = normalizeTimeToAmPm(c.proposedStartTime);
     var end = self.counterEndTime(c);
     c.proposedTime = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
   };
@@ -504,6 +565,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   };
 
   self.onTutorRescheduleStartTimeChange = function (c) {
+    c.proposedStartTime = normalizeTimeToAmPm(c.proposedStartTime);
     var end = self.rescheduleEndTime(c);
     c.proposedTime = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
   };
@@ -521,6 +583,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitCounter = function () {
     if (!self.counterBooking) return;
+    if (self.hasInvalidCounter()) return;
     if (self.hasTooSoonCounter()) return;
     if (self.hasDuplicateCounter()) return;
     BookingService.updateStatus(self.counterBooking.id, 'countered', {
@@ -612,6 +675,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitTutorReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasInvalidTutorReschedule()) return;
     if (self.hasTooSoonTutorReschedule()) return;
     if (self.hasDurationMismatchTutorReschedule()) return;
     if (self.hasDuplicateTutorReschedule()) return;
@@ -762,10 +826,9 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   }, 15000);
   $rootScope.$on('$destroy', function () { $interval.cancel(_pollInterval); });
 
-  // Chat
   self.sendMessage = function () {
-    if (!self.chatText.trim() || !self.tutor) return;
-    ChatService.send({ tutorId: self.tutor.id, sender: 'tutor', text: self.chatText })
+    if (!self.chatText.trim() || !self.tutor || !self.activeParentUserId) return;
+    ChatService.send({ tutorId: self.tutor.id, parentUserId: self.activeParentUserId, text: self.chatText })
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';

@@ -84,6 +84,12 @@ a { text-decoration: none; color: inherit; }
 
 .avatar-circle { width: 36px; height: 36px; border-radius: 50%; background: #d1fae5; color: #059669; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .avatar-circle.indigo { background: #d1fae5; color: #059669; }
+
+/* Default tutor avatar (no photo uploaded yet) — shows the tutor's initial letter in
+   place of a broken <img>. Layered onto whichever sizing class the real photo would
+   have used (.tutor-avatar, .tutor-detail-avatar, .avatar-lg, .avatar), so it always
+   matches that context's dimensions/shape exactly. */
+.avatar-fallback { background: #d1fae5; color: #059669; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .avatar-circle.dark { background: #334155; color: #e2e8f0; }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
@@ -593,6 +599,16 @@ a { text-decoration: none; color: inherit; }
 .chat-container { display: flex; flex-direction: column; height: 500px; padding: 0; overflow: hidden; }
 .chat-header { background: #f8fafc; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
 .chat-header strong { font-size: 15px; font-weight: 700; }
+
+.chat-layout { display: flex; gap: 16px; align-items: flex-start; }
+.chat-tutor-list { width: 240px; flex-shrink: 0; padding: 8px; }
+.chat-tutor-list h4 { padding: 8px 10px 12px; font-size: 13px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+.chat-tutor-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; cursor: pointer; }
+.chat-tutor-item:hover { background: #f1f5f9; }
+.chat-tutor-item.active { background: #ecfdf5; }
+.chat-tutor-item img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.chat-tutor-item span { font-size: 14px; font-weight: 600; color: #1e293b; }
+.chat-container.flex-1 { flex: 1; min-width: 0; }
 .online-status { font-size: 12px; color: #16a34a; margin-top: 2px; }
 .chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: #fafafa; display: flex; flex-direction: column; gap: 12px; }
 .chat-message-wrap { display: flex; }
