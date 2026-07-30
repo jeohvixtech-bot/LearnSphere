@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog',
+function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -128,10 +128,22 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.studentSuccess = false;
   self.newlyAddedStudentId = null;
 
+  // Preferred teaching-modes dual-pool for the "Add New Child" form — the student
+  // doesn't exist yet, so this is saved via a follow-up PATCH right after creation.
+  self.newStudentPreferredLeft = TeachingModesCatalog.slice();
+  self.newStudentPreferredRight = [];
+  self.newStudentPreferredModesError = '';
+
   // Edit student state
   self.editingStudent = null;
   self.editStudentForm = {};
   self.editStudentSubjects = []; // [{country, level, subject}]
+
+  // Preferred teaching-modes dual-pool selector (drag-and-drop, right pool is ordered).
+  // Rebuilt into plain arrays only on edit-open/change, never inline in the template.
+  self.preferredLeft = [];
+  self.preferredRight = [];
+  self.preferredModesError = '';
   self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
 
   // Parent profile panel
@@ -801,6 +813,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.editStudentForm = { name: s.name, school: s.school, learningGoal: s.learningGoal || '' };
     self.editStudentSubjects = self.parseSubjectCombos(s.subjectSelect, s.educationLevel);
     self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
+    rebuildPreferredPools(s.preferredModes);
   };
 
   self.cancelEditStudent = function () {
@@ -808,7 +821,65 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.editStudentForm = {};
     self.editStudentSubjects = [];
     self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
+    self.preferredLeft = [];
+    self.preferredRight = [];
   };
+
+  function rebuildPreferredPools(preferredModes) {
+    var preferred = preferredModes || [];
+    self.preferredRight = preferred
+      .map(function (mode) { return TeachingModesCatalog.filter(function (m) { return m.mode === mode; })[0]; })
+      .filter(function (m) { return !!m; });
+    self.preferredLeft = TeachingModesCatalog.filter(function (m) { return preferred.indexOf(m.mode) === -1; });
+  }
+
+  self.onPreferredDropToRight = function (item) {
+    if (self.preferredRight.some(function (m) { return m.mode === item.mode; })) return;
+    self.preferredLeft = self.preferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    self.preferredRight.push(item);
+  };
+
+  self.onPreferredDropToLeft = function (item) {
+    if (self.preferredLeft.some(function (m) { return m.mode === item.mode; })) return;
+    self.preferredRight = self.preferredRight.filter(function (m) { return m.mode !== item.mode; });
+    self.preferredLeft.push(item);
+  };
+
+  self.removePreferredMode = function (mode) {
+    self.onPreferredDropToLeft(mode);
+  };
+
+  // Drop directly on a row within the ordered pool — inserts at that row's position,
+  // whether the dragged item came from the left pool or is being reordered in-place.
+  self.onPreferredDropOnItem = function (item, targetIndex) {
+    var fromIndex = self.preferredRight.findIndex(function (m) { return m.mode === item.mode; });
+    if (fromIndex !== -1) {
+      self.preferredRight.splice(fromIndex, 1);
+      if (fromIndex < targetIndex) targetIndex -= 1;
+    } else {
+      self.preferredLeft = self.preferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    }
+    if (targetIndex > self.preferredRight.length) targetIndex = self.preferredRight.length;
+    if (targetIndex < 0) targetIndex = 0;
+    self.preferredRight.splice(targetIndex, 0, item);
+  };
+
+  self.movePreferredModeUp = function (index) {
+    if (index <= 0) return;
+    var arr = self.preferredRight;
+    var tmp = arr[index - 1];
+    arr[index - 1] = arr[index];
+    arr[index] = tmp;
+  };
+
+  self.movePreferredModeDown = function (index) {
+    if (index >= self.preferredRight.length - 1) return;
+    var arr = self.preferredRight;
+    var tmp = arr[index + 1];
+    arr[index + 1] = arr[index];
+    arr[index] = tmp;
+  };
+
 
   self.addEditStudentSubject = function () {
     var c = self.newEditStudentSubjectCombo;
@@ -823,6 +894,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.saveEditStudent = function () {
     if (!self.editingStudent || !self.editStudentForm.name.trim()) return;
+    self.preferredModesError = '';
+    if (!self.preferredRight.length) {
+      self.preferredModesError = 'Please select at least one preferred teaching mode.';
+      return;
+    }
     var payload = {
       name: self.editStudentForm.name,
       school: self.editStudentForm.school || '',
@@ -830,11 +906,17 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       subjectSelect: self.formatSubjectCombos(self.editStudentSubjects),
       learningGoal: self.editStudentForm.learningGoal || null
     };
-    StudentService.update(self.editingStudent.id, payload).then(function (res) {
+    var preferredModes = self.preferredRight.map(function (m) { return m.mode; });
+    var editingId = self.editingStudent.id;
+    StudentService.update(editingId, payload).then(function () {
+      return StudentService.updatePreferredModes(editingId, preferredModes);
+    }).then(function (res) {
       res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
-      var idx = self.students.findIndex(function (s) { return s.id === self.editingStudent.id; });
+      var idx = self.students.findIndex(function (s) { return s.id === editingId; });
       if (idx >= 0) self.students[idx] = res.data;
       self.cancelEditStudent();
+    }, function () {
+      self.preferredModesError = 'Failed to save changes. Please try again.';
     });
   };
 
@@ -904,13 +986,63 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.removeStudentSubject = function (i) { self.studentSubjects.splice(i, 1); };
 
+  self.onNewStudentPreferredDropToRight = function (item) {
+    if (self.newStudentPreferredRight.some(function (m) { return m.mode === item.mode; })) return;
+    self.newStudentPreferredLeft = self.newStudentPreferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    self.newStudentPreferredRight.push(item);
+  };
+
+  self.onNewStudentPreferredDropToLeft = function (item) {
+    if (self.newStudentPreferredLeft.some(function (m) { return m.mode === item.mode; })) return;
+    self.newStudentPreferredRight = self.newStudentPreferredRight.filter(function (m) { return m.mode !== item.mode; });
+    self.newStudentPreferredLeft.push(item);
+  };
+
+  self.removeNewStudentPreferredMode = function (mode) {
+    self.onNewStudentPreferredDropToLeft(mode);
+  };
+
+  self.onNewStudentPreferredDropOnItem = function (item, targetIndex) {
+    var fromIndex = self.newStudentPreferredRight.findIndex(function (m) { return m.mode === item.mode; });
+    if (fromIndex !== -1) {
+      self.newStudentPreferredRight.splice(fromIndex, 1);
+      if (fromIndex < targetIndex) targetIndex -= 1;
+    } else {
+      self.newStudentPreferredLeft = self.newStudentPreferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    }
+    if (targetIndex > self.newStudentPreferredRight.length) targetIndex = self.newStudentPreferredRight.length;
+    if (targetIndex < 0) targetIndex = 0;
+    self.newStudentPreferredRight.splice(targetIndex, 0, item);
+  };
+
+  self.moveNewStudentPreferredModeUp = function (index) {
+    if (index <= 0) return;
+    var arr = self.newStudentPreferredRight;
+    var tmp = arr[index - 1];
+    arr[index - 1] = arr[index];
+    arr[index] = tmp;
+  };
+
+  self.moveNewStudentPreferredModeDown = function (index) {
+    if (index >= self.newStudentPreferredRight.length - 1) return;
+    var arr = self.newStudentPreferredRight;
+    var tmp = arr[index + 1];
+    arr[index + 1] = arr[index];
+    arr[index] = tmp;
+  };
+
   // Add student
   self.studentSubjectsError = '';
   self.createStudent = function () {
     self.studentSubjectsError = '';
+    self.newStudentPreferredModesError = '';
     if (!self.studentForm.name.trim()) return;
     if (!self.studentSubjects.length) {
       self.studentSubjectsError = 'Please add at least one subject before creating the profile.';
+      return;
+    }
+    if (!self.newStudentPreferredRight.length) {
+      self.newStudentPreferredModesError = 'Please select at least one preferred teaching mode.';
       return;
     }
 
@@ -924,14 +1056,21 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         learningGoal: self.studentForm.learningGoal,
         photoUrl: self.studentForm.photoUrl || null
       };
+      var preferredModes = self.newStudentPreferredRight.map(function (m) { return m.mode; });
       StudentService.create(payload).then(function (res) {
-        res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
-        self.students.push(res.data);
-        self.newlyAddedStudentId = res.data.id;
+        return StudentService.updatePreferredModes(res.data.id, preferredModes).then(function (modesRes) {
+          return modesRes.data;
+        });
+      }).then(function (student) {
+        student.subjectCombos = self.parseSubjectCombos(student.subjectSelect, student.educationLevel);
+        self.students.push(student);
+        self.newlyAddedStudentId = student.id;
         self.studentSuccess = true;
         self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
         self.studentSubjects = [];
         self.newStudentSubjectCombo = { country: '', selectedOption: null };
+        self.newStudentPreferredLeft = TeachingModesCatalog.slice();
+        self.newStudentPreferredRight = [];
         self.schoolSearch = '';
         self.institutions = [];
         self.schoolDropdownOpen = false;

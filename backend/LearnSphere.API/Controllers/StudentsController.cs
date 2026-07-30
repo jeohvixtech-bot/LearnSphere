@@ -22,6 +22,7 @@ public class StudentsController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var students = await _context.Students
+            .Include(s => s.PreferredModes)
             .Where(s => s.ParentUserId == userId)
             .ToListAsync();
         return Ok(students.Select(MapToDto));
@@ -156,6 +157,24 @@ public class StudentsController : ControllerBase
         return Ok(MapToDto(student));
     }
 
+    [HttpPatch("{id}/preferred-modes")]
+    public async Task<IActionResult> UpdatePreferredModes(int id, [FromBody] UpdatePreferredModesDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var student = await _context.Students
+            .Include(s => s.PreferredModes)
+            .FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
+        if (student == null) return NotFound();
+
+        _context.RemoveRange(student.PreferredModes);
+        student.PreferredModes = dto.Modes
+            .Select((mode, index) => new StudentPreferredMode { StudentId = id, Mode = mode, Sequence = index })
+            .ToList();
+
+        await _context.SaveChangesAsync();
+        return Ok(MapToDto(student));
+    }
+
     [HttpGet("booking")]
     public async Task<IActionResult> GetBookings()
     {
@@ -274,6 +293,7 @@ public class StudentsController : ControllerBase
         SubjectSelect = s.SubjectSelect,
         LearningGoal = s.LearningGoal,
         PhotoUrl = s.PhotoUrl,
-        IsArchived = s.IsArchived
+        IsArchived = s.IsArchived,
+        PreferredModes = s.PreferredModes?.OrderBy(m => m.Sequence).Select(m => m.Mode).ToList() ?? new()
     };
 }

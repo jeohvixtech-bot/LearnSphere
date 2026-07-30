@@ -232,16 +232,16 @@ public class TutorsController : ControllerBase
             if (dto.Offerings.Count > 0)
                 tutor.PricePerSession = dto.Offerings.Min(o => o.Price);
 
-            // Sync flat tables so search filters keep working
+            // Sync flat tables so search filters keep working. Modes is deliberately NOT
+            // re-derived here — the tutor's overall teaching modes are independently
+            // set via PATCH /api/tutors/{id}/modes (the drag-and-drop selector), which
+            // is now the sole source of truth for that list.
             _context.RemoveRange(tutor.Subjects);
             tutor.Subjects = dto.Offerings.Select(o => o.Subject).Distinct()
                 .Select(s => new TutorSubject { TutorId = id, Subject = s }).ToList();
             _context.RemoveRange(tutor.Levels);
             tutor.Levels = dto.Offerings.Select(o => o.Level).Distinct()
                 .Select(l => new TutorLevel { TutorId = id, Level = l }).ToList();
-            _context.RemoveRange(tutor.Modes);
-            tutor.Modes = dto.Offerings.Select(o => o.Mode).Distinct()
-                .Select(m => new TutorMode { TutorId = id, Mode = m }).ToList();
             _context.RemoveRange(tutor.Qualifications);
             tutor.Qualifications = dto.Offerings.Select(o => o.Qualification).Distinct()
                 .Select(q => new TutorQualification { TutorId = id, Qualification = q }).ToList();
@@ -296,6 +296,35 @@ public class TutorsController : ControllerBase
         if (tutor.UserId != userId) return Forbid();
 
         tutor.IsOnline = dto.IsOnline;
+        await _context.SaveChangesAsync();
+
+        var updated = await _context.Tutors
+            .Include(t => t.User)
+            .Include(t => t.Subjects)
+            .Include(t => t.Levels)
+            .Include(t => t.Modes)
+            .Include(t => t.Qualifications)
+            .Include(t => t.Reviews)
+            .Include(t => t.TimeSlots)
+            .Include(t => t.Offerings)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        return Ok(MapToDto(updated!));
+    }
+
+    // Sole source of truth for a tutor's overall teaching modes (the drag-and-drop
+    // selector) — no longer re-derived from Offerings on every profile save.
+    [HttpPatch("{id}/modes")]
+    [Authorize]
+    public async Task<IActionResult> UpdateModes(int id, [FromBody] UpdateTutorModesDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.Include(t => t.Modes).FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        _context.RemoveRange(tutor.Modes);
+        tutor.Modes = dto.Modes.Distinct().Select(m => new TutorMode { TutorId = id, Mode = m }).ToList();
         await _context.SaveChangesAsync();
 
         var updated = await _context.Tutors

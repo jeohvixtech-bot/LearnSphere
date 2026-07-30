@@ -12,6 +12,12 @@ public class StudentDto
     public string? LearningGoal { get; set; }
     public string? PhotoUrl { get; set; }
     public bool IsArchived { get; set; }
+    public List<string> PreferredModes { get; set; } = new();
+}
+
+public class UpdatePreferredModesDto
+{
+    public List<string> Modes { get; set; } = new();
 }
 
 public class CreateStudentDto

@@ -269,6 +269,59 @@
                   </span>
                 </div>
               </div>
+
+              <div class="form-group">
+                <label>Preferred Teaching Modes <span class="text-danger">*</span> <span style="font-weight:400;color:#94a3b8">(drag to set order, most preferred first)</span></label>
+                <div class="mode-pool-container">
+                  <div class="mode-pool">
+                    <div class="mode-pool-header">
+                      <span>Available</span>
+                      <span class="mode-pool-badge">{{ vm.preferredLeft.length }}</span>
+                    </div>
+                    <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onPreferredDropToLeft(item)">
+                      <div class="mode-pool-item" ng-repeat="m in vm.preferredLeft" dnd-draggable="m">
+                        <span class="mode-drag-handle">⠿</span>
+                        <i class="ti" ng-class="m.icon"></i>
+                        <span class="mode-item-text">
+                          <span class="mode-item-name">{{ m.mode }}</span>
+                          <span class="mode-item-desc">{{ m.description }}</span>
+                        </span>
+                      </div>
+                      <div class="mode-pool-empty" ng-if="!vm.preferredLeft.length">All modes ranked</div>
+                    </div>
+                  </div>
+                  <div class="mode-pool mode-pool-accent">
+                    <div class="mode-pool-header mode-pool-header-accent">
+                      <span>Preferred Order</span>
+                      <span class="mode-pool-badge mode-pool-badge-accent">{{ vm.preferredRight.length }}</span>
+                    </div>
+                    <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onPreferredDropToRight(item)">
+                      <div class="mode-pool-item mode-pool-item-ordered" ng-repeat="m in vm.preferredRight"
+                        dnd-draggable="m" dnd-dropzone dnd-drop="vm.onPreferredDropOnItem(item, $index)">
+                        <span class="mode-order-badge">{{ $index + 1 }}</span>
+                        <span class="mode-drag-handle">⠿</span>
+                        <i class="ti" ng-class="m.icon"></i>
+                        <span class="mode-item-text">
+                          <span class="mode-item-name">{{ m.mode }}</span>
+                          <span class="mode-item-desc">{{ m.description }}</span>
+                        </span>
+                        <span class="mode-order-controls">
+                          <button type="button" class="mode-order-btn" ng-click="vm.movePreferredModeUp($index)" ng-disabled="$first">
+                            <i class="ti ti-chevron-up"></i>
+                          </button>
+                          <button type="button" class="mode-order-btn" ng-click="vm.movePreferredModeDown($index)" ng-disabled="$last">
+                            <i class="ti ti-chevron-down"></i>
+                          </button>
+                        </span>
+                        <button type="button" class="mode-item-remove" ng-click="vm.removePreferredMode(m)">&times;</button>
+                      </div>
+                      <div class="mode-pool-empty" ng-if="!vm.preferredRight.length">Drag modes here to rank them</div>
+                    </div>
+                  </div>
+                </div>
+                <p class="field-error" ng-if="vm.preferredModesError">{{ vm.preferredModesError }}</p>
+              </div>
+
               <div class="form-group">
                 <label>Learning Goals</label>
                 <textarea ng-model="vm.editStudentForm.learningGoal" rows="2"
@@ -378,6 +431,58 @@
               </span>
             </div>
             <p class="field-error" ng-if="vm.studentSubjectsError">{{ vm.studentSubjectsError }}</p>
+          </div>
+
+          <div class="form-group">
+            <label>Preferred Teaching Modes <span class="text-danger">*</span> <span style="font-weight:400;color:#94a3b8">(drag to set order, most preferred first)</span></label>
+            <div class="mode-pool-container">
+              <div class="mode-pool">
+                <div class="mode-pool-header">
+                  <span>Available</span>
+                  <span class="mode-pool-badge">{{ vm.newStudentPreferredLeft.length }}</span>
+                </div>
+                <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onNewStudentPreferredDropToLeft(item)">
+                  <div class="mode-pool-item" ng-repeat="m in vm.newStudentPreferredLeft" dnd-draggable="m">
+                    <span class="mode-drag-handle">⠿</span>
+                    <i class="ti" ng-class="m.icon"></i>
+                    <span class="mode-item-text">
+                      <span class="mode-item-name">{{ m.mode }}</span>
+                      <span class="mode-item-desc">{{ m.description }}</span>
+                    </span>
+                  </div>
+                  <div class="mode-pool-empty" ng-if="!vm.newStudentPreferredLeft.length">All modes ranked</div>
+                </div>
+              </div>
+              <div class="mode-pool mode-pool-accent">
+                <div class="mode-pool-header mode-pool-header-accent">
+                  <span>Preferred Order</span>
+                  <span class="mode-pool-badge mode-pool-badge-accent">{{ vm.newStudentPreferredRight.length }}</span>
+                </div>
+                <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onNewStudentPreferredDropToRight(item)">
+                  <div class="mode-pool-item mode-pool-item-ordered" ng-repeat="m in vm.newStudentPreferredRight"
+                    dnd-draggable="m" dnd-dropzone dnd-drop="vm.onNewStudentPreferredDropOnItem(item, $index)">
+                    <span class="mode-order-badge">{{ $index + 1 }}</span>
+                    <span class="mode-drag-handle">⠿</span>
+                    <i class="ti" ng-class="m.icon"></i>
+                    <span class="mode-item-text">
+                      <span class="mode-item-name">{{ m.mode }}</span>
+                      <span class="mode-item-desc">{{ m.description }}</span>
+                    </span>
+                    <span class="mode-order-controls">
+                      <button type="button" class="mode-order-btn" ng-click="vm.moveNewStudentPreferredModeUp($index)" ng-disabled="$first">
+                        <i class="ti ti-chevron-up"></i>
+                      </button>
+                      <button type="button" class="mode-order-btn" ng-click="vm.moveNewStudentPreferredModeDown($index)" ng-disabled="$last">
+                        <i class="ti ti-chevron-down"></i>
+                      </button>
+                    </span>
+                    <button type="button" class="mode-item-remove" ng-click="vm.removeNewStudentPreferredMode(m)">&times;</button>
+                  </div>
+                  <div class="mode-pool-empty" ng-if="!vm.newStudentPreferredRight.length">Drag modes here to rank them</div>
+                </div>
+              </div>
+            </div>
+            <p class="field-error" ng-if="vm.newStudentPreferredModesError">{{ vm.newStudentPreferredModesError }}</p>
           </div>
 
           <div class="profile-form-section">Learning Goals</div>

@@ -65,6 +65,11 @@ public class UpdateTutorOnlineStatusDto
     public bool IsOnline { get; set; }
 }
 
+public class UpdateTutorModesDto
+{
+    public List<string> Modes { get; set; } = new();
+}
+
 public class UpdateTutorDto
 {
     public string? ImageUrl { get; set; }

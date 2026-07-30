@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('TutorCtrl', ['$location', '$timeout', '$interval', '$rootScope', 'AuthService', 'TutorService',
-  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog',
-function ($location, $timeout, $interval, $rootScope, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog) {
+  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog',
+function ($location, $timeout, $interval, $rootScope, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -12,6 +12,16 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.invoices = [];
   self.chatMessages = [];
   self.subjectCatalog = SubjectCatalog;
+  self.teachingModesCatalog = TeachingModesCatalog;
+  self.modesError = '';
+
+  // Offerings are built from whatever's currently selected in the Teaching Mode
+  // dropdown — if a mode gets deselected there, drop it as a stale selection here too.
+  self.onProfileModesChanged = function () {
+    if (self.newOffering.mode && self.profileForm.modes.indexOf(self.newOffering.mode) === -1) {
+      self.newOffering.mode = '';
+    }
+  };
 
   // Tab state
   self.activeTab = 'overview';
@@ -54,6 +64,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
         imageUrl: res.data.imageUrl,
         bio: res.data.bio,
         experienceYears: res.data.experienceYears,
+        modes: res.data.modes ? res.data.modes.slice() : [],
         offerings: res.data.offerings && res.data.offerings.length
           ? res.data.offerings.map(function(o) {
               return { country: o.country, subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
@@ -799,8 +810,13 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     if (!self.tutor) return;
     self.profileSuccess = false;
     self.profileError = '';
+    self.modesError = '';
     if (!self.profileForm.imageUrl) {
       self.profileError = 'Please upload a profile photo before saving.';
+      return;
+    }
+    if (!self.profileForm.modes.length) {
+      self.modesError = 'Please select at least one teaching mode.';
       return;
     }
     var payload = {
@@ -809,8 +825,11 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       experienceYears: self.profileForm.experienceYears,
       offerings: self.profileForm.offerings
     };
-    TutorService.update(self.tutor.id, payload).then(function (res) {
+    TutorService.update(self.tutor.id, payload).then(function () {
+      return TutorService.updateModes(self.tutor.id, self.profileForm.modes);
+    }).then(function (res) {
       self.tutor = res.data;
+      self.profileForm.modes = res.data.modes.slice();
       self.profileSuccess = true;
       $timeout(function () { self.profileSuccess = false; }, 3000);
     }, function () {

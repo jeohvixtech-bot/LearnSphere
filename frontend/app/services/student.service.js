@@ -27,4 +27,10 @@ angular.module('learnSphereApp')
   self.unarchive = function (id) {
     return $http.post(API_URL + '/students/' + id + '/unarchive', {}, { headers: AuthService.authHeader() });
   };
+
+  self.updatePreferredModes = function (id, modes) {
+    return $http.patch(API_URL + '/students/' + id + '/preferred-modes', { modes: modes }, {
+      headers: AuthService.authHeader()
+    });
+  };
 }]);

@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<TutorReview> TutorReviews { get; set; }
     public DbSet<TutorTimeSlot> TutorTimeSlots { get; set; }
     public DbSet<Student> Students { get; set; }
+    public DbSet<StudentPreferredMode> StudentPreferredModes { get; set; }
     public DbSet<Booking> Bookings { get; set; }
     public DbSet<BookingClass> BookingClasses { get; set; }
     public DbSet<CounterProposal> CounterProposals { get; set; }
@@ -44,6 +45,11 @@ public class AppDbContext : DbContext
             .HasOne(s => s.ParentUser)
             .WithMany(u => u.Students)
             .HasForeignKey(s => s.ParentUserId);
+
+        modelBuilder.Entity<StudentPreferredMode>()
+            .HasOne(m => m.Student)
+            .WithMany(s => s.PreferredModes)
+            .HasForeignKey(m => m.StudentId);
 
         modelBuilder.Entity<Booking>()
             .HasOne(b => b.Tutor)

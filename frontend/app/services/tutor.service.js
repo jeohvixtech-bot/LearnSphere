@@ -46,6 +46,12 @@ angular.module('learnSphereApp')
     });
   };
 
+  self.updateModes = function (id, modes) {
+    return $http.patch(API_URL + '/tutors/' + id + '/modes', { modes: modes }, {
+      headers: AuthService.authHeader()
+    });
+  };
+
   self.uploadImage = function (file) {
     var fd = new FormData();
     fd.append('file', file);

@@ -209,6 +209,17 @@ using (var scope = app.Services.CreateScope())
             "ALTER TABLE `ChatMessages` ADD COLUMN `ParentUserId` INT NOT NULL DEFAULT 0");
         await context.Database.ExecuteSqlRawAsync("DELETE FROM `ChatMessages`");
     } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `StudentPreferredModes` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `StudentId` INT NOT NULL,
+            `Mode` VARCHAR(50) NOT NULL,
+            `Sequence` INT NOT NULL DEFAULT 0,
+            PRIMARY KEY (`Id`),
+            KEY `IX_StudentPreferredModes_StudentId` (`StudentId`),
+            CONSTRAINT `FK_StudentPreferredModes_Students` FOREIGN KEY (`StudentId`) REFERENCES `Students` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(
