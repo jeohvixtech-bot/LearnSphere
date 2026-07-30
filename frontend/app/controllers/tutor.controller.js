@@ -12,15 +12,35 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.invoices = [];
   self.chatMessages = [];
   self.subjectCatalog = SubjectCatalog;
-  self.teachingModesCatalog = TeachingModesCatalog;
+
+  // Teaching-mode dual-pool selector (drag-and-drop between "available" and "offered").
+  // Rebuilt into plain arrays only on load/change — never computed inline in the
+  // template — to avoid the infinite-digest trap ng-repeat-over-a-function hits here.
+  self.modesLeft = [];
+  self.modesRight = [];
   self.modesError = '';
 
-  // Offerings are built from whatever's currently selected in the Teaching Mode
-  // dropdown — if a mode gets deselected there, drop it as a stale selection here too.
-  self.onProfileModesChanged = function () {
-    if (self.newOffering.mode && self.profileForm.modes.indexOf(self.newOffering.mode) === -1) {
-      self.newOffering.mode = '';
-    }
+  function rebuildModePools(offeredModes) {
+    var offered = offeredModes || [];
+    self.modesLeft = TeachingModesCatalog.filter(function (m) { return offered.indexOf(m.mode) === -1; });
+    self.modesRight = TeachingModesCatalog.filter(function (m) { return offered.indexOf(m.mode) !== -1; });
+  }
+
+  self.onModeDropToRight = function (item) {
+    if (self.modesRight.some(function (m) { return m.mode === item.mode; })) return;
+    self.modesLeft = self.modesLeft.filter(function (m) { return m.mode !== item.mode; });
+    self.modesRight.push(item);
+  };
+
+  self.onModeDropToLeft = function (item) {
+    if (self.modesLeft.some(function (m) { return m.mode === item.mode; })) return;
+    self.modesRight = self.modesRight.filter(function (m) { return m.mode !== item.mode; });
+    self.modesLeft.push(item);
+    if (self.newOffering.mode === item.mode) self.newOffering.mode = '';
+  };
+
+  self.removeMode = function (mode) {
+    self.onModeDropToLeft(mode);
   };
 
   // Tab state
@@ -31,7 +51,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.profileSuccess = false;
   self.profileError = '';
   self.uploading = false;
-  self.newOffering = { country: '', selectedOption: null, mode: '', qualification: '', price: null };
+  self.newOffering = { country: '', selectedOption: null, qualification: '', price: null };
 
   // Report forms
   self.reportBooking = null;
@@ -64,13 +84,13 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
         imageUrl: res.data.imageUrl,
         bio: res.data.bio,
         experienceYears: res.data.experienceYears,
-        modes: res.data.modes ? res.data.modes.slice() : [],
         offerings: res.data.offerings && res.data.offerings.length
           ? res.data.offerings.map(function(o) {
               return { country: o.country, subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
             })
           : []
       };
+      rebuildModePools(res.data.modes);
       maybeInitChat();
     });
     BookingService.getAll().then(function (res) {
@@ -769,16 +789,26 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   // Edit profile offerings
   self.addOffering = function () {
     var opt = self.newOffering.selectedOption;
-    if (!self.newOffering.country || !opt || !self.newOffering.mode || !self.newOffering.qualification) return;
-    self.profileForm.offerings.push({
-      country: self.newOffering.country,
-      subject: opt.subject,
-      level: opt.level,
-      mode: self.newOffering.mode,
-      qualification: self.newOffering.qualification,
-      price: parseFloat(self.newOffering.price) || 0
+    if (!self.newOffering.country || !opt || !self.newOffering.qualification || !self.modesRight.length) return;
+    var price = parseFloat(self.newOffering.price) || 0;
+    // One offering combo per mode currently in "Offered" — the offering builder no
+    // longer asks for mode separately, it always matches whatever's selected above.
+    self.modesRight.forEach(function (m) {
+      var exists = self.profileForm.offerings.some(function (o) {
+        return o.country === self.newOffering.country && o.subject === opt.subject &&
+          o.level === opt.level && o.mode === m.mode && o.qualification === self.newOffering.qualification;
+      });
+      if (exists) return;
+      self.profileForm.offerings.push({
+        country: self.newOffering.country,
+        subject: opt.subject,
+        level: opt.level,
+        mode: m.mode,
+        qualification: self.newOffering.qualification,
+        price: price
+      });
     });
-    self.newOffering = { country: self.newOffering.country, selectedOption: null, mode: '', qualification: '', price: null };
+    self.newOffering = { country: self.newOffering.country, selectedOption: null, qualification: '', price: null };
   };
 
   self.removeOffering = function (index) {
@@ -815,7 +845,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       self.profileError = 'Please upload a profile photo before saving.';
       return;
     }
-    if (!self.profileForm.modes.length) {
+    if (!self.modesRight.length) {
       self.modesError = 'Please select at least one teaching mode.';
       return;
     }
@@ -825,11 +855,11 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       experienceYears: self.profileForm.experienceYears,
       offerings: self.profileForm.offerings
     };
+    var modes = self.modesRight.map(function (m) { return m.mode; });
     TutorService.update(self.tutor.id, payload).then(function () {
-      return TutorService.updateModes(self.tutor.id, self.profileForm.modes);
+      return TutorService.updateModes(self.tutor.id, modes);
     }).then(function (res) {
       self.tutor = res.data;
-      self.profileForm.modes = res.data.modes.slice();
       self.profileSuccess = true;
       $timeout(function () { self.profileSuccess = false; }, 3000);
     }, function () {

@@ -512,23 +512,10 @@
           <textarea ng-model="vm.profileForm.bio" rows="3" placeholder="Tell parents about your teaching style..."></textarea>
         </div>
 
-        <!-- Teaching Mode — the tutor's overall offered modes. Set this first: the
-             offering builder below only lets you pick from modes selected here, so
-             there's a single source of truth instead of two separate mode pickers
-             that could drift apart. -->
-        <div class="form-group">
-          <label>Teaching Mode <span class="text-danger">*</span></label>
-          <select multiple ng-model="vm.profileForm.modes" ng-change="vm.onProfileModesChanged()" size="4">
-            <option ng-repeat="m in vm.teachingModesCatalog" value="{{ m.mode }}">{{ m.mode }}</option>
-          </select>
-          <p class="text-muted offering-hint">Hold Ctrl (Cmd on Mac) and click to select multiple modes.</p>
-          <p class="field-error" ng-if="vm.modesError">{{ vm.modesError }}</p>
-        </div>
-
         <!-- Teaching Offerings -->
         <div class="form-group">
           <label>Teaching Offerings</label>
-          <p class="text-muted offering-hint">Select a country, then a subject, then mode and qualification, then click Add Offering.</p>
+          <p class="text-muted offering-hint">Select a country, subject and teaching mode(s), then qualification, then click Add Offering — it's added for every mode you select below.</p>
           <div class="offering-builder">
             <div class="form-group">
               <label>Country</label>
@@ -545,13 +532,52 @@
                 <option value="">{{ vm.newOffering.country ? '— Select subject —' : '— Select a country first —' }}</option>
               </select>
             </div>
+
+            <!-- Teaching Modes (drag-and-drop dual pool) — the tutor's overall offered
+                 modes. Whatever ends up in "Offered" is what Add Offering below fans
+                 the combo out across, so this is the single source of truth for mode. -->
             <div class="form-group">
-              <label>Teaching Mode</label>
-              <select ng-model="vm.newOffering.mode" ng-disabled="!vm.profileForm.modes.length">
-                <option value="">{{ vm.profileForm.modes.length ? '— Mode —' : 'Select a teaching mode above first' }}</option>
-                <option ng-repeat="m in vm.profileForm.modes" value="{{ m }}">{{ m }}</option>
-              </select>
+              <label>Teaching Modes Offered <span class="text-danger">*</span></label>
+              <div class="mode-pool-container">
+                <div class="mode-pool">
+                  <div class="mode-pool-header">
+                    <span>Available</span>
+                    <span class="mode-pool-badge">{{ vm.modesLeft.length }}</span>
+                  </div>
+                  <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onModeDropToLeft(item)">
+                    <div class="mode-pool-item" ng-repeat="m in vm.modesLeft" dnd-draggable="m">
+                      <span class="mode-drag-handle">⠿</span>
+                      <i class="ti" ng-class="m.icon"></i>
+                      <span class="mode-item-text">
+                        <span class="mode-item-name">{{ m.mode }}</span>
+                        <span class="mode-item-desc">{{ m.description }}</span>
+                      </span>
+                    </div>
+                    <div class="mode-pool-empty" ng-if="!vm.modesLeft.length">All modes offered</div>
+                  </div>
+                </div>
+                <div class="mode-pool mode-pool-accent">
+                  <div class="mode-pool-header mode-pool-header-accent">
+                    <span>Offered</span>
+                    <span class="mode-pool-badge mode-pool-badge-accent">{{ vm.modesRight.length }}</span>
+                  </div>
+                  <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onModeDropToRight(item)">
+                    <div class="mode-pool-item" ng-repeat="m in vm.modesRight" dnd-draggable="m">
+                      <span class="mode-drag-handle">⠿</span>
+                      <i class="ti" ng-class="m.icon"></i>
+                      <span class="mode-item-text">
+                        <span class="mode-item-name">{{ m.mode }}</span>
+                        <span class="mode-item-desc">{{ m.description }}</span>
+                      </span>
+                      <button type="button" class="mode-item-remove" ng-click="vm.removeMode(m)">&times;</button>
+                    </div>
+                    <div class="mode-pool-empty" ng-if="!vm.modesRight.length">Drag modes here</div>
+                  </div>
+                </div>
+              </div>
+              <p class="field-error" style="margin-top:8px" ng-if="vm.modesError">{{ vm.modesError }}</p>
             </div>
+
             <div class="form-group">
               <label>Qualification</label>
               <select ng-model="vm.newOffering.qualification">
