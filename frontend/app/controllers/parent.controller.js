@@ -96,8 +96,70 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.selectedSubject = 'All';
   self.selectedMode = 'All';
   self.minRating = 0;
+
+  // Flow B — book a tutor's pre-published class slot directly, no per-request approval.
+  self.searchTab = 'flowA';
+  self.searchStudentId = '';
+  self.presetSlots = [];
+  self.presetSlotsLoading = false;
+  self.pendingPresetSlot = null;
+  self.showPresetConfirm = false;
+  self.showPresetSuccess = false;
+  self.presetBookingError = '';
+
+  self.searchStudent = function () {
+    return (self.students || []).find(function (s) { return String(s.id) === String(self.searchStudentId); });
+  };
+
+  self.loadPresetSlots = function () {
+    if (!self.searchStudentId) return;
+    self.presetSlotsLoading = true;
+    TutorService.getPresetSlots(self.searchStudentId).then(function (res) {
+      self.presetSlots = res.data;
+      self.presetSlotsLoading = false;
+    }).catch(function () { self.presetSlotsLoading = false; });
+  };
+
+  self.onSearchStudentChange = function () {
+    self.presetSlots = [];
+    if (!self.searchStudentId) return;
+    if (self.searchTab === 'flowB') self.loadPresetSlots();
+  };
+
+  self.setSearchTab = function (tab) {
+    self.searchTab = tab;
+    if (tab === 'flowB' && self.searchStudentId) self.loadPresetSlots();
+  };
+
+  self.bookPresetSlot = function (slot) {
+    if (slot.isFull) return;
+    self.pendingPresetSlot = slot;
+    self.presetBookingError = '';
+    self.showPresetConfirm = true;
+  };
+
+  self.cancelPresetBooking = function () {
+    self.pendingPresetSlot = null;
+    self.showPresetConfirm = false;
+  };
+
+  self.confirmPresetBooking = function () {
+    if (!self.pendingPresetSlot || !self.searchStudentId) return;
+    BookingService.bookPreset({
+      presetSlotId: self.pendingPresetSlot.id,
+      studentId: self.searchStudentId
+    }).then(function () {
+      self.showPresetConfirm = false;
+      self.pendingPresetSlot = null;
+      self.showPresetSuccess = true;
+      self.loadPresetSlots();
+      BookingService.getAll().then(function (r) { self.bookings = r.data; });
+      $timeout(function () { self.showPresetSuccess = false; }, 3000);
+    }).catch(function (err) {
+      self.presetBookingError = (err.data && err.data.message) || 'Booking failed. Please try again.';
+    });
+  };
   self.minExperience = 0;
-  self.filtersExpanded = true;
 
   self.selectSearchCountry = function (c) {
     self.selectedCountry = c;
@@ -413,8 +475,18 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Load data
   function init() {
-    TutorService.getAll().then(function (res) {
+    TutorService.getAll({ includePresetSlots: true }).then(function (res) {
       self.tutors = res.data;
+      // Preset slot strip on each tutor card (search page) — fetched per-tutor since
+      // the catalog endpoint doesn't embed presetSlots yet; falls back to an empty
+      // list (strip shows "No preset classes yet") if the request fails.
+      self.tutors.forEach(function (t) {
+        TutorService.getTutorPresetSlots(t.id).then(function (r) {
+          t.presetSlots = r.data || [];
+        }).catch(function () {
+          t.presetSlots = [];
+        });
+      });
       var pendingTutorId = PendingMatchService.consumeTutor();
       if (pendingTutorId) {
         var t = self.tutors.find(function (x) { return x.id === pendingTutorId; });
@@ -479,6 +551,118 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     }).sort(function (a, b) {
       return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
     });
+  };
+
+  // ── Next month label e.g. "Aug 2026" ──────────────────────────────
+  self.nextMonthLabel = function () {
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return months[d.getMonth()] + ' ' + d.getFullYear();
+  };
+
+  // ── Returns next month's date range as YYYY-MM-DD strings ─────────
+  self._nextMonthRange = function () {
+    var now = new Date();
+    var y = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+    var m = (now.getMonth() + 1) % 12;
+    var start = new Date(y, m, 1);
+    var end = new Date(y, m + 1, 0);
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    var fmt = function (d) { return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); };
+    return { start: fmt(start), end: fmt(end) };
+  };
+
+  // ── All preset slots for a tutor in next month ────────────────────
+  self.tutorNextMonthSlots = function (t) {
+    var range = self._nextMonthRange();
+    return (t.presetSlots || []).filter(function (s) {
+      return s.date >= range.start && s.date <= range.end && !s.isFull;
+    });
+  };
+
+  // ── Does the tutor have ANY preset slots (full or not) next month ─
+  self.tutorHasAnySlots = function (t) {
+    var range = self._nextMonthRange();
+    return (t.presetSlots || []).some(function (s) {
+      return s.date >= range.start && s.date <= range.end;
+    });
+  };
+
+  // ── Group tutor's next month slots by subject ─────────────────────
+  // Returns array of { subject, level, mode, classSize, pricePerLesson,
+  //   startTime, endTime, recurrenceLabel, slots: [...] }
+  self.tutorSlotsBySubject = function (t) {
+    var range = self._nextMonthRange();
+    var slots = (t.presetSlots || []).filter(function (s) {
+      return s.date >= range.start && s.date <= range.end;
+    });
+
+    var groups = {};
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    slots.forEach(function (s) {
+      var key = s.subject + '|' + s.mode;
+      if (!groups[key]) {
+        groups[key] = {
+          subject: s.subject,
+          level: s.level,
+          mode: s.mode,
+          classSize: s.classSize,
+          pricePerLesson: s.pricePerLesson,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          recurrenceLabel: '',
+          slots: []
+        };
+      }
+      var d = new Date(s.date + 'T00:00:00');
+      groups[key].slots.push({
+        date: s.date,
+        dateFormatted: days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()],
+        startTime: s.startTime,
+        endTime: s.endTime,
+        isFull: s.isFull,
+        classSize: s.classSize,
+        confirmedCount: s.confirmedCount || 0,
+        maxStudents: s.maxStudents || 1
+      });
+    });
+
+    // Build recurrence label from first slot's day name
+    Object.values(groups).forEach(function (g) {
+      g.slots.sort(function (a, b) { return a.date.localeCompare(b.date); });
+      if (g.slots.length > 0) {
+        var d = new Date(g.slots[0].date + 'T00:00:00');
+        var nm = self.nextMonthLabel().split(' ');
+        g.recurrenceLabel = 'Every ' + ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()] + ', ' + nm[0] + ' ' + nm[1];
+      }
+    });
+
+    return Object.values(groups);
+  };
+
+  // ── Subjects tutor teaches but has NO preset slot next month ───────
+  self.tutorSubjectsWithoutSlots = function (t) {
+    var slotSubjects = self.tutorSlotsBySubject(t).map(function (g) { return g.subject; });
+    return (t.offerings || []).filter(function (o) {
+      return slotSubjects.indexOf(o.subject) < 0;
+    }).reduce(function (acc, o) {
+      if (!acc.some(function (x) { return x.subject === o.subject; })) acc.push(o);
+      return acc;
+    }, []);
+  };
+
+  // ── Mode icon helper (Tabler icon suffix) ─────────────────────────
+  self.modeIcon = function (mode) {
+    var map = {
+      'Online': 'video',
+      'Home Visit': 'home',
+      'Tutor Place': 'building',
+      'Tuition Center': 'building'
+    };
+    return map[mode] || 'calendar';
   };
 
   // Select a tutor to book

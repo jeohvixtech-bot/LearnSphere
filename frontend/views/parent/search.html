@@ -5,14 +5,30 @@
       <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
-      <a href="#!/parent/search" class="nav-item active">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
-      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+      <a href="#!/parent/dashboard" class="nav-item">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="nav-item">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="nav-item active">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="nav-item">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="nav-item">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="nav-item">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="nav-item">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="nav-item">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
@@ -23,115 +39,100 @@
          ══════════════════════════════════════════════ -->
     <div ng-if="!vm.selectedTutor">
 
-      <!-- ── Flow A/B tabs ──────────────────────── -->
-      <div class="search-tabs">
-        <button type="button" ng-click="vm.setSearchTab('flowA')" ng-class="{active: vm.searchTab === 'flowA'}">
-          🔍 Find a tutor
-        </button>
-        <button type="button" ng-click="vm.setSearchTab('flowB')" ng-class="{active: vm.searchTab === 'flowB'}">
-          📅 Available classes
-        </button>
-      </div>
-
-      <div ng-show="vm.searchTab === 'flowA'">
-
       <!-- ── Search Hero ─────────────────────────── -->
       <div class="search-hero">
         <h2 class="search-hero-title">Find Your Perfect Tutor</h2>
-        <p class="search-hero-sub">Browse verified NIE-trained tutors across Singapore &amp; Malaysia</p>
+        <p class="search-hero-sub">Browse verified tutors across Singapore &amp; Malaysia</p>
         <div class="search-hero-bar">
-          <span class="search-icon">🔍</span>
+          <i class="ti ti-search search-icon" aria-hidden="true"></i>
           <input type="text" ng-model="vm.searchQuery" placeholder="Search tutor name" />
         </div>
       </div>
 
-      <!-- ── Filter Bar ──────────────────────────── -->
+      <!-- ── Filter Bar (always visible) ─────────── -->
       <div class="filter-bar">
 
-        <div class="filter-bar-header" ng-click="vm.filtersExpanded = !vm.filtersExpanded">
-          <span class="filter-bar-label">🔧 Filter</span>
-          <span class="filter-toggle-icon" ng-class="{open: vm.filtersExpanded}">▾</span>
-          <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+        <div class="filter-bar-group">
+          <span class="filter-bar-label">Country</span>
+          <div class="filter-country-switch">
+            <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
+              ng-click="vm.selectSearchCountry(c)"
+              ng-class="{active: vm.selectedCountry === c}" class="filter-chip">
+              {{ c === 'Singapore' ? 'SG' : 'MY' }}
+            </button>
+          </div>
         </div>
 
-        <div class="filter-bar-panel" ng-show="vm.filtersExpanded">
+        <div class="filter-bar-divider"></div>
 
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Country</span>
-            <div class="filter-country-switch">
-              <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
-                ng-click="vm.selectSearchCountry(c)"
-                ng-class="{active: vm.selectedCountry === c}" class="filter-chip">
-                {{ c === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}
-              </button>
-            </div>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Subject</span>
-            <select class="filter-select-sm" ng-model="vm.selectedSubject"
-              ng-options="opt.subject as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
-              <option value="All">All Subjects</option>
-            </select>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Mode</span>
-            <select class="filter-select-sm" ng-model="vm.selectedMode">
-              <option value="All">All Modes</option>
-              <option value="Online">Online</option>
-              <option value="Home Visit">Home Visit</option>
-              <option value="Tutor Place">Tutor Place</option>
-              <option value="Tuition Center">Tuition Center</option>
-            </select>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Experience</span>
-            <select class="filter-select-sm" ng-model="vm.minExperience"
-              ng-options="e.value as e.label for e in [{value:0,label:'All Experience'},{value:15,label:'> 15 years'},{value:10,label:'> 10 years'},{value:5,label:'> 5 years'},{value:3,label:'> 3 years'},{value:1,label:'> 1 year'}]">
-            </select>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Rating</span>
-            <select class="filter-select-sm" ng-model="vm.minRating"
-              ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
-            </select>
-          </div>
-
+        <div class="filter-bar-group">
+          <span class="filter-bar-label">Subject</span>
+          <select class="filter-select-sm" ng-model="vm.selectedSubject"
+            ng-options="opt.subject as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
+            <option value="All">All Subjects</option>
+          </select>
         </div>
+
+        <div class="filter-bar-divider"></div>
+
+        <div class="filter-bar-group">
+          <span class="filter-bar-label">Mode</span>
+          <select class="filter-select-sm" ng-model="vm.selectedMode">
+            <option value="All">All Modes</option>
+            <option value="Online">Online</option>
+            <option value="Home Visit">Home Visit</option>
+            <option value="Tutor Place">Tutor Place</option>
+            <option value="Tuition Center">Tuition Center</option>
+          </select>
+        </div>
+
+        <div class="filter-bar-divider"></div>
+
+        <div class="filter-bar-group">
+          <span class="filter-bar-label">Experience</span>
+          <select class="filter-select-sm" ng-model="vm.minExperience"
+            ng-options="e.value as e.label for e in [{value:0,label:'All Experience'},{value:15,label:'> 15 years'},{value:10,label:'> 10 years'},{value:5,label:'> 5 years'},{value:3,label:'> 3 years'},{value:1,label:'> 1 year'}]">
+          </select>
+        </div>
+
+        <div class="filter-bar-divider"></div>
+
+        <div class="filter-bar-group">
+          <span class="filter-bar-label">Rating</span>
+          <select class="filter-select-sm" ng-model="vm.minRating"
+            ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
+          </select>
+        </div>
+
+        <span class="result-count">{{ vm.filteredTutors().length }} tutors found</span>
       </div>
 
       <!-- ── Tutor Grid ───────────────────────────── -->
       <div class="tutor-grid">
-        <div class="tutor-card" ng-repeat="t in vm.filteredTutors()" ng-class="{'tutor-card--favorited': vm.isFavorited(t.id)}">
+        <div class="tutor-card" ng-repeat="t in vm.filteredTutors()"
+          ng-class="{'tutor-card--favorited': vm.isFavorited(t.id)}">
 
-          <button type="button" class="favorite-btn" ng-class="{active: vm.isFavorited(t.id)}"
+          <!-- Favourite button -->
+          <button type="button" class="favorite-btn"
+            ng-class="{active: vm.isFavorited(t.id)}"
             ng-click="vm.toggleFavorite(t, $event)" title="Like this tutor">
-            {{ vm.isFavorited(t.id) ? '♥' : '♡' }}
+            <i class="ti ti-heart" aria-hidden="true"></i>
           </button>
 
-          <!-- ── Top row: avatar + info ── -->
+          <!-- Top: avatar + info -->
           <div class="tutor-card-main">
             <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
-            <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback" style="font-size:56px">{{ t.name[0] }}</div>
+            <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback">{{ t.name[0] }}</div>
             <div class="tutor-card-body">
               <div class="tutor-card-name-row">
                 <h4>{{ t.name }}</h4>
-                <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
+                <span ng-if="t.isVerified" class="badge-verified">
+                  <i class="ti ti-check" style="font-size:10px; vertical-align:-1px;" aria-hidden="true"></i> Verified
+                </span>
               </div>
               <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
               <div class="qual-tags">
-                <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
+                <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
               </div>
               <div class="tutor-card-subjects-label">Teaches</div>
               <div class="subject-list">
@@ -144,10 +145,10 @@
             </div>
           </div>
 
-          <!-- ── Bottom bar: rating + modes + price + CTA ── -->
+          <!-- Middle bar: rating + modes + price + CTA -->
           <div class="tutor-card-bar">
             <div class="tutor-card-rating">
-              <span class="tutor-rating-star">⭐</span>
+              <i class="ti ti-star" style="font-size:14px; color:#f59e0b;" aria-hidden="true"></i>
               <span class="tutor-rating-value">{{ t.rating }}</span>
               <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
             </div>
@@ -159,69 +160,95 @@
               <small>Trial Rate</small>
               <strong class="price">${{ t.pricePerSession }}/hr</strong>
             </div>
-            <button class="btn-primary" ng-click="vm.selectTutor(t)">View &amp; Book →</button>
+            <button class="btn-primary" ng-click="vm.selectTutor(t)">View &amp; Book</button>
+          </div>
+
+          <!-- Bottom: preset class slot strip -->
+          <div class="tutor-slot-strip" ng-if="vm.tutorNextMonthSlots(t).length > 0 || vm.tutorHasAnySlots(t)">
+            <p class="tutor-slot-strip-label">
+              <i class="ti ti-calendar-event" aria-hidden="true"></i>
+              Available classes — {{ vm.nextMonthLabel() }}
+            </p>
+            <div class="tutor-slot-chips">
+
+              <!-- One chip per unique subject in preset slots -->
+              <div class="slot-chip" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.subject">
+                <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                {{ sg.subject }} · {{ sg.slots.length }} {{ sg.slots.length === 1 ? 'class' : 'classes' }}
+
+                <!-- Tooltip: full month details -->
+                <div class="slot-tooltip">
+                  <p class="slot-tooltip-title">{{ sg.subject }} · {{ sg.level }}</p>
+                  <div class="slot-tooltip-meta">
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-calendar" aria-hidden="true"></i>
+                      <span>{{ sg.recurrenceLabel }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-clock" aria-hidden="true"></i>
+                      <span>{{ sg.startTime }} – {{ sg.endTime }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                      <span>{{ sg.mode }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-{{ sg.classSize === 'one-to-one' ? 'user' : 'users' }}" aria-hidden="true"></i>
+                      <span>{{ sg.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-currency-dollar" aria-hidden="true"></i>
+                      <span class="slot-price">
+                        ${{ sg.pricePerLesson }} / lesson
+                        <span class="slot-price-est">· est. ${{ sg.pricePerLesson * sg.slots.length }} / month</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="slot-tooltip-schedule">
+                    <div class="slot-tooltip-row" ng-repeat="s in sg.slots">
+                      <div>
+                        <p class="slot-tooltip-date">{{ s.dateFormatted }}</p>
+                        <p class="slot-tooltip-time">{{ s.startTime }} – {{ s.endTime }}</p>
+                      </div>
+                      <span class="slot-status-badge"
+                        ng-class="{
+                          'badge-open': !s.isFull && s.classSize === 'one-to-one',
+                          'badge-fill': !s.isFull && s.classSize === 'one-to-many',
+                          'badge-full': s.isFull
+                        }">
+                        <span ng-if="s.isFull">Full</span>
+                        <span ng-if="!s.isFull && s.classSize === 'one-to-one'">Open</span>
+                        <span ng-if="!s.isFull && s.classSize === 'one-to-many'">{{ s.confirmedCount }} / {{ s.maxStudents }} filled</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Empty chip for subjects tutor teaches but has no preset slot -->
+              <div class="slot-chip-empty" ng-repeat="o in vm.tutorSubjectsWithoutSlots(t) track by o.subject">
+                <i class="ti ti-calendar-x" aria-hidden="true"></i>
+                No preset for {{ o.subject }}
+              </div>
+
+            </div>
+          </div>
+
+          <!-- No slots at all -->
+          <div class="tutor-slot-strip tutor-slot-strip--empty" ng-if="!vm.tutorHasAnySlots(t)">
+            <p class="tutor-slot-strip-label">
+              <i class="ti ti-calendar-event" aria-hidden="true"></i>
+              Available classes — {{ vm.nextMonthLabel() }}
+            </p>
+            <span class="slot-chip-empty">
+              <i class="ti ti-calendar-x" aria-hidden="true"></i>
+              No preset classes yet
+            </span>
           </div>
 
         </div>
       </div>
-
-      </div><!-- end flowA -->
-
-      <!-- ══════════════════════════════════════════════
-           FLOW B — AVAILABLE (PRESET) CLASSES
-           ══════════════════════════════════════════════ -->
-      <div ng-show="vm.searchTab === 'flowB'">
-
-        <!-- ── Student selector (only needed for direct-book preset classes) ── -->
-        <div class="student-selector-bar">
-          <label>Booking for:</label>
-          <select ng-model="vm.searchStudentId" ng-change="vm.onSearchStudentChange()">
-            <option value="">-- Select a child --</option>
-            <option ng-repeat="s in vm.activeStudents()" value="{{ s.id }}">{{ s.name }}</option>
-          </select>
-          <span ng-if="vm.searchStudentId && vm.searchStudent()" class="student-profile-pill">
-            {{ vm.searchStudent().subjectSelect }}
-          </span>
-        </div>
-
-        <div ng-if="!vm.searchStudentId">
-          <p class="empty-state">Please select a child above to see available classes.</p>
-        </div>
-
-        <div ng-if="vm.searchStudentId">
-          <div ng-if="vm.presetSlotsLoading" class="empty-state">Loading available classes...</div>
-
-          <div ng-if="!vm.presetSlotsLoading && !vm.presetSlots.length" class="empty-state">
-            No available classes match {{ vm.searchStudent().name }}'s profile right now.
-          </div>
-
-          <div class="preset-slot-list" ng-if="!vm.presetSlotsLoading && vm.presetSlots.length">
-            <div class="preset-slot-card" ng-repeat="slot in vm.presetSlots">
-              <div class="preset-slot-tutor">
-                <img ng-if="slot.tutorPhoto" ng-src="{{ slot.tutorPhoto }}" class="avatar" alt="{{ slot.tutorName }}" />
-                <div ng-if="!slot.tutorPhoto" class="avatar avatar-fallback">{{ slot.tutorName[0] }}</div>
-                <div>
-                  <strong>{{ slot.tutorName }}</strong>
-                  <span class="text-muted">⭐ {{ slot.tutorRating }}</span>
-                </div>
-              </div>
-              <div class="preset-slot-details">
-                <span class="chip">{{ slot.subject }} · {{ slot.level }}</span>
-                <span class="chip">{{ slot.mode }}</span>
-                <span class="chip">{{ slot.classSize === 'one-to-one' ? '1-to-1' : ('1-to-many (' + slot.confirmedCount + '/' + slot.maxStudents + ')') }}</span>
-                <span class="preset-slot-time">{{ slot.date | dmy }} · {{ slot.startTime | hhmma }} – {{ slot.endTime | hhmma }}</span>
-              </div>
-              <div class="preset-slot-price">
-                <strong>${{ slot.pricePerLesson }} / lesson</strong>
-                <small>Est. ${{ slot.monthlyTotal }} / month</small>
-              </div>
-              <button type="button" class="btn-primary" ng-click="vm.bookPresetSlot(slot)" ng-disabled="slot.isFull">
-                {{ slot.isFull ? 'Unavailable' : 'Book now' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div><!-- end flowB -->
 
     </div><!-- end listing view -->
 

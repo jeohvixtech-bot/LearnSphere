@@ -53,6 +53,18 @@ public class TimeSlotDto
     public string Time { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public int? BookingId { get; set; }
+
+    // Populated only for tutor-preset class slots (see TutorTimeSlot).
+    public string? EndTime { get; set; }
+    public string? Mode { get; set; }
+    public string? Subject { get; set; }
+    public string? Level { get; set; }
+    public string? Country { get; set; }
+    public string? ClassSize { get; set; }
+    public int MaxStudents { get; set; }
+    public int ConfirmedCount { get; set; }
+    public bool IsFull { get; set; }
+    public decimal PricePerLesson { get; set; }
 }
 
 public class VerifyTutorDto
@@ -68,6 +80,53 @@ public class UpdateTutorOnlineStatusDto
 public class UpdateTutorModesDto
 {
     public List<string> Modes { get; set; } = new();
+}
+
+public class SetupClassSlotDto
+{
+    public string Date { get; set; } = string.Empty;
+    public string StartTime { get; set; } = string.Empty;
+    public string EndTime { get; set; } = string.Empty;
+    // Optional — a slot combined from a dragged range of grid cells carries its own
+    // actual duration (may differ from the form's single duration dropdown, which
+    // only reflects a plain single-cell click). Falls back to SetupClassDto.DurationMinutes
+    // when not provided, so older/simpler callers are unaffected.
+    public int? DurationMinutes { get; set; }
+}
+
+public class SetupClassDto
+{
+    public List<SetupClassSlotDto> Slots { get; set; } = new();
+    public int DurationMinutes { get; set; } = 60;
+    public string Mode { get; set; } = string.Empty;
+    public string Subject { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
+    public string ClassSize { get; set; } = "one-to-one";
+    public int MaxStudents { get; set; } = 1;
+    public decimal PricePerLesson { get; set; } = 0;
+}
+
+public class PresetSlotDto
+{
+    public int Id { get; set; }
+    public int TutorId { get; set; }
+    public string TutorName { get; set; } = string.Empty;
+    public string TutorPhoto { get; set; } = string.Empty;
+    public double TutorRating { get; set; }
+    public string Subject { get; set; } = string.Empty;
+    public string Level { get; set; } = string.Empty;
+    public string Mode { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
+    public string ClassSize { get; set; } = string.Empty;
+    public int ConfirmedCount { get; set; }
+    public int MaxStudents { get; set; }
+    public bool IsFull { get; set; }
+    public string Date { get; set; } = string.Empty;
+    public string StartTime { get; set; } = string.Empty;
+    public string EndTime { get; set; } = string.Empty;
+    public decimal PricePerLesson { get; set; }
+    public decimal MonthlyTotal { get; set; }
 }
 
 public class UpdateTutorDto

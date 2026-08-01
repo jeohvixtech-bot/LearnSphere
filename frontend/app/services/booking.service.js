@@ -13,6 +13,10 @@ angular.module('learnSphereApp')
     return $http.post(API_URL + '/bookings', data, h());
   };
 
+  self.bookPreset = function (data) {
+    return $http.post(API_URL + '/bookings/preset', data, h());
+  };
+
   self.updateStatus = function (id, status, counterProposal) {
     return $http.patch(API_URL + '/bookings/' + id + '/status', {
       status: status,

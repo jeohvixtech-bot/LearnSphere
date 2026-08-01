@@ -341,6 +341,221 @@ public class TutorsController : ControllerBase
         return Ok(MapToDto(updated!));
     }
 
+    // A student's subjects live packed into SubjectSelect as one or more
+    // "Country · Level · Subject" combos (comma-separated) rather than flat fields —
+    // mirrors the frontend's parseSubjectCombos convention.
+    private static List<(string Country, string Level, string Subject)> ParseSubjectCombos(string? subjectSelect)
+    {
+        var result = new List<(string, string, string)>();
+        if (string.IsNullOrWhiteSpace(subjectSelect)) return result;
+        foreach (var raw in subjectSelect.Split(','))
+        {
+            var token = raw.Trim();
+            if (token.Length == 0) continue;
+            var parts = token.Split('·').Select(p => p.Trim()).ToArray();
+            if (parts.Length >= 3) result.Add((parts[0], parts[1], string.Join("·", parts.Skip(2)).Trim()));
+            else if (parts.Length == 2) result.Add(("Singapore", parts[0], parts[1]));
+            else result.Add(("Singapore", string.Empty, token));
+        }
+        return result;
+    }
+
+    // Available preset class slots (Flow B) matching a student's subject/level/country
+    // combos and ranked by the student's preferred teaching mode order. No auth required —
+    // mirrors the public GET /api/tutors catalog search.
+    [HttpGet("preset-slots")]
+    public async Task<IActionResult> GetPresetSlots([FromQuery] int studentId, [FromQuery] string? country)
+    {
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == studentId);
+        if (student == null) return NotFound(new { message = "Student not found." });
+
+        var combos = ParseSubjectCombos(student.SubjectSelect);
+        var preferredModes = await _context.StudentPreferredModes
+            .Where(m => m.StudentId == studentId)
+            .OrderBy(m => m.Sequence)
+            .Select(m => m.Mode)
+            .ToListAsync();
+
+        if (combos.Count == 0 || preferredModes.Count == 0) return Ok(new List<PresetSlotDto>());
+
+        var today = DateTime.Today.ToString("yyyy-MM-dd");
+
+        var candidates = await _context.TutorTimeSlots
+            .Include(s => s.Tutor).ThenInclude(t => t.User)
+            .Where(s => s.Status == "Available" && !s.IsFull &&
+                string.Compare(s.Day, today) >= 0 &&
+                s.Tutor.IsVerified && s.Tutor.IsOnline &&
+                s.Mode != null && preferredModes.Contains(s.Mode))
+            .ToListAsync();
+
+        var matched = candidates.Where(s => combos.Any(c =>
+            string.Equals(c.Subject, s.Subject, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(c.Level, s.Level, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(string.IsNullOrWhiteSpace(country) ? c.Country : country, s.Country, StringComparison.OrdinalIgnoreCase)
+        )).ToList();
+
+        if (matched.Count == 0) return Ok(new List<PresetSlotDto>());
+
+        // "Est. monthly total" — how many lessons of this exact recurring class (same
+        // tutor/subject/level/mode/country/price/size) fall in the same calendar month
+        // as this particular slot, regardless of whether those other dates are still
+        // bookable. Computed once for all matched tutors rather than per-row.
+        var tutorIds = matched.Select(s => s.TutorId).Distinct().ToList();
+        var allSlotsForTutors = await _context.TutorTimeSlots
+            .Where(s => tutorIds.Contains(s.TutorId))
+            .Select(s => new { s.TutorId, s.Subject, s.Level, s.Mode, s.Country, s.ClassSize, s.PricePerLesson, s.Day })
+            .ToListAsync();
+
+        int MonthlyCount(TutorTimeSlot s) => allSlotsForTutors.Count(o =>
+            o.TutorId == s.TutorId && o.Subject == s.Subject && o.Level == s.Level &&
+            o.Mode == s.Mode && o.Country == s.Country && o.ClassSize == s.ClassSize &&
+            o.PricePerLesson == s.PricePerLesson && o.Day.Length >= 7 && s.Day.Length >= 7 &&
+            o.Day.Substring(0, 7) == s.Day.Substring(0, 7));
+
+        var result = matched.Select(s => new PresetSlotDto
+        {
+            Id = s.Id,
+            TutorId = s.TutorId,
+            TutorName = s.Tutor?.User?.Name ?? string.Empty,
+            TutorPhoto = s.Tutor?.ImageUrl ?? string.Empty,
+            TutorRating = s.Tutor?.Rating ?? 0,
+            Subject = s.Subject ?? string.Empty,
+            Level = s.Level ?? string.Empty,
+            Mode = s.Mode ?? string.Empty,
+            Country = s.Country ?? string.Empty,
+            ClassSize = s.ClassSize,
+            ConfirmedCount = s.ConfirmedCount,
+            MaxStudents = s.MaxStudents,
+            IsFull = s.IsFull,
+            Date = s.Day,
+            StartTime = s.Time,
+            EndTime = s.EndTime ?? string.Empty,
+            PricePerLesson = s.PricePerLesson,
+            MonthlyTotal = s.PricePerLesson * MonthlyCount(s)
+        })
+        .OrderBy(dto => { var idx = preferredModes.IndexOf(dto.Mode); return idx < 0 ? int.MaxValue : idx; })
+        .ThenBy(dto => dto.Date)
+        .ToList();
+
+        return Ok(result);
+    }
+
+    // Parses a single "H:MM AM/PM" clock time into minutes since midnight, or null if
+    // unrecognizable / out of the valid 1-12 hour range for 12-hour format.
+    private static int? ParseClockMinutes(string? timeStr)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(
+            timeStr ?? string.Empty, @"^(\d{1,2}):(\d{2})\s*(AM|PM)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!m.Success) return null;
+        var h = int.Parse(m.Groups[1].Value);
+        var min = int.Parse(m.Groups[2].Value);
+        if (h < 1 || h > 12 || min < 0 || min > 59) return null;
+        var ampm = m.Groups[3].Value.ToUpperInvariant();
+        if (ampm == "PM" && h != 12) h += 12;
+        if (ampm == "AM" && h == 12) h = 0;
+        return h * 60 + min;
+    }
+
+    // Parses a "H:MM AM/PM - H:MM AM/PM" range string (as stored on BookingClass.Time)
+    // into (start, end) minutes since midnight, or null if it doesn't contain two times.
+    private static (int Start, int End)? ParseTimeRangeMinutes(string? timeStr)
+    {
+        var matches = System.Text.RegularExpressions.Regex.Matches(
+            timeStr ?? string.Empty, @"(\d{1,2}):(\d{2})\s*(AM|PM)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (matches.Count < 2) return null;
+        int ToMinutes(System.Text.RegularExpressions.Match mm)
+        {
+            var h = int.Parse(mm.Groups[1].Value);
+            var min = int.Parse(mm.Groups[2].Value);
+            var ampm = mm.Groups[3].Value.ToUpperInvariant();
+            if (ampm == "PM" && h != 12) h += 12;
+            if (ampm == "AM" && h == 12) h = 0;
+            return h * 60 + min;
+        }
+        var start = ToMinutes(matches[0]);
+        var end = ToMinutes(matches[1]);
+        if (end <= start) end += 24 * 60;
+        return (start, end);
+    }
+
+    // Publishes tutor-preset class slots (Flow B) — a parent books these directly
+    // without a per-request confirmation step. Only the owning tutor can call this.
+    [HttpPost("{id}/setup-class")]
+    [Authorize]
+    public async Task<IActionResult> SetupClass(int id, [FromBody] SetupClassDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        if (dto.Slots == null || dto.Slots.Count == 0)
+            return BadRequest(new { message = "Please select at least one time slot." });
+        if (string.IsNullOrWhiteSpace(dto.Mode))
+            return BadRequest(new { message = "Please select a teaching mode." });
+        if (string.IsNullOrWhiteSpace(dto.Subject))
+            return BadRequest(new { message = "Please select a subject." });
+        if (dto.PricePerLesson <= 0)
+            return BadRequest(new { message = "Please enter a price per lesson." });
+
+        // Blocked-date exclusion is enforced client-side (the tutor's blocked ranges are
+        // only ever kept in browser memory, never persisted) — here we only guard against
+        // a real, already-confirmed booking actually overlapping the requested time.
+        var dates = dto.Slots.Select(s => s.Date).Distinct().ToList();
+        var confirmedClasses = await _context.Bookings
+            .Where(b => b.TutorId == id && b.Status == "confirmed")
+            .SelectMany(b => b.Classes)
+            .Where(c => dates.Contains(c.Date))
+            .Select(c => new { c.Date, c.Time })
+            .ToListAsync();
+
+        var maxStudents = dto.ClassSize == "one-to-many" ? Math.Max(2, dto.MaxStudents) : 1;
+        var createdIds = new List<int>();
+
+        foreach (var slot in dto.Slots)
+        {
+            var newStart = ParseClockMinutes(slot.StartTime);
+            var newEnd = ParseClockMinutes(slot.EndTime);
+            if (newStart == null || newEnd == null)
+                return BadRequest(new { message = $"Invalid time for {slot.Date}." });
+            var end = newEnd <= newStart ? newEnd.Value + 24 * 60 : newEnd.Value;
+
+            var overlapsConfirmed = confirmedClasses.Where(c => c.Date == slot.Date).Any(c =>
+            {
+                var range = ParseTimeRangeMinutes(c.Time);
+                return range != null && newStart < range.Value.End && range.Value.Start < end;
+            });
+            if (overlapsConfirmed)
+                return BadRequest(new { message = $"You already have a confirmed class on {slot.Date} that overlaps this time." });
+
+            var newSlot = new TutorTimeSlot
+            {
+                TutorId = id,
+                Day = slot.Date,
+                Time = slot.StartTime,
+                EndTime = slot.EndTime,
+                Status = "Available",
+                DurationMinutes = slot.DurationMinutes ?? dto.DurationMinutes,
+                Mode = dto.Mode,
+                Subject = dto.Subject,
+                Level = dto.Level,
+                Country = dto.Country,
+                ClassSize = dto.ClassSize,
+                MaxStudents = maxStudents,
+                ConfirmedCount = 0,
+                IsFull = false,
+                PricePerLesson = dto.PricePerLesson
+            };
+            _context.TutorTimeSlots.Add(newSlot);
+            await _context.SaveChangesAsync();
+            createdIds.Add(newSlot.Id);
+        }
+
+        return Ok(new { slotIds = createdIds });
+    }
+
     [HttpPost("{id}/slots")]
     [Authorize]
     public async Task<IActionResult> AddSlot(int id, [FromBody] AddTimeSlotDto dto)
@@ -453,7 +668,13 @@ public class TutorsController : ControllerBase
         IsVerified = t.IsVerified,
         IsOnline = t.IsOnline,
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
-        Timetable = t.TimeSlots.Select(s => new TimeSlotDto { Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId }).ToList(),
+        Timetable = t.TimeSlots.Select(s => new TimeSlotDto
+        {
+            Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId,
+            EndTime = s.EndTime, Mode = s.Mode, Subject = s.Subject, Level = s.Level, Country = s.Country,
+            ClassSize = s.ClassSize, MaxStudents = s.MaxStudents, ConfirmedCount = s.ConfirmedCount,
+            IsFull = s.IsFull, PricePerLesson = s.PricePerLesson
+        }).ToList(),
         Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
     };
 }

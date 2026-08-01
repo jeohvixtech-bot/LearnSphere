@@ -71,7 +71,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.rescheduleSuccess = false;
 
   self.chatText = '';
-  self.selectedCalDay = new Date().getDate();
+  self.selectedCalDays = [];
   var _now = new Date();
   self.calYear = _now.getFullYear();
   self.calMonth = _now.getMonth(); // 0-indexed
@@ -91,6 +91,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
           : []
       };
       rebuildModePools(res.data.modes);
+      rebuildSetupClassUniqueSubjects();
       maybeInitChat();
     });
     BookingService.getAll().then(function (res) {
@@ -249,6 +250,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.blockedRanges = [];
   self.blockConflicts = [];
   self.blockOverlapError = '';
+  self.blockPresetWarning = '';
 
   function parseLocalDate(val) {
     if (!val) return new Date(NaN);
@@ -449,13 +451,28 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       return;
     }
 
+    // Preset (Flow B) slots in the newly-blocked range: one with active bookings just
+    // gets a heads-up (existing students are unaffected, it just won't take new ones);
+    // one nobody has booked yet is quietly removed since it'll never be filled now.
+    self.blockPresetWarning = '';
+    (self.tutor.timetable || []).forEach(function (slot) {
+      if (!slot.mode) return; // not a preset slot
+      var d = parseLocalDate(slot.day);
+      if (d < start || d > end) return;
+      if (slot.confirmedCount > 0 && !slot.isFull) {
+        self.blockPresetWarning = 'This date has active class bookings. Blocking it will not affect existing students but no new bookings will be accepted.';
+      } else if (slot.confirmedCount === 0 && !slot.isFull) {
+        TutorService.deleteSlot(self.tutor.id, slot.id);
+      }
+    });
+
     self.blockConflicts = [];
     ScheduleService.addBlock(self.tutor.id, s, e); // normalises to YYYY-MM-DD strings
     self.blockForm.startDate = '';
     self.blockForm.endDate = '';
   };
 
-  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; };
+  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; self.blockPresetWarning = ''; };
 
   self.removeBlock = function (idx) {
     self.blockedRanges.splice(idx, 1);
@@ -490,13 +507,13 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.prevMonth = function () {
     if (self.calMonth === 0) { self.calMonth = 11; self.calYear--; }
     else { self.calMonth--; }
-    self.selectedCalDay = 0;
+    self.selectedCalDays = [];
   };
 
   self.nextMonth = function () {
     if (self.calMonth === 11) { self.calMonth = 0; self.calYear++; }
     else { self.calMonth++; }
-    self.selectedCalDay = 0;
+    self.selectedCalDays = [];
   };
 
   self.calDaysArray = function () {
@@ -520,6 +537,20 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     return self.calYear + '-' + m + '-' + d;
   }
 
+  // Multi-date selection for "Setup class" (up to 5 dates at once). Blocked/past days
+  // can't be selected — same rule the single-day calendar already enforced.
+  self.toggleCalDay = function (d) {
+    if (!d || self.isPastDay(d) || self.isBlocked(d)) return;
+    var idx = self.selectedCalDays.indexOf(d);
+    if (idx > -1) { self.selectedCalDays.splice(idx, 1); return; }
+    if (self.selectedCalDays.length >= 5) return;
+    self.selectedCalDays.push(d);
+  };
+
+  self.isCalDaySelected = function (d) { return self.selectedCalDays.indexOf(d) > -1; };
+
+  self.resetCalDaySelection = function () { self.selectedCalDays = []; };
+
   self.bookingsOnDay = function (dayNum) {
     if (!self.tutor || !dayNum) return [];
     var s = calDayStr(dayNum);
@@ -537,6 +568,304 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.confirmedOnDay = function (dayNum) {
     return self.bookingsOnDay(dayNum).filter(function (b) { return b.status === 'confirmed'; });
+  };
+
+  // A day's dot reflects ALL bookings that day, not just the first one found —
+  // any unpaid booking takes priority (signals action needed) over an all-paid day.
+  self.dayHasUnpaidBooking = function (dayNum) {
+    return self.bookingsOnDay(dayNum).some(function (b) { return !self.isPaid(b.id); });
+  };
+
+  self.dayAllBookingsPaid = function (dayNum) {
+    var list = self.bookingsOnDay(dayNum);
+    return list.length > 0 && list.every(function (b) { return self.isPaid(b.id); });
+  };
+
+  // Preset (tutor-published) class slots on a given day — these are separate from
+  // actual bookings: a slot only becomes a booking once a parent books it. Sourced
+  // from self.tutor.timetable, which includes every TutorTimeSlot for this tutor;
+  // slot.mode set is what distinguishes a preset-class slot from a plain
+  // availability block (see the same check in confirmBlock() above).
+  self.publishedSlotsOnDay = function (dayNum) {
+    if (!self.tutor || !self.tutor.timetable || !dayNum) return [];
+    var s = calDayStr(dayNum);
+    return self.tutor.timetable.filter(function (slot) {
+      return slot.mode && slot.day === s;
+    });
+  };
+
+  // ── Setup Class (tutor-preset slots, Flow B) ──────────────────────────
+  self.setupClassOpen = false;
+  self.setupClassSaving = false;
+  self.setupClassError = '';
+  self.setupClassForm = {
+    mode: '', subject: '', level: '', country: '',
+    classSize: 'one-to-one', maxStudents: 1,
+    pricePerLesson: 0
+  };
+  self.setupClassSlots = {}; // { "YYYY-MM-DD": ["09:00 AM", ...], ... }
+
+  // Grid rows are 30-minute slots (8:00 AM – 9:30 PM) — each row IS an exact,
+  // directly-selectable start time, expressed as total minutes since midnight.
+  self.setupClassGridSlots = [];
+  for (var _gm = 8 * 60; _gm <= 21 * 60 + 30; _gm += 30) self.setupClassGridSlots.push(_gm);
+
+  self.setupClassGridSlotLabel = function (totalMin) {
+    return clockFromMinutes(totalMin);
+  };
+
+  function clockFromMinutes(totalMin) {
+    var t = ((totalMin % (24 * 60)) + 24 * 60) % (24 * 60);
+    var h = Math.floor(t / 60);
+    var m = t % 60;
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
+  }
+
+  self.setupClassSelectedDates = function () {
+    return self.selectedCalDays.slice().sort(function (a, b) { return a - b; }).map(calDayStr);
+  };
+
+  self.setupClassSelectedDatesLabel = function () {
+    var days = self.selectedCalDays.slice().sort(function (a, b) { return a - b; });
+    if (!days.length) return '';
+    return days.join(', ') + ' · ' + self.calYear;
+  };
+
+  self.openSetupClass = function () {
+    if (!self.selectedCalDays.length || !self.tutor) return;
+    rebuildSetupClassUniqueSubjects();
+    self.setupClassSlots = {};
+    self.setupClassSelectedDates().forEach(function (key) { self.setupClassSlots[key] = []; });
+    self.setupClassForm.mode = self.tutor.modes && self.tutor.modes[0] ? self.tutor.modes[0] : '';
+    var firstOffering = self.tutor.offerings && self.tutor.offerings[0];
+    self.setupClassForm.subject = firstOffering ? firstOffering.subject : '';
+    self.setupClassForm.level = firstOffering ? firstOffering.level : '';
+    self.setupClassForm.country = firstOffering ? firstOffering.country : '';
+    self.setupClassForm.classSize = 'one-to-one';
+    self.setupClassForm.maxStudents = 1;
+    self.setupClassError = '';
+    self._slotDrag = null;
+    self.setupClassOpen = true;
+  };
+
+  self.closeSetupClass = function () { self.setupClassOpen = false; self._slotDrag = null; };
+
+  // Grid rows carry their own exact time (30-min resolution) — a direct conversion,
+  // no separate start-time spinner needed (removed along with the now-unused
+  // Duration dropdown and time-summary pill; each class's time now comes entirely
+  // from which grid cell(s) were clicked/dragged, see makeSlotRange below).
+  self.setupClassTimeAt = function (totalMin) {
+    return clockFromMinutes(totalMin);
+  };
+
+  // setupClassSlots[dateStr] holds an array of *ranges* — { startMin, endMin, start, end } —
+  // not individual 30-min entries. Each range is ONE class: dragging across several grid
+  // cells combines them into a single range spanning the first cell's start time to the
+  // last cell's end time, rather than creating one class per cell.
+  function makeSlotRange(startMin, endMin) {
+    return { startMin: startMin, endMin: endMin, start: clockFromMinutes(startMin), end: clockFromMinutes(endMin) };
+  }
+
+  self.isSetupSlotSelected = function (dateStr, totalMin) {
+    return (self.setupClassSlots[dateStr] || []).some(function (r) {
+      return totalMin >= r.startMin && totalMin < r.endMin;
+    });
+  };
+
+  // The combined "start – end" label is only shown on the first cell of a range,
+  // since the cells after it belong to the same class, not separate ones.
+  self.setupSlotRangeLabel = function (dateStr, totalMin) {
+    var r = (self.setupClassSlots[dateStr] || []).find(function (r) { return r.startMin === totalMin; });
+    return r ? (r.start + ' – ' + r.end) : '';
+  };
+
+  function parseTimeRangeMinutesForBooked(timeStr) {
+    var matches = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi);
+    if (!matches || matches.length < 2) return null;
+    function toMin(t) {
+      var mm = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      var hh = parseInt(mm[1], 10) % 12, min = parseInt(mm[2], 10);
+      if (mm[3].toUpperCase() === 'PM') hh += 12;
+      return hh * 60 + min;
+    }
+    var start = toMin(matches[0]), end = toMin(matches[1]);
+    if (end <= start) end += 24 * 60;
+    return { start: start, end: end };
+  }
+
+  // Marks a grid cell as unavailable if it overlaps EITHER an existing confirmed/
+  // countered booking OR a preset slot this tutor has already published (whether
+  // booked or not) — both count as "an existing class", so neither can be
+  // double-booked over from this grid.
+  self.isSetupSlotBooked = function (dateStr, totalMin) {
+    if (!self.tutor) return false;
+    var slotStart = totalMin, slotEnd = totalMin + 30;
+
+    var overlapsBooking = self.bookings.some(function (b) {
+      if (b.tutorId !== self.tutor.id || (b.status !== 'confirmed' && b.status !== 'countered')) return false;
+      return (b.classes || []).some(function (c) {
+        if (c.date !== dateStr) return false;
+        var range = parseTimeRangeMinutesForBooked(c.time);
+        return range && slotStart < range.end && range.start < slotEnd;
+      });
+    });
+    if (overlapsBooking) return true;
+
+    return (self.tutor.timetable || []).some(function (slot) {
+      if (!slot.mode || slot.day !== dateStr) return false;
+      var range = parseTimeRangeMinutesForBooked(slot.time + ' - ' + (slot.endTime || slot.time));
+      return range && slotStart < range.end && range.start < slotEnd;
+    });
+  };
+
+  self.toggleSetupSlot = function (dateStr, totalMin) {
+    if (self.isSetupSlotBooked(dateStr, totalMin)) return;
+    var ranges = self.setupClassSlots[dateStr] || [];
+    var idx = ranges.findIndex(function (r) { return totalMin >= r.startMin && totalMin < r.endMin; });
+    if (idx > -1) ranges.splice(idx, 1);
+    else ranges.push(makeSlotRange(totalMin, totalMin + 30));
+    self.setupClassSlots[dateStr] = ranges;
+  };
+
+  // ── Drag-to-select a time range on the Setup Class grid ──────────────
+  // A plain click (mousedown+mouseup on the same cell, no drag) still toggles
+  // just that one cell. Dragging across multiple cells in the same date column
+  // combines the whole span into ONE class — first cell's start time to last
+  // cell's end time — rather than one class per cell. The drag can't extend
+  // through an already-occupied cell (existing booking or published slot), so a
+  // combined range never silently overlaps something that's already there. Drag
+  // is confined to a single date column; moving into a different column is ignored.
+  self._slotDrag = null;
+
+  function slotRangeHasOccupiedCell(dateStr, loMin, hiMinExclusive) {
+    for (var m = loMin; m < hiMinExclusive; m += 30) {
+      if (self.isSetupSlotBooked(dateStr, m)) return true;
+    }
+    return false;
+  }
+
+  self.startSlotDrag = function (dateStr, totalMin, $event) {
+    if ($event) $event.preventDefault();
+    self._slotDrag = { dateStr: dateStr, startSlot: totalMin, endSlot: totalMin };
+  };
+
+  self.dragOverSlot = function (dateStr, totalMin) {
+    if (!self._slotDrag || dateStr !== self._slotDrag.dateStr) return;
+    var lo = Math.min(self._slotDrag.startSlot, totalMin);
+    var hi = Math.max(self._slotDrag.startSlot, totalMin);
+    if (slotRangeHasOccupiedCell(dateStr, lo, hi + 30)) return; // don't drag through an occupied cell
+    self._slotDrag.endSlot = totalMin;
+  };
+
+  self.isSetupSlotDragPreview = function (dateStr, totalMin) {
+    if (!self._slotDrag || dateStr !== self._slotDrag.dateStr) return false;
+    var lo = Math.min(self._slotDrag.startSlot, self._slotDrag.endSlot);
+    var hi = Math.max(self._slotDrag.startSlot, self._slotDrag.endSlot);
+    return totalMin >= lo && totalMin <= hi;
+  };
+
+  self.endSlotDrag = function () {
+    if (!self._slotDrag) return;
+    var d = self._slotDrag;
+    self._slotDrag = null;
+    var lo = Math.min(d.startSlot, d.endSlot);
+    var hi = Math.max(d.startSlot, d.endSlot) + 30; // exclusive upper bound, covers the last cell's full 30 min
+
+    if (lo === hi - 30) {
+      // Plain click, no real drag — toggle behaviour (existing single-cell semantics)
+      self.toggleSetupSlot(d.dateStr, lo);
+      return;
+    }
+    // Combine into one range spanning the whole drag. Any existing ranges the new
+    // span touches are replaced by it (redefining that stretch of time), rather
+    // than kept alongside it — avoids overlapping classes on the same date.
+    var ranges = (self.setupClassSlots[d.dateStr] || []).filter(function (r) {
+      return r.endMin <= lo || r.startMin >= hi;
+    });
+    ranges.push(makeSlotRange(lo, hi));
+    self.setupClassSlots[d.dateStr] = ranges;
+  };
+
+  self.setupClassTotalSlots = function () {
+    return Object.keys(self.setupClassSlots).reduce(function (sum, k) {
+      return sum + (self.setupClassSlots[k] || []).length;
+    }, 0);
+  };
+
+  self.onClassSizeChange = function () {
+    if (self.setupClassForm.classSize === 'one-to-one') self.setupClassForm.maxStudents = 1;
+    else if (!self.setupClassForm.maxStudents || self.setupClassForm.maxStudents < 2) self.setupClassForm.maxStudents = 2;
+  };
+
+  // Rebuilt once (not called from ng-repeat directly) — a function called from the
+  // view that allocates new objects every digest never stabilizes: ng-repeat tracks
+  // items by identity by default, so a fresh array/objects every digest tears down
+  // and rebuilds every <option>, which was resetting the Subject <select> back to
+  // blank on every digest (same trap computeContactableParents() above avoids).
+  self.setupClassUniqueSubjectsList = [];
+
+  function rebuildSetupClassUniqueSubjects() {
+    if (!self.tutor || !self.tutor.offerings) { self.setupClassUniqueSubjectsList = []; return; }
+    var seen = {}, out = [];
+    self.tutor.offerings.forEach(function (o) {
+      var key = o.subject + ' (' + o.level + ')';
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({ key: key, subject: o.subject, level: o.level, country: o.country });
+    });
+    self.setupClassUniqueSubjectsList = out;
+  }
+
+  self.onSubjectChange = function () {
+    var match = self.setupClassUniqueSubjectsList.find(function (o) { return o.subject === self.setupClassForm.subject; });
+    if (match) { self.setupClassForm.level = match.level; self.setupClassForm.country = match.country; }
+  };
+
+  self.submitSetupClass = function () {
+    self.setupClassError = '';
+    if (self.setupClassTotalSlots() === 0) { self.setupClassError = 'Please select at least one time slot.'; return; }
+    if (!self.setupClassForm.mode) { self.setupClassError = 'Please select a teaching mode.'; return; }
+    if (!self.setupClassForm.subject) { self.setupClassError = 'Please select a subject.'; return; }
+    if (!self.setupClassForm.pricePerLesson || self.setupClassForm.pricePerLesson <= 0) {
+      self.setupClassError = 'Please enter a price per lesson.';
+      return;
+    }
+
+    // Each range already carries its own accurate start/end (first cell's start
+    // through last cell's end for a dragged/combined class), so its own span is
+    // sent as-is rather than derived from the form's single duration dropdown —
+    // that duration only applies to a plain single-cell click/selection.
+    var slots = [];
+    Object.keys(self.setupClassSlots).forEach(function (dateStr) {
+      (self.setupClassSlots[dateStr] || []).forEach(function (r) {
+        slots.push({ date: dateStr, startTime: r.start, endTime: r.end, durationMinutes: r.endMin - r.startMin });
+      });
+    });
+
+    self.setupClassSaving = true;
+    TutorService.setupClass(self.tutor.id, {
+      slots: slots,
+      mode: self.setupClassForm.mode,
+      subject: self.setupClassForm.subject,
+      level: self.setupClassForm.level,
+      country: self.setupClassForm.country,
+      classSize: self.setupClassForm.classSize,
+      maxStudents: self.setupClassForm.maxStudents,
+      pricePerLesson: self.setupClassForm.pricePerLesson
+    }).then(function () {
+      self.setupClassSaving = false;
+      self.setupClassOpen = false;
+      self.selectedCalDays = [];
+      TutorService.getByUser(user.userId).then(function (res) {
+        self.tutor = res.data;
+        rebuildSetupClassUniqueSubjects();
+      });
+    }).catch(function (err) {
+      self.setupClassSaving = false;
+      self.setupClassError = (err.data && err.data.message) ? err.data.message : 'Failed to save. Please try again.';
+    });
   };
 
   self.getInvoice = function (bookingId) {
@@ -860,6 +1189,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       return TutorService.updateModes(self.tutor.id, modes);
     }).then(function (res) {
       self.tutor = res.data;
+      rebuildSetupClassUniqueSubjects();
       self.profileSuccess = true;
       $timeout(function () { self.profileSuccess = false; }, 3000);
     }, function () {

@@ -6,14 +6,21 @@
         <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
       </div>
       <nav class="sidebar-nav">
-        <a href="#!/tutor/overview" class="nav-item active">📋 Overview & Schedules</a>
-        <a href="#!/tutor/chat" class="nav-item">💬 Direct Messages</a>
+        <a href="#!/tutor/overview" class="nav-item active">
+          <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
+        </a>
+        <a href="#!/tutor/chat" class="nav-item">
+          <i class="ti ti-message" aria-hidden="true"></i> Direct messages
+        </a>
       </nav>
     </aside>
 
     <!-- Calendar Legend -->
     <div class="card calendar-legend" ng-if="vm.activeTab === 'overview'">
-      <h4>📖 Calendar Legend</h4>
+      <h4 style="font-size:13px; font-weight:500; color:#64748b; margin-bottom:10px;">
+        <i class="ti ti-book-2" style="font-size:14px; vertical-align:-2px; margin-right:5px;" aria-hidden="true"></i>
+        Calendar legend
+      </h4>
       <div class="legend-grid">
         <div class="legend-item"><span class="legend-swatch legend-selected"></span> Selected Day</div>
         <div class="legend-item"><span class="legend-swatch legend-paid"></span> Paid Session</div>
@@ -22,6 +29,7 @@
         <div class="legend-item"><span class="legend-swatch legend-holiday-sg"></span> SG Public Holiday</div>
         <div class="legend-item"><span class="legend-swatch legend-blocked">🚫</span> Blocked by You</div>
         <div class="legend-item"><span class="legend-swatch legend-past"></span> Past Date</div>
+        <div class="legend-item"><span class="legend-swatch legend-published"></span> Your Published Slots</div>
       </div>
     </div>
   </div>
@@ -30,8 +38,12 @@
 
     <!-- Tab Bar -->
     <div class="tab-bar">
-      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'overview'}" ng-click="vm.activeTab = 'overview'">📋 Overview & Schedules</button>
-      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'profile'}" ng-click="vm.activeTab = 'profile'">✏️ Edit Profile</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'overview'}" ng-click="vm.activeTab = 'overview'">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
+      </button>
+      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'profile'}" ng-click="vm.activeTab = 'profile'">
+        <i class="ti ti-edit" aria-hidden="true"></i> Edit profile
+      </button>
     </div>
 
     <!-- ===== OVERVIEW TAB ===== -->
@@ -45,9 +57,15 @@
         <div>
           <h2>
             {{ vm.tutor.name }}
-            <span class="badge-gold">🏆 Gold Teacher</span>
-            <span class="badge-verified" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">✓ Verified</span>
-            <span class="badge-pending" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">⏳ Pending</span>
+            <span class="badge-gold">
+              <i class="ti ti-trophy" style="font-size:12px; vertical-align:-1px;" aria-hidden="true"></i> Gold teacher
+            </span>
+            <span class="badge-verified" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">
+              <i class="ti ti-check" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i> Verified
+            </span>
+            <span class="badge-pending" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">
+              <i class="ti ti-clock" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i> Pending
+            </span>
             <button type="button" class="status-switch" ng-class="{'is-online': vm.tutor.isOnline}" ng-click="vm.toggleOnlineStatus()"
               title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
               <span class="status-switch-knob"></span>{{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
@@ -74,7 +92,7 @@
 
     <!-- Pending Booking Requests -->
     <div class="card" ng-if="vm.pendingRequests().length">
-      <h3><span class="dot-amber"></span> Parents Booking Requests ({{ vm.pendingRequests().length }})</h3>
+      <h3><i class="ti ti-clock" style="font-size:16px; color:#f59e0b;" aria-hidden="true"></i> Parents booking requests ({{ vm.pendingRequests().length }})</h3>
       <div class="request-list">
         <div class="request-item" ng-repeat="b in vm.pendingRequests()">
           <div>
@@ -155,24 +173,31 @@
     <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
       <div class="card-header">
         <span class="label-tag indigo">TUTOR SCHEDULER</span>
-        <h3>Calendar & Payout Coordinator</h3>
+        <h3><i class="ti ti-calendar" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Calendar & Payout Coordinator</h3>
         <div class="cal-nav-row">
           <button class="btn-outline sm" ng-click="vm.prevMonth()">‹ Prev</button>
-          <span class="cal-month-label">📆 {{ vm.calMonthName() }} {{ vm.calYear }}</span>
+          <span class="cal-month-label"><i class="ti ti-calendar" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ vm.calYear }}</span>
           <button class="btn-outline sm" ng-click="vm.nextMonth()">Next ›</button>
+          <button class="btn-primary sm" ng-click="vm.openSetupClass()" ng-disabled="vm.selectedCalDays.length === 0">
+            <i class="ti ti-calendar-plus"></i> Setup class
+          </button>
+          <button class="btn-outline sm" ng-click="vm.resetCalDaySelection()" ng-disabled="vm.selectedCalDays.length === 0">
+            <i class="ti ti-x"></i> Reset
+          </button>
         </div>
       </div>
+      <p class="text-muted" style="margin:-6px 0 8px">{{ vm.selectedCalDays.length }} of 5 dates selected</p>
       <div class="cal-stats-row">
         <div class="cal-stat amber">
           <small>Pending Confirmation</small>
           <strong>{{ vm.pendingRequests().length }} Session(s)</strong>
-          <span ng-if="vm.pendingRequests().length" class="pulse-badge">⏳ Action Required</span>
-          <span ng-if="!vm.pendingRequests().length" class="ok-badge">✓ All Clear</span>
+          <span ng-if="vm.pendingRequests().length" class="pulse-badge"><i class="ti ti-clock" style="font-size:11px;" aria-hidden="true"></i> Action required</span>
+          <span ng-if="!vm.pendingRequests().length" class="ok-badge"><i class="ti ti-check" style="font-size:11px;" aria-hidden="true"></i> All clear</span>
         </div>
         <div class="cal-stat indigo">
-          <small ng-if="vm.selectedCalDay">Sessions on {{ vm.calMonthName() }} {{ vm.selectedCalDay }}</small>
-          <small ng-if="!vm.selectedCalDay">Select a day</small>
-          <strong>{{ vm.confirmedOnDay(vm.selectedCalDay).length }} Lesson(s)</strong>
+          <small ng-if="vm.selectedCalDays[0]">Sessions on {{ vm.calMonthName() }} {{ vm.selectedCalDays[0] }}</small>
+          <small ng-if="!vm.selectedCalDays[0]">Select a day</small>
+          <strong>{{ vm.confirmedOnDay(vm.selectedCalDays[0]).length }} Lesson(s)</strong>
         </div>
       </div>
 
@@ -180,43 +205,64 @@
       <div class="cal-grid">
         <span class="cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
         <button class="cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
-          ng-click="vm.selectedCalDay = d"
+          ng-click="vm.toggleCalDay(d)"
           ng-disabled="vm.isPastDay(d)"
           ng-class="{
-            'selected': vm.selectedCalDay === d,
+            'selected': vm.isCalDaySelected(d),
             'past-day': vm.isPastDay(d),
             'blocked': !vm.isPastDay(d) && vm.isBlocked(d),
             'public-holiday-sg': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
             'public-holiday': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d) && !vm.isSgHoliday(d),
-            'has-paid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.isPaid(vm.bookingsOnDay(d)[0].id),
-            'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && !vm.isPaid(vm.bookingsOnDay(d)[0].id)
+            'has-paid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayAllBookingsPaid(d),
+            'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayHasUnpaidBooking(d)
           }">
           <span class="day-num">{{ d }}</span>
-          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)">🚫</span>
+          <span class="day-published-dot" ng-if="!vm.isPastDay(d) && vm.publishedSlotsOnDay(d).length" title="{{ vm.publishedSlotsOnDay(d).length }} published slot(s)"></span>
+          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)"><i class="ti ti-ban" style="font-size:10px; color:#ef4444;" aria-hidden="true"></i></span>
           <span class="day-holiday-name" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
           <span class="day-label" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length">
-            {{ vm.isPaid(vm.bookingsOnDay(d)[0].id) ? '🟢' : '🔒' }}
+            <i class="ti" ng-class="vm.dayHasUnpaidBooking(d) ? 'ti-lock' : 'ti-circle-check'"
+              ng-style="{color: vm.dayHasUnpaidBooking(d) ? '#f59e0b' : '#16a34a'}"
+              style="font-size:9px;" aria-hidden="true"></i>
           </span>
         </button>
       </div>
 
-      <div class="day-detail" ng-if="vm.selectedCalDay">
-        <h4>📅 Scheduled Classes for {{ vm.calMonthName() }} {{ vm.selectedCalDay }}, {{ vm.calYear }}</h4>
-        <p ng-if="!vm.bookingsOnDay(vm.selectedCalDay).length" class="empty-state">No lessons on this day.</p>
-        <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(vm.selectedCalDay)">
+      <div class="day-detail" ng-if="vm.selectedCalDays[0]">
+        <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> Scheduled Classes for {{ vm.calMonthName() }} {{ vm.selectedCalDays[0] }}, {{ vm.calYear }}</h4>
+        <p ng-if="!vm.bookingsOnDay(vm.selectedCalDays[0]).length" class="empty-state">No lessons on this day.</p>
+        <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(vm.selectedCalDays[0])">
           <div class="booking-detail-header">
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>Child: {{ b.studentName }}</strong>
-            <p>{{ vm.classOnDay(b, vm.selectedCalDay).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
+            <p>{{ vm.classOnDay(b, vm.selectedCalDays[0]).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
           </div>
           <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
           <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
+        </div>
+
+        <div ng-if="vm.publishedSlotsOnDay(vm.selectedCalDays[0]).length">
+          <h5 class="section-label" style="margin-top:14px">
+            <span class="published-dot-inline"></span> Your Published Slots
+          </h5>
+          <div class="booking-detail-card published-slot-card" ng-repeat="slot in vm.publishedSlotsOnDay(vm.selectedCalDays[0])">
+            <div class="booking-detail-header">
+              <span class="badge-subject">{{ slot.subject }}</span>
+              <strong>{{ slot.time | hhmma }} – {{ slot.endTime | hhmma }}</strong>
+              <p>{{ slot.mode }} · {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }} · ${{ slot.pricePerLesson }}/lesson</p>
+            </div>
+            <p ng-if="slot.isFull" class="text-danger">Full — no more bookings accepted</p>
+            <p ng-if="!slot.isFull" class="text-muted">Open for booking · not yet claimed by a parent</p>
+          </div>
         </div>
       </div>
 
       <!-- Block Unavailable Dates -->
       <div class="block-dates-panel">
-        <div class="block-dates-title">🚫 Block Unavailable Date Range</div>
+        <div class="block-dates-title">
+          <i class="ti ti-ban" style="font-size:15px; color:#ef4444;" aria-hidden="true"></i>
+          Block unavailable date range
+        </div>
         <div class="block-dates-form">
           <div class="block-dates-field">
             <label>Start Date <span class="text-danger">*</span></label>
@@ -243,6 +289,12 @@
           <p class="block-conflict-sub">{{ vm.blockOverlapError }}</p>
         </div>
 
+        <!-- Active preset (Flow B) class bookings in the newly-blocked range -->
+        <div class="block-conflict-alert" ng-if="vm.blockPresetWarning">
+          <div class="block-conflict-header">⚠️ Active class bookings in this range</div>
+          <p class="block-conflict-sub">{{ vm.blockPresetWarning }}</p>
+        </div>
+
         <!-- Conflict alert -->
         <div class="block-conflict-alert" ng-if="vm.blockConflicts.length">
           <div class="block-conflict-header">
@@ -266,6 +318,112 @@
             <span class="blocked-range-icon">🚫</span>
             <span class="blocked-range-dates">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
             <button class="btn-link" ng-click="vm.removeBlock($index)">✕ Remove</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Setup Class Modal -->
+    <div class="modal-overlay" ng-if="vm.setupClassOpen">
+      <div class="modal-card setup-class-modal">
+        <div class="modal-header">
+          <div>
+            <h3>Setup class</h3>
+            <p class="text-muted">{{ vm.setupClassSelectedDatesLabel() }}</p>
+          </div>
+          <button type="button" class="modal-close" ng-click="vm.closeSetupClass()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="setup-grid-wrap" ng-mouseup="vm.endSlotDrag()" ng-mouseleave="vm._slotDrag = null">
+            <p class="text-muted" style="margin:0 0 8px;font-size:11px">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              Click a single slot, or click-and-drag down a column to combine several into one class (first slot's start time to last slot's end time). Grayed-out slots are already-scheduled classes or published slots you've already set up.
+            </p>
+            <table class="setup-grid">
+              <thead>
+                <tr>
+                  <th class="setup-grid-timecol"></th>
+                  <th ng-repeat="dateStr in vm.setupClassSelectedDates()">{{ dateStr | dmy }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="slot in vm.setupClassGridSlots">
+                  <td class="setup-grid-timecol">{{ vm.setupClassGridSlotLabel(slot) }}</td>
+                  <td ng-repeat="dateStr in vm.setupClassSelectedDates()"
+                    class="setup-grid-cell"
+                    ng-class="{
+                      'setup-cell-selected': vm.isSetupSlotSelected(dateStr, slot),
+                      'setup-cell-booked': vm.isSetupSlotBooked(dateStr, slot),
+                      'setup-cell-dragging': !vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotDragPreview(dateStr, slot)
+                    }"
+                    ng-mousedown="!vm.isSetupSlotBooked(dateStr, slot) && vm.startSlotDrag(dateStr, slot, $event)"
+                    ng-mouseenter="vm.dragOverSlot(dateStr, slot)">
+                    <span ng-if="vm.isSetupSlotBooked(dateStr, slot)"><i class="ti ti-lock"></i> Booked</span>
+                    <span ng-if="!vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotSelected(dateStr, slot)">
+                      <i class="ti ti-check"></i>
+                      <span ng-if="vm.setupSlotRangeLabel(dateStr, slot)">{{ vm.setupSlotRangeLabel(dateStr, slot) }}</span>
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="setup-inputs-panel">
+            <div class="setup-inputs-row-4">
+              <div class="form-group">
+                <label>Teaching Mode</label>
+                <select ng-model="vm.setupClassForm.mode">
+                  <option value="">— Mode —</option>
+                  <option ng-repeat="m in vm.tutor.modes" value="{{ m }}">{{ m }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Subject</label>
+                <select ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()">
+                  <option value="">— Subject —</option>
+                  <option ng-repeat="o in vm.setupClassUniqueSubjectsList" value="{{ o.subject }}">{{ o.key }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Class Size</label>
+                <div class="segmented-toggle">
+                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-one'}"
+                    ng-click="vm.setupClassForm.classSize = 'one-to-one'; vm.onClassSizeChange()">1-to-1</button>
+                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-many'}"
+                    ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">1-to-many</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Max Students</label>
+                <input type="number" ng-model="vm.setupClassForm.maxStudents"
+                  ng-disabled="vm.setupClassForm.classSize === 'one-to-one'"
+                  min="2" max="30" />
+                <span class="text-muted" style="font-size:11px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for 1-to-1</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Price per lesson (RM / SGD based on country)</label>
+              <input type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
+            </div>
+
+            <p class="field-error" ng-if="vm.setupClassError">{{ vm.setupClassError }}</p>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <div class="setup-footer-legend">
+            <span><span class="legend-dot selected"></span> Selected</span>
+            <span><span class="legend-dot booked"></span> Booked</span>
+            <span class="text-muted">{{ vm.setupClassTotalSlots() }} class(es) selected across {{ vm.setupClassSelectedDates().length }} date(s)</span>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn-outline" ng-click="vm.closeSetupClass()">Cancel</button>
+            <button type="button" class="btn-primary" ng-click="vm.submitSetupClass()" ng-disabled="vm.setupClassSaving">
+              {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
+            </button>
           </div>
         </div>
       </div>
@@ -348,7 +506,7 @@
 
     <!-- Confirmed Classes -->
     <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking && !vm.rescheduleBooking">
-      <h3>Confirmed Classes Checklist</h3>
+      <h3><i class="ti ti-checkbox" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Confirmed Classes Checklist</h3>
       <p ng-if="!vm.confirmedClasses().length" class="empty-state">No active class appointments.</p>
       <div class="session-item" ng-repeat="b in vm.confirmedClasses()"
         ng-class="{'session-conflicted': vm.isTutorBookingConflicted(b)}">
@@ -389,13 +547,16 @@
 
     <!-- Class Reports Portal -->
     <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
-      <h3>Class Reports Portal</h3>
+      <h3><i class="ti ti-file-text" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Class Reports Portal</h3>
 
       <!-- Needs reports -->
       <div ng-if="vm.needsReport().length">
         <div class="report-needed" ng-repeat="b in vm.needsReport()">
           <div>
-            <span class="badge-amber">REPORT REQUIRED</span>
+            <span class="badge-amber">
+              <i class="ti ti-alert-circle" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+              Report required
+            </span>
             <strong>{{ b.subject }} — {{ b.classes.length }} class(es)</strong>
             <p>Child: {{ b.studentName }}</p>
           </div>
@@ -598,7 +759,9 @@
               <label>Price per Session ($)</label>
               <input type="number" ng-model="vm.newOffering.price" placeholder="0.00" min="0" step="0.01" />
             </div>
-            <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addOffering()">+ Add Offering</button>
+            <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addOffering()">
+              <i class="ti ti-plus" style="font-size:13px;" aria-hidden="true"></i> Add offering
+            </button>
           </div>
 
           <div class="chip-list" ng-if="vm.profileForm.offerings.length">

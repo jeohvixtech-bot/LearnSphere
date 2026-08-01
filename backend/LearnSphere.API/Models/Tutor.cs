@@ -91,4 +91,18 @@ public class TutorTimeSlot
     public string Time { get; set; } = string.Empty;
     public string Status { get; set; } = "Available"; // Available | Booked
     public int? BookingId { get; set; }
+
+    // Tutor-preset class slots (Flow B) — a slot the tutor publishes ahead of time
+    // that a parent can book directly, without a per-request tutor confirmation step.
+    public string? EndTime { get; set; }
+    public int DurationMinutes { get; set; } = 60;
+    public string? Mode { get; set; }
+    public string? Subject { get; set; }
+    public string? Level { get; set; }
+    public string? Country { get; set; }
+    public string ClassSize { get; set; } = "one-to-one"; // one-to-one | one-to-many
+    public int MaxStudents { get; set; } = 1;
+    public int ConfirmedCount { get; set; } = 0;
+    public bool IsFull { get; set; } = false;
+    public decimal PricePerLesson { get; set; } = 0;
 }

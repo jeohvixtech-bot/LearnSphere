@@ -171,9 +171,11 @@ npx serve . -p 3000
 | POST | `/api/tutors/{id}/slots` | JWT | Add a timetable slot (validates no clash with existing slots) |
 | DELETE | `/api/tutors/{id}/slots/{slotId}` | JWT | Remove a timetable slot |
 | GET | `/api/tutors/preset-slots` | — | List a tutor's published preset class slots matching a student's subject/level/country and preferred modes (Flow B — see `?studentId=`, `?country=`) |
-| POST | `/api/tutors/{id}/setup-class` | JWT (owner) | Publish one or more preset class slots a parent can book directly, no per-request approval |
+| POST | `/api/tutors/{id}/setup-class` | JWT (owner) | Publish one or more preset class slots a parent can book directly, no per-request approval. Each slot in the request may optionally carry its own `durationMinutes`, overriding the request-level default — used when the tutor's UI combines several dragged 30-min grid cells into one longer class |
 
 > To reschedule a class: delete the old slot and add a new one.
+
+> **Known gap:** the parent search page's tutor cards are wired to call `GET /api/tutors/{id}/preset-slots` to show a tutor's published-but-unbooked slots inline, but that route doesn't exist yet — only the student-matched `GET /api/tutors/preset-slots?studentId=` above does. Until a tutor-scoped route is added, that part of the card silently shows "no preset classes."
 
 ### Parents
 
@@ -538,7 +540,7 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 ### Parent
 - Dashboard: upcoming sessions, student progress, active children profiles
 - Add, edit, archive/unarchive, and set teaching-mode preferences for student profiles, with school search (Singapore & Malaysia institutions)
-- Tutor catalog with search/filter by subject, mode, and rating — browse and open a tutor's profile first, then pick the child inside the booking form
+- Tutor catalog with search/filter by subject, mode, and rating — browse and open a tutor's profile first, then pick the child inside the booking form. Each tutor card also shows a preset-class slot strip for next month (grouped by subject, with a hover tooltip listing every date/time and fill status) so a parent can spot an instantly-bookable class without leaving the catalog
 - Favorite tutors for quick access
 - Two booking flows: request a custom session with any tutor (needs their confirmation), or book a tutor's already-published preset class slot directly (Flow B — auto-confirmed, matched to a child's subjects/level and preferred teaching modes)
 - Full booking flow — multi-session support, classes per month, recurring weekly dates
@@ -548,10 +550,11 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 - Notification bell drawer
 
 ### Tutor
-- Interactive calendar (paid = green, unpaid = amber)
+- Interactive calendar (paid = green, unpaid = amber); day dot reflects *all* of a day's bookings, not just the first — any unpaid session takes priority over an all-paid day
 - Accept or counter-propose booking requests; parents can counter-propose back in turn (no round limit)
 - Confirm bookings (auto-generates invoice with INV number)
-- Publish preset class slots parents can book directly, no per-request approval (Flow B)
+- Publish preset class slots parents can book directly, no per-request approval (Flow B) — the Setup Class popup uses a 30-minute grid per selected date; click a single slot, or click-and-drag down a column to combine several into one class (first slot's start to last slot's end). The grid grays out anything already occupied — both real confirmed bookings and the tutor's own previously-published slots — so a drag can't be extended through, or resubmitted over, something that's already there
+- Published-but-unbooked slots show on the main calendar as a pink-purple dot per day, with full detail (time, mode, fill count, price) in that day's detail panel
 - Submit and edit lesson reports (with audit trail)
 - Teaching offerings builder (subject + level + mode + qualification + price)
 - Online/offline visibility switch — going offline immediately hides the profile from parent search and blocks new bookings

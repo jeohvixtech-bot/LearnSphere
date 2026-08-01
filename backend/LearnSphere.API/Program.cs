@@ -220,6 +220,38 @@ using (var scope = app.Services.CreateScope())
             CONSTRAINT `FK_StudentPreferredModes_Students` FOREIGN KEY (`StudentId`) REFERENCES `Students` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
+    // Tutor-preset class slots (Flow B) — a slot the tutor publishes ahead of time
+    // that a parent can book directly without a per-request confirmation step.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `EndTime` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `DurationMinutes` INT NOT NULL DEFAULT 60"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `Mode` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `Subject` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `Level` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `Country` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `ClassSize` VARCHAR(20) NOT NULL DEFAULT 'one-to-one'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `MaxStudents` INT NOT NULL DEFAULT 1"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `ConfirmedCount` INT NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `IsFull` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PricePerLesson` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` ADD COLUMN `BookingType` VARCHAR(20) NOT NULL DEFAULT 'parent-offer'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` ADD COLUMN `PresetSlotId` INT NULL"); } catch { }
+    // Widened from INT — 15-min-interval preset classes (e.g. 90 min) aren't whole hours.
+    // Safe/lossless widen; existing whole-hour values are unaffected.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` MODIFY COLUMN `DurationHours` DOUBLE NOT NULL DEFAULT 1"); } catch { }
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(

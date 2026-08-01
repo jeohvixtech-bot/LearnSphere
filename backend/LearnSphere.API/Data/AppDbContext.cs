@@ -63,6 +63,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(b => b.StudentId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Booking>()
+            .HasOne(b => b.PresetSlot)
+            .WithMany()
+            .HasForeignKey(b => b.PresetSlotId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<BookingClass>()
             .HasOne(bc => bc.Booking)
             .WithMany(b => b.Classes)
@@ -125,6 +131,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Payout>()
             .Property(p => p.Amount)
+            .HasPrecision(10, 2);
+
+        modelBuilder.Entity<TutorTimeSlot>()
+            .Property(s => s.PricePerLesson)
             .HasPrecision(10, 2);
 
         // Filtered unique index: one review per booking (only when BookingId is set)

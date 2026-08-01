@@ -9,11 +9,15 @@ public class Booking
     public Student Student { get; set; } = null!;
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
-    public int DurationHours { get; set; } = 1;
+    public double DurationHours { get; set; } = 1; // widened from int — 15-min-interval preset classes (e.g. 90 min) aren't whole hours
     public string? Message { get; set; }
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = "pending"; // pending|countered|confirmed|completed|cancelled
     public string BookingNumber { get; set; } = string.Empty;
+
+    public string BookingType { get; set; } = "parent-offer"; // parent-offer | tutor-preset
+    public int? PresetSlotId { get; set; }
+    public TutorTimeSlot? PresetSlot { get; set; }
 
     public ICollection<BookingClass> Classes { get; set; } = new List<BookingClass>();
     public ICollection<CounterProposal> CounterProposals { get; set; } = new List<CounterProposal>();

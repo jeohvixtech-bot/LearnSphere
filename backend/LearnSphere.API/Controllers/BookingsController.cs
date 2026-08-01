@@ -185,6 +185,93 @@ public class BookingsController : ControllerBase
         return Ok(MapToDto(created!));
     }
 
+    // Books a tutor-preset class slot (Flow B) directly — auto-confirmed, no per-request
+    // tutor approval, since the tutor already published this slot ahead of time.
+    [HttpPost("preset")]
+    public async Task<IActionResult> BookPreset([FromBody] PresetBookingDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var slot = await _context.TutorTimeSlots.FirstOrDefaultAsync(s => s.Id == dto.PresetSlotId);
+        if (slot == null) return NotFound(new { message = "This class slot no longer exists." });
+        if (slot.Status != "Available" || slot.IsFull)
+            return BadRequest(new { message = "This class is no longer available." });
+
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == dto.StudentId);
+        if (student == null || student.ParentUserId != userId) return NotFound(new { message = "Student not found." });
+        if (student.IsArchived)
+            return BadRequest(new { message = "This profile is archived and can't be booked for. Restore it first." });
+
+        var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
+        var studentClassesSameDay = await _context.Bookings
+            .Where(b => b.StudentId == dto.StudentId && b.Status == "confirmed")
+            .SelectMany(b => b.Classes)
+            .Where(c => c.Date == slot.Day)
+            .Select(c => c.Time)
+            .ToListAsync();
+        var alreadyBooked = slotRange != null && studentClassesSameDay.Any(t =>
+        {
+            var r = ParseTimeRangeMinutes(t);
+            return r != null && slotRange.Value.Start < r.Value.End && r.Value.Start < slotRange.Value.End;
+        });
+        if (alreadyBooked)
+            return BadRequest(new { message = "This child already has a confirmed class at this date and time." });
+
+        var booking = new Booking
+        {
+            TutorId = slot.TutorId,
+            StudentId = dto.StudentId,
+            Subject = slot.Subject ?? string.Empty,
+            Mode = slot.Mode ?? string.Empty,
+            DurationHours = slot.DurationMinutes / 60.0,
+            TotalPrice = slot.PricePerLesson,
+            Status = "confirmed",
+            BookingType = "tutor-preset",
+            PresetSlotId = slot.Id
+        };
+        _context.Bookings.Add(booking);
+        await _context.SaveChangesAsync();
+        booking.BookingNumber = "BOK" + booking.Id.ToString("D5");
+
+        _context.BookingClasses.Add(new BookingClass { BookingId = booking.Id, Date = slot.Day, Time = slot.Time + " - " + slot.EndTime });
+
+        var newInvoice = new Invoice
+        {
+            BookingId = booking.Id,
+            Date = slot.Day,
+            Amount = booking.TotalPrice,
+            Status = "Unpaid",
+            Subject = booking.Subject
+        };
+        _context.Invoices.Add(newInvoice);
+
+        slot.ConfirmedCount += 1;
+        if (slot.ConfirmedCount >= slot.MaxStudents) slot.IsFull = true;
+
+        var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == slot.TutorId);
+        _context.Notifications.Add(new Notification
+        {
+            UserId = userId,
+            Title = "Class Booked",
+            Message = $"You booked {slot.Subject} with {tutor?.User?.Name ?? "your tutor"} on {slot.Day}.",
+            Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+            Type = "booking",
+            IsRead = false
+        });
+
+        await _context.SaveChangesAsync();
+        newInvoice.InvoiceNumber = "INV" + newInvoice.Id.ToString("D5");
+        await _context.SaveChangesAsync();
+
+        var created = await _context.Bookings
+            .Include(b => b.Tutor).ThenInclude(t => t.User)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
+            .Include(b => b.Classes)
+            .FirstOrDefaultAsync(b => b.Id == booking.Id);
+
+        return Ok(MapToDto(created!));
+    }
+
     [HttpPatch("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateBookingStatusDto dto)
     {
@@ -299,6 +386,31 @@ public class BookingsController : ControllerBase
                     IsRead = false
                 });
             }
+
+            // A Flow-A (parent-offer) booking just got confirmed — if it lands on the same
+            // date/time as one of this tutor's still-open preset slots (Flow B), that slot
+            // is no longer really available (the tutor is now busy then), so hide it from
+            // preset search rather than let a second family double-book the same time.
+            // Already-full slots need no action — they're already hidden from search.
+            if (booking.BookingType != "tutor-preset")
+            {
+                var overlappingPresetSlots = await _context.TutorTimeSlots
+                    .Where(s => s.TutorId == booking.TutorId && s.Status == "Available" && !s.IsFull)
+                    .ToListAsync();
+                foreach (var c in booking.Classes)
+                {
+                    var classRange = ParseTimeRangeMinutes(c.Time);
+                    if (classRange == null) continue;
+                    foreach (var slot in overlappingPresetSlots)
+                    {
+                        if (slot.Day != c.Date) continue;
+                        var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
+                        if (slotRange == null) continue;
+                        if (classRange.Value.Start < slotRange.Value.End && slotRange.Value.Start < classRange.Value.End)
+                            slot.Status = "Booked";
+                    }
+                }
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -350,6 +462,17 @@ public class BookingsController : ControllerBase
 
         var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
         if (pendingProposal != null) pendingProposal.Status = "cancelled";
+
+        // Cancelling a preset (Flow B) booking frees up the seat it held on that slot.
+        if (booking.BookingType == "tutor-preset" && booking.PresetSlotId.HasValue)
+        {
+            var presetSlot = await _context.TutorTimeSlots.FindAsync(booking.PresetSlotId.Value);
+            if (presetSlot != null)
+            {
+                presetSlot.ConfirmedCount = Math.Max(0, presetSlot.ConfirmedCount - 1);
+                if (presetSlot.ConfirmedCount < presetSlot.MaxStudents) presetSlot.IsFull = false;
+            }
+        }
 
         // Void any outstanding invoice so Billing & Invoices stops offering to pay for a cancelled class.
         if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")

@@ -12,7 +12,7 @@ public class BookingDto
     public string ParentName { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
-    public int DurationHours { get; set; }
+    public double DurationHours { get; set; }
     public string? Message { get; set; }
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = string.Empty;
@@ -37,9 +37,15 @@ public class CreateBookingDto
     public string Subject { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
     public List<BookingClassDto> Classes { get; set; } = new();
-    public int DurationHours { get; set; } = 1;
+    public double DurationHours { get; set; } = 1;
     public string? Message { get; set; }
     public decimal TotalPrice { get; set; }
+}
+
+public class PresetBookingDto
+{
+    public int PresetSlotId { get; set; }
+    public int StudentId { get; set; }
 }
 
 public class UpdateBookingStatusDto
