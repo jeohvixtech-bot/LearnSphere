@@ -1,6 +1,7 @@
 -- LearnSphere MySQL Schema
 -- Generated from EF Core models (AppDbContext + AppDbContextModelSnapshot)
--- Last updated: reflects all migrations including AddReviewBookingId
+-- Last updated: reflects all migrations including FavoriteTutors, StudentPreferredModes,
+-- ChatMessages.ParentUserId, and tutor-preset class slots (Flow B)
 -- Run this against a fresh MySQL instance to create the full schema manually.
 -- (The .NET backend uses EF Core migrations at runtime — this file is for manual/reference use.)
 
@@ -104,13 +105,27 @@ CREATE UNIQUE INDEX UQ_TutorReviews_TutorBooking
 -- ============================================================
 -- TutorTimeSlots
 -- ============================================================
+-- Day/Time hold a preset slot's date ("YYYY-MM-DD") and start time when the slot
+-- represents a tutor-preset class (BookingType = 'tutor-preset' on Bookings); the
+-- extra columns below are only populated for those rows.
 CREATE TABLE IF NOT EXISTS TutorTimeSlots (
-    Id         INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId    INT         NOT NULL,
-    Day        LONGTEXT    NOT NULL,
-    Time       LONGTEXT    NOT NULL,
-    Status     LONGTEXT    NOT NULL DEFAULT 'Available', -- Available | Booked
-    BookingId  INT         NULL,
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId          INT             NOT NULL,
+    Day              LONGTEXT        NOT NULL,
+    Time             LONGTEXT        NOT NULL,
+    Status           LONGTEXT        NOT NULL DEFAULT 'Available', -- Available | Booked
+    BookingId        INT             NULL,
+    EndTime          LONGTEXT        NULL,
+    DurationMinutes  INT             NOT NULL DEFAULT 60,
+    Mode             LONGTEXT        NULL,
+    Subject          LONGTEXT        NULL,
+    Level            LONGTEXT        NULL,
+    Country          LONGTEXT        NULL,
+    ClassSize        VARCHAR(20)     NOT NULL DEFAULT 'one-to-one', -- one-to-one | one-to-many
+    MaxStudents      INT             NOT NULL DEFAULT 1,
+    ConfirmedCount   INT             NOT NULL DEFAULT 0,
+    IsFull           TINYINT(1)      NOT NULL DEFAULT 0,
+    PricePerLesson   DECIMAL(10,2)   NOT NULL DEFAULT 0,
     CONSTRAINT FK_TutorTimeSlots_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
@@ -127,8 +142,20 @@ CREATE TABLE IF NOT EXISTS Students (
     SubjectSelect   LONGTEXT    NOT NULL,
     LearningGoal    LONGTEXT    NULL,
     PhotoUrl        LONGTEXT    NULL,
-    IsArchived      TINYINT(1)  NOT NULL DEFAULT 0,
+    IsArchived      TINYINT(1)  NOT NULL DEFAULT 0,   -- archived profiles are hidden from active lists/booking, not deleted
     CONSTRAINT FK_Students_Users FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- StudentPreferredModes  (ranked teaching-mode preference per child)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS StudentPreferredModes (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    StudentId  INT          NOT NULL,
+    Mode       VARCHAR(50)  NOT NULL, -- Online | Home Visit | Tutor Place | Tuition Center
+    Sequence   INT          NOT NULL DEFAULT 0, -- preference order, ascending
+    KEY IX_StudentPreferredModes_StudentId (StudentId),
+    CONSTRAINT FK_StudentPreferredModes_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -146,14 +173,17 @@ CREATE TABLE IF NOT EXISTS Bookings (
     Mode           LONGTEXT        NOT NULL,
     Date           LONGTEXT        NULL,                     -- legacy; superseded by BookingClasses.Date
     Time           LONGTEXT        NULL,                     -- legacy; superseded by BookingClasses.Time
-    DurationHours  INT             NOT NULL DEFAULT 1,
+    DurationHours  DOUBLE          NOT NULL DEFAULT 1, -- widened from INT: 15-min-interval preset classes (e.g. 90 min) aren't whole hours
     Message        LONGTEXT        NULL,
     TotalPrice     DECIMAL(10,2)   NOT NULL,
     Status         LONGTEXT        NOT NULL DEFAULT 'pending', -- pending | countered | confirmed | completed | cancelled
     SlotId         INT             NULL,                     -- legacy; unused
     BookingNumber  LONGTEXT        NOT NULL,
+    BookingType    VARCHAR(20)     NOT NULL DEFAULT 'parent-offer', -- parent-offer | tutor-preset
+    PresetSlotId   INT             NULL,                     -- FK to TutorTimeSlots.Id when BookingType = 'tutor-preset'
     CONSTRAINT FK_Bookings_Tutors   FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)   ON DELETE RESTRICT,
-    CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT
+    CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT,
+    CONSTRAINT FK_Bookings_PresetSlot FOREIGN KEY (PresetSlotId) REFERENCES TutorTimeSlots(Id) ON DELETE RESTRICT
 );
 
 -- ============================================================
@@ -272,14 +302,31 @@ CREATE TABLE IF NOT EXISTS Payouts (
 );
 
 -- ============================================================
+-- FavoriteTutors  (parent's liked/bookmarked tutors)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS FavoriteTutors (
+    Id            INT AUTO_INCREMENT PRIMARY KEY,
+    ParentUserId  INT          NOT NULL,
+    TutorId       INT          NOT NULL,
+    CreatedAt     DATETIME(6)  NOT NULL,
+    UNIQUE KEY UQ_FavoriteTutors_Parent_Tutor (ParentUserId, TutorId),
+    CONSTRAINT FK_FavoriteTutors_Users  FOREIGN KEY (ParentUserId) REFERENCES Users(Id)  ON DELETE CASCADE,
+    CONSTRAINT FK_FavoriteTutors_Tutors FOREIGN KEY (TutorId)      REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- ChatMessages
+-- Added: ParentUserId — threads were keyed by TutorId alone, mixing every
+-- parent who messaged a given tutor into one conversation. The key is now
+-- (TutorId, ParentUserId).
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ChatMessages (
-    Id         INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId    INT         NOT NULL,
-    Sender     LONGTEXT    NOT NULL, -- parent | tutor | system
-    Text       LONGTEXT    NOT NULL,
-    Timestamp  LONGTEXT    NOT NULL
+    Id            INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId       INT         NOT NULL,
+    ParentUserId  INT         NOT NULL DEFAULT 0,
+    Sender        LONGTEXT    NOT NULL, -- parent | tutor | system
+    Text          LONGTEXT    NOT NULL,
+    Timestamp     LONGTEXT    NOT NULL
 );
 
 -- ============================================================

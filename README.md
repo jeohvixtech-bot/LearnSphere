@@ -35,6 +35,8 @@ LearnSphere/
 │       └── appsettings.json       # Connection strings & JWT settings
 ├── frontend/
 │   ├── index.html                 # SPA shell (ng-app + ng-view)
+│   ├── libs/                      # Vendored AngularJS, ngRoute, Flatpickr, Tabler icons
+│   │   └── ...                    # (no CDN dependency — see Frontend Setup)
 │   ├── app/
 │   │   ├── app.js                 # Angular module + $routeProvider
 │   │   ├── services/              # HTTP services (auth, tutor, booking…)
@@ -101,6 +103,8 @@ Open `http://localhost:5000/swagger` to explore all API endpoints.
 
 The frontend is plain HTML + AngularJS 1.x — **no build step required**.
 
+> **No CDN dependency:** AngularJS, ngRoute, Flatpickr, and Tabler icons are vendored locally under `frontend/libs/` (not loaded from `ajax.googleapis.com` / `cdn.jsdelivr.net`). This keeps the app working on networks that block those hosts. If you need to update a vendored library version, reinstall it via npm into a scratch folder and copy the new `dist` files into `frontend/libs/`.
+
 ### Option A: VS Code Live Server
 
 1. Open the `frontend/` folder in VS Code.
@@ -152,15 +156,22 @@ npx serve . -p 3000
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/api/tutors` | — | List tutors — only `IsVerified && IsOnline` profiles are ever returned (filter: `subject`, `mode`, `search`, `rating`) |
+| GET | `/api/tutors/favorites` | JWT (parent) | Get the caller's favorited tutor IDs |
+| POST | `/api/tutors/{id}/favorite` | JWT (parent) | Favorite a tutor |
+| DELETE | `/api/tutors/{id}/favorite` | JWT (parent) | Unfavorite a tutor |
 | GET | `/api/tutors/{id}` | — | Get tutor by ID (public) — same `IsVerified && IsOnline` gate; unverified/offline profiles 404 |
 | GET | `/api/tutors/by-user/{userId}` | JWT | Get tutor profile by user ID (self-retrieve) |
 | PUT | `/api/tutors/{id}` | JWT | Update tutor profile (bio, image, price, subjects, levels, modes, qualifications) |
 | PATCH | `/api/tutors/{id}/online-status` | JWT (owner) | Toggle a tutor's own online/offline visibility |
+| PATCH | `/api/tutors/{id}/modes` | JWT (owner) | Replace a tutor's teaching modes |
 | DELETE | `/api/tutors/{id}` | JWT | Delete tutor account |
 | GET | `/api/tutors/booking` | JWT | Get tutor's bookings |
 | GET | `/api/tutors/{id}/slots` | JWT | Get full timetable |
+| GET | `/api/tutors/{id}/busy-times` | — | Get a tutor's booked times (for the parent-facing availability calendar) |
 | POST | `/api/tutors/{id}/slots` | JWT | Add a timetable slot (validates no clash with existing slots) |
 | DELETE | `/api/tutors/{id}/slots/{slotId}` | JWT | Remove a timetable slot |
+| GET | `/api/tutors/preset-slots` | — | List a tutor's published preset class slots matching a student's subject/level/country and preferred modes (Flow B — see `?studentId=`, `?country=`) |
+| POST | `/api/tutors/{id}/setup-class` | JWT (owner) | Publish one or more preset class slots a parent can book directly, no per-request approval |
 
 > To reschedule a class: delete the old slot and add a new one.
 
@@ -180,7 +191,10 @@ npx serve . -p 3000
 | GET | `/api/students` | JWT | Get my students |
 | POST | `/api/students` | JWT | Add a new student |
 | PUT | `/api/students/{id}` | JWT | Update a student |
-| DELETE | `/api/students/{id}` | JWT | Delete a student |
+| DELETE | `/api/students/{id}` | JWT | Permanently delete a student (erases session/billing history — archive instead to keep records) |
+| POST | `/api/students/{id}/archive` | JWT | Archive a student profile (hides from active lists/booking, keeps history) |
+| POST | `/api/students/{id}/unarchive` | JWT | Restore an archived student profile |
+| PATCH | `/api/students/{id}/preferred-modes` | JWT | Set a student's ranked teaching-mode preference (used by preset-class matching) |
 | GET | `/api/students/booking` | JWT | Get student's bookings |
 | GET | `/api/students/{id}/slots` | JWT | Get student timetable |
 | POST | `/api/students/{id}/slots` | JWT | Add a timetable slot (validates no clash) |
@@ -194,6 +208,7 @@ npx serve . -p 3000
 |--------|----------|------|-------------|
 | GET | `/api/bookings` | JWT | Get bookings (role-filtered: parent sees own students, tutor sees own) |
 | POST | `/api/bookings` | JWT | Create a booking — auto-assigns `BookingNumber` (BOK00001…) |
+| POST | `/api/bookings/preset` | JWT (parent) | Book a tutor-preset class slot directly (Flow B) — auto-confirmed, no per-request approval, since the tutor already published the slot |
 | PATCH | `/api/bookings/{id}/status` | JWT (parent/tutor on that booking) | Update status: `confirmed` / `cancelled` / `countered`. A `countered` update inserts a new CounterProposals row rather than overwriting; either party can counter-propose in turn |
 | POST | `/api/bookings/{id}/lesson-report` | JWT | Submit a lesson report |
 | PATCH | `/api/bookings/{id}/lesson-report` | JWT | Edit an existing lesson report (audit trail saved) |
@@ -210,7 +225,7 @@ npx serve . -p 3000
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/chat/{tutorId}` | JWT | Get chat messages for a tutor–parent thread |
+| GET | `/api/chat/{tutorId}/{parentUserId}` | JWT | Get chat messages for a specific tutor–parent thread |
 | POST | `/api/chat` | JWT | Send a chat message |
 
 ### Notifications
@@ -348,6 +363,28 @@ npx serve . -p 3000
 | `Time` | VARCHAR | e.g. `10:00 AM` |
 | `Status` | VARCHAR | `Available` \| `Booked` |
 | `BookingId` | INT NULL | Set when slot is booked |
+| `EndTime` | VARCHAR NULL | Preset-class end time (Flow B only) |
+| `DurationMinutes` | INT | Default 60; preset-class length in minutes |
+| `Mode` | VARCHAR NULL | Preset-class mode |
+| `Subject` | VARCHAR NULL | Preset-class subject |
+| `Level` | VARCHAR NULL | Preset-class level |
+| `Country` | VARCHAR NULL | Preset-class country |
+| `ClassSize` | VARCHAR(20) | `one-to-one` \| `one-to-many` |
+| `MaxStudents` | INT | Default 1 |
+| `ConfirmedCount` | INT | Number of students currently booked into this slot |
+| `IsFull` | TINYINT(1) | Set once `ConfirmedCount >= MaxStudents` |
+| `PricePerLesson` | DECIMAL(10,2) | Preset-class price |
+
+> `EndTime` through `PricePerLesson` are only populated for tutor-preset class slots (Flow B) — the slot a tutor publishes ahead of time that a parent can book directly, without a per-request confirmation step.
+
+### StudentPreferredModes
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `StudentId` | INT (FK → Students.Id, CASCADE DELETE) | |
+| `Mode` | VARCHAR(50) | `Online` \| `Home Visit` \| `Tutor Place` \| `Tuition Center` |
+| `Sequence` | INT | Preference order, ascending — used to rank Flow B preset-class matches |
 
 ### Students
 
@@ -362,6 +399,7 @@ npx serve . -p 3000
 | `SubjectSelect` | VARCHAR | Comma-separated subjects needed |
 | `LearningGoal` | VARCHAR NULL | Parent-defined milestones |
 | `PhotoUrl` | VARCHAR NULL | Profile photo URL |
+| `IsArchived` | TINYINT(1) | Archived profiles are hidden from active lists/booking, not deleted (default `0`) |
 
 ### Bookings
 
@@ -375,11 +413,13 @@ npx serve . -p 3000
 | `Mode` | VARCHAR | `Online` \| `Home Visit` \| `Tutor Place` |
 | `Date` | VARCHAR | Session date `YYYY-MM-DD` |
 | `Time` | VARCHAR | e.g. `04:00 PM - 05:00 PM` |
-| `DurationHours` | INT | Default 1 |
+| `DurationHours` | DOUBLE | Default 1; widened from INT since 15-min-interval preset classes (e.g. 90 min) aren't whole hours |
 | `Message` | VARCHAR NULL | Parent's notes to tutor |
 | `TotalPrice` | DECIMAL(10,2) | sessions × price per session |
 | `Status` | VARCHAR | `pending` \| `countered` \| `confirmed` \| `completed` \| `cancelled` |
-| `SlotId` | INT NULL | FK to TutorTimeSlots |
+| `SlotId` | INT NULL | Legacy; unused |
+| `BookingType` | VARCHAR(20) | `parent-offer` (default) \| `tutor-preset` |
+| `PresetSlotId` | INT NULL (FK → TutorTimeSlots.Id, RESTRICT) | Set when `BookingType = 'tutor-preset'` |
 
 ### CounterProposals
 
@@ -438,12 +478,24 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 | `Status` | VARCHAR | `Unpaid` \| `Paid` \| `Refunded` |
 | `Subject` | VARCHAR NULL | Copied from Booking.Subject |
 
+### FavoriteTutors
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `ParentUserId` | INT (FK → Users.Id) | |
+| `TutorId` | INT (FK → Tutors.Id) | |
+| `CreatedAt` | DATETIME(6) | |
+
+> Unique on `(ParentUserId, TutorId)` — a parent can favorite a given tutor only once.
+
 ### ChatMessages
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | INT (PK, AUTO_INCREMENT) | |
-| `TutorId` | INT (FK → Tutors.Id) | Conversation thread key |
+| `TutorId` | INT | Conversation thread key |
+| `ParentUserId` | INT | Conversation thread key — together with `TutorId` scopes messages to one parent–tutor pair (default `0` on rows predating this column) |
 | `Sender` | VARCHAR | `parent` \| `tutor` \| `system` |
 | `Text` | VARCHAR | Message body |
 | `Timestamp` | VARCHAR | e.g. `Jun 21, 2026 3:00 PM` |
@@ -484,24 +536,27 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 ## Features
 
 ### Parent
-- Dashboard: upcoming sessions, student progress, children profiles
-- Add & edit student profiles with school search (Singapore & Malaysia institutions)
-- Tutor catalog with search/filter by subject, mode, and rating
+- Dashboard: upcoming sessions, student progress, active children profiles
+- Add, edit, archive/unarchive, and set teaching-mode preferences for student profiles, with school search (Singapore & Malaysia institutions)
+- Tutor catalog with search/filter by subject, mode, and rating — browse and open a tutor's profile first, then pick the child inside the booking form
+- Favorite tutors for quick access
+- Two booking flows: request a custom session with any tutor (needs their confirmation), or book a tutor's already-published preset class slot directly (Flow B — auto-confirmed, matched to a child's subjects/level and preferred teaching modes)
 - Full booking flow — multi-session support, classes per month, recurring weekly dates
 - Session activity log with lesson reports
 - Invoice payment system with BOK/INV reference numbers
-- Direct parent-tutor chat
+- Direct parent-tutor chat, scoped per child-tutor conversation
 - Notification bell drawer
 
 ### Tutor
 - Interactive calendar (paid = green, unpaid = amber)
 - Accept or counter-propose booking requests; parents can counter-propose back in turn (no round limit)
 - Confirm bookings (auto-generates invoice with INV number)
+- Publish preset class slots parents can book directly, no per-request approval (Flow B)
 - Submit and edit lesson reports (with audit trail)
 - Teaching offerings builder (subject + level + mode + qualification + price)
 - Online/offline visibility switch — going offline immediately hides the profile from parent search and blocks new bookings
 - Stats dashboard (sessions this month, rating, balance)
-- Direct parent-tutor chat
+- Direct parent-tutor chat, scoped per child-tutor conversation
 
 ### Admin
 - Platform metrics (parents, tutors, sessions, revenue)
