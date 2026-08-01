@@ -112,7 +112,7 @@
       </div>
 
       <div class="student-grid">
-        <div class="student-mini-card" ng-repeat="s in vm.students">
+        <div class="student-mini-card" ng-repeat="s in vm.activeStudents()">
           <div class="student-avatar-circle">{{ s.name[0] }}</div>
           <div>
             <strong>{{ s.name }}</strong>
@@ -121,7 +121,7 @@
             <small ng-if="s.learningGoal">🎯 "{{ s.learningGoal }}"</small>
           </div>
         </div>
-        <div class="student-mini-empty" ng-if="!vm.students.length">
+        <div class="student-mini-empty" ng-if="!vm.activeStudents().length">
           No child profiles yet. <a href="#!/parent/students">Add one now →</a>
         </div>
       </div>

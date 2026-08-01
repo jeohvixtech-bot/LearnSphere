@@ -23,6 +23,18 @@
          ══════════════════════════════════════════════ -->
     <div ng-if="!vm.selectedTutor">
 
+      <!-- ── Flow A/B tabs ──────────────────────── -->
+      <div class="search-tabs">
+        <button type="button" ng-click="vm.setSearchTab('flowA')" ng-class="{active: vm.searchTab === 'flowA'}">
+          🔍 Find a tutor
+        </button>
+        <button type="button" ng-click="vm.setSearchTab('flowB')" ng-class="{active: vm.searchTab === 'flowB'}">
+          📅 Available classes
+        </button>
+      </div>
+
+      <div ng-show="vm.searchTab === 'flowA'">
+
       <!-- ── Search Hero ─────────────────────────── -->
       <div class="search-hero">
         <h2 class="search-hero-title">Find Your Perfect Tutor</h2>
@@ -153,7 +165,92 @@
         </div>
       </div>
 
+      </div><!-- end flowA -->
+
+      <!-- ══════════════════════════════════════════════
+           FLOW B — AVAILABLE (PRESET) CLASSES
+           ══════════════════════════════════════════════ -->
+      <div ng-show="vm.searchTab === 'flowB'">
+
+        <!-- ── Student selector (only needed for direct-book preset classes) ── -->
+        <div class="student-selector-bar">
+          <label>Booking for:</label>
+          <select ng-model="vm.searchStudentId" ng-change="vm.onSearchStudentChange()">
+            <option value="">-- Select a child --</option>
+            <option ng-repeat="s in vm.activeStudents()" value="{{ s.id }}">{{ s.name }}</option>
+          </select>
+          <span ng-if="vm.searchStudentId && vm.searchStudent()" class="student-profile-pill">
+            {{ vm.searchStudent().subjectSelect }}
+          </span>
+        </div>
+
+        <div ng-if="!vm.searchStudentId">
+          <p class="empty-state">Please select a child above to see available classes.</p>
+        </div>
+
+        <div ng-if="vm.searchStudentId">
+          <div ng-if="vm.presetSlotsLoading" class="empty-state">Loading available classes...</div>
+
+          <div ng-if="!vm.presetSlotsLoading && !vm.presetSlots.length" class="empty-state">
+            No available classes match {{ vm.searchStudent().name }}'s profile right now.
+          </div>
+
+          <div class="preset-slot-list" ng-if="!vm.presetSlotsLoading && vm.presetSlots.length">
+            <div class="preset-slot-card" ng-repeat="slot in vm.presetSlots">
+              <div class="preset-slot-tutor">
+                <img ng-if="slot.tutorPhoto" ng-src="{{ slot.tutorPhoto }}" class="avatar" alt="{{ slot.tutorName }}" />
+                <div ng-if="!slot.tutorPhoto" class="avatar avatar-fallback">{{ slot.tutorName[0] }}</div>
+                <div>
+                  <strong>{{ slot.tutorName }}</strong>
+                  <span class="text-muted">⭐ {{ slot.tutorRating }}</span>
+                </div>
+              </div>
+              <div class="preset-slot-details">
+                <span class="chip">{{ slot.subject }} · {{ slot.level }}</span>
+                <span class="chip">{{ slot.mode }}</span>
+                <span class="chip">{{ slot.classSize === 'one-to-one' ? '1-to-1' : ('1-to-many (' + slot.confirmedCount + '/' + slot.maxStudents + ')') }}</span>
+                <span class="preset-slot-time">{{ slot.date | dmy }} · {{ slot.startTime | hhmma }} – {{ slot.endTime | hhmma }}</span>
+              </div>
+              <div class="preset-slot-price">
+                <strong>${{ slot.pricePerLesson }} / lesson</strong>
+                <small>Est. ${{ slot.monthlyTotal }} / month</small>
+              </div>
+              <button type="button" class="btn-primary" ng-click="vm.bookPresetSlot(slot)" ng-disabled="slot.isFull">
+                {{ slot.isFull ? 'Unavailable' : 'Book now' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div><!-- end flowB -->
+
     </div><!-- end listing view -->
+
+    <!-- Preset booking confirm dialog -->
+    <div class="modal-overlay" ng-if="vm.showPresetConfirm">
+      <div class="modal-card" style="max-width:420px">
+        <div class="modal-header">
+          <h3>Confirm booking</h3>
+          <button type="button" class="modal-close" ng-click="vm.cancelPresetBooking()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Book <strong>{{ vm.pendingPresetSlot.subject }}</strong> with <strong>{{ vm.pendingPresetSlot.tutorName }}</strong>
+            on {{ vm.pendingPresetSlot.date | dmy }} at {{ vm.pendingPresetSlot.startTime | hhmma }}
+            for {{ vm.searchStudent().name }}?</p>
+          <p class="text-muted">This class is confirmed immediately — ${{ vm.pendingPresetSlot.pricePerLesson }} per lesson.</p>
+          <p class="field-error" ng-if="vm.presetBookingError">{{ vm.presetBookingError }}</p>
+        </div>
+        <div class="modal-footer">
+          <div class="btn-row">
+            <button type="button" class="btn-outline" ng-click="vm.cancelPresetBooking()">Cancel</button>
+            <button type="button" class="btn-primary" ng-click="vm.confirmPresetBooking()">Confirm Booking</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-success large" ng-if="vm.showPresetSuccess" style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px">
+      ✓ Class booked! Check Sessions &amp; Activity for details.
+    </div>
 
 
     <!-- ══════════════════════════════════════════════
