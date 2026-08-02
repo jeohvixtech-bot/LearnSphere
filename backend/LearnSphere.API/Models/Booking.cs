@@ -16,10 +16,15 @@ public class Booking
     public string BookingNumber { get; set; } = string.Empty;
 
     public string BookingType { get; set; } = "parent-offer"; // parent-offer | tutor-preset
+    // Kept for backward compatibility with bookings created before BookingPresetSlots
+    // existed (always the first slot of the group, when there's more than one) —
+    // new code should prefer the PresetSlots collection, which covers every
+    // occurrence in a multi-session preset-class booking, not just the first.
     public int? PresetSlotId { get; set; }
     public TutorTimeSlot? PresetSlot { get; set; }
 
     public ICollection<BookingClass> Classes { get; set; } = new List<BookingClass>();
+    public ICollection<BookingPresetSlot> PresetSlots { get; set; } = new List<BookingPresetSlot>();
     public ICollection<CounterProposal> CounterProposals { get; set; } = new List<CounterProposal>();
     public LessonReport? LessonReport { get; set; }
     public IssueReport? IssueReport { get; set; }
@@ -33,6 +38,18 @@ public class BookingClass
     public Booking Booking { get; set; } = null!;
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+}
+
+// One row per TutorTimeSlot consumed by a (possibly multi-session) preset-class
+// booking — lets a single Booking cover an entire recurring series (e.g. all 5
+// occurrences of a weekly class) while still tracking exactly which slots need
+// their seat freed if the booking is later cancelled.
+public class BookingPresetSlot
+{
+    public int Id { get; set; }
+    public int BookingId { get; set; }
+    public Booking Booking { get; set; } = null!;
+    public int TutorTimeSlotId { get; set; }
 }
 
 public class CounterProposal
@@ -87,5 +104,8 @@ public class IssueReport
     public Booking Booking { get; set; } = null!;
     public string IssueType { get; set; } = string.Empty;
     public string Details { get; set; } = string.Empty;
-    public string Timestamp { get; set; } = string.Empty;
+    public string Timestamp { get; set; } = string.Empty; // display-only, time-of-day (no date) — see CreatedAt
+    // Real date/time, needed for the AI Speed Match "Tutor Dispute (Refresh Monthly)"
+    // scoring criterion — Timestamp above predates that need and carries no date part.
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

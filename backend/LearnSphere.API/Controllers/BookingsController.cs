@@ -185,79 +185,95 @@ public class BookingsController : ControllerBase
         return Ok(MapToDto(created!));
     }
 
-    // Books a tutor-preset class slot (Flow B) directly — auto-confirmed, no per-request
-    // tutor approval, since the tutor already published this slot ahead of time.
+    // Books one or more tutor-preset class slots (Flow B) as a SINGLE booking —
+    // e.g. every occurrence of a recurring series, same as how a parent-offer
+    // booking already covers multiple sessions in one Booking. Auto-confirmed, no
+    // per-request tutor approval, since the tutor already published these slots
+    // ahead of time.
     [HttpPost("preset")]
     public async Task<IActionResult> BookPreset([FromBody] PresetBookingDto dto)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        var slot = await _context.TutorTimeSlots.FirstOrDefaultAsync(s => s.Id == dto.PresetSlotId);
-        if (slot == null) return NotFound(new { message = "This class slot no longer exists." });
-        if (slot.Status != "Available" || slot.IsFull)
-            return BadRequest(new { message = "This class is no longer available." });
+        var slotIds = (dto.PresetSlotIds ?? new List<int>()).Distinct().ToList();
+        if (slotIds.Count == 0) return BadRequest(new { message = "No class slots specified." });
+
+        var slots = await _context.TutorTimeSlots.Where(s => slotIds.Contains(s.Id)).ToListAsync();
+        if (slots.Count != slotIds.Count)
+            return NotFound(new { message = "One or more of these classes no longer exist." });
+        if (slots.Any(s => s.Status != "Available" || s.IsFull))
+            return BadRequest(new { message = "One or more of these classes are no longer available." });
+        if (slots.Select(s => s.TutorId).Distinct().Count() > 1)
+            return BadRequest(new { message = "These classes belong to different tutors." });
 
         var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == dto.StudentId);
         if (student == null || student.ParentUserId != userId) return NotFound(new { message = "Student not found." });
         if (student.IsArchived)
             return BadRequest(new { message = "This profile is archived and can't be booked for. Restore it first." });
 
-        var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
-        var studentClassesSameDay = await _context.Bookings
+        var studentConfirmedClasses = await _context.Bookings
             .Where(b => b.StudentId == dto.StudentId && b.Status == "confirmed")
             .SelectMany(b => b.Classes)
-            .Where(c => c.Date == slot.Day)
-            .Select(c => c.Time)
             .ToListAsync();
-        var alreadyBooked = slotRange != null && studentClassesSameDay.Any(t =>
+        foreach (var slot in slots)
         {
-            var r = ParseTimeRangeMinutes(t);
-            return r != null && slotRange.Value.Start < r.Value.End && r.Value.Start < slotRange.Value.End;
-        });
-        if (alreadyBooked)
-            return BadRequest(new { message = "This child already has a confirmed class at this date and time." });
+            var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
+            var alreadyBooked = slotRange != null && studentConfirmedClasses.Where(c => c.Date == slot.Day).Any(c =>
+            {
+                var r = ParseTimeRangeMinutes(c.Time);
+                return r != null && slotRange.Value.Start < r.Value.End && r.Value.Start < slotRange.Value.End;
+            });
+            if (alreadyBooked)
+                return BadRequest(new { message = $"This child already has a confirmed class on {slot.Day} that overlaps this time." });
+        }
 
+        var first = slots.OrderBy(s => s.Day).First();
         var booking = new Booking
         {
-            TutorId = slot.TutorId,
+            TutorId = first.TutorId,
             StudentId = dto.StudentId,
             // Matches the parent-offer flow's "Subject - Level" convention (composed
             // client-side in parent.controller.js's submitBooking) so the level shows
             // up wherever the booking's Subject string is displayed, not just on the
             // original slot.
-            Subject = (slot.Subject ?? string.Empty) + (string.IsNullOrWhiteSpace(slot.Level) ? "" : " - " + slot.Level),
-            Mode = slot.Mode ?? string.Empty,
-            DurationHours = slot.DurationMinutes / 60.0,
-            TotalPrice = slot.PricePerLesson,
+            Subject = (first.Subject ?? string.Empty) + (string.IsNullOrWhiteSpace(first.Level) ? "" : " - " + first.Level),
+            Mode = first.Mode ?? string.Empty,
+            DurationHours = first.DurationMinutes / 60.0,
+            TotalPrice = slots.Sum(s => s.PricePerLesson),
             Status = "confirmed",
             BookingType = "tutor-preset",
-            PresetSlotId = slot.Id
+            PresetSlotId = first.Id
         };
         _context.Bookings.Add(booking);
         await _context.SaveChangesAsync();
         booking.BookingNumber = "BOK" + booking.Id.ToString("D5");
 
-        _context.BookingClasses.Add(new BookingClass { BookingId = booking.Id, Date = slot.Day, Time = slot.Time + " - " + slot.EndTime });
+        foreach (var slot in slots)
+        {
+            _context.BookingClasses.Add(new BookingClass { BookingId = booking.Id, Date = slot.Day, Time = slot.Time + " - " + slot.EndTime });
+            _context.BookingPresetSlots.Add(new BookingPresetSlot { BookingId = booking.Id, TutorTimeSlotId = slot.Id });
+            slot.ConfirmedCount += 1;
+            if (slot.ConfirmedCount >= slot.MaxStudents) slot.IsFull = true;
+        }
 
         var newInvoice = new Invoice
         {
             BookingId = booking.Id,
-            Date = slot.Day,
+            Date = first.Day,
             Amount = booking.TotalPrice,
             Status = "Unpaid",
             Subject = booking.Subject
         };
         _context.Invoices.Add(newInvoice);
 
-        slot.ConfirmedCount += 1;
-        if (slot.ConfirmedCount >= slot.MaxStudents) slot.IsFull = true;
-
-        var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == slot.TutorId);
+        var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == first.TutorId);
         _context.Notifications.Add(new Notification
         {
             UserId = userId,
             Title = "Class Booked",
-            Message = $"You booked {slot.Subject} with {tutor?.User?.Name ?? "your tutor"} on {slot.Day}.",
+            Message = slots.Count == 1
+                ? $"You booked {first.Subject} with {tutor?.User?.Name ?? "your tutor"} on {first.Day}."
+                : $"You booked {slots.Count} {first.Subject} classes with {tutor?.User?.Name ?? "your tutor"}, starting {first.Day}.",
             Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
             Type = "booking",
             IsRead = false
@@ -467,11 +483,20 @@ public class BookingsController : ControllerBase
         var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
         if (pendingProposal != null) pendingProposal.Status = "cancelled";
 
-        // Cancelling a preset (Flow B) booking frees up the seat it held on that slot.
-        if (booking.BookingType == "tutor-preset" && booking.PresetSlotId.HasValue)
+        // Cancelling a preset (Flow B) booking frees up the seat it held on every
+        // slot it covers — BookingPresetSlots for bookings made after that table
+        // existed, falling back to the single legacy PresetSlotId otherwise.
+        if (booking.BookingType == "tutor-preset")
         {
-            var presetSlot = await _context.TutorTimeSlots.FindAsync(booking.PresetSlotId.Value);
-            if (presetSlot != null)
+            var presetSlotIds = await _context.BookingPresetSlots
+                .Where(bps => bps.BookingId == booking.Id)
+                .Select(bps => bps.TutorTimeSlotId)
+                .ToListAsync();
+            if (presetSlotIds.Count == 0 && booking.PresetSlotId.HasValue)
+                presetSlotIds.Add(booking.PresetSlotId.Value);
+
+            var presetSlots = await _context.TutorTimeSlots.Where(s => presetSlotIds.Contains(s.Id)).ToListAsync();
+            foreach (var presetSlot in presetSlots)
             {
                 presetSlot.ConfirmedCount = Math.Max(0, presetSlot.ConfirmedCount - 1);
                 if (presetSlot.ConfirmedCount < presetSlot.MaxStudents) presetSlot.IsFull = false;
@@ -589,7 +614,8 @@ public class BookingsController : ControllerBase
                 BookingId = id,
                 IssueType = dto.IssueType,
                 Details = dto.Details,
-                Timestamp = DateTime.Now.ToString("h:mm:ss tt")
+                Timestamp = DateTime.Now.ToString("h:mm:ss tt"),
+                CreatedAt = DateTime.UtcNow
             };
         }
 
@@ -617,6 +643,7 @@ public class BookingsController : ControllerBase
         TotalPrice = b.TotalPrice,
         Status = b.Status,
         BookingNumber = b.BookingNumber,
+        BookingType = b.BookingType,
         Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
         CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {

@@ -168,13 +168,12 @@ npx serve . -p 3000
 | GET | `/api/tutors/{id}/slots` | JWT | Get full timetable |
 | GET | `/api/tutors/{id}/busy-times` | — | Get a tutor's booked times (for the parent-facing availability calendar) |
 | POST | `/api/tutors/{id}/slots` | JWT | Add a timetable slot (validates no clash with existing slots) |
-| DELETE | `/api/tutors/{id}/slots/{slotId}` | JWT | Remove a timetable slot |
-| GET | `/api/tutors/preset-slots` | — | List a tutor's published preset class slots matching a student's subject/level/country and preferred modes (Flow B — see `?studentId=`, `?country=`) |
-| POST | `/api/tutors/{id}/setup-class` | JWT (owner) | Publish one or more preset class slots a parent can book directly, no per-request approval. Each slot in the request may optionally carry its own `durationMinutes`, overriding the request-level default — used when the tutor's UI combines several dragged 30-min grid cells into one longer class |
+| DELETE | `/api/tutors/{id}/slots/{slotId}` | JWT (owner) | Remove a timetable slot. For a preset (Flow B) slot with confirmed/pending bookings riding on it, cascades: removes just that one session from each affected booking (shrinking its price/invoice), or cancels the whole booking outright if it was the booking's last remaining session — either way voids the affected invoice(s) and notifies the parent(s) before the slot disappears |
+| GET | `/api/tutors/preset-slots` | — | List a tutor's published preset class slots matching a student's subject/level/country and preferred modes (Flow B — see `?studentId=`, `?country=`). Not currently called by the frontend — the parent catalog reads preset slots straight off `GET /api/tutors`' `timetable` field instead — kept for any future tutor-scoped preset browsing |
+| GET | `/api/tutors/match-scores` | — | AI Speed Match score for every verified/online tutor, computed live from admin-configured `ScoringWeightages` percentages combined with each tutor's current rating, experience, and this-calendar-month completed-class/dispute counts. Returns both the final score and each criterion's raw metric + points, per tutor |
+| POST | `/api/tutors/{id}/setup-class` | JWT (owner) | Publish one or more preset class slots a parent can book directly, no per-request approval. Every slot in one request is tagged with a shared `PresetGroupId` (`PRESET` + zero-padded id of the batch's first slot) so the catalog groups them as one class rather than merging unrelated batches that share a subject. Each slot may optionally carry its own `durationMinutes`, overriding the request-level default — used when the tutor's UI combines several dragged 30-min grid cells into one longer class |
 
 > To reschedule a class: delete the old slot and add a new one.
-
-> **Known gap:** the parent search page's tutor cards are wired to call `GET /api/tutors/{id}/preset-slots` to show a tutor's published-but-unbooked slots inline, but that route doesn't exist yet — only the student-matched `GET /api/tutors/preset-slots?studentId=` above does. Until a tutor-scoped route is added, that part of the card silently shows "no preset classes."
 
 ### Parents
 
@@ -209,8 +208,9 @@ npx serve . -p 3000
 |--------|----------|------|-------------|
 | GET | `/api/bookings` | JWT | Get bookings (role-filtered: parent sees own students, tutor sees own) |
 | POST | `/api/bookings` | JWT | Create a booking — auto-assigns `BookingNumber` (BOK00001…) |
-| POST | `/api/bookings/preset` | JWT (parent) | Book a tutor-preset class slot directly (Flow B) — auto-confirmed, no per-request approval, since the tutor already published the slot |
+| POST | `/api/bookings/preset` | JWT (parent) | Book one or more tutor-preset class slots directly (Flow B) as a SINGLE booking — e.g. every occurrence of a recurring series in one call (`presetSlotIds: [...]`) — auto-confirmed, no per-request approval, since the tutor already published these slots. One `Booking` row + one `BookingClass` per occurrence, tracked via `BookingPresetSlots` so cancelling frees every slot's seat |
 | PATCH | `/api/bookings/{id}/status` | JWT (parent/tutor on that booking) | Update status: `confirmed` / `cancelled` / `countered`. A `countered` update inserts a new CounterProposals row rather than overwriting; either party can counter-propose in turn |
+| POST | `/api/bookings/{id}/cancel` | JWT (parent, owner) | Cancel a booking — voids any unpaid invoice, frees the seat on every preset slot it covers (Flow B), notifies the tutor if they'd already responded. Blocked once `completed`/`cancelled`, or once the invoice is `Paid` |
 | POST | `/api/bookings/{id}/lesson-report` | JWT | Submit a lesson report |
 | PATCH | `/api/bookings/{id}/lesson-report` | JWT | Edit an existing lesson report (audit trail saved) |
 | POST | `/api/bookings/{id}/issue` | JWT | Report an issue on a booking |
@@ -263,6 +263,8 @@ npx serve . -p 3000
 | GET | `/api/admin/disputes` | JWT (admin) | List disputed bookings |
 | PATCH | `/api/admin/disputes/{bookingId}/resolve` | JWT (admin) | Resolve a dispute |
 | GET | `/api/admin/institutions` | — | Search institutions (filter: `country`, `type`, `search`) |
+| GET | `/api/admin/scoring-weightages` | — | Get the AI Speed Match scoring config (6 fixed rows: Tutor Rating, Activeness, Disputes, Experience, + 2 reserved). Public read — the parent-facing match score needs these percentages too |
+| PUT | `/api/admin/scoring-weightages` | JWT (admin) | Update weightage percentages by `key` (0–100, clamped). Point-scale bands per criterion are fixed/not editable, only the weightage % each contributes to the total score |
 
 ---
 
@@ -375,8 +377,9 @@ npx serve . -p 3000
 | `ConfirmedCount` | INT | Number of students currently booked into this slot |
 | `IsFull` | TINYINT(1) | Set once `ConfirmedCount >= MaxStudents` |
 | `PricePerLesson` | DECIMAL(10,2) | Preset-class price |
+| `PresetGroupId` | VARCHAR(20) NULL | Shared across every slot from one Setup Class submission (e.g. all occurrences of a weekly recurring class) — `PRESET` + zero-padded id of the batch's first slot. Lets the catalog group a recurring series as one class instead of merging unrelated batches that share a subject |
 
-> `EndTime` through `PricePerLesson` are only populated for tutor-preset class slots (Flow B) — the slot a tutor publishes ahead of time that a parent can book directly, without a per-request confirmation step.
+> `EndTime` through `PresetGroupId` are only populated for tutor-preset class slots (Flow B) — the slot a tutor publishes ahead of time that a parent can book directly, without a per-request confirmation step.
 
 ### StudentPreferredModes
 
@@ -420,7 +423,17 @@ npx serve . -p 3000
 | `Status` | VARCHAR | `pending` \| `countered` \| `confirmed` \| `completed` \| `cancelled` |
 | `SlotId` | INT NULL | Legacy; unused |
 | `BookingType` | VARCHAR(20) | `parent-offer` (default) \| `tutor-preset` |
-| `PresetSlotId` | INT NULL (FK → TutorTimeSlots.Id, RESTRICT) | Set when `BookingType = 'tutor-preset'` |
+| `PresetSlotId` | INT NULL (FK → TutorTimeSlots.Id, RESTRICT) | Set when `BookingType = 'tutor-preset'` — legacy single-slot reference (always just the first slot when a booking spans more than one), kept for bookings created before `BookingPresetSlots` existed |
+
+### BookingPresetSlots
+
+One row per `TutorTimeSlot` a preset-class (Flow B) booking covers — lets a single `Booking` span an entire recurring series (e.g. all 5 occurrences of a weekly class) instead of one booking per occurrence, while still tracking exactly which slots need their seat freed if the booking is cancelled.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `BookingId` | INT (FK → Bookings.Id, CASCADE DELETE) | |
+| `TutorTimeSlotId` | INT (FK → TutorTimeSlots.Id, CASCADE DELETE) | |
 
 ### CounterProposals
 
@@ -465,7 +478,8 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 | `BookingId` | INT (FK → Bookings.Id) | One-to-one with Booking |
 | `IssueType` | VARCHAR | e.g. `Tutor was absent (No show)` |
 | `Details` | VARCHAR | Full description |
-| `Timestamp` | VARCHAR | Report time |
+| `Timestamp` | VARCHAR | Display-only, time-of-day (no date) |
+| `CreatedAt` | DATETIME(6) | Real date/time — used by the AI Speed Match "Tutor Dispute (Refresh Monthly)" scoring criterion |
 
 ### Invoices
 
@@ -532,6 +546,18 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 | `Country` | VARCHAR | `Singapore` \| `Malaysia` |
 | `Type` | VARCHAR | `Primary` \| `Secondary` \| `Junior College` \| `Polytechnic/Vocational` \| `University/Tertiary` |
 
+### ScoringWeightages
+
+AI Speed Match scoring config (Admin → Scoring Config page). Seeded once with 6 fixed rows (`rating`, `activeness`, `disputes`, `experience`, + 2 reserved `na` slots); only `Percent` is admin-editable thereafter — the point-scale bands each criterion converts to are fixed in code, not stored here.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `Key` | VARCHAR(20) UNIQUE | `rating` \| `activeness` \| `disputes` \| `experience` \| `na1` \| `na2` — stable identifier the match-score calculator switches on |
+| `Label` | VARCHAR(100) | Display text for the admin panel |
+| `Percent` | INT | Default 0; weightage this criterion contributes to the total score |
+| `SortOrder` | INT | Display order |
+
 ---
 
 ## Features
@@ -539,12 +565,13 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 ### Parent
 - Dashboard: upcoming sessions, student progress, active children profiles
 - Add, edit, archive/unarchive, and set teaching-mode preferences for student profiles, with school search (Singapore & Malaysia institutions)
-- Tutor catalog with search/filter by subject, mode, and rating — browse and open a tutor's profile first, then pick the child inside the booking form. Each tutor card also shows a preset-class slot strip for next month (grouped by subject, with a hover tooltip listing every date/time and fill status) so a parent can spot an instantly-bookable class without leaving the catalog
+- Tutor catalog with search/filter by subject, mode, and rating — browse and open a tutor's profile first, then pick the child inside the booking form. Each tutor card also shows a preset-class slot strip for next month (grouped by `PresetGroupId` — one chip per Setup Class submission, not merged across unrelated batches that share a subject — with a hover tooltip listing every date/time and fill status) so a parent can spot an instantly-bookable class without leaving the catalog. Click a chip to select that class, then "View & Book" for a booking summary instead of the plain request form
+- AI Speed Match: pick a child + subject, ranked results filtered by subject/level/country and teaching-mode overlap with the child's saved preferences, sorted by a live AI Speed Match score (highest first, price breaks ties) — each result also shows its own available-classes slot strip, selectable the same way as the catalog
 - Favorite tutors for quick access
-- Two booking flows: request a custom session with any tutor (needs their confirmation), or book a tutor's already-published preset class slot directly (Flow B — auto-confirmed, matched to a child's subjects/level and preferred teaching modes)
+- Two booking flows: request a custom session with any tutor (needs their confirmation), or book one or more of a tutor's already-published preset class slots directly as a single booking (Flow B — auto-confirmed and paid immediately via the booking summary, no per-request approval)
 - Full booking flow — multi-session support, classes per month, recurring weekly dates
-- Session activity log with lesson reports
-- Invoice payment system with BOK/INV reference numbers
+- Session activity log with lesson reports; Reschedule isn't offered for preset-class (Flow B) bookings, since their schedule is fixed and possibly shared with other students
+- "Pay Invoice" opens a payment summary for review before charging; Billing & Invoices is read-only history (payment only happens from Sessions & Activity)
 - Direct parent-tutor chat, scoped per child-tutor conversation
 - Notification bell drawer
 
@@ -552,8 +579,8 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 - Interactive calendar (paid = green, unpaid = amber); day dot reflects *all* of a day's bookings, not just the first — any unpaid session takes priority over an all-paid day
 - Accept or counter-propose booking requests; parents can counter-propose back in turn (no round limit)
 - Confirm bookings (auto-generates invoice with INV number)
-- Publish preset class slots parents can book directly, no per-request approval (Flow B) — the Setup Class popup uses a 30-minute grid per selected date; click a single slot, or click-and-drag down a column to combine several into one class (first slot's start to last slot's end). The grid grays out anything already occupied — both real confirmed bookings and the tutor's own previously-published slots — so a drag can't be extended through, or resubmitted over, something that's already there
-- Published-but-unbooked slots show on the main calendar as a pink-purple dot per day, with full detail (time, mode, fill count, price) in that day's detail panel
+- Publish preset class slots parents can book directly, no per-request approval (Flow B) — the Setup Class popup uses a 30-minute grid per selected date; click a single slot, or click-and-drag down a column to combine several into one class (first slot's start to last slot's end). The grid grays out anything already occupied — both real confirmed bookings and the tutor's own previously-published slots — so a drag can't be extended through, or resubmitted over, something that's already there. Every slot from one submission shares a `PresetGroupId`
+- Published-but-unbooked slots show on the main calendar as a pink-purple dot per day, with full detail (time, mode, fill count, price) in that day's detail panel — each published slot has a Cancel action that cascades: removes just that occurrence from any affected booking (or cancels the whole booking if it was its last remaining session), voids the invoice, and notifies the parent
 - Submit and edit lesson reports (with audit trail)
 - Teaching offerings builder (subject + level + mode + qualification + price)
 - Online/offline visibility switch — going offline immediately hides the profile from parent search and blocks new bookings
@@ -565,6 +592,7 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 - Operations system log
 - Tutor vetting queue (verify credentials)
 - Dispute resolution desk
+- Scoring Config: set AI Speed Match weightage percentages per criterion (Rating, Activeness, Disputes, Experience), view the fixed point-scale reference tables, and a live Tutor Scores leaderboard showing every verified/online tutor's current score with its full breakdown
 
 ### Architecture
 - JWT authentication (7-day tokens, role-based routes)

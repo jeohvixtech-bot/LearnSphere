@@ -276,6 +276,47 @@ using (var scope = app.Services.CreateScope())
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Invoices` SET `InvoiceNumber` = CONCAT('INV', LPAD(`Id`, 5, '0')) WHERE `InvoiceNumber` = ''");
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `IssueReports` ADD COLUMN `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)"); } catch { }
+    // One booking can now cover an entire recurring preset-class series (multiple
+    // TutorTimeSlot occurrences) instead of one booking per occurrence — see
+    // BookingsController.BookPreset. Existing single-slot preset bookings keep
+    // working via the legacy Bookings.PresetSlotId column; this table is only
+    // populated going forward.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `BookingPresetSlots` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BookingId` INT NOT NULL,
+            `TutorTimeSlotId` INT NOT NULL,
+            PRIMARY KEY (`Id`),
+            KEY `IX_BookingPresetSlots_BookingId` (`BookingId`),
+            CONSTRAINT `FK_BookingPresetSlots_Bookings` FOREIGN KEY (`BookingId`) REFERENCES `Bookings` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_BookingPresetSlots_TutorTimeSlots` FOREIGN KEY (`TutorTimeSlotId`) REFERENCES `TutorTimeSlots` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    // AI Speed Match scoring config (admin Scoring Config page) — Key is the stable
+    // identifier the match-score calculator switches on; INSERT IGNORE seeds the six
+    // rows once and never overwrites percentages an admin has already saved.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ScoringWeightages` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `Key` VARCHAR(20) NOT NULL,
+            `Label` VARCHAR(100) NOT NULL,
+            `Percent` INT NOT NULL DEFAULT 0,
+            `SortOrder` INT NOT NULL DEFAULT 0,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    await context.Database.ExecuteSqlRawAsync(@"
+        INSERT IGNORE INTO `ScoringWeightages` (`Key`, `Label`, `Percent`, `SortOrder`) VALUES
+            ('rating', 'Tutor Rating', 0, 0),
+            ('activeness', 'Tutor Activeness (Refresh Monthly)', 0, 1),
+            ('disputes', 'Tutor Dispute (Refresh Monthly)', 0, 2),
+            ('experience', 'Tutor Experience', 0, 3),
+            ('na1', 'NA', 0, 4),
+            ('na2', 'NA', 0, 5)
+    ");
     await DbSeeder.SeedAsync(context);
 }
 

@@ -67,3 +67,42 @@ public class AdminStatsDto
     public int TotalSessions { get; set; }
     public decimal GrossRevenue { get; set; }
 }
+
+public class ScoringWeightageDto
+{
+    public int Id { get; set; }
+    public string Key { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public int Percent { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public class UpdateScoringWeightageItemDto
+{
+    public string Key { get; set; } = string.Empty;
+    public int Percent { get; set; }
+}
+
+public class UpdateScoringWeightagesDto
+{
+    public List<UpdateScoringWeightageItemDto> Weightages { get; set; } = new();
+}
+
+// One tutor's AI Speed Match score, broken down by criterion — both the raw metric
+// and the points it converted to — so the parent-facing panel and the admin
+// leaderboard (Scoring Config → Tutor Scores) can show what actually drove the
+// ranking, not just a final number.
+public class TutorMatchScoreDto
+{
+    public int TutorId { get; set; }
+    public string TutorName { get; set; } = string.Empty;
+    public double Score { get; set; }
+    public double Rating { get; set; }
+    public int RatingPoints { get; set; }
+    public int ClassesThisMonth { get; set; }
+    public int ActivenessPoints { get; set; }
+    public int DisputesThisMonth { get; set; }
+    public int DisputePoints { get; set; }
+    public int ExperienceYears { get; set; }
+    public int ExperiencePoints { get; set; }
+}

@@ -1,8 +1,8 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AdminCtrl', ['$location', '$timeout', 'AuthService', 'AdminService',
-function ($location, $timeout, AuthService, AdminService) {
+.controller('AdminCtrl', ['$location', '$timeout', 'AuthService', 'AdminService', 'TutorService',
+function ($location, $timeout, AuthService, AdminService, TutorService) {
   var self = this;
   self.user = AuthService.getCurrentUser();
 
@@ -11,15 +11,23 @@ function ($location, $timeout, AuthService, AdminService) {
   self.disputes = [];
   self.systemLogs = [];
 
-  // Scoring config
+  // Scoring config — weightages are persisted server-side (ScoringWeightages
+  // table, see AdminController/TutorsController.GetMatchScores) and drive the
+  // actual AI Speed Match ranking on the parent side, not just this display.
+  // Pre-seeded with the same 6 rows the backend seeds (rather than starting
+  // empty and waiting on the GET below) because the template writes straight to
+  // fixed indexes (vm.weightages[0].percent, etc.) — unlike reads, AngularJS's
+  // ng-model assignment does NOT fail silently on an undefined array slot, so
+  // typing into a field before the GET resolved would throw and the edit would
+  // never actually land in this array, making Save a silent no-op.
   self.activeScoringTab = 'threshold';
   self.weightages = [
-    { label: 'Tutor Rating', percent: 0 },
-    { label: 'Tutor Activeness (Refresh Monthly)', percent: 0 },
-    { label: 'Tutor Dispute (Refresh Monthly)', percent: 0 },
-    { label: 'Tutor Experience', percent: 0 },
-    { label: 'NA', percent: 0 },
-    { label: 'NA', percent: 0 }
+    { key: 'rating', label: 'Tutor Rating', percent: 0, sortOrder: 0 },
+    { key: 'activeness', label: 'Tutor Activeness (Refresh Monthly)', percent: 0, sortOrder: 1 },
+    { key: 'disputes', label: 'Tutor Dispute (Refresh Monthly)', percent: 0, sortOrder: 2 },
+    { key: 'experience', label: 'Tutor Experience', percent: 0, sortOrder: 3 },
+    { key: 'na1', label: 'NA', percent: 0, sortOrder: 4 },
+    { key: 'na2', label: 'NA', percent: 0, sortOrder: 5 }
   ];
   self.ratingScale = [
     { range: '90% - 100%', points: 10 },
@@ -52,25 +60,51 @@ function ($location, $timeout, AuthService, AdminService) {
     { range: '> 1 year', points: 1 }
   ];
 
-  var savedWeightages = localStorage.getItem('ls_scoring_weightages');
-  if (savedWeightages) {
-    JSON.parse(savedWeightages).forEach(function (saved, i) {
-      if (self.weightages[i]) self.weightages[i].percent = saved.percent;
-    });
-  }
+  self.weightageSaveError = '';
 
   self.saveWeightages = function () {
-    localStorage.setItem('ls_scoring_weightages', JSON.stringify(self.weightages));
-    self.weightageSaveSuccess = true;
-    $timeout(function () {
-      self.weightageSaveSuccess = false;
-    }, 2000);
+    self.weightageSaveError = '';
+    AdminService.updateScoringWeightages(self.weightages.map(function (w) {
+      return { key: w.key, percent: w.percent };
+    })).then(function (res) {
+      self.weightages = res.data;
+      self.weightageSaveSuccess = true;
+      $timeout(function () {
+        self.weightageSaveSuccess = false;
+      }, 2000);
+      // Scores depend on these percentages — refresh so the Tutor Scores tab
+      // doesn't show stale numbers if the admin already had it loaded.
+      self.loadTutorScores();
+    }).catch(function (err) {
+      self.weightageSaveError = (err.data && err.data.message) || 'Could not save weightages. Please try again.';
+    });
+  };
+
+  // Tutor Scores tab — every verified/online tutor's live AI Speed Match score,
+  // same computation TutorsController.GetMatchScores gives the parent-facing AI
+  // Speed Match panel. Loaded on demand (not on page init) since it's a heavier
+  // query than the other scoring-config data.
+  self.tutorScores = [];
+  self.tutorScoresLoading = false;
+
+  self.loadTutorScores = function () {
+    self.tutorScoresLoading = true;
+    TutorService.getMatchScores().then(function (res) {
+      self.tutorScores = res.data;
+      self.tutorScoresLoading = false;
+    }).catch(function () { self.tutorScoresLoading = false; });
+  };
+
+  self.openTutorScoresTab = function () {
+    self.activeScoringTab = 'scores';
+    self.loadTutorScores();
   };
 
   function init() {
     AdminService.getStats().then(function (res) { self.stats = res.data; });
     AdminService.getUnverifiedTutors().then(function (res) { self.unverifiedTutors = res.data; });
     AdminService.getDisputes().then(function (res) { self.disputes = res.data; });
+    AdminService.getScoringWeightages().then(function (res) { self.weightages = res.data; });
   }
   init();
 

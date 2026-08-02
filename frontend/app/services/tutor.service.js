@@ -58,6 +58,10 @@ angular.module('learnSphereApp')
     });
   };
 
+  self.getMatchScores = function () {
+    return $http.get(API_URL + '/tutors/match-scores');
+  };
+
   self.getPresetSlots = function (studentId) {
     return $http.get(API_URL + '/tutors/preset-slots', {
       params: { studentId: studentId }

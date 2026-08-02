@@ -34,6 +34,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.aiMatchAppliedStudentId = null;
   self.aiMatchAppliedSubject = '';
   self.aiMatchResults = [];
+  self.aiMatchScoresLoading = false;
   self.applyAiMatch = function (s) {
     self.aiMatchSelectedStudentId = s.id;
     self.aiMatchAppliedStudentId = s.id;
@@ -42,11 +43,47 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     var combo = (s.subjectCombos || []).find(function (c) {
       return (c.country + ' · ' + c.level + ' · ' + c.subject) === self.aiMatchAppliedSubject;
     });
-    var subjectName = combo ? combo.subject : '';
-    self.aiMatchResults = self.tutors.filter(function (t) {
-      return (t.offerings || []).some(function (o) { return o.subject === subjectName; }) ||
-             (t.subjects || []).indexOf(subjectName) >= 0;
-    });
+    // Filters, all of which must pass:
+    //  - Subject + level + country together (same fix as filteredTutors()'s
+    //    matchSub) — a bare subject-name check would pass a tutor teaching the
+    //    same subject at a completely different level than the child needs.
+    //  - Teaching mode — the child's saved preferredModes must overlap with the
+    //    tutor's offered modes; a strict online-only/home-visit-only mismatch
+    //    isn't something ranking can fix, so it's excluded outright rather than
+    //    just ranked lower. No preferredModes saved = no mode filter applied.
+    //  - Availability (tutor currently accepting bookings) is already covered
+    //    upstream — self.tutors only ever contains IsVerified && IsOnline
+    //    tutors (see TutorsController.GetAll), so nothing further is needed here.
+    var preferredModes = s.preferredModes || [];
+    var matched = combo ? self.tutors.filter(function (t) {
+      var subjectMatch = (t.offerings || []).some(function (o) {
+        return o.subject === combo.subject && o.level === combo.level && o.country === combo.country;
+      });
+      var modeMatch = !preferredModes.length || (t.modes || []).some(function (m) {
+        return preferredModes.indexOf(m) >= 0;
+      });
+      return subjectMatch && modeMatch;
+    }) : [];
+    self.aiMatchResults = matched;
+    if (!matched.length) return;
+
+    // Rank by AI Speed Match score (admin-configured weightage × tutor's live
+    // rating/experience/this-month activeness/disputes — see TutorsController.
+    // GetMatchScores), highest first; price breaks ties among equal scores
+    // (cheaper tutor ranks higher), never overriding a better score outright.
+    self.aiMatchScoresLoading = true;
+    TutorService.getMatchScores().then(function (res) {
+      var scoreByTutor = {};
+      res.data.forEach(function (m) { scoreByTutor[m.tutorId] = m; });
+      matched.forEach(function (t) { t.matchScore = scoreByTutor[t.id] || null; });
+      self.aiMatchResults = matched.slice().sort(function (a, b) {
+        var sa = a.matchScore ? a.matchScore.score : -Infinity;
+        var sb = b.matchScore ? b.matchScore.score : -Infinity;
+        if (sb !== sa) return sb - sa;
+        return a.pricePerSession - b.pricePerSession;
+      });
+      self.aiMatchScoresLoading = false;
+    }).catch(function () { self.aiMatchScoresLoading = false; });
   };
 
   // Personalize My Class
@@ -109,11 +146,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.presetBookingSuccess = false;
   self.presetBookingReceipt = null;
 
-  // Books every occurrence in the selected preset class group (one API call per
-  // TutorTimeSlot — BookPreset only takes a single slot at a time) as one logical
-  // "booking" for the invoice summary/receipt. Runs sequentially rather than in
-  // parallel so a slot that became full/unavailable mid-series doesn't leave an
-  // unclear partial state — we know exactly how many succeeded before the failure.
+  // Books every occurrence in the selected preset class group as ONE booking
+  // (BookPreset takes an array of slot ids and creates a single Booking with one
+  // class per occurrence — same as how a parent-offer booking already covers
+  // multiple sessions) so it shows up as one entry in Sessions & Activity, not
+  // one per occurrence.
   self.confirmPresetGroupBooking = function () {
     var group = self.selectedPresetGroup;
     if (!group || !self.bookingForm.studentId || self.presetBookingBusy) return;
@@ -121,16 +158,27 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.presetBookingBusy = true;
     self.presetBookingError = '';
 
-    var created = [];
-    var chain = $q.when();
-    group.slots.forEach(function (s) {
-      chain = chain.then(function () {
-        return BookingService.bookPreset({ presetSlotId: s.id, studentId: self.bookingForm.studentId })
-          .then(function (res) { created.push(res.data); });
+    BookingService.bookPreset({
+      presetSlotIds: group.slots.map(function (s) { return s.id; }),
+      studentId: self.bookingForm.studentId
+    }).then(function (res) {
+      var createdBooking = res.data;
+      // The button says "Confirm Payment" — actually pay the invoice immediately
+      // here rather than just creating it Unpaid, unlike the tutor-approval
+      // request flow (submitBooking) which genuinely can't charge until the
+      // tutor accepts. Otherwise "Pay Invoice" would still show as outstanding
+      // in Sessions & Activity right after a parent thinks they've just paid.
+      return InvoiceService.getAll().then(function (r) {
+        self.invoices = r.data;
+        var inv = self.invoices.find(function (i) { return i.bookingId === createdBooking.id; });
+        return inv ? InvoiceService.pay(inv.id) : $q.when();
+      }).then(function () {
+        return InvoiceService.getAll();
+      }).then(function (r2) {
+        self.invoices = r2.data;
+        return createdBooking;
       });
-    });
-
-    chain.then(function () {
+    }).then(function (createdBooking) {
       self.presetBookingBusy = false;
       self.presetBookingSuccess = true;
       var student = self.students.find(function (x) { return x.id === self.bookingForm.studentId; });
@@ -141,15 +189,14 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         level: group.level,
         mode: group.mode,
         pricePerLesson: group.pricePerLesson,
-        total: group.pricePerLesson * created.length,
-        bookings: created
+        total: createdBooking.totalPrice,
+        booking: createdBooking
       };
       BookingService.getAll().then(function (r) { self.bookings = r.data; });
-      InvoiceService.getAll().then(function (r) { self.invoices = r.data; });
       // Refresh the catalog so the booked occurrences drop out of / update in
       // everyone's "Available classes" chips (fill count, isFull, etc).
-      TutorService.getAll({ includePresetSlots: true }).then(function (res) {
-        self.tutors = res.data;
+      TutorService.getAll({ includePresetSlots: true }).then(function (res2) {
+        self.tutors = res2.data;
         self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
       });
       $timeout(function () {
@@ -161,9 +208,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       }, 3500);
     }).catch(function (err) {
       self.presetBookingBusy = false;
-      self.presetBookingError = (created.length
-        ? created.length + ' of ' + group.slots.length + ' classes were booked before this happened — check My Sessions. '
-        : '') + ((err.data && err.data.message) || 'Booking failed. Please try again.');
+      self.presetBookingError = (err.data && err.data.message) || 'Booking failed. Please try again.';
     });
   };
   self.minExperience = 0;
@@ -540,6 +585,14 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Load data
   function init() {
+    // Consumed synchronously up front (PendingMatchService is a plain in-memory
+    // store, no async needed) so both loads below — which run in parallel with no
+    // guaranteed order — can agree on the same values regardless of which
+    // resolves first, rather than racing to set self.bookingForm.studentId.
+    var pendingTutorId = PendingMatchService.consumeTutor();
+    var pendingPresetGroupId = PendingMatchService.consumePresetGroupId();
+    var pendingStudentId = PendingMatchService.consumeStudentId();
+
     TutorService.getAll({ includePresetSlots: true }).then(function (res) {
       self.tutors = res.data;
       // Preset slot strip on each tutor card (search page) reads straight off
@@ -547,19 +600,28 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       // that's already included in this response, no per-tutor round trip needed.
       // Computed once here (not from the template) to avoid $rootScope:infdig.
       self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
-      var pendingTutorId = PendingMatchService.consumeTutor();
       if (pendingTutorId) {
         var t = self.tutors.find(function (x) { return x.id === pendingTutorId; });
-        if (t) self.selectTutor(t);
+        if (t) {
+          // Carry the chip selection from AI Speed Match (if any) over onto this
+          // freshly-loaded tutor object — selectTutor() below reads it straight
+          // off the tutor, same as a chip clicked directly on this page would.
+          if (pendingPresetGroupId) t._selectedPresetGroupId = pendingPresetGroupId;
+          self.selectTutor(t, pendingStudentId);
+        }
       }
     });
     StudentService.getMyStudents().then(function (res) {
       self.students = res.data;
       self.students.forEach(function (s) { s.subjectCombos = self.parseSubjectCombos(s.subjectSelect, s.educationLevel); });
-      var firstActive = self.students.find(function (s) { return !s.isArchived; });
-      if (firstActive) {
-        self.bookingForm.studentId = firstActive.id;
-      }
+      // Computes the exact same target selectTutor() above would, so it doesn't
+      // matter which of these two parallel loads resolves first — a pending
+      // student (from an AI Speed Match hand-off) wins if still valid/active,
+      // otherwise the first active child, same as before.
+      var activeStudents = self.activeStudents();
+      var preferredValid = pendingStudentId && activeStudents.some(function (s) { return s.id === pendingStudentId; });
+      if (preferredValid) self.bookingForm.studentId = pendingStudentId;
+      else if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
     });
     BookingService.getAll().then(function (res) {
       self.bookings = res.data;
@@ -787,8 +849,12 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
   }
 
-  // Select a tutor to book
-  self.selectTutor = function (tutor) {
+  // Select a tutor to book. preferredStudentId (optional) is the child a match
+  // was actually run for (e.g. AI Speed Match, via PendingMatchService) — when
+  // given and valid, it wins over the plain "first active child" default, so a
+  // booking made off an AI Speed Match result doesn't silently land on whichever
+  // child happens to be first in the parent's list instead of the one matched.
+  self.selectTutor = function (tutor, preferredStudentId) {
     self.selectedTutor = tutor;
     self.selectedPresetGroup = null;
     self.presetBookingError = '';
@@ -796,7 +862,9 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     var activeStudents = self.activeStudents();
-    if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
+    var preferredValid = preferredStudentId && activeStudents.some(function (s) { return s.id === preferredStudentId; });
+    if (preferredValid) self.bookingForm.studentId = preferredStudentId;
+    else if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
 
     // A published class chip was selected first — carry its subject and exact
     // schedule (one session row per still-bookable occurrence) into the booking
@@ -823,10 +891,13 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   // Jump from AI Speed Match results straight into the booking flow on the search page.
-  // Route changes re-instantiate ParentCtrl, so the tutor id is handed off via PendingMatchService
-  // and picked back up once the search page's tutor list has loaded (see init()).
+  // Route changes re-instantiate ParentCtrl, so the tutor id (and, if a preset class
+  // chip was selected on the AI Match card, its group id too) is handed off via
+  // PendingMatchService and picked back up once the search page's tutor list has
+  // loaded (see init()) — landing straight on the booking summary instead of the
+  // plain request form, same as picking a chip directly on the search page does.
   self.goToBookTutor = function (tutor) {
-    PendingMatchService.setTutor(tutor.id);
+    PendingMatchService.setTutor(tutor.id, tutor._selectedPresetGroupId, self.aiMatchAppliedStudentId);
     $location.path('/parent/search');
   };
 

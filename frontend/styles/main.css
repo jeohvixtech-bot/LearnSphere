@@ -1887,6 +1887,21 @@ a { text-decoration: none; color: inherit; }
   padding: 1px 7px; border-radius: 100px;
   display: inline-flex; align-items: center; gap: 3px;
 }
+.badge-match-score {
+  font-size: 11px; font-weight: 500;
+  background: #eef2ff; color: #4338ca;
+  border: 0.5px solid #c7d2fe;
+  padding: 1px 7px; border-radius: 100px;
+  display: inline-flex; align-items: center; gap: 3px;
+  cursor: default;
+}
+.badge-top-match {
+  font-size: 11px; font-weight: 600;
+  background: #fffbeb; color: #b45309;
+  border: 0.5px solid #fcd34d;
+  padding: 1px 7px; border-radius: 100px;
+  display: inline-flex; align-items: center; gap: 3px;
+}
 .tutor-card-meta { font-size: 12px; color: #64748b; margin: 0; }
 .tutor-card-subjects-label {
   font-size: 10px; font-weight: 600;

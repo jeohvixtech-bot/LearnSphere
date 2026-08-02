@@ -52,6 +52,116 @@ public class TutorsController : ControllerBase
         return Ok(tutors.Select(MapToDto));
     }
 
+    // AI Speed Match score, one row per verified/online tutor. Reads live weightage
+    // percentages from ScoringWeightages (admin Scoring Config page — see
+    // AdminController) and combines them with each tutor's current rating,
+    // experience, and this-calendar-month activeness/dispute counts. Computed fresh
+    // on every call rather than cached/stored, since "Refresh Monthly" activeness
+    // and disputes are moving targets by design.
+    [HttpGet("match-scores")]
+    public async Task<IActionResult> GetMatchScores()
+    {
+        var weightages = await _context.ScoringWeightages.ToListAsync();
+        int PctOf(string key) => weightages.FirstOrDefault(w => w.Key == key)?.Percent ?? 0;
+        var ratingPct = PctOf("rating");
+        var activenessPct = PctOf("activeness");
+        var disputesPct = PctOf("disputes");
+        var experiencePct = PctOf("experience");
+
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var monthStartStr = monthStart.ToString("yyyy-MM-dd");
+        var nextMonthStartStr = monthStart.AddMonths(1).ToString("yyyy-MM-dd");
+
+        var tutors = await _context.Tutors.Include(t => t.User).Where(t => t.IsVerified && t.IsOnline).ToListAsync();
+
+        var activenessByTutor = (await _context.Bookings
+            .Where(b => b.Status == "completed")
+            .SelectMany(b => b.Classes, (b, c) => new { b.TutorId, c.Date })
+            .Where(x => string.Compare(x.Date, monthStartStr) >= 0 && string.Compare(x.Date, nextMonthStartStr) < 0)
+            .ToListAsync())
+            .GroupBy(x => x.TutorId).ToDictionary(g => g.Key, g => g.Count());
+
+        var disputesByTutor = (await _context.IssueReports
+            .Where(ir => ir.CreatedAt >= monthStart && ir.CreatedAt < monthStart.AddMonths(1))
+            .Select(ir => ir.Booking.TutorId)
+            .ToListAsync())
+            .GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+
+        var results = tutors.Select(t =>
+        {
+            var classesThisMonth = activenessByTutor.TryGetValue(t.Id, out var ac) ? ac : 0;
+            var disputesThisMonth = disputesByTutor.TryGetValue(t.Id, out var dc) ? dc : 0;
+
+            var ratingPoints = RatingToPoints(t.Rating);
+            var activenessPoints = ActivenessToPoints(classesThisMonth);
+            var disputePoints = DisputesToPoints(disputesThisMonth);
+            var experiencePoints = ExperienceToPoints(t.ExperienceYears);
+
+            var score = (ratingPoints * ratingPct + activenessPoints * activenessPct +
+                         disputePoints * disputesPct + experiencePoints * experiencePct) / 100.0;
+
+            return new TutorMatchScoreDto
+            {
+                TutorId = t.Id,
+                TutorName = t.User.Name,
+                Score = Math.Round(score, 2),
+                Rating = t.Rating,
+                RatingPoints = ratingPoints,
+                ClassesThisMonth = classesThisMonth,
+                ActivenessPoints = activenessPoints,
+                DisputesThisMonth = disputesThisMonth,
+                DisputePoints = disputePoints,
+                ExperienceYears = t.ExperienceYears,
+                ExperiencePoints = experiencePoints
+            };
+        }).OrderByDescending(r => r.Score);
+
+        return Ok(results);
+    }
+
+    // Scale bands mirror the read-only reference tables on the admin Scoring Config
+    // page (admin.controller.js ratingScale/activenessScale/disputesScale/
+    // experienceScale) — only the weightage %, not these bands, is admin-editable.
+    private static int RatingToPoints(double rating)
+    {
+        var pct = Math.Max(0, Math.Min(100, rating / 5.0 * 100));
+        if (pct >= 90) return 10;
+        if (pct >= 80) return 9;
+        if (pct >= 70) return 8;
+        if (pct >= 60) return 7;
+        if (pct >= 50) return 6;
+        if (pct >= 40) return 5;
+        if (pct >= 30) return 4;
+        if (pct >= 20) return 3;
+        if (pct >= 10) return 2;
+        return 1;
+    }
+
+    private static int ActivenessToPoints(int classesThisMonth)
+    {
+        if (classesThisMonth > 15) return 5;
+        if (classesThisMonth >= 10) return 3;
+        if (classesThisMonth >= 5) return 1;
+        return 0;
+    }
+
+    private static int DisputesToPoints(int disputesThisMonth)
+    {
+        if (disputesThisMonth >= 2) return -10;
+        if (disputesThisMonth == 1) return -5;
+        return 2;
+    }
+
+    private static int ExperienceToPoints(int years)
+    {
+        if (years > 15) return 5;
+        if (years > 10) return 4;
+        if (years > 5) return 3;
+        if (years > 3) return 2;
+        if (years > 1) return 1;
+        return 0;
+    }
+
     [HttpGet("favorites")]
     [Authorize]
     public async Task<IActionResult> GetFavorites()
@@ -612,28 +722,64 @@ public class TutorsController : ControllerBase
         // Flow B preset slots track fills via ConfirmedCount/IsFull, not the legacy
         // Status flag (that only reflects unrelated time-overlap blocking — see
         // BookPreset), so any confirmed/pending bookings riding on this slot must be
-        // cancelled explicitly. Mirrors the parent-side cancel flow in
-        // BookingsController.CancelBooking: void the invoice, notify the other side —
-        // before the slot itself disappears, so nobody's booking silently vanishes.
+        // dealt with explicitly. A booking can now span multiple occurrences of a
+        // recurring series (see BookPreset/BookingPresetSlots) — cancelling one slot
+        // only removes THAT session from the booking, not the whole thing, unless it
+        // was the booking's only remaining session. Mirrors the parent-side cancel
+        // flow in BookingsController.CancelBooking: void the invoice (or shrink it),
+        // notify the other side — before the slot itself disappears.
+        var affectedBookingIds = await _context.BookingPresetSlots
+            .Where(bps => bps.TutorTimeSlotId == slotId)
+            .Select(bps => bps.BookingId)
+            .ToListAsync();
+        var legacyBookingIds = await _context.Bookings
+            .Where(b => b.PresetSlotId == slotId && !affectedBookingIds.Contains(b.Id))
+            .Select(b => b.Id)
+            .ToListAsync();
+        affectedBookingIds.AddRange(legacyBookingIds);
+
         var affectedBookings = await _context.Bookings
             .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Invoice)
-            .Where(b => b.PresetSlotId == slotId && (b.Status == "confirmed" || b.Status == "pending"))
+            .Include(b => b.Classes)
+            .Include(b => b.PresetSlots)
+            .Where(b => affectedBookingIds.Contains(b.Id) && (b.Status == "confirmed" || b.Status == "pending"))
             .ToListAsync();
 
+        var cancelledCount = 0;
         foreach (var booking in affectedBookings)
         {
-            booking.Status = "cancelled";
-            if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
-                booking.Invoice.Status = "Cancelled";
+            var classToRemove = booking.Classes.FirstOrDefault(c => c.Date == slot.Day && c.Time.StartsWith(slot.Time));
+            if (classToRemove != null) _context.BookingClasses.Remove(classToRemove);
+            var presetSlotLink = booking.PresetSlots.FirstOrDefault(ps => ps.TutorTimeSlotId == slotId);
+            if (presetSlotLink != null) _context.BookingPresetSlots.Remove(presetSlotLink);
+
+            var remainingSessions = booking.Classes.Count - (classToRemove != null ? 1 : 0);
+            var wholeBookingCancelled = remainingSessions <= 0;
+
+            if (wholeBookingCancelled)
+            {
+                booking.Status = "cancelled";
+                if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
+                    booking.Invoice.Status = "Cancelled";
+                cancelledCount++;
+            }
+            else
+            {
+                // Booking survives with fewer sessions — shrink its price/invoice to match.
+                booking.TotalPrice = Math.Max(0, booking.TotalPrice - slot.PricePerLesson);
+                if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
+                    booking.Invoice.Amount = booking.TotalPrice;
+            }
 
             if (booking.Student?.ParentUser != null)
             {
                 _context.Notifications.Add(new Notification
                 {
                     UserId = booking.Student.ParentUser.Id,
-                    Title = "Class Cancelled by Tutor",
-                    Message = $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled by the tutor.",
+                    Title = wholeBookingCancelled ? "Class Cancelled by Tutor" : "One Session Cancelled by Tutor",
+                    Message = $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled by the tutor." +
+                        (wholeBookingCancelled ? "" : " The rest of this booking's sessions are unaffected."),
                     Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                     Type = "booking",
                     IsRead = false
@@ -643,7 +789,7 @@ public class TutorsController : ControllerBase
 
         _context.TutorTimeSlots.Remove(slot);
         await _context.SaveChangesAsync();
-        return Ok(new { cancelledBookings = affectedBookings.Count });
+        return Ok(new { cancelledBookings = cancelledCount, affectedBookings = affectedBookings.Count });
     }
 
     [HttpPost("{id}/reviews")]

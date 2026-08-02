@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS TutorTimeSlots (
     ConfirmedCount   INT             NOT NULL DEFAULT 0,
     IsFull           TINYINT(1)      NOT NULL DEFAULT 0,
     PricePerLesson   DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    PresetGroupId    VARCHAR(20)     NULL, -- shared across every slot from one Setup Class submission (e.g. all occurrences of a weekly recurring class), "PRESET" + zero-padded id of the batch's first slot
     CONSTRAINT FK_TutorTimeSlots_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
@@ -195,6 +196,24 @@ CREATE TABLE IF NOT EXISTS BookingClasses (
     Date       LONGTEXT    NOT NULL,
     Time       LONGTEXT    NOT NULL,
     CONSTRAINT FK_BookingClasses_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- BookingPresetSlots  (one row per TutorTimeSlot a preset-class booking
+-- covers — lets a single Booking span an entire recurring series, e.g. all
+-- 5 occurrences of a weekly class, while still tracking exactly which slots
+-- need their seat freed if the booking is cancelled. Bookings.PresetSlotId
+-- is kept for backward compatibility with bookings created before this
+-- table existed — always just the first slot of the group when there's
+-- more than one.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS BookingPresetSlots (
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId        INT         NOT NULL,
+    TutorTimeSlotId  INT         NOT NULL,
+    KEY IX_BookingPresetSlots_BookingId (BookingId),
+    CONSTRAINT FK_BookingPresetSlots_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_BookingPresetSlots_TutorTimeSlots FOREIGN KEY (TutorTimeSlotId) REFERENCES TutorTimeSlots(Id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -270,7 +289,8 @@ CREATE TABLE IF NOT EXISTS IssueReports (
     BookingId   INT         NOT NULL UNIQUE,
     IssueType   LONGTEXT    NOT NULL,
     Details     LONGTEXT    NOT NULL,
-    Timestamp   LONGTEXT    NOT NULL,
+    Timestamp   LONGTEXT    NOT NULL,        -- display-only, time-of-day (no date) — see CreatedAt
+    CreatedAt   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), -- real date/time, used by the AI Speed Match "Tutor Dispute (Refresh Monthly)" scoring criterion
     CONSTRAINT FK_IssueReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
@@ -351,4 +371,20 @@ CREATE TABLE IF NOT EXISTS Institutions (
     Name     LONGTEXT    NOT NULL,
     Country  LONGTEXT    NOT NULL, -- Singapore | Malaysia
     Type     LONGTEXT    NOT NULL  -- Primary | Secondary | Junior College | Polytechnic/Vocational | University/Tertiary
+);
+
+-- ============================================================
+-- ScoringWeightages  (AI Speed Match scoring config, admin Scoring Config
+-- page — Key is the stable identifier the match-score calculator switches
+-- on; Label is display text only. Seeded once with 6 fixed rows
+-- (rating/activeness/disputes/experience + 2 reserved "na" slots); only
+-- Percent is admin-editable thereafter.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ScoringWeightages (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    `Key`      VARCHAR(20)   NOT NULL, -- rating | activeness | disputes | experience | na1 | na2
+    Label      VARCHAR(100)  NOT NULL,
+    Percent    INT           NOT NULL DEFAULT 0,
+    SortOrder  INT           NOT NULL DEFAULT 0,
+    UNIQUE KEY UQ_ScoringWeightages_Key (`Key`)
 );

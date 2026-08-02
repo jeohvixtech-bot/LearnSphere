@@ -17,6 +17,7 @@ public class BookingDto
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = string.Empty;
     public string BookingNumber { get; set; } = string.Empty;
+    public string BookingType { get; set; } = string.Empty; // parent-offer | tutor-preset
     public List<BookingClassDto> Classes { get; set; } = new();
     public CounterProposalDto? CounterProposal { get; set; }
     public LessonReportDto? LessonReport { get; set; }
@@ -44,7 +45,9 @@ public class CreateBookingDto
 
 public class PresetBookingDto
 {
-    public int PresetSlotId { get; set; }
+    // One or more TutorTimeSlot ids — e.g. every occurrence of a recurring class
+    // series (same PresetGroupId) booked together as a single Booking.
+    public List<int> PresetSlotIds { get; set; } = new();
     public int StudentId { get; set; }
 }
 

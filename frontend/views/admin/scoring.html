@@ -19,6 +19,7 @@
     <div class="tab-bar">
       <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'threshold'}" ng-click="vm.activeScoringTab = 'threshold'">🎯 Score Threshold</button>
       <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'weightage'}" ng-click="vm.activeScoringTab = 'weightage'">⚖️ Score Weightage</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'scores'}" ng-click="vm.openTutorScoresTab()">📊 Tutor Scores</button>
     </div>
 
     <!-- ===== SCORE THRESHOLD TAB ===== -->
@@ -32,11 +33,16 @@
       </div>
     </div>
 
+    <!-- Save confirmation popup — floats over the page rather than pushing content
+         down, so it reads as a toast notification, not an inline status line. -->
+    <div class="alert-success" ng-if="vm.weightageSaveSuccess"
+      style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.15)">
+      ✓ Weightage percentages saved successfully!
+    </div>
+
     <!-- ===== SCORE WEIGHTAGE TAB ===== -->
     <div ng-if="vm.activeScoringTab === 'weightage'">
-      <div class="alert-success" ng-if="vm.weightageSaveSuccess" style="margin-bottom:12px">
-        ✓ Weightage percentages saved successfully!
-      </div>
+      <p class="field-error" ng-if="vm.weightageSaveError" style="margin-bottom:12px">{{ vm.weightageSaveError }}</p>
       <div class="grid-2">
         <div class="card">
           <div class="card-header">
@@ -137,6 +143,46 @@
         </div>
       </div>
       <button class="btn-primary" style="margin-top:20px" ng-click="vm.saveWeightages()">💾 Save Weightage</button>
+    </div>
+
+    <!-- ===== TUTOR SCORES TAB ===== -->
+    <div ng-if="vm.activeScoringTab === 'scores'">
+      <div class="card">
+        <h3>Tutor Final Scores</h3>
+        <p class="text-muted">Every verified, online tutor's current AI Speed Match score — recomputed live from the weightages above and each tutor's current rating/experience/this-month activeness/disputes. Sorted highest to lowest.</p>
+
+        <p class="empty-state" ng-if="!vm.tutorScoresLoading && !vm.tutorScores.length">
+          No verified/online tutors to score yet.
+        </p>
+        <p class="text-muted" ng-if="vm.tutorScoresLoading">Loading scores…</p>
+
+        <div class="table-wrap" ng-if="vm.tutorScores.length">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tutor</th>
+                <th>Rating</th>
+                <th>Activeness</th>
+                <th>Disputes</th>
+                <th>Experience</th>
+                <th>Final Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="t in vm.tutorScores">
+                <td>{{ $index + 1 }}</td>
+                <td>{{ t.tutorName }}</td>
+                <td>{{ t.rating }}★ ({{ t.ratingPoints }} pts)</td>
+                <td>{{ t.classesThisMonth }} classes ({{ t.activenessPoints }} pts)</td>
+                <td>{{ t.disputesThisMonth }} disputes ({{ t.disputePoints }} pts)</td>
+                <td>{{ t.experienceYears }} yrs ({{ t.experiencePoints }} pts)</td>
+                <td><strong>{{ t.score }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </main>

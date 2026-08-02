@@ -28,4 +28,12 @@ angular.module('learnSphereApp')
   self.getInstitutions = function (params) {
     return $http.get(API_URL + '/admin/institutions', { params: params });
   };
+
+  self.getScoringWeightages = function () {
+    return $http.get(API_URL + '/admin/scoring-weightages');
+  };
+
+  self.updateScoringWeightages = function (weightages) {
+    return $http.put(API_URL + '/admin/scoring-weightages', { weightages: weightages }, h());
+  };
 }]);

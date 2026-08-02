@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<StudentPreferredMode> StudentPreferredModes { get; set; }
     public DbSet<Booking> Bookings { get; set; }
     public DbSet<BookingClass> BookingClasses { get; set; }
+    public DbSet<BookingPresetSlot> BookingPresetSlots { get; set; }
     public DbSet<CounterProposal> CounterProposals { get; set; }
     public DbSet<CounterProposalClass> CounterProposalClasses { get; set; }
     public DbSet<LessonReport> LessonReports { get; set; }
@@ -31,6 +32,7 @@ public class AppDbContext : DbContext
     public DbSet<Institution> Institutions { get; set; }
     public DbSet<TutorOffering> TutorOfferings { get; set; }
     public DbSet<FavoriteTutor> FavoriteTutors { get; set; }
+    public DbSet<ScoringWeightage> ScoringWeightages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

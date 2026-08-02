@@ -131,6 +131,35 @@ public class AdminController : ControllerBase
         return Ok();
     }
 
+    // Public read (same pattern as institutions below) — the AI Speed Match score
+    // shown to parents needs these percentages too, not just the admin config page.
+    [HttpGet("scoring-weightages")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetScoringWeightages()
+    {
+        var weightages = await _context.ScoringWeightages.OrderBy(w => w.SortOrder).ToListAsync();
+        return Ok(weightages.Select(w => new ScoringWeightageDto
+        {
+            Id = w.Id, Key = w.Key, Label = w.Label, Percent = w.Percent, SortOrder = w.SortOrder
+        }));
+    }
+
+    [HttpPut("scoring-weightages")]
+    public async Task<IActionResult> UpdateScoringWeightages([FromBody] UpdateScoringWeightagesDto dto)
+    {
+        var weightages = await _context.ScoringWeightages.ToListAsync();
+        foreach (var item in dto.Weightages ?? new List<UpdateScoringWeightageItemDto>())
+        {
+            var match = weightages.FirstOrDefault(w => w.Key == item.Key);
+            if (match != null) match.Percent = Math.Max(0, Math.Min(100, item.Percent));
+        }
+        await _context.SaveChangesAsync();
+        return Ok(weightages.OrderBy(w => w.SortOrder).Select(w => new ScoringWeightageDto
+        {
+            Id = w.Id, Key = w.Key, Label = w.Label, Percent = w.Percent, SortOrder = w.SortOrder
+        }));
+    }
+
     [HttpGet("institutions")]
     [AllowAnonymous]
     public async Task<IActionResult> GetInstitutions([FromQuery] string? country, [FromQuery] string? type, [FromQuery] string? search)

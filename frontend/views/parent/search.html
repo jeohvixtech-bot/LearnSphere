@@ -269,13 +269,14 @@
       <!-- Preset Booking Success (Flow B — already confirmed, invoice receipt) -->
       <div class="card invoice-receipt" ng-if="vm.presetBookingSuccess">
         <div class="invoice-receipt-icon"><i class="ti ti-circle-check" aria-hidden="true"></i></div>
-        <h3>Class Booked &amp; Confirmed!</h3>
+        <h3>Class Booked &amp; Paid!</h3>
         <p class="text-muted">No approval needed — {{ vm.presetBookingReceipt.tutorName }} already published this class.</p>
         <div class="invoice-summary-block">
           <div class="invoice-summary-row"><span>Student</span><strong>{{ vm.presetBookingReceipt.studentName }}</strong></div>
           <div class="invoice-summary-row"><span>Subject</span><strong>{{ vm.presetBookingReceipt.subject }}<span ng-if="vm.presetBookingReceipt.level"> · {{ vm.presetBookingReceipt.level }}</span></strong></div>
           <div class="invoice-summary-row"><span>Mode</span><strong>{{ vm.presetBookingReceipt.mode }}</strong></div>
-          <div class="invoice-summary-row"><span>Invoice(s)</span><strong>{{ vm.presetBookingReceipt.bookings.length }} class(es) · {{ vm.presetBookingReceipt.bookings.length }} invoice(s)</strong></div>
+          <div class="invoice-summary-row"><span>Booking</span><strong>#{{ vm.presetBookingReceipt.booking.bookingNumber }} · {{ vm.presetBookingReceipt.booking.classes.length }} class(es)</strong></div>
+          <div class="invoice-summary-row"><span>Payment</span><strong class="text-success">✓ Paid</strong></div>
           <div class="invoice-summary-row invoice-summary-total"><span>Total</span><strong>${{ vm.presetBookingReceipt.total }}.00</strong></div>
         </div>
         <p class="text-muted" style="margin-top:10px">Redirecting to your sessions...</p>

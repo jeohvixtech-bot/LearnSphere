@@ -272,11 +272,14 @@
               ✓ Accept Counter
             </button>
             <button class="btn-outline sm"
-              ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor'"
+              ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor' && b.bookingType !== 'tutor-preset'"
               ng-click="vm.startReschedule(b)">
               🔁 Counter Propose Again
             </button>
-            <button ng-if="b.status === 'confirmed'"
+            <!-- Preset-class (Flow B) bookings sit on a fixed, tutor-published schedule —
+                 possibly shared with other students in a one-to-many class — so an
+                 individual reschedule isn't offered, unlike a parent-offer booking. -->
+            <button ng-if="b.status === 'confirmed' && b.bookingType !== 'tutor-preset'"
               ng-class="vm.isBookingConflicted(b) ? 'btn-warning sm' : 'btn-outline sm'"
               ng-click="vm.startReschedule(b)">
               <span ng-if="vm.isBookingConflicted(b)">⚠️ Reschedule Required</span>
