@@ -68,8 +68,8 @@
         <div class="filter-bar-group">
           <span class="filter-bar-label">Subject</span>
           <select class="filter-select-sm" ng-model="vm.selectedSubject"
-            ng-options="opt.subject as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
-            <option value="All">All Subjects</option>
+            ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
+            <option value="">All Subjects</option>
           </select>
         </div>
 
@@ -137,8 +137,8 @@
               <div class="tutor-card-subjects-label">Teaches</div>
               <div class="subject-list">
                 <button ng-repeat="o in t.offerings" class="subject-chip"
-                  ng-click="vm.selectedCountry = o.country; vm.selectedSubject = o.subject">
-                  {{ o.country }} · {{ o.level }} · {{ o.subject }}
+                  ng-click="vm.selectedCountry = o.country; vm.selectedSubject = vm.findSubjectCatalogEntry(o.country, o.subject, o.level)">
+                  {{ vm.abbreviateOffering(o) }}
                 </button>
               </div>
               <p class="tutor-bio">"{{ t.bio }}"</p>
@@ -156,10 +156,6 @@
               <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
             </div>
             <div class="tutor-card-bar-spacer"></div>
-            <div class="tutor-card-price">
-              <small>Trial Rate</small>
-              <strong class="price">${{ t.pricePerSession }}/hr</strong>
-            </div>
             <button class="btn-primary" ng-click="vm.selectTutor(t)">View &amp; Book</button>
           </div>
 
@@ -167,14 +163,16 @@
           <div class="tutor-slot-strip" ng-if="vm.tutorNextMonthSlots(t).length > 0 || vm.tutorHasAnySlots(t)">
             <p class="tutor-slot-strip-label">
               <i class="ti ti-calendar-event" aria-hidden="true"></i>
-              Available classes — {{ vm.nextMonthLabel() }}
+              Available classes through {{ vm.nextMonthLabel() }}
             </p>
             <div class="tutor-slot-chips">
 
               <!-- One chip per unique subject in preset slots -->
-              <div class="slot-chip" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.subject">
+              <div class="slot-chip" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.presetGroupId"
+                ng-click="vm.selectPresetChip(t, sg)"
+                ng-class="{'slot-chip-selected': t._selectedPresetGroupId === sg.presetGroupId}">
                 <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
-                {{ sg.subject }} · {{ sg.slots.length }} {{ sg.slots.length === 1 ? 'class' : 'classes' }}
+                {{ vm.abbreviateSubject(sg.subject) }} · {{ sg.slots[0].dateShort }}, {{ sg.slots[0].startTime }}
 
                 <!-- Tooltip: full month details -->
                 <div class="slot-tooltip">
@@ -239,7 +237,7 @@
           <div class="tutor-slot-strip tutor-slot-strip--empty" ng-if="!vm.tutorHasAnySlots(t)">
             <p class="tutor-slot-strip-label">
               <i class="ti ti-calendar-event" aria-hidden="true"></i>
-              Available classes — {{ vm.nextMonthLabel() }}
+              Available classes through {{ vm.nextMonthLabel() }}
             </p>
             <span class="slot-chip-empty">
               <i class="ti ti-calendar-x" aria-hidden="true"></i>
@@ -252,34 +250,6 @@
 
     </div><!-- end listing view -->
 
-    <!-- Preset booking confirm dialog -->
-    <div class="modal-overlay" ng-if="vm.showPresetConfirm">
-      <div class="modal-card" style="max-width:420px">
-        <div class="modal-header">
-          <h3>Confirm booking</h3>
-          <button type="button" class="modal-close" ng-click="vm.cancelPresetBooking()">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p>Book <strong>{{ vm.pendingPresetSlot.subject }}</strong> with <strong>{{ vm.pendingPresetSlot.tutorName }}</strong>
-            on {{ vm.pendingPresetSlot.date | dmy }} at {{ vm.pendingPresetSlot.startTime | hhmma }}
-            for {{ vm.searchStudent().name }}?</p>
-          <p class="text-muted">This class is confirmed immediately — ${{ vm.pendingPresetSlot.pricePerLesson }} per lesson.</p>
-          <p class="field-error" ng-if="vm.presetBookingError">{{ vm.presetBookingError }}</p>
-        </div>
-        <div class="modal-footer">
-          <div class="btn-row">
-            <button type="button" class="btn-outline" ng-click="vm.cancelPresetBooking()">Cancel</button>
-            <button type="button" class="btn-primary" ng-click="vm.confirmPresetBooking()">Confirm Booking</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="alert-success large" ng-if="vm.showPresetSuccess" style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px">
-      ✓ Class booked! Check Sessions &amp; Activity for details.
-    </div>
-
-
     <!-- ══════════════════════════════════════════════
          BOOKING DETAIL VIEW
          ══════════════════════════════════════════════ -->
@@ -290,14 +260,29 @@
         <button class="btn-link" ng-click="vm.clearSelectedTutor()">← Back to Tutor Catalog</button>
       </div>
 
-      <!-- Booking Success -->
+      <!-- Booking Success (Flow A — request dispatched, awaiting tutor approval) -->
       <div class="alert-success large" ng-if="vm.bookingSuccess">
         ✓ Booking Request Dispatched!<br/>
         <small style="font-weight:400">Connecting you with {{ vm.selectedTutor.name }}. Redirecting to your sessions...</small>
       </div>
 
+      <!-- Preset Booking Success (Flow B — already confirmed, invoice receipt) -->
+      <div class="card invoice-receipt" ng-if="vm.presetBookingSuccess">
+        <div class="invoice-receipt-icon"><i class="ti ti-circle-check" aria-hidden="true"></i></div>
+        <h3>Class Booked &amp; Confirmed!</h3>
+        <p class="text-muted">No approval needed — {{ vm.presetBookingReceipt.tutorName }} already published this class.</p>
+        <div class="invoice-summary-block">
+          <div class="invoice-summary-row"><span>Student</span><strong>{{ vm.presetBookingReceipt.studentName }}</strong></div>
+          <div class="invoice-summary-row"><span>Subject</span><strong>{{ vm.presetBookingReceipt.subject }}<span ng-if="vm.presetBookingReceipt.level"> · {{ vm.presetBookingReceipt.level }}</span></strong></div>
+          <div class="invoice-summary-row"><span>Mode</span><strong>{{ vm.presetBookingReceipt.mode }}</strong></div>
+          <div class="invoice-summary-row"><span>Invoice(s)</span><strong>{{ vm.presetBookingReceipt.bookings.length }} class(es) · {{ vm.presetBookingReceipt.bookings.length }} invoice(s)</strong></div>
+          <div class="invoice-summary-row invoice-summary-total"><span>Total</span><strong>${{ vm.presetBookingReceipt.total }}.00</strong></div>
+        </div>
+        <p class="text-muted" style="margin-top:10px">Redirecting to your sessions...</p>
+      </div>
+
       <!-- ── Full-width tutor profile header ────── -->
-      <div class="tutor-detail-card" ng-if="!vm.bookingSuccess">
+      <div class="tutor-detail-card" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess">
 
         <div class="tutor-detail-top">
           <img ng-if="vm.selectedTutor.imageUrl" ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-detail-avatar" alt="{{ vm.selectedTutor.name }}" />
@@ -332,7 +317,7 @@
             <span class="tutor-detail-footer-label">Subjects Offered</span>
             <div class="subject-list">
               <button ng-repeat="o in vm.selectedTutor.offerings" class="subject-chip"
-                ng-click="vm.selectedCountry = o.country; vm.selectedSubject = o.subject">
+                ng-click="vm.selectedCountry = o.country; vm.selectedSubject = vm.findSubjectCatalogEntry(o.country, o.subject, o.level)">
                 {{ o.country }} · {{ o.level }} · {{ o.subject }}
               </button>
             </div>
@@ -347,8 +332,9 @@
 
       </div><!-- end tutor-detail-card -->
 
-      <!-- ── Tutor availability calendar (dates/times only, no booking details) ── -->
-      <div class="card" ng-if="!vm.bookingSuccess">
+      <!-- ── Tutor availability calendar (dates/times only, no booking details) ──
+           Hidden once a published class is selected — its schedule is already fixed. -->
+      <div class="card" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && !vm.selectedPresetGroup">
         <div class="cal-nav-row" style="justify-content:space-between;margin-bottom:12px">
           <div>
             <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">📅 {{ vm.selectedTutor.name }}'s Availability</h3>
@@ -390,8 +376,54 @@
         </div>
       </div>
 
-      <!-- ── Booking form (full width below profile) -->
-      <div class="booking-form-single card" ng-if="!vm.bookingSuccess">
+      <!-- ── Invoice summary (a published class was selected — confirms immediately,
+           no tutor approval needed, unlike the request form below) ── -->
+      <div class="booking-form-single card" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && vm.selectedPresetGroup">
+
+        <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e2e8f0">
+          <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">Booking Summary</h3>
+          <p class="text-muted">This class is already published by {{ vm.selectedTutor.name }} — booking confirms immediately, no approval needed.</p>
+        </div>
+
+        <div class="invoice-summary-block">
+          <div class="invoice-summary-row"><span>Tutor</span><strong>{{ vm.selectedTutor.name }}</strong></div>
+          <div class="invoice-summary-row"><span>Subject</span><strong>{{ vm.selectedPresetGroup.subject }}<span ng-if="vm.selectedPresetGroup.level"> · {{ vm.selectedPresetGroup.level }}</span></strong></div>
+          <div class="invoice-summary-row"><span>Mode</span><strong>{{ vm.selectedPresetGroup.mode }}</strong></div>
+          <div class="invoice-summary-row"><span>Class size</span><strong>{{ vm.selectedPresetGroup.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</strong></div>
+          <div class="invoice-summary-row"><span>Price per lesson</span><strong>${{ vm.selectedPresetGroup.pricePerLesson }}</strong></div>
+        </div>
+
+        <div class="booking-form-section">Schedule ({{ vm.bookingForm.sessions.length }} class{{ vm.bookingForm.sessions.length === 1 ? '' : 'es' }})</div>
+        <div class="invoice-summary-schedule">
+          <div class="invoice-summary-schedule-row" ng-repeat="session in vm.bookingForm.sessions">
+            <span>{{ session.date }}</span><span>{{ session.startTime }} – {{ session.endTime }}</span>
+          </div>
+        </div>
+
+        <div class="booking-form-section">Child</div>
+        <div class="form-group">
+          <label>Select Child</label>
+          <select ng-model="vm.bookingForm.studentId">
+            <option ng-repeat="s in vm.activeStudents()" ng-value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+
+        <div class="price-summary">
+          <span>💳 Total for {{ vm.bookingForm.sessions.length }} class(es)</span>
+          <strong>${{ vm.selectedPresetGroup.pricePerLesson * vm.bookingForm.sessions.length }}.00</strong>
+        </div>
+
+        <p class="field-error" ng-if="vm.presetBookingError">{{ vm.presetBookingError }}</p>
+
+        <button type="button" class="btn-primary full-width" ng-click="vm.confirmPresetGroupBooking()"
+          ng-disabled="vm.presetBookingBusy || !vm.bookingForm.studentId">
+          {{ vm.presetBookingBusy ? 'Booking…' : 'Confirm Payment' }}
+        </button>
+
+      </div><!-- end invoice summary -->
+
+      <!-- ── Booking form (full width below profile) — request needing tutor approval -->
+      <div class="booking-form-single card" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && !vm.selectedPresetGroup">
 
         <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e2e8f0">
           <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">Request Tutorial Session</h3>

@@ -29,15 +29,16 @@
       </div>
     </div>
 
-    <!-- ── Student profile picker ─────────────────── -->
-    <div class="profile-empty-state" ng-if="!vm.students.length">
+    <!-- ── Student profile picker (active profiles only — archived children
+         aren't valid match targets) ─────────────────── -->
+    <div class="profile-empty-state" ng-if="!vm.activeStudents().length">
       <div class="profile-empty-icon">👤</div>
       <h4>No Profiles Yet</h4>
       <p>Add a child's profile under Children Profiles to start matching.</p>
     </div>
 
-    <div class="ai-match-grid-3" ng-if="vm.students.length">
-      <div class="profile-card" ng-repeat="s in vm.students"
+    <div class="ai-match-grid-3" ng-if="vm.activeStudents().length">
+      <div class="profile-card" ng-repeat="s in vm.activeStudents()"
         ng-class="{'profile-card--selected': vm.aiMatchSelectedStudentId === s.id}"
         ng-click="vm.selectAiMatchStudent(s.id)" style="cursor:pointer">
         <span class="profile-selected-badge" ng-if="vm.aiMatchSelectedStudentId === s.id">✓ SELECTED</span>

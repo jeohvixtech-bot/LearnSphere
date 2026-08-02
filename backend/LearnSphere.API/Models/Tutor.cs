@@ -105,4 +105,11 @@ public class TutorTimeSlot
     public int ConfirmedCount { get; set; } = 0;
     public bool IsFull { get; set; } = false;
     public decimal PricePerLesson { get; set; } = 0;
+
+    // Shared across every slot created by one Setup Class submission (e.g. all
+    // occurrences of a weekly recurring class), so the catalog can display/group
+    // them as a single class rather than merging unrelated batches that just
+    // happen to share the same subject. Format: "PRESET" + 6-digit zero-padded
+    // id of the first slot in the batch (same convention as Booking/InvoiceNumber).
+    public string? PresetGroupId { get; set; }
 }

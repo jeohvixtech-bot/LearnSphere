@@ -245,6 +245,26 @@ using (var scope = app.Services.CreateScope())
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PricePerLesson` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PresetGroupId` VARCHAR(20) NULL"); } catch { }
+    // Backfill preset slots published before PresetGroupId existed. We can't recover
+    // which original Setup Class submission each row came from, so approximate the
+    // catalog's old merge-by-subject behavior — group legacy rows sharing the same
+    // tutor/subject/level/mode/country under one id — rather than fragmenting each
+    // into its own singleton chip. Only ever-so-slightly-approximate: brand new
+    // slots (created after this migration) get real per-submission grouping instead.
+    await context.Database.ExecuteSqlRawAsync(@"
+        UPDATE `TutorTimeSlots` t
+        JOIN (
+            SELECT `TutorId`, `Subject`, `Level`, `Mode`, `Country`, MIN(`Id`) AS MinId
+            FROM `TutorTimeSlots`
+            WHERE `Mode` IS NOT NULL AND (`PresetGroupId` IS NULL OR `PresetGroupId` = '')
+            GROUP BY `TutorId`, `Subject`, `Level`, `Mode`, `Country`
+        ) g ON t.`TutorId` = g.`TutorId` AND t.`Subject` <=> g.`Subject` AND t.`Level` <=> g.`Level`
+            AND t.`Mode` <=> g.`Mode` AND t.`Country` <=> g.`Country`
+        SET t.`PresetGroupId` = CONCAT('PRESET', LPAD(g.MinId, 6, '0'))
+        WHERE t.`Mode` IS NOT NULL AND (t.`PresetGroupId` IS NULL OR t.`PresetGroupId` = '')
+    ");
+    try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Bookings` ADD COLUMN `BookingType` VARCHAR(20) NOT NULL DEFAULT 'parent-offer'"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Bookings` ADD COLUMN `PresetSlotId` INT NULL"); } catch { }

@@ -64,15 +64,6 @@ angular.module('learnSphereApp')
     });
   };
 
-  // Per-tutor preset slots for the search-page card strip. Named distinctly from
-  // getPresetSlots(studentId) above (which the Flow B student-matched view still
-  // uses) to avoid colliding signatures. NOTE: the backend does not yet expose a
-  // GET /tutors/{id}/preset-slots route — this call 404s today, so callers should
-  // treat a failed/empty response as "no preset classes" rather than an error.
-  self.getTutorPresetSlots = function (tutorId, params) {
-    return $http.get(API_URL + '/tutors/' + tutorId + '/preset-slots', { params: params });
-  };
-
   self.deleteSlot = function (tutorId, slotId) {
     return $http.delete(API_URL + '/tutors/' + tutorId + '/slots/' + slotId, {
       headers: AuthService.authHeader()

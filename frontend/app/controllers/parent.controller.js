@@ -93,77 +93,142 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Search / filter state
   self.searchQuery = '';
   self.selectedCountry = 'Singapore';
-  self.selectedSubject = 'All';
+  // null = "All Subjects"; otherwise the whole {examType, subject, level, label} catalog
+  // entry — filtering needs the level too, not just the subject name (see filteredTutors).
+  self.selectedSubject = null;
   self.selectedMode = 'All';
   self.minRating = 0;
 
-  // Flow B — book a tutor's pre-published class slot directly, no per-request approval.
-  self.searchTab = 'flowA';
-  self.searchStudentId = '';
-  self.presetSlots = [];
-  self.presetSlotsLoading = false;
-  self.pendingPresetSlot = null;
-  self.showPresetConfirm = false;
-  self.showPresetSuccess = false;
+  // Flow B — booking a tutor's already-published class (picked via a catalog card's
+  // "Available classes" chip, see selectPresetChip/selectTutor below) confirms
+  // immediately, no per-request tutor approval. State for that flow's invoice
+  // summary + receipt (see confirmPresetGroupBooking below).
+  self.selectedPresetGroup = null;
+  self.presetBookingBusy = false;
   self.presetBookingError = '';
+  self.presetBookingSuccess = false;
+  self.presetBookingReceipt = null;
 
-  self.searchStudent = function () {
-    return (self.students || []).find(function (s) { return String(s.id) === String(self.searchStudentId); });
-  };
+  // Books every occurrence in the selected preset class group (one API call per
+  // TutorTimeSlot — BookPreset only takes a single slot at a time) as one logical
+  // "booking" for the invoice summary/receipt. Runs sequentially rather than in
+  // parallel so a slot that became full/unavailable mid-series doesn't leave an
+  // unclear partial state — we know exactly how many succeeded before the failure.
+  self.confirmPresetGroupBooking = function () {
+    var group = self.selectedPresetGroup;
+    if (!group || !self.bookingForm.studentId || self.presetBookingBusy) return;
 
-  self.loadPresetSlots = function () {
-    if (!self.searchStudentId) return;
-    self.presetSlotsLoading = true;
-    TutorService.getPresetSlots(self.searchStudentId).then(function (res) {
-      self.presetSlots = res.data;
-      self.presetSlotsLoading = false;
-    }).catch(function () { self.presetSlotsLoading = false; });
-  };
-
-  self.onSearchStudentChange = function () {
-    self.presetSlots = [];
-    if (!self.searchStudentId) return;
-    if (self.searchTab === 'flowB') self.loadPresetSlots();
-  };
-
-  self.setSearchTab = function (tab) {
-    self.searchTab = tab;
-    if (tab === 'flowB' && self.searchStudentId) self.loadPresetSlots();
-  };
-
-  self.bookPresetSlot = function (slot) {
-    if (slot.isFull) return;
-    self.pendingPresetSlot = slot;
+    self.presetBookingBusy = true;
     self.presetBookingError = '';
-    self.showPresetConfirm = true;
-  };
 
-  self.cancelPresetBooking = function () {
-    self.pendingPresetSlot = null;
-    self.showPresetConfirm = false;
-  };
+    var created = [];
+    var chain = $q.when();
+    group.slots.forEach(function (s) {
+      chain = chain.then(function () {
+        return BookingService.bookPreset({ presetSlotId: s.id, studentId: self.bookingForm.studentId })
+          .then(function (res) { created.push(res.data); });
+      });
+    });
 
-  self.confirmPresetBooking = function () {
-    if (!self.pendingPresetSlot || !self.searchStudentId) return;
-    BookingService.bookPreset({
-      presetSlotId: self.pendingPresetSlot.id,
-      studentId: self.searchStudentId
-    }).then(function () {
-      self.showPresetConfirm = false;
-      self.pendingPresetSlot = null;
-      self.showPresetSuccess = true;
-      self.loadPresetSlots();
+    chain.then(function () {
+      self.presetBookingBusy = false;
+      self.presetBookingSuccess = true;
+      var student = self.students.find(function (x) { return x.id === self.bookingForm.studentId; });
+      self.presetBookingReceipt = {
+        tutorName: self.selectedTutor.name,
+        studentName: student ? student.name : '',
+        subject: group.subject,
+        level: group.level,
+        mode: group.mode,
+        pricePerLesson: group.pricePerLesson,
+        total: group.pricePerLesson * created.length,
+        bookings: created
+      };
       BookingService.getAll().then(function (r) { self.bookings = r.data; });
-      $timeout(function () { self.showPresetSuccess = false; }, 3000);
+      InvoiceService.getAll().then(function (r) { self.invoices = r.data; });
+      // Refresh the catalog so the booked occurrences drop out of / update in
+      // everyone's "Available classes" chips (fill count, isFull, etc).
+      TutorService.getAll({ includePresetSlots: true }).then(function (res) {
+        self.tutors = res.data;
+        self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
+      });
+      $timeout(function () {
+        self.presetBookingSuccess = false;
+        self.presetBookingReceipt = null;
+        self.selectedTutor = null;
+        self.selectedPresetGroup = null;
+        $location.path('/parent/sessions');
+      }, 3500);
     }).catch(function (err) {
-      self.presetBookingError = (err.data && err.data.message) || 'Booking failed. Please try again.';
+      self.presetBookingBusy = false;
+      self.presetBookingError = (created.length
+        ? created.length + ' of ' + group.slots.length + ' classes were booked before this happened — check My Sessions. '
+        : '') + ((err.data && err.data.message) || 'Booking failed. Please try again.');
     });
   };
   self.minExperience = 0;
 
   self.selectSearchCountry = function (c) {
     self.selectedCountry = c;
-    self.selectedSubject = 'All';
+    self.selectedSubject = null;
+  };
+
+  // Finds the catalog entry matching a given subject+level (used when a tutor card's
+  // subject chip is clicked, so the filter dropdown highlights the same entry it just
+  // applied — ng-options matches by object identity, so a freshly-built object with the
+  // same fields wouldn't show as selected even though it'd filter correctly either way).
+  self.findSubjectCatalogEntry = function (country, subject, level) {
+    return (self.subjectCatalog[country] || []).find(function (opt) {
+      return opt.subject === subject && opt.level === level;
+    }) || { examType: '', subject: subject, level: level, label: subject + ' (' + level + ')' };
+  };
+
+  var COUNTRY_ABBREV = { Singapore: 'SG', Malaysia: 'MY' };
+  var SUBJECT_ABBREV = {
+    'Mathematics': 'Maths',
+    'Additional Mathematics': 'A. Maths',
+    'English Language': 'English',
+    'Mother Tongue (Chinese)': 'Chinese',
+    'Mother Tongue (Malay)': 'Malay',
+    'Mother Tongue (Tamil)': 'Tamil',
+    'Combined Science': 'Comb. Science',
+    'Literature in English': 'Literature',
+    'Principles of Accounts': 'POA',
+    'Social Studies': 'Soc. Studies',
+    'Design & Technology': 'D&T',
+    'Food & Nutrition': 'F&N',
+    'General Paper': 'GP',
+    'Bahasa Malaysia': 'BM',
+    'Business Studies': 'Biz Studies',
+    'Information Technology': 'IT'
+  };
+
+  // Card-tag abbreviation for the compact "SG · P6 · Maths" chip format — the
+  // detailed tooltip/booking view keeps full text (e.g. "Mathematics · Primary 6"),
+  // this is only for the dense catalog-card tags where space is tight.
+  function abbreviateLevel(level) {
+    if (!level) return '';
+    var m = level.match(/^Primary\s+(\d+)$/i);
+    if (m) return 'P' + m[1];
+    m = level.match(/^Secondary\s+(\d+)$/i);
+    if (m) return 'Sec' + m[1];
+    if (/PSLE/i.test(level)) return 'PSLE';
+    if (/SPM/i.test(level)) return 'SPM';
+    if (/UPSR/i.test(level)) return 'UPSR';
+    if (/PT3/i.test(level)) return 'PT3';
+    if (/STPM/i.test(level)) return 'STPM';
+    return level;
+  }
+
+  self.abbreviateSubject = function (subject) {
+    return SUBJECT_ABBREV[subject] || subject;
+  };
+
+  self.abbreviateOffering = function (o) {
+    if (!o) return '';
+    var country = COUNTRY_ABBREV[o.country] || o.country;
+    var level = abbreviateLevel(o.level);
+    return country + ' · ' + level + ' · ' + self.abbreviateSubject(o.subject);
   };
 
   // Booking form
@@ -477,16 +542,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   function init() {
     TutorService.getAll({ includePresetSlots: true }).then(function (res) {
       self.tutors = res.data;
-      // Preset slot strip on each tutor card (search page) — fetched per-tutor since
-      // the catalog endpoint doesn't embed presetSlots yet; falls back to an empty
-      // list (strip shows "No preset classes yet") if the request fails.
-      self.tutors.forEach(function (t) {
-        TutorService.getTutorPresetSlots(t.id).then(function (r) {
-          t.presetSlots = r.data || [];
-        }).catch(function () {
-          t.presetSlots = [];
-        });
-      });
+      // Preset slot strip on each tutor card (search page) reads straight off
+      // each tutor's own t.timetable (see computeTutorPresetSummary below) —
+      // that's already included in this response, no per-tutor round trip needed.
+      // Computed once here (not from the template) to avoid $rootScope:infdig.
+      self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
       var pendingTutorId = PendingMatchService.consumeTutor();
       if (pendingTutorId) {
         var t = self.tutors.find(function (x) { return x.id === pendingTutorId; });
@@ -543,7 +603,12 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; }) ||
         (t.qualifications || []).some(function (ql) { return ql.toLowerCase().indexOf(q) >= 0; });
       var matchCountry = (t.offerings || []).some(function (o) { return o.country === self.selectedCountry; });
-      var matchSub = self.selectedSubject === 'All' || t.subjects.indexOf(self.selectedSubject) >= 0;
+      // Matches on subject AND level together (via the tutor's actual offerings) — a
+      // bare subject-name check would pass for a tutor teaching the subject at a
+      // completely different level than the one selected.
+      var matchSub = !self.selectedSubject || (t.offerings || []).some(function (o) {
+        return o.subject === self.selectedSubject.subject && o.level === self.selectedSubject.level;
+      });
       var matchMode = self.selectedMode === 'All' || t.modes.indexOf(self.selectedMode) >= 0;
       var matchRating = !self.minRating || t.rating >= self.minRating;
       var matchExperience = !self.minExperience || t.experienceYears >= self.minExperience;
@@ -561,51 +626,69 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return months[d.getMonth()] + ' ' + d.getFullYear();
   };
 
-  // ── Returns next month's date range as YYYY-MM-DD strings ─────────
+  // ── Returns the "upcoming" date range as YYYY-MM-DD strings: today
+  // through the end of next month. Deliberately NOT just next calendar
+  // month alone — a slot dated later this month (e.g. published 9 days out)
+  // is exactly the kind of imminent, bookable class this strip exists to
+  // surface, and excluding it just because it isn't technically "next
+  // month" would hide real, useful data for no good reason.
   self._nextMonthRange = function () {
     var now = new Date();
     var y = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
     var m = (now.getMonth() + 1) % 12;
-    var start = new Date(y, m, 1);
     var end = new Date(y, m + 1, 0);
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
     var fmt = function (d) { return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); };
+    var start = now;
     return { start: fmt(start), end: fmt(end) };
   };
 
-  // ── All preset slots for a tutor in next month ────────────────────
-  self.tutorNextMonthSlots = function (t) {
+  // Preset-slot summary for one tutor — computed ONCE per tutor (see init(),
+  // where this is called right after self.tutors loads) and cached on
+  // t._presetSummary, NOT recomputed from the template. tutorNextMonthSlots/
+  // tutorHasAnySlots/tutorSlotsBySubject/tutorSubjectsWithoutSlots below are
+  // called directly from ng-if/ng-repeat in the template; a function called
+  // from there that builds fresh arrays/objects every call never stabilizes
+  // and trips Angular's infinite-digest guard ($rootScope:infdig) — the
+  // original version of this code did exactly that (same trap fixed
+  // elsewhere for setupClassUniqueSubjects/computeContactableTutors, just
+  // missed here when this feature was first built).
+  function computeTutorPresetSummary(t) {
     var range = self._nextMonthRange();
-    return (t.presetSlots || []).filter(function (s) {
-      return s.date >= range.start && s.date <= range.end && !s.isFull;
-    });
-  };
-
-  // ── Does the tutor have ANY preset slots (full or not) next month ─
-  self.tutorHasAnySlots = function (t) {
-    var range = self._nextMonthRange();
-    return (t.presetSlots || []).some(function (s) {
-      return s.date >= range.start && s.date <= range.end;
-    });
-  };
-
-  // ── Group tutor's next month slots by subject ─────────────────────
-  // Returns array of { subject, level, mode, classSize, pricePerLesson,
-  //   startTime, endTime, recurrenceLabel, slots: [...] }
-  self.tutorSlotsBySubject = function (t) {
-    var range = self._nextMonthRange();
-    var slots = (t.presetSlots || []).filter(function (s) {
-      return s.date >= range.start && s.date <= range.end;
+    var slots = (t.timetable || []).filter(function (s) {
+      return s.mode && s.day >= range.start && s.day <= range.end;
+    }).map(function (s) {
+      return {
+        id: s.id,
+        date: s.day,
+        startTime: s.time,
+        endTime: s.endTime,
+        isFull: s.isFull,
+        subject: s.subject,
+        level: s.level,
+        mode: s.mode,
+        classSize: s.classSize,
+        pricePerLesson: s.pricePerLesson,
+        confirmedCount: s.confirmedCount,
+        maxStudents: s.maxStudents,
+        presetGroupId: s.presetGroupId
+      };
     });
 
     var groups = {};
     var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+    // Grouped by preset-id (one id per Setup Class submission, assigned server-side —
+    // see SetupClass in TutorsController) rather than subject+mode, so a class only
+    // merges with the OTHER occurrences it was actually published together with, not
+    // every unrelated slot that happens to share the same subject. Falls back to
+    // subject|mode for any pre-migration row that somehow still lacks a group id.
     slots.forEach(function (s) {
-      var key = s.subject + '|' + s.mode;
+      var key = s.presetGroupId || (s.subject + '|' + s.mode);
       if (!groups[key]) {
         groups[key] = {
+          presetGroupId: key,
           subject: s.subject,
           level: s.level,
           mode: s.mode,
@@ -619,8 +702,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       }
       var d = new Date(s.date + 'T00:00:00');
       groups[key].slots.push({
+        id: s.id,
         date: s.date,
         dateFormatted: days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()],
+        dateShort: d.getDate() + ' ' + months[d.getMonth()],
         startTime: s.startTime,
         endTime: s.endTime,
         isFull: s.isFull,
@@ -630,28 +715,50 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       });
     });
 
-    // Build recurrence label from first slot's day name
-    Object.values(groups).forEach(function (g) {
+    var nm = self.nextMonthLabel().split(' ');
+    var groupList = Object.keys(groups).map(function (k) { return groups[k]; });
+    groupList.forEach(function (g) {
       g.slots.sort(function (a, b) { return a.date.localeCompare(b.date); });
       if (g.slots.length > 0) {
         var d = new Date(g.slots[0].date + 'T00:00:00');
-        var nm = self.nextMonthLabel().split(' ');
         g.recurrenceLabel = 'Every ' + ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()] + ', ' + nm[0] + ' ' + nm[1];
       }
     });
 
-    return Object.values(groups);
-  };
-
-  // ── Subjects tutor teaches but has NO preset slot next month ───────
-  self.tutorSubjectsWithoutSlots = function (t) {
-    var slotSubjects = self.tutorSlotsBySubject(t).map(function (g) { return g.subject; });
-    return (t.offerings || []).filter(function (o) {
-      return slotSubjects.indexOf(o.subject) < 0;
+    var subjectsWithSlots = groupList.map(function (g) { return g.subject; });
+    var subjectsWithoutSlots = (t.offerings || []).filter(function (o) {
+      return subjectsWithSlots.indexOf(o.subject) < 0;
     }).reduce(function (acc, o) {
       if (!acc.some(function (x) { return x.subject === o.subject; })) acc.push(o);
       return acc;
     }, []);
+
+    return {
+      openSlots: slots.filter(function (s) { return !s.isFull; }),
+      hasAny: slots.length > 0,
+      groups: groupList,
+      subjectsWithoutSlots: subjectsWithoutSlots
+    };
+  }
+
+  // ── All preset slots for a tutor in next month ────────────────────
+  self.tutorNextMonthSlots = function (t) {
+    return (t._presetSummary && t._presetSummary.openSlots) || [];
+  };
+
+  // ── Does the tutor have ANY preset slots (full or not) next month ─
+  self.tutorHasAnySlots = function (t) {
+    return !!(t._presetSummary && t._presetSummary.hasAny);
+  };
+
+  // ── Group tutor's next month slots by subject ─────────────────────
+  self.tutorSlotsBySubject = function (t) {
+    return (t._presetSummary && t._presetSummary.groups) || [];
+  };
+
+  // ── Subjects tutor teaches but has NO preset slot next month ───────
+  self.tutorSubjectsWithoutSlots = function (t) {
+    return (t._presetSummary && t._presetSummary.subjectsWithoutSlots) || [];
   };
 
   // ── Mode icon helper (Tabler icon suffix) ─────────────────────────
@@ -665,14 +772,48 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return map[mode] || 'calendar';
   };
 
+  // Click one of a tutor's "Available classes" chips to mark it selected (toggles
+  // off on a second click) — selectTutor() below then uses it to pre-fill the
+  // booking form's schedule, so the parent doesn't have to hand-type dates/times
+  // that are already fixed by the tutor's preset slot.
+  self.selectPresetChip = function (t, sg) {
+    t._selectedPresetGroupId = (t._selectedPresetGroupId === sg.presetGroupId) ? null : sg.presetGroupId;
+  };
+
+  // 'YYYY-MM-DD' (as stored/returned by the API) -> 'DD-MM-YYYY' (what the
+  // booking form's fp-date-bound session.date fields expect — see filters.js).
+  function toDdMmYyyy(ymd) {
+    var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+  }
+
   // Select a tutor to book
   self.selectTutor = function (tutor) {
     self.selectedTutor = tutor;
+    self.selectedPresetGroup = null;
+    self.presetBookingError = '';
     self.bookingForm.subject = tutor.subjects[0] || '';
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     var activeStudents = self.activeStudents();
     if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
+
+    // A published class chip was selected first — carry its subject and exact
+    // schedule (one session row per still-bookable occurrence) into the booking
+    // form/invoice summary. The parent only needs to pick a child from here.
+    // Already-full occurrences are dropped — nothing left to book there.
+    var groupId = tutor._selectedPresetGroupId;
+    var group = groupId && tutor._presetSummary &&
+      (tutor._presetSummary.groups || []).find(function (g) { return g.presetGroupId === groupId; });
+    var openSlots = group ? group.slots.filter(function (s) { return !s.isFull; }) : [];
+    if (group && openSlots.length > 0) {
+      self.selectedPresetGroup = angular.extend({}, group, { slots: openSlots });
+      self.bookingForm.subject = group.subject;
+      self.bookingForm.classesPerMonth = openSlots.length;
+      self.bookingForm.sessions = openSlots.map(function (s) {
+        return { date: toDdMmYyyy(s.date), startTime: s.startTime, endTime: s.endTime, recurring: false };
+      });
+    }
 
     self.tutorCal.year = _scNow.getFullYear();
     self.tutorCal.month = _scNow.getMonth();
@@ -936,7 +1077,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     session.endTime = normalizeTimeToAmPm(session.endTime);
   };
 
-  self.clearSelectedTutor = function () { self.selectedTutor = null; };
+  self.clearSelectedTutor = function () {
+    self.selectedTutor = null;
+    self.selectedPresetGroup = null;
+    self.presetBookingError = '';
+  };
 
   // Book a tutor
   self.submitBooking = function () {
@@ -1296,6 +1441,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Pay an invoice
   self.paySuccess = false;
+  self.payingBooking = null;
+
+  // Sessions & Activity's "Pay Invoice" button opens this review panel first
+  // (same invoice-summary layout as the preset-class booking summary on the Find
+  // Tutors page) rather than charging immediately on click.
+  self.openPaySummary = function (b) { self.payingBooking = b; };
+
+  self.confirmPayInvoice = function () {
+    if (!self.payingBooking) return;
+    var inv = self.getInvoiceForBooking(self.payingBooking.id);
+    self.payingBooking = null;
+    if (inv) self.payInvoice(inv.id);
+  };
 
   self.invoicesTab = 'active';
 

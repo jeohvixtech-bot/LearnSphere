@@ -487,7 +487,10 @@ public class TutorsController : ControllerBase
     public async Task<IActionResult> SetupClass(int id, [FromBody] SetupClassDto dto)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        var tutor = await _context.Tutors
+            .Include(t => t.Offerings)
+            .Include(t => t.Modes)
+            .FirstOrDefaultAsync(t => t.Id == id);
         if (tutor == null) return NotFound();
         if (tutor.UserId != userId) return Forbid();
 
@@ -499,6 +502,21 @@ public class TutorsController : ControllerBase
             return BadRequest(new { message = "Please select a subject." });
         if (dto.PricePerLesson <= 0)
             return BadRequest(new { message = "Please enter a price per lesson." });
+
+        // The Setup Class UI only ever offers subjects/levels/modes the tutor has
+        // already registered as an offering — this is the server-side backstop for
+        // that, so a preset slot can never be published for a subject/level/mode the
+        // tutor never actually listed, regardless of what calls this endpoint.
+        var offeringMatch = tutor.Offerings.Any(o =>
+            string.Equals(o.Subject, dto.Subject, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(o.Level, dto.Level, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(o.Country, dto.Country, StringComparison.OrdinalIgnoreCase));
+        if (!offeringMatch)
+            return BadRequest(new { message = $"You haven't registered \"{dto.Subject}\" at \"{dto.Level}\" ({dto.Country}) as one of your teaching offerings. Add it under Edit Profile first." });
+
+        var modeMatch = tutor.Modes.Any(m => string.Equals(m.Mode, dto.Mode, StringComparison.OrdinalIgnoreCase));
+        if (!modeMatch)
+            return BadRequest(new { message = $"You haven't registered \"{dto.Mode}\" as one of your teaching modes." });
 
         // Blocked-date exclusion is enforced client-side (the tutor's blocked ranges are
         // only ever kept in browser memory, never persisted) — here we only guard against
@@ -512,7 +530,7 @@ public class TutorsController : ControllerBase
             .ToListAsync();
 
         var maxStudents = dto.ClassSize == "one-to-many" ? Math.Max(2, dto.MaxStudents) : 1;
-        var createdIds = new List<int>();
+        var createdSlots = new List<TutorTimeSlot>();
 
         foreach (var slot in dto.Slots)
         {
@@ -550,10 +568,19 @@ public class TutorsController : ControllerBase
             };
             _context.TutorTimeSlots.Add(newSlot);
             await _context.SaveChangesAsync();
-            createdIds.Add(newSlot.Id);
+            createdSlots.Add(newSlot);
         }
 
-        return Ok(new { slotIds = createdIds });
+        // Tag every slot from this one Setup Class submission with a shared preset-group
+        // id (derived from the first slot's own auto-increment id, same PREFIX+pad
+        // convention as BookingNumber/InvoiceNumber) so the catalog groups/displays a
+        // recurring series as one class instead of merging unrelated batches that just
+        // happen to share the same subject.
+        var presetGroupId = "PRESET" + createdSlots[0].Id.ToString("D6");
+        foreach (var s in createdSlots) s.PresetGroupId = presetGroupId;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { slotIds = createdSlots.Select(s => s.Id).ToList(), presetGroupId });
     }
 
     [HttpPost("{id}/slots")]
@@ -574,13 +601,49 @@ public class TutorsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> DeleteSlot(int id, int slotId)
     {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
         var slot = await _context.TutorTimeSlots.FirstOrDefaultAsync(s => s.Id == slotId && s.TutorId == id);
         if (slot == null) return NotFound();
-        if (slot.Status == "Booked") return BadRequest(new { message = "Cannot delete a booked slot." });
+
+        // Flow B preset slots track fills via ConfirmedCount/IsFull, not the legacy
+        // Status flag (that only reflects unrelated time-overlap blocking — see
+        // BookPreset), so any confirmed/pending bookings riding on this slot must be
+        // cancelled explicitly. Mirrors the parent-side cancel flow in
+        // BookingsController.CancelBooking: void the invoice, notify the other side —
+        // before the slot itself disappears, so nobody's booking silently vanishes.
+        var affectedBookings = await _context.Bookings
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
+            .Include(b => b.Invoice)
+            .Where(b => b.PresetSlotId == slotId && (b.Status == "confirmed" || b.Status == "pending"))
+            .ToListAsync();
+
+        foreach (var booking in affectedBookings)
+        {
+            booking.Status = "cancelled";
+            if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
+                booking.Invoice.Status = "Cancelled";
+
+            if (booking.Student?.ParentUser != null)
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    UserId = booking.Student.ParentUser.Id,
+                    Title = "Class Cancelled by Tutor",
+                    Message = $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled by the tutor.",
+                    Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+                    Type = "booking",
+                    IsRead = false
+                });
+            }
+        }
 
         _context.TutorTimeSlots.Remove(slot);
         await _context.SaveChangesAsync();
-        return Ok();
+        return Ok(new { cancelledBookings = affectedBookings.Count });
     }
 
     [HttpPost("{id}/reviews")]
@@ -673,7 +736,7 @@ public class TutorsController : ControllerBase
             Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId,
             EndTime = s.EndTime, Mode = s.Mode, Subject = s.Subject, Level = s.Level, Country = s.Country,
             ClassSize = s.ClassSize, MaxStudents = s.MaxStudents, ConfirmedCount = s.ConfirmedCount,
-            IsFull = s.IsFull, PricePerLesson = s.PricePerLesson
+            IsFull = s.IsFull, PricePerLesson = s.PricePerLesson, PresetGroupId = s.PresetGroupId
         }).ToList(),
         Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
     };

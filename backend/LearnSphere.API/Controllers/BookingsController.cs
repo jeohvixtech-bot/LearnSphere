@@ -221,7 +221,11 @@ public class BookingsController : ControllerBase
         {
             TutorId = slot.TutorId,
             StudentId = dto.StudentId,
-            Subject = slot.Subject ?? string.Empty,
+            // Matches the parent-offer flow's "Subject - Level" convention (composed
+            // client-side in parent.controller.js's submitBooking) so the level shows
+            // up wherever the booking's Subject string is displayed, not just on the
+            // original slot.
+            Subject = (slot.Subject ?? string.Empty) + (string.IsNullOrWhiteSpace(slot.Level) ? "" : " - " + slot.Level),
             Mode = slot.Mode ?? string.Empty,
             DurationHours = slot.DurationMinutes / 60.0,
             TotalPrice = slot.PricePerLesson,

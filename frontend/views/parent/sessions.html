@@ -92,6 +92,43 @@
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
+    <!-- ── Payment Summary (same layout as the preset-class booking summary
+         on the Find Tutors page) ───────────────────────── -->
+    <div class="card" ng-if="vm.payingBooking && !vm.paySuccess">
+      <div class="report-issue-header">
+        <div class="report-issue-icon">💳</div>
+        <div>
+          <h3>Payment Summary</h3>
+          <p>Booking #{{ vm.payingBooking.bookingNumber }}</p>
+        </div>
+        <button class="btn-link" ng-click="vm.payingBooking = null" style="margin-left:auto">✕ Cancel</button>
+      </div>
+
+      <div class="invoice-summary-block">
+        <div class="invoice-summary-row"><span>Tutor</span><strong>{{ vm.payingBooking.tutorName }}</strong></div>
+        <div class="invoice-summary-row"><span>Student</span><strong>{{ vm.payingBooking.studentName }}</strong></div>
+        <div class="invoice-summary-row"><span>Subject</span><strong>{{ vm.payingBooking.subject }}</strong></div>
+        <div class="invoice-summary-row"><span>Mode</span><strong>{{ vm.payingBooking.mode }}</strong></div>
+      </div>
+
+      <div class="booking-form-section">Schedule ({{ vm.payingBooking.classes.length }} class{{ vm.payingBooking.classes.length === 1 ? '' : 'es' }})</div>
+      <div class="invoice-summary-schedule">
+        <div class="invoice-summary-schedule-row" ng-repeat="c in vm.payingBooking.classes track by $index">
+          <span>{{ c.date | dmy }}</span><span>{{ c.time | hhmma }}</span>
+        </div>
+      </div>
+
+      <div class="price-summary">
+        <span>💳 Total</span>
+        <strong>${{ vm.payingBooking.totalPrice }}.00</strong>
+      </div>
+
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn-outline" ng-click="vm.payingBooking = null">Cancel</button>
+        <button class="btn-primary" ng-click="vm.confirmPayInvoice()">Confirm Payment</button>
+      </div>
+    </div>
+
     <!-- ── Cancel Success ───────────────────────────── -->
     <div class="alert-success" ng-if="vm.cancelSuccess">
       ✓ Booking cancelled.
@@ -226,7 +263,7 @@
             <button class="btn-primary sm"
               ng-if="b.status === 'confirmed'"
               ng-show="vm.getInvoiceForBooking(b.id) && vm.getInvoiceForBooking(b.id).status === 'Unpaid'"
-              ng-click="vm.payInvoice(vm.getInvoiceForBooking(b.id).id)">
+              ng-click="vm.openPaySummary(b)">
               💳 Pay Invoice
             </button>
             <button class="btn-outline sm"

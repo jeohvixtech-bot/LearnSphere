@@ -165,7 +165,6 @@ npx serve . -p 3000
 | PATCH | `/api/tutors/{id}/online-status` | JWT (owner) | Toggle a tutor's own online/offline visibility |
 | PATCH | `/api/tutors/{id}/modes` | JWT (owner) | Replace a tutor's teaching modes |
 | DELETE | `/api/tutors/{id}` | JWT | Delete tutor account |
-| GET | `/api/tutors/booking` | JWT | Get tutor's bookings |
 | GET | `/api/tutors/{id}/slots` | JWT | Get full timetable |
 | GET | `/api/tutors/{id}/busy-times` | — | Get a tutor's booked times (for the parent-facing availability calendar) |
 | POST | `/api/tutors/{id}/slots` | JWT | Add a timetable slot (validates no clash with existing slots) |

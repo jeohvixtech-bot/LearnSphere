@@ -549,6 +549,13 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.isCalDaySelected = function (d) { return self.selectedCalDays.indexOf(d) > -1; };
 
+  // Selected days in date order for the day-detail panel below the calendar —
+  // returns a fresh array each call, but ng-repeat uses "track by day" on the
+  // primitive value itself, so identity stays stable across digests regardless.
+  self.sortedSelectedCalDays = function () {
+    return self.selectedCalDays.slice().sort(function (a, b) { return a - b; });
+  };
+
   self.resetCalDaySelection = function () { self.selectedCalDays = []; };
 
   self.bookingsOnDay = function (dayNum) {
@@ -591,6 +598,35 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     var s = calDayStr(dayNum);
     return self.tutor.timetable.filter(function (slot) {
       return slot.mode && slot.day === s;
+    });
+  };
+
+  // Cancelling a published slot that already has confirmed/pending student
+  // bookings cascades on the backend (cancels those bookings, voids unpaid
+  // invoices, notifies the parents) — so the confirmation here warns about
+  // that impact up front rather than letting it happen silently.
+  self.cancelSlotBusy = false;
+
+  self.cancelPublishedSlot = function (slot) {
+    var count = slot.confirmedCount || 0;
+    var msg = count > 0
+      ? 'This class has ' + count + ' student' + (count === 1 ? '' : 's') + ' booked. Cancelling will notify ' +
+        (count === 1 ? 'them' : 'them all') + ' and void any unpaid invoices for this class. Continue?'
+      : 'Cancel this class? It will be removed from your published slots.';
+    if (!confirm(msg)) return;
+
+    self.cancelSlotBusy = true;
+    TutorService.deleteSlot(self.tutor.id, slot.id).then(function () {
+      self.cancelSlotBusy = false;
+      TutorService.getByUser(user.userId).then(function (res) {
+        self.tutor = res.data;
+        rebuildSetupClassUniqueSubjects();
+      });
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    }).catch(function (err) {
+      self.cancelSlotBusy = false;
+      alert((err.data && err.data.message) ? err.data.message : 'Failed to cancel. Please try again.');
     });
   };
 

@@ -1829,7 +1829,12 @@ a { text-decoration: none; color: inherit; }
   background: #fff;
   border: 0.5px solid #e2e8f0;
   border-radius: 12px;
-  overflow: hidden;
+  /* Not hidden — a slot chip's hover tooltip (position:absolute, pops upward past
+     the card's own edge) would otherwise get clipped by the rounded-corner card
+     boundary, showing a cut-off box with the page behind bleeding through. Nothing
+     else in the card touches its raw edge (all inner sections have their own
+     horizontal padding), so nothing relies on this to look clipped/rounded. */
+  overflow: visible;
   transition: border-color .15s, box-shadow .15s;
 }
 .tutor-card:hover { border-color: #6ee7b7; box-shadow: 0 4px 16px rgba(5,150,105,0.08); }
@@ -1970,6 +1975,10 @@ a { text-decoration: none; color: inherit; }
   white-space: nowrap;
 }
 .slot-chip:hover { background: #059669; color: #fff; }
+.slot-chip-selected, .slot-chip-selected:hover {
+  background: #059669; color: #fff; border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.25);
+}
 .slot-chip i { font-size: 11px; flex-shrink: 0; }
 
 .slot-chip-empty {
@@ -1990,13 +1999,15 @@ a { text-decoration: none; color: inherit; }
 .slot-tooltip {
   display: none;
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: 100%;
   left: 0;
   background: #fff;
   border: 0.5px solid #e2e8f0;
   border-radius: 12px;
   padding: 14px 16px;
   width: 290px;
+  max-height: 340px;
+  overflow-y: auto;
   z-index: 100;
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
   white-space: normal;
@@ -2156,6 +2167,37 @@ a { text-decoration: none; color: inherit; }
 }
 .price-summary span { font-size: 14px; color: #047857; font-weight: 600; }
 .price-summary strong { font-size: 17px; color: #059669; font-weight: 900; }
+
+/* ── Invoice summary (preset class booking) ────────────────────── */
+.invoice-summary-block {
+  background: #f8fafc; border: 0.5px solid #e2e8f0; border-radius: 12px;
+  padding: 4px 16px;
+}
+.invoice-summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 0.5px solid #e2e8f0; font-size: 13px;
+}
+.invoice-summary-row:last-child { border-bottom: none; }
+.invoice-summary-row span { color: #64748b; }
+.invoice-summary-row strong { color: #0f172a; font-weight: 500; text-align: right; }
+.invoice-summary-row.invoice-summary-total strong { color: #059669; font-size: 16px; }
+
+.invoice-summary-schedule {
+  border: 0.5px solid #e2e8f0; border-radius: 12px; overflow: hidden;
+  max-height: 220px; overflow-y: auto;
+}
+.invoice-summary-schedule-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 16px; font-size: 13px; color: #334155;
+  border-bottom: 0.5px solid #f1f5f9;
+}
+.invoice-summary-schedule-row:last-child { border-bottom: none; }
+.invoice-summary-schedule-row span:last-child { color: #94a3b8; }
+
+.invoice-receipt { text-align: center; padding: 32px; }
+.invoice-receipt-icon { font-size: 40px; color: #059669; margin-bottom: 10px; }
+.invoice-receipt h3 { font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 4px; }
+.invoice-receipt .invoice-summary-block { text-align: left; margin: 18px auto 0; max-width: 380px; }
 
 .alert-success.large {
   font-size: 17px; font-weight: 700; padding: 24px; text-align: center;

@@ -65,6 +65,7 @@ public class TimeSlotDto
     public int ConfirmedCount { get; set; }
     public bool IsFull { get; set; }
     public decimal PricePerLesson { get; set; }
+    public string? PresetGroupId { get; set; }
 }
 
 public class VerifyTutorDto

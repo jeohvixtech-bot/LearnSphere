@@ -228,31 +228,34 @@
         </button>
       </div>
 
-      <div class="day-detail" ng-if="vm.selectedCalDays[0]">
-        <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> Scheduled Classes for {{ vm.calMonthName() }} {{ vm.selectedCalDays[0] }}, {{ vm.calYear }}</h4>
-        <p ng-if="!vm.bookingsOnDay(vm.selectedCalDays[0]).length" class="empty-state">No lessons on this day.</p>
-        <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(vm.selectedCalDays[0])">
+      <div class="day-detail" ng-repeat="day in vm.sortedSelectedCalDays() track by day">
+        <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> Scheduled Classes for {{ vm.calMonthName() }} {{ day }}, {{ vm.calYear }}</h4>
+        <p ng-if="!vm.bookingsOnDay(day).length" class="empty-state">No lessons on this day.</p>
+        <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(day)">
           <div class="booking-detail-header">
             <span class="badge-subject">{{ b.subject }}</span>
             <strong>Child: {{ b.studentName }}</strong>
-            <p>{{ vm.classOnDay(b, vm.selectedCalDays[0]).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
+            <p>{{ vm.classOnDay(b, day).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
           </div>
           <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
           <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
         </div>
 
-        <div ng-if="vm.publishedSlotsOnDay(vm.selectedCalDays[0]).length">
+        <div ng-if="vm.publishedSlotsOnDay(day).length">
           <h5 class="section-label" style="margin-top:14px">
             <span class="published-dot-inline"></span> Your Published Slots
           </h5>
-          <div class="booking-detail-card published-slot-card" ng-repeat="slot in vm.publishedSlotsOnDay(vm.selectedCalDays[0])">
+          <div class="booking-detail-card published-slot-card" ng-repeat="slot in vm.publishedSlotsOnDay(day)">
             <div class="booking-detail-header">
-              <span class="badge-subject">{{ slot.subject }}</span>
+              <span class="badge-subject">{{ slot.subject }}<span ng-if="slot.level"> · {{ slot.level }}</span></span>
               <strong>{{ slot.time | hhmma }} – {{ slot.endTime | hhmma }}</strong>
               <p>{{ slot.mode }} · {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }} · ${{ slot.pricePerLesson }}/lesson</p>
             </div>
             <p ng-if="slot.isFull" class="text-danger">Full — no more bookings accepted</p>
             <p ng-if="!slot.isFull" class="text-muted">Open for booking · not yet claimed by a parent</p>
+            <button class="btn-outline sm text-danger" ng-click="vm.cancelPublishedSlot(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px">
+              <i class="ti ti-x" aria-hidden="true"></i> Cancel class
+            </button>
           </div>
         </div>
       </div>
