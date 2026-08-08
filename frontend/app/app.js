@@ -110,6 +110,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
     })
+    .when('/admin/reschedule-queue', {
+      templateUrl: 'views/admin/reschedule-queue.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
     .otherwise({ redirectTo: '/welcome' });
 
   function authGuard(requiredRole) {

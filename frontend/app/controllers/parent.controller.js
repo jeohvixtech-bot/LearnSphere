@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog) {
+.controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -62,7 +62,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       var modeMatch = !preferredModes.length || (t.modes || []).some(function (m) {
         return preferredModes.indexOf(m) >= 0;
       });
-      return subjectMatch && modeMatch;
+      // Same rule as the catalog's filteredTutors() — booking now only happens
+      // from a tutor's published preset classes, so a tutor with none isn't a
+      // useful match result right now.
+      var hasPresetClasses = self.tutorHasAnySlots(t);
+      return subjectMatch && modeMatch && hasPresetClasses;
     }) : [];
     self.aiMatchResults = matched;
     if (!matched.length) return;
@@ -136,10 +140,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.selectedMode = 'All';
   self.minRating = 0;
 
-  // Flow B — booking a tutor's already-published class (picked via a catalog card's
-  // "Available classes" chip, see selectPresetChip/selectTutor below) confirms
-  // immediately, no per-request tutor approval. State for that flow's invoice
-  // summary + receipt (see confirmPresetGroupBooking below).
+  // Flow B — booking a tutor's already-published class (picked via a catalog
+  // card's "View & Book" row button, see viewAndBookPreset/selectTutor below)
+  // confirms immediately, no per-request tutor approval. State for that flow's
+  // invoice summary + receipt (see confirmPresetGroupBooking below).
   self.selectedPresetGroup = null;
   self.presetBookingBusy = false;
   self.presetBookingError = '';
@@ -636,8 +640,66 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
     TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
+
+    // Forced "tutor cancelled your class" popup — only checked/shown on the
+    // dashboard page (explicit requirement), but reappears every time the
+    // parent lands back there until every pending item is resolved. The GET
+    // itself also sweeps auto-accept server-side (see
+    // PresetCancellationsController.GetMine), so a proposal nobody responded
+    // to before its date/time passed shows up already resolved, not pending.
+    if ($location.path() === '/parent/dashboard') {
+      PresetCancellationService.getMine().then(function (res) {
+        self.pendingCancellations = res.data;
+      });
+    }
   }
   init();
+
+  self.pendingCancellations = [];
+  self.cancellationActionBusy = false;
+  self.cancellationActionError = '';
+
+  self.currentCancellation = function () {
+    return self.pendingCancellations.length ? self.pendingCancellations[0] : null;
+  };
+
+  self.acceptCancellation = function (decision) {
+    self.cancellationActionBusy = true;
+    self.cancellationActionError = '';
+    PresetCancellationService.accept(decision.id).then(function () {
+      self.pendingCancellations = self.pendingCancellations.filter(function (d) { return d.id !== decision.id; });
+      self.cancellationActionBusy = false;
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    }).catch(function (err) {
+      self.cancellationActionBusy = false;
+      self.cancellationActionError = (err.data && err.data.message) || 'Could not process this. Please try again.';
+    });
+  };
+
+  self.rejectCancellation = function (decision) {
+    self.cancellationActionBusy = true;
+    self.cancellationActionError = '';
+    PresetCancellationService.reject(decision.id).then(function () {
+      self.pendingCancellations = self.pendingCancellations.filter(function (d) { return d.id !== decision.id; });
+      self.cancellationActionBusy = false;
+    }).catch(function (err) {
+      self.cancellationActionBusy = false;
+      self.cancellationActionError = (err.data && err.data.message) || 'Could not process this. Please try again.';
+    });
+  };
+
+  self.acknowledgeCancellation = function (decision) {
+    self.cancellationActionBusy = true;
+    self.cancellationActionError = '';
+    PresetCancellationService.acknowledge(decision.id).then(function () {
+      self.pendingCancellations = self.pendingCancellations.filter(function (d) { return d.id !== decision.id; });
+      self.cancellationActionBusy = false;
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    }).catch(function (err) {
+      self.cancellationActionBusy = false;
+      self.cancellationActionError = (err.data && err.data.message) || 'Could not process this. Please try again.';
+    });
+  };
 
   // Favorite tutors
   self.isFavorited = function (tutorId) {
@@ -674,7 +736,11 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       var matchMode = self.selectedMode === 'All' || t.modes.indexOf(self.selectedMode) >= 0;
       var matchRating = !self.minRating || t.rating >= self.minRating;
       var matchExperience = !self.minExperience || t.experienceYears >= self.minExperience;
-      return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience;
+      // The catalog only ever books from a tutor's published preset classes now
+      // (see viewAndBookPreset) — a tutor with none isn't bookable from this page,
+      // so hide them entirely rather than showing a card with no action on it.
+      var hasPresetClasses = self.tutorHasAnySlots(t);
+      return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience && hasPresetClasses;
     }).sort(function (a, b) {
       return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
     });
@@ -834,12 +900,66 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     return map[mode] || 'calendar';
   };
 
-  // Click one of a tutor's "Available classes" chips to mark it selected (toggles
-  // off on a second click) — selectTutor() below then uses it to pre-fill the
-  // booking form's schedule, so the parent doesn't have to hand-type dates/times
-  // that are already fixed by the tutor's preset slot.
-  self.selectPresetChip = function (t, sg) {
-    t._selectedPresetGroupId = (t._selectedPresetGroupId === sg.presetGroupId) ? null : sg.presetGroupId;
+  // Each row in the catalog/AI-Match "Available classes" list has its own View &
+  // Book button — jumps straight to the booking summary for THAT class (via
+  // selectTutor()'s existing t._selectedPresetGroupId pre-fill logic), no
+  // separate select-then-click-a-shared-button step needed.
+  self.viewAndBookPreset = function (t, sg) {
+    t._selectedPresetGroupId = sg.presetGroupId;
+    self.selectTutor(t);
+  };
+
+  // AI Speed Match equivalent of viewAndBookPreset — this page has no in-page
+  // booking-detail section of its own, so it reuses goToBookTutor's existing
+  // PendingMatchService hand-off to land on that section over on /parent/search.
+  self.viewAndBookPresetMatch = function (t, sg) {
+    t._selectedPresetGroupId = sg.presetGroupId;
+    self.goToBookTutor(t);
+  };
+
+  // The preset-class list (.tutor-slot-list) scrolls internally (max ~4 rows
+  // visible) — a plain CSS :hover + position:absolute tooltip would get
+  // clipped by that scroll box the moment its content is taller than the box
+  // itself, even with nothing currently scrolled (overflow:auto clips
+  // absolutely-positioned descendants unconditionally, not just while
+  // scrolled). Computing position:fixed coordinates here escapes that
+  // clipping entirely, since fixed positioning is relative to the viewport,
+  // not any scrolling ancestor.
+  self.showRowTooltip = function (sg, $event) {
+    var rowRect = $event.currentTarget.getBoundingClientRect();
+    // Anchored below the WHOLE scrollable list (.tutor-slot-list), not just the
+    // hovered row — anchoring to the row alone let the tooltip overlap
+    // whichever sibling row(s) happened to sit right below it, leaving that
+    // row's own View & Book button peeking out beside the tooltip looking
+    // like a dangling, disconnected control. Below the full list, it never
+    // overlaps any row regardless of which one is hovered.
+    var listEl = $event.currentTarget.closest('.tutor-slot-list') || $event.currentTarget;
+    var listRect = listEl.getBoundingClientRect();
+
+    // Flip upward when there isn't reasonably enough room below (e.g. the card
+    // is scrolled near the bottom of the viewport) — otherwise the tooltip
+    // runs off the bottom of the screen instead of being fully visible.
+    // Anchoring with `bottom` (grows upward) rather than computing `top` from
+    // an estimated height means this works regardless of the tooltip's actual
+    // rendered height, which varies with how many dates are in the schedule.
+    var spaceBelow = window.innerHeight - listRect.bottom;
+    var flipUp = spaceBelow < 260;
+
+    sg._tooltipStyle = flipUp ? {
+      display: 'block',
+      top: 'auto',
+      bottom: (window.innerHeight - listRect.top + 6) + 'px',
+      left: rowRect.left + 'px'
+    } : {
+      display: 'block',
+      top: (listRect.bottom + 6) + 'px',
+      bottom: 'auto',
+      left: rowRect.left + 'px'
+    };
+  };
+
+  self.hideRowTooltip = function (sg) {
+    sg._tooltipStyle = null;
   };
 
   // 'YYYY-MM-DD' (as stored/returned by the API) -> 'DD-MM-YYYY' (what the
@@ -1596,7 +1716,10 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.loadChat = function (tutorId) {
     self.activeTutorId = tutorId;
     self.activeTutor = self.contactableTutors.find(function (t) { return t.id === tutorId; }) || null;
-    ChatService.getMessages(tutorId, self.user.userId).then(function (res) { self.chatMessages = res.data; });
+    ChatService.getMessages(tutorId, self.user.userId).then(function (res) {
+      self.chatMessages = res.data;
+      scrollChatToBottom();
+    });
   };
 
   self.sendMessage = function () {
@@ -1605,8 +1728,38 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';
+        scrollChatToBottom();
       });
   };
+
+  // Auto-refresh the open conversation so a reply shows up without the parent
+  // needing to reload the page. Polls rather than pushing over a live socket —
+  // simplest option for this app's scale, mirrors the existing booking poll in
+  // tutor.controller.js. Only appends messages the client hasn't already seen
+  // (by id) so an in-progress read/scroll position isn't disrupted by replacing
+  // the whole array every tick.
+  function mergeNewChatMessages(fetched) {
+    var seenIds = {};
+    self.chatMessages.forEach(function (m) { seenIds[m.id] = true; });
+    var added = false;
+    fetched.forEach(function (m) {
+      if (!seenIds[m.id]) { self.chatMessages.push(m); added = true; }
+    });
+    if (added) scrollChatToBottom();
+  }
+
+  function scrollChatToBottom() {
+    $timeout(function () {
+      var el = document.getElementById('chatMessages');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  var _chatPollInterval = $interval(function () {
+    if (!self.activeTutorId) return;
+    ChatService.getMessages(self.activeTutorId, self.user.userId).then(mergeNewChatMessages);
+  }, 4000);
+  $scope.$on('$destroy', function () { $interval.cancel(_chatPollInterval); });
 
   // School dropdown
   self.openSchoolDropdown = function () {

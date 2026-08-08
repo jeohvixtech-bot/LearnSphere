@@ -34,9 +34,45 @@ public class TutorDto
     public List<string> Qualifications { get; set; } = new();
     public bool IsVerified { get; set; }
     public bool IsOnline { get; set; }
+    public string VerificationStatus { get; set; } = string.Empty;
+    public bool OfferingsUnlocked { get; set; }
+    public List<TutorDocumentDto> Documents { get; set; } = new();
     public List<ReviewDto> Reviews { get; set; } = new();
     public List<TimeSlotDto> Timetable { get; set; } = new();
     public List<TutorOfferingDto> Offerings { get; set; } = new();
+}
+
+public class TutorDocumentDto
+{
+    public int Id { get; set; }
+    public string DocumentType { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public string? ExternalUrl { get; set; }
+    public string? FileName { get; set; }
+    public long? FileSizeBytes { get; set; }
+    public string? IdType { get; set; }
+    public string? IdNumber { get; set; }
+    public int SortOrder { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? AdminNote { get; set; }
+    public DateTime UploadedAt { get; set; }
+}
+
+public class SaveDocumentDto
+{
+    public string DocumentType { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public string? ExternalUrl { get; set; }
+    public string? FileName { get; set; }
+    public long? FileSizeBytes { get; set; }
+    public string? IdType { get; set; }
+    public string? IdNumber { get; set; }
+}
+
+public class ReviewDocumentDto
+{
+    public string Status { get; set; } = string.Empty; // "approved" | "rejected"
+    public string? Note { get; set; }
 }
 
 public class ReviewDto

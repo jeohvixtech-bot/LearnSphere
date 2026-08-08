@@ -68,7 +68,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("Bookings");
+                    b.ToTable("Bookings", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.BookingClass", b =>
@@ -94,7 +94,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("BookingId");
 
-                    b.ToTable("BookingClasses");
+                    b.ToTable("BookingClasses", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.ChatMessage", b =>
@@ -122,7 +122,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ChatMessages");
+                    b.ToTable("ChatMessages", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.CounterProposal", b =>
@@ -145,7 +145,7 @@ namespace LearnSphere.API.Migrations
                     b.HasIndex("BookingId")
                         .IsUnique();
 
-                    b.ToTable("CounterProposals");
+                    b.ToTable("CounterProposals", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.CounterProposalClass", b =>
@@ -179,7 +179,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("CounterProposalId");
 
-                    b.ToTable("CounterProposalClasses");
+                    b.ToTable("CounterProposalClasses", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Institution", b =>
@@ -204,7 +204,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Institutions");
+                    b.ToTable("Institutions", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Invoice", b =>
@@ -242,7 +242,7 @@ namespace LearnSphere.API.Migrations
                     b.HasIndex("BookingId")
                         .IsUnique();
 
-                    b.ToTable("Invoices");
+                    b.ToTable("Invoices", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.IssueReport", b =>
@@ -273,7 +273,7 @@ namespace LearnSphere.API.Migrations
                     b.HasIndex("BookingId")
                         .IsUnique();
 
-                    b.ToTable("IssueReports");
+                    b.ToTable("IssueReports", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.LessonReport", b =>
@@ -308,7 +308,7 @@ namespace LearnSphere.API.Migrations
                     b.HasIndex("BookingId")
                         .IsUnique();
 
-                    b.ToTable("LessonReports");
+                    b.ToTable("LessonReports", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.LessonReportEdit", b =>
@@ -334,7 +334,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("LessonReportId");
 
-                    b.ToTable("LessonReportEdits");
+                    b.ToTable("LessonReportEdits", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Notification", b =>
@@ -371,7 +371,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Payout", b =>
@@ -401,7 +401,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("Payouts");
+                    b.ToTable("Payouts", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Student", b =>
@@ -445,7 +445,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("ParentUserId");
 
-                    b.ToTable("Students");
+                    b.ToTable("Students", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Tutor", b =>
@@ -488,7 +488,7 @@ namespace LearnSphere.API.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Tutors");
+                    b.ToTable("Tutors", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorLevel", b =>
@@ -510,7 +510,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("TutorLevels");
+                    b.ToTable("TutorLevels", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorMode", b =>
@@ -532,7 +532,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("TutorModes");
+                    b.ToTable("TutorModes", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorOffering", b =>
@@ -570,7 +570,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("TutorOfferings");
+                    b.ToTable("TutorOfferings", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorQualification", b =>
@@ -592,7 +592,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("TutorQualifications");
+                    b.ToTable("TutorQualifications", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorReview", b =>
@@ -626,7 +626,7 @@ namespace LearnSphere.API.Migrations
                         .IsUnique()
                         .HasFilter("[BookingId] IS NOT NULL");
 
-                    b.ToTable("TutorReviews");
+                    b.ToTable("TutorReviews", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorSubject", b =>
@@ -652,7 +652,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("TutorSubjects");
+                    b.ToTable("TutorSubjects", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.TutorTimeSlot", b =>
@@ -685,7 +685,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasIndex("TutorId");
 
-                    b.ToTable("TutorTimeSlots");
+                    b.ToTable("TutorTimeSlots", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.User", b =>
@@ -717,7 +717,7 @@ namespace LearnSphere.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("LearnSphere.API.Models.Booking", b =>

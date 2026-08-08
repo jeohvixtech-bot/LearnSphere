@@ -31,8 +31,11 @@ public class AppDbContext : DbContext
     public DbSet<Payout> Payouts { get; set; }
     public DbSet<Institution> Institutions { get; set; }
     public DbSet<TutorOffering> TutorOfferings { get; set; }
+    public DbSet<TutorDocument> TutorDocuments { get; set; }
     public DbSet<FavoriteTutor> FavoriteTutors { get; set; }
     public DbSet<ScoringWeightage> ScoringWeightages { get; set; }
+    public DbSet<PresetCancellationDecision> PresetCancellationDecisions { get; set; }
+    public DbSet<TutorPenalty> TutorPenalties { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +45,11 @@ public class AppDbContext : DbContext
             .HasOne(t => t.User)
             .WithOne(u => u.TutorProfile)
             .HasForeignKey<Tutor>(t => t.UserId);
+
+        modelBuilder.Entity<TutorDocument>()
+            .HasOne(d => d.Tutor)
+            .WithMany(t => t.Documents)
+            .HasForeignKey(d => d.TutorId);
 
         modelBuilder.Entity<Student>()
             .HasOne(s => s.ParentUser)

@@ -40,6 +40,8 @@ public class PayoutsController : ControllerBase
         if (tutor == null) return NotFound(new { message = "Tutor profile not found." });
 
         // Calculate available balance: paid invoices minus already requested payouts
+        // minus any penalties (e.g. a preset-class cancellation resolved toward a
+        // parent credit — see IPresetCancellationService).
         var earned = await _context.Invoices
             .Where(i => i.Booking.TutorId == tutor.Id && i.Status == "Paid")
             .SumAsync(i => (decimal?)i.Amount) ?? 0;
@@ -48,7 +50,11 @@ public class PayoutsController : ControllerBase
             .Where(p => p.TutorId == tutor.Id)
             .SumAsync(p => (decimal?)p.Amount) ?? 0;
 
-        var available = earned - paid;
+        var penalties = await _context.TutorPenalties
+            .Where(p => p.TutorId == tutor.Id)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+
+        var available = earned - paid - penalties;
 
         if (dto.Amount <= 0)
             return BadRequest(new { message = "Amount must be greater than zero." });

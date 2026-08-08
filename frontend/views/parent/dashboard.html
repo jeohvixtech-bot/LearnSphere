@@ -1,4 +1,59 @@
 <div class="dashboard-layout">
+
+  <!-- ── Forced: tutor cancelled a confirmed class ─────────────────────
+       No close button — must Accept/Reject (or Acknowledge) before doing
+       anything else. Shows one at a time; the next one (if any) appears
+       immediately after this one resolves. -->
+  <div class="modal-overlay" ng-if="vm.currentCancellation()">
+    <div class="modal-card" style="max-width:460px">
+      <div class="modal-header">
+        <div>
+          <h3 ng-if="vm.currentCancellation().proposedDate">Your class was rescheduled</h3>
+          <h3 ng-if="!vm.currentCancellation().proposedDate">Your class was cancelled</h3>
+          <p class="text-muted">{{ vm.currentCancellation().tutorName }} · {{ vm.currentCancellation().subject }}</p>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div class="invoice-summary-block">
+          <div class="invoice-summary-row">
+            <span>Original class</span>
+            <strong>{{ vm.currentCancellation().originalDate | dmy }}, {{ vm.currentCancellation().originalTime | hhmma }}</strong>
+          </div>
+          <div class="invoice-summary-row" ng-if="vm.currentCancellation().proposedDate">
+            <span>Proposed new date</span>
+            <strong>{{ vm.currentCancellation().proposedDate | dmy }}, {{ vm.currentCancellation().proposedTime | hhmma }}</strong>
+          </div>
+        </div>
+
+        <p class="text-muted" style="margin-top:14px" ng-if="vm.currentCancellation().proposedDate">
+          {{ vm.currentCancellation().tutorName }} needs to move this class. Accept the new date, or decline for a refund credit (reviewed by our team).
+        </p>
+        <p class="text-muted" style="margin-top:14px" ng-if="!vm.currentCancellation().proposedDate">
+          {{ vm.currentCancellation().tutorName }} cancelled this class with no replacement offered. You'll receive a refund credit for it.
+        </p>
+
+        <p class="field-error" ng-if="vm.cancellationActionError">{{ vm.cancellationActionError }}</p>
+      </div>
+
+      <div class="modal-footer">
+        <div class="btn-row" ng-if="vm.currentCancellation().proposedDate">
+          <button type="button" class="btn-outline" ng-disabled="vm.cancellationActionBusy" ng-click="vm.rejectCancellation(vm.currentCancellation())">
+            Reject — Request Refund
+          </button>
+          <button type="button" class="btn-primary" ng-disabled="vm.cancellationActionBusy" ng-click="vm.acceptCancellation(vm.currentCancellation())">
+            Accept {{ vm.currentCancellation().proposedDate | dmy }}, {{ vm.currentCancellation().proposedTime | hhmma }}
+          </button>
+        </div>
+        <div class="btn-row" ng-if="!vm.currentCancellation().proposedDate">
+          <button type="button" class="btn-primary full-width" ng-disabled="vm.cancellationActionBusy" ng-click="vm.acknowledgeCancellation(vm.currentCancellation())">
+            OK, Got It
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <aside class="sidebar">
     <div class="sidebar-user">
       <div class="avatar-circle">{{ vm.user.name[0] }}</div>

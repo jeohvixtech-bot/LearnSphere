@@ -17,6 +17,8 @@ angular.module('learnSphereApp')
   self.showTerms = false;
   self.errorMsg = '';
   self.loading = false;
+  self.showRegisterPassword = false;
+  self.showRegisterConfirmPassword = false;
 
   // Forgot password
   self.showForgotPassword = false;

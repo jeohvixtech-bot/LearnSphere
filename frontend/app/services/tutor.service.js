@@ -68,9 +68,14 @@ angular.module('learnSphereApp')
     });
   };
 
-  self.deleteSlot = function (tutorId, slotId) {
+  // body (optional): { proposedDate, proposedTime, proposedEndTime } to propose a
+  // reschedule for affected students instead of a straight cancel — see
+  // TutorsController.DeleteSlot. $http.delete's config supports a `data` property
+  // for a request body, same as post/put.
+  self.deleteSlot = function (tutorId, slotId, body) {
     return $http.delete(API_URL + '/tutors/' + tutorId + '/slots/' + slotId, {
-      headers: AuthService.authHeader()
+      headers: AuthService.authHeader(),
+      data: body || {}
     });
   };
 
@@ -80,6 +85,33 @@ angular.module('learnSphereApp')
     return $http.post(API_URL + '/upload/image', fd, {
       headers: angular.extend({ 'Content-Type': undefined }, AuthService.authHeader()),
       transformRequest: angular.identity
+    });
+  };
+
+  self.uploadDocument = function (file, type) {
+    var fd = new FormData();
+    fd.append('file', file);
+    return $http.post(API_URL + '/upload/document?type=' + type, fd, {
+      headers: angular.extend({ 'Content-Type': undefined }, AuthService.authHeader()),
+      transformRequest: angular.identity
+    });
+  };
+
+  self.saveDocument = function (tutorId, data) {
+    return $http.post(API_URL + '/tutors/' + tutorId + '/documents', data, {
+      headers: AuthService.authHeader()
+    });
+  };
+
+  self.removeDocument = function (tutorId, docId) {
+    return $http.delete(API_URL + '/tutors/' + tutorId + '/documents/' + docId, {
+      headers: AuthService.authHeader()
+    });
+  };
+
+  self.submitVerification = function (tutorId) {
+    return $http.post(API_URL + '/tutors/' + tutorId + '/submit-verification', null, {
+      headers: AuthService.authHeader()
     });
   };
 }]);

@@ -1,8 +1,8 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AdminCtrl', ['$location', '$timeout', 'AuthService', 'AdminService', 'TutorService',
-function ($location, $timeout, AuthService, AdminService, TutorService) {
+.controller('AdminCtrl', ['$location', '$timeout', '$filter', 'AuthService', 'AdminService', 'TutorService', 'PresetCancellationService',
+function ($location, $timeout, $filter, AuthService, AdminService, TutorService, PresetCancellationService) {
   var self = this;
   self.user = AuthService.getCurrentUser();
 
@@ -100,14 +100,41 @@ function ($location, $timeout, AuthService, AdminService, TutorService) {
     self.loadTutorScores();
   };
 
+  // Reschedule Rejections queue (Admin → Reschedule Rejections) — see
+  // AdminController.GetPendingCancellations/ResolvePresetCancellation.
+  self.rescheduleQueue = [];
+  self.rescheduleActionBusy = false;
+  self.rescheduleResolveSuccess = false;
+
+  self.loadRescheduleQueue = function () {
+    PresetCancellationService.getAdminQueue().then(function (res) { self.rescheduleQueue = res.data; });
+  };
+
+  self.resolveRescheduleRejection = function (d) {
+    self.rescheduleActionBusy = true;
+    PresetCancellationService.resolveAdmin(d.id, d._adminNote).then(function () {
+      self.rescheduleQueue = self.rescheduleQueue.filter(function (x) { return x.id !== d.id; });
+      self.rescheduleActionBusy = false;
+      self.rescheduleResolveSuccess = true;
+      $timeout(function () { self.rescheduleResolveSuccess = false; }, 2500);
+    }).catch(function (err) {
+      self.rescheduleActionBusy = false;
+      alert((err.data && err.data.message) || 'Could not resolve this. Please try again.');
+    });
+  };
+
   function init() {
     AdminService.getStats().then(function (res) { self.stats = res.data; });
     AdminService.getUnverifiedTutors().then(function (res) { self.unverifiedTutors = res.data; });
     AdminService.getDisputes().then(function (res) { self.disputes = res.data; });
     AdminService.getScoringWeightages().then(function (res) { self.weightages = res.data; });
+    self.loadRescheduleQueue();
   }
   init();
 
+  // Kept for compatibility — no longer called from vetting.html (superseded by
+  // the per-document review + confirmTutor/rejectAndNotify flow below), but left
+  // in place in case anything else still calls it.
   self.verifyTutor = function (tutor) {
     AdminService.verifyTutor(tutor.id).then(function () {
       tutor.isVerified = true;
@@ -115,6 +142,139 @@ function ($location, $timeout, AuthService, AdminService, TutorService) {
       self.systemLogs.unshift('Approved tutor: ' + tutor.name + ' (Just now)');
       AdminService.getStats().then(function (res) { self.stats = res.data; });
     });
+  };
+
+  // ── Tutor Vetting: per-document review ──────────────────────────────
+  self.rejectionReasons = {};
+  self.expandedTutorId = null;
+
+  // Per-document review state: { [docId]: { status, selectedReason, freeText, saving, error } }
+  self.docReview = {};
+
+  AdminService.getRejectionReasons().then(function (res) {
+    self.rejectionReasons = res.data;
+  });
+
+  self.toggleVettingExpand = function (tutorId) {
+    self.expandedTutorId = self.expandedTutorId === tutorId ? null : tutorId;
+    if (self.expandedTutorId === tutorId) {
+      self.docReview = {};
+    }
+  };
+
+  self.getDocReview = function (docId) {
+    if (!self.docReview[docId]) {
+      self.docReview[docId] = {
+        status: null,
+        selectedReason: '',
+        freeText: '',
+        saving: false,
+        saved: false,
+        error: null
+      };
+    }
+    return self.docReview[docId];
+  };
+
+  self.getReasonsForType = function (docType) {
+    return self.rejectionReasons[docType] || ['Other'];
+  };
+
+  // Reuses the same document-type labels as the tutor-side verification section
+  // (see filters.js verifDocLabel) instead of maintaining a second copy here.
+  self.docTypeLabel = function (docType) {
+    return $filter('verifDocLabel')(docType);
+  };
+
+  self.formatFileSize = function (bytes) {
+    if (!bytes) return '';
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return Math.round(bytes / 1024) + ' KB';
+  };
+
+  self.saveDocReview = function (tutor, doc) {
+    var review = self.getDocReview(doc.id);
+    if (!review.status) { review.error = 'Please select approve or reject.'; return; }
+    var note = null;
+    if (review.status === 'rejected') {
+      var reason = review.selectedReason === 'Other' ? review.freeText : review.selectedReason;
+      if (!reason) { review.error = 'Please select or enter a rejection reason.'; return; }
+      note = reason;
+    }
+
+    review.saving = true;
+    review.error = null;
+
+    AdminService.reviewDocument(tutor.id, doc.id, review.status, note)
+      .then(function () {
+        doc.status = review.status;
+        doc.adminNote = note;
+        review.saved = true;
+        review.saving = false;
+      })
+      .catch(function () {
+        review.error = 'Failed to save. Please try again.';
+        review.saving = false;
+      });
+  };
+
+  // Check if all uploaded mandatory docs are approved
+  self.canConfirmTutor = function (tutor) {
+    var docs = tutor.documents || [];
+    var uploaded = docs.filter(function (d) { return d.fileUrl || d.externalUrl; });
+    if (!uploaded.length) return false;
+
+    var hasIdentityApproved = uploaded.some(function (d) {
+      return d.documentType === 'identity_photo' && d.status === 'approved';
+    });
+    var hasAcademicApproved = uploaded.some(function (d) {
+      return ['o_level', 'a_level', 'degree', 'postgrad'].indexOf(d.documentType) >= 0
+        && d.status === 'approved';
+    });
+    var anyRejected = uploaded.some(function (d) { return d.status === 'rejected'; });
+    var anyPending = uploaded.some(function (d) { return d.status === 'pending'; });
+
+    return hasIdentityApproved && hasAcademicApproved && !anyRejected && !anyPending;
+  };
+
+  self.hasRejectedDocs = function (tutor) {
+    return (tutor.documents || []).some(function (d) {
+      return d.status === 'rejected' && d.adminNote;
+    });
+  };
+
+  self.confirmTutor = function (tutor) {
+    tutor.confirming = true;
+    tutor.confirmError = null;
+    AdminService.confirmVerification(tutor.id)
+      .then(function () {
+        self.unverifiedTutors = self.unverifiedTutors.filter(function (t) { return t.id !== tutor.id; });
+        self.expandedTutorId = null;
+        self.systemLogs.unshift('Approved tutor: ' + tutor.name + ' (Just now)');
+        AdminService.getStats().then(function (res) { self.stats = res.data; });
+      })
+      .catch(function (err) {
+        tutor.confirmError = err.data && err.data.message
+          ? err.data.message : 'Failed to confirm. Please try again.';
+        tutor.confirming = false;
+      });
+  };
+
+  self.rejectAndNotify = function (tutor) {
+    tutor.rejecting = true;
+    tutor.rejectError = null;
+    AdminService.rejectVerification(tutor.id)
+      .then(function () {
+        tutor.verificationStatus = 'rejected';
+        tutor.rejecting = false;
+        tutor.rejectSent = true;
+        self.systemLogs.unshift('Rejection sent to tutor: ' + tutor.name + ' (Just now)');
+      })
+      .catch(function (err) {
+        tutor.rejectError = err.data && err.data.message
+          ? err.data.message : 'Failed to send rejection.';
+        tutor.rejecting = false;
+      });
   };
 
   self.resolveDispute = function (dispute) {

@@ -14,6 +14,15 @@ public class Tutor
     public bool IsVerified { get; set; } = false;
     public bool IsOnline { get; set; } = true; // Offline hides the profile from parent search entirely
 
+    // Document verification (identity, academic, teaching credentials, etc. — see
+    // TutorDocument). VerificationStatus is separate from IsVerified: IsVerified is
+    // the long-standing "listed in search results" flag set by ReviewDocument once
+    // every mandatory document is approved; VerificationStatus tracks the submission
+    // workflow itself (not_submitted | pending | approved | rejected).
+    public string VerificationStatus { get; set; } = "not_submitted";
+    public bool OfferingsUnlocked { get; set; } = false;
+    public List<TutorDocument> Documents { get; set; } = new();
+
     public List<TutorSubject> Subjects { get; set; } = new();
     public List<TutorLevel> Levels { get; set; } = new();
     public List<TutorMode> Modes { get; set; } = new();
@@ -23,6 +32,29 @@ public class Tutor
     public List<Booking> Bookings { get; set; } = new();
     public List<Payout> Payouts { get; set; } = new();
     public List<TutorOffering> Offerings { get; set; } = new();
+}
+
+// One row per uploaded/linked verification document. DocumentType distinguishes what
+// it is: identity_photo | o_level | a_level | degree | postgrad | nie_cert |
+// intro_video | specialist_cert. Every type upserts a single row except specialist_cert,
+// which allows multiple (ordered by SortOrder) — see TutorsController.SaveDocument.
+public class TutorDocument
+{
+    public int Id { get; set; }
+    public int TutorId { get; set; }
+    public Tutor Tutor { get; set; } = null!;
+    public string DocumentType { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public string? ExternalUrl { get; set; } // intro_video may be a pasted link instead of an upload
+    public string? FileName { get; set; }
+    public long? FileSizeBytes { get; set; }
+    public string? IdType { get; set; }   // identity_photo only: NRIC | MyKad | Passport
+    public string? IdNumber { get; set; } // identity_photo only
+    public int SortOrder { get; set; } = 0;
+    public string Status { get; set; } = "pending"; // pending | approved | rejected
+    public string? AdminNote { get; set; }
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ReviewedAt { get; set; }
 }
 
 public class TutorOffering

@@ -110,84 +110,88 @@
             <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
           </div>
           <div class="tutor-card-bar-spacer"></div>
-          <div class="tutor-card-price">
-            <small>Trial Rate</small>
-            <strong class="price">${{ t.pricePerSession }}/hr</strong>
-          </div>
-          <button class="btn-primary" ng-click="vm.goToBookTutor(t)">View &amp; Book →</button>
+          <!-- Shared "View & Book" button hidden for now — every visible result is
+               guaranteed at least one preset class (see applyAiMatch), and each
+               one now has its own View & Book button in the list below. -->
         </div>
 
-        <!-- Available preset classes — same slot-strip as the Find Tutors catalog.
-             aiMatchResults is filtered straight from vm.tutors (same object
-             references), so each t already carries the _presetSummary computed
-             once in init() — no extra fetch needed here. Selecting a chip sets
-             t._selectedPresetGroupId, which goToBookTutor hands off via
-             PendingMatchService so the search page lands straight on the booking
-             summary for that class instead of the plain request form. -->
-        <div class="tutor-slot-strip" ng-if="vm.tutorHasAnySlots(t)">
+        <!-- Available preset classes — same list layout as the Find Tutors
+             catalog. aiMatchResults is filtered straight from vm.tutors (same
+             object references), so each t already carries the _presetSummary
+             computed once in init() — no extra fetch needed here. Every result
+             here is guaranteed at least one preset class (see applyAiMatch), so
+             no "no slots" empty state is needed. viewAndBookPresetMatch hands
+             the tutor + class off via PendingMatchService so the search page
+             lands straight on the booking summary for it. -->
+        <div class="tutor-slot-strip">
           <p class="tutor-slot-strip-label">
             <i class="ti ti-calendar-event" aria-hidden="true"></i>
             Available classes through {{ vm.nextMonthLabel() }}
           </p>
-          <div class="tutor-slot-chips">
+          <div class="tutor-slot-list">
 
-            <div class="slot-chip" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.presetGroupId"
-              ng-click="vm.selectPresetChip(t, sg)"
-              ng-class="{'slot-chip-selected': t._selectedPresetGroupId === sg.presetGroupId}">
-              <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
-              {{ vm.abbreviateSubject(sg.subject) }} · {{ sg.slots[0].dateShort }}, {{ sg.slots[0].startTime }}
+            <div class="slot-list-row" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.presetGroupId"
+              ng-mouseenter="vm.showRowTooltip(sg, $event)" ng-mouseleave="vm.hideRowTooltip(sg)">
+              <div class="slot-list-row-info">
+                <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                <span>{{ vm.abbreviateSubject(sg.subject) }} · {{ sg.slots[0].dateShort }}, {{ sg.slots[0].startTime }}</span>
 
-              <div class="slot-tooltip">
-                <p class="slot-tooltip-title">{{ sg.subject }} · {{ sg.level }}</p>
-                <div class="slot-tooltip-meta">
-                  <div class="slot-tooltip-meta-row">
-                    <i class="ti ti-calendar" aria-hidden="true"></i>
-                    <span>{{ sg.recurrenceLabel }}</span>
-                  </div>
-                  <div class="slot-tooltip-meta-row">
-                    <i class="ti ti-clock" aria-hidden="true"></i>
-                    <span>{{ sg.startTime }} – {{ sg.endTime }}</span>
-                  </div>
-                  <div class="slot-tooltip-meta-row">
-                    <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
-                    <span>{{ sg.mode }}</span>
-                  </div>
-                  <div class="slot-tooltip-meta-row">
-                    <i class="ti ti-{{ sg.classSize === 'one-to-one' ? 'user' : 'users' }}" aria-hidden="true"></i>
-                    <span>{{ sg.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</span>
-                  </div>
-                  <div class="slot-tooltip-meta-row">
-                    <i class="ti ti-currency-dollar" aria-hidden="true"></i>
-                    <span class="slot-price">
-                      ${{ sg.pricePerLesson }} / lesson
-                      <span class="slot-price-est">· est. ${{ sg.pricePerLesson * sg.slots.length }} / month</span>
-                    </span>
-                  </div>
-                </div>
-                <div class="slot-tooltip-schedule">
-                  <div class="slot-tooltip-row" ng-repeat="s in sg.slots">
-                    <div>
-                      <p class="slot-tooltip-date">{{ s.dateFormatted }}</p>
-                      <p class="slot-tooltip-time">{{ s.startTime }} – {{ s.endTime }}</p>
+                <div class="slot-tooltip slot-tooltip-fixed" ng-if="sg._tooltipStyle" ng-style="sg._tooltipStyle">
+                  <p class="slot-tooltip-title">{{ sg.subject }} · {{ sg.level }}</p>
+                  <div class="slot-tooltip-meta">
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-calendar" aria-hidden="true"></i>
+                      <span>{{ sg.recurrenceLabel }}</span>
                     </div>
-                    <span class="slot-status-badge"
-                      ng-class="{
-                        'badge-open': !s.isFull && s.classSize === 'one-to-one',
-                        'badge-fill': !s.isFull && s.classSize === 'one-to-many',
-                        'badge-full': s.isFull
-                      }">
-                      <span ng-if="s.isFull">Full</span>
-                      <span ng-if="!s.isFull && s.classSize === 'one-to-one'">Open</span>
-                      <span ng-if="!s.isFull && s.classSize === 'one-to-many'">{{ s.confirmedCount }} / {{ s.maxStudents }} filled</span>
-                    </span>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-clock" aria-hidden="true"></i>
+                      <span>{{ sg.startTime }} – {{ sg.endTime }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                      <span>{{ sg.mode }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-{{ sg.classSize === 'one-to-one' ? 'user' : 'users' }}" aria-hidden="true"></i>
+                      <span>{{ sg.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</span>
+                    </div>
+                    <div class="slot-tooltip-meta-row">
+                      <i class="ti ti-currency-dollar" aria-hidden="true"></i>
+                      <span class="slot-price">
+                        ${{ sg.pricePerLesson }} / lesson
+                        <span class="slot-price-est">· est. ${{ sg.pricePerLesson * sg.slots.length }} / month</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="slot-tooltip-schedule">
+                    <div class="slot-tooltip-row" ng-repeat="s in sg.slots">
+                      <div>
+                        <p class="slot-tooltip-date">{{ s.dateFormatted }}</p>
+                        <p class="slot-tooltip-time">{{ s.startTime }} – {{ s.endTime }}</p>
+                      </div>
+                      <span class="slot-status-badge"
+                        ng-class="{
+                          'badge-open': !s.isFull && s.classSize === 'one-to-one',
+                          'badge-fill': !s.isFull && s.classSize === 'one-to-many',
+                          'badge-full': s.isFull
+                        }">
+                        <span ng-if="s.isFull">Full</span>
+                        <span ng-if="!s.isFull && s.classSize === 'one-to-one'">Open</span>
+                        <span ng-if="!s.isFull && s.classSize === 'one-to-many'">{{ s.confirmedCount }} / {{ s.maxStudents }} filled</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              <button type="button" class="btn-outline sm" ng-click="vm.viewAndBookPresetMatch(t, sg)">View &amp; Book</button>
             </div>
 
-            <div class="slot-chip-empty" ng-repeat="o in vm.tutorSubjectsWithoutSlots(t) track by o.subject">
-              <i class="ti ti-calendar-x" aria-hidden="true"></i>
-              No preset for {{ o.subject }}
+            <div class="slot-list-row slot-list-row-empty" ng-repeat="o in vm.tutorSubjectsWithoutSlots(t) track by o.subject">
+              <div class="slot-list-row-info">
+                <i class="ti ti-calendar-x" aria-hidden="true"></i>
+                <span>No preset for {{ o.subject }}</span>
+              </div>
             </div>
 
           </div>

@@ -36,4 +36,24 @@ angular.module('learnSphereApp')
   self.updateScoringWeightages = function (weightages) {
     return $http.put(API_URL + '/admin/scoring-weightages', { weightages: weightages }, h());
   };
+
+  self.getRejectionReasons = function () {
+    return $http.get(API_URL + '/tutors/rejection-reasons', h());
+  };
+
+  self.reviewDocument = function (tutorId, docId, status, note) {
+    return $http.patch(
+      API_URL + '/tutors/' + tutorId + '/documents/' + docId + '/review',
+      { status: status, note: note },
+      h()
+    );
+  };
+
+  self.confirmVerification = function (tutorId) {
+    return $http.post(API_URL + '/tutors/' + tutorId + '/confirm-verification', null, h());
+  };
+
+  self.rejectVerification = function (tutorId) {
+    return $http.post(API_URL + '/tutors/' + tutorId + '/reject-verification', null, h());
+  };
 }]);

@@ -253,7 +253,7 @@
             </div>
             <p ng-if="slot.isFull" class="text-danger">Full — no more bookings accepted</p>
             <p ng-if="!slot.isFull" class="text-muted">Open for booking · not yet claimed by a parent</p>
-            <button class="btn-outline sm text-danger" ng-click="vm.cancelPublishedSlot(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px">
+            <button class="btn-outline sm text-danger" ng-click="vm.openCancelSlotModal(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px">
               <i class="ti ti-x" aria-hidden="true"></i> Cancel class
             </button>
           </div>
@@ -338,7 +338,32 @@
         </div>
 
         <div class="modal-body">
-          <div class="setup-grid-wrap" ng-mouseup="vm.endSlotDrag()" ng-mouseleave="vm._slotDrag = null">
+          <!-- Three distinct states, since "can't publish yet" and "why" differ:
+                 - No offerings/modes yet + not verified ("pending"): profile is
+                   incomplete — blocks the form, asks them to complete it.
+                 - No offerings/modes yet + verified: an edge case (e.g. admin
+                   verified them before/after they cleared their offerings) —
+                   blocks the form, points specifically at adding an offering.
+                 - Has offerings/modes but not verified yet ("under verifying"):
+                   NOT blocking — nothing server-side stops this today, so they
+                   can still prep classes ahead of approval; just an FYI banner
+                   above the still-functional form. -->
+          <div class="empty-state-box" ng-if="!vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <p><i class="ti ti-alert-triangle" aria-hidden="true"></i> Please complete your tutor profile — including at least one teaching offering (subject, level, and mode) — before you can publish a class.</p>
+            <button type="button" class="btn-primary sm" style="margin-top:10px"
+              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
+          </div>
+          <div class="empty-state-box" ng-if="!vm.tutorHasOfferings() && vm.tutor.isVerified">
+            <p><i class="ti ti-alert-triangle" aria-hidden="true"></i> Add at least one teaching offering (subject + level + mode) under Edit Profile before you can publish a class.</p>
+            <button type="button" class="btn-primary sm" style="margin-top:10px"
+              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
+          </div>
+          <p class="text-muted" style="margin:0 0 12px" ng-if="vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+            Your profile is currently being verified by our operations team. You can still set up classes now — they just won't be visible to parents until verification is complete.
+          </p>
+
+          <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()" ng-mouseleave="vm._slotDrag = null">
             <p class="text-muted" style="margin:0 0 8px;font-size:11px">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
               Click a single slot, or click-and-drag down a column to combine several into one class (first slot's start time to last slot's end time). Grayed-out slots are already-scheduled classes or published slots you've already set up.
@@ -373,7 +398,7 @@
             </table>
           </div>
 
-          <div class="setup-inputs-panel">
+          <div class="setup-inputs-panel" ng-if="vm.tutorHasOfferings()">
             <div class="setup-inputs-row-4">
               <div class="form-group">
                 <label>Teaching Mode</label>
@@ -393,9 +418,9 @@
                 <label>Class Size</label>
                 <div class="segmented-toggle">
                   <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-one'}"
-                    ng-click="vm.setupClassForm.classSize = 'one-to-one'; vm.onClassSizeChange()">1-to-1</button>
+                    ng-click="vm.setupClassForm.classSize = 'one-to-one'; vm.onClassSizeChange()">Personal Class</button>
                   <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-many'}"
-                    ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">1-to-many</button>
+                    ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">Group Class</button>
                 </div>
               </div>
               <div class="form-group">
@@ -403,7 +428,7 @@
                 <input type="number" ng-model="vm.setupClassForm.maxStudents"
                   ng-disabled="vm.setupClassForm.classSize === 'one-to-one'"
                   min="2" max="30" />
-                <span class="text-muted" style="font-size:11px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for 1-to-1</span>
+                <span class="text-muted" style="font-size:11px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for Personal Class</span>
               </div>
             </div>
 
@@ -424,8 +449,73 @@
           </div>
           <div class="btn-row">
             <button type="button" class="btn-outline" ng-click="vm.closeSetupClass()">Cancel</button>
-            <button type="button" class="btn-primary" ng-click="vm.submitSetupClass()" ng-disabled="vm.setupClassSaving">
+            <button type="button" class="btn-primary" ng-click="vm.submitSetupClass()"
+              ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings()">
               {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cancel Published Class Modal -->
+    <div class="modal-overlay" ng-if="vm.cancelSlotModal">
+      <div class="modal-card" style="max-width:480px">
+        <div class="modal-header">
+          <div>
+            <h3>Cancel class</h3>
+            <p class="text-muted">{{ vm.cancelSlotModal.subject }}<span ng-if="vm.cancelSlotModal.level"> · {{ vm.cancelSlotModal.level }}</span> — {{ vm.cancelSlotModal.day | dmy }} at {{ vm.cancelSlotModal.time | hhmma }}</p>
+          </div>
+          <button type="button" class="modal-close" ng-click="vm.closeCancelSlotModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="text-muted" ng-if="vm.cancelSlotModal.confirmedCount > 0" style="margin-bottom:14px">
+            {{ vm.cancelSlotModal.confirmedCount }} student{{ vm.cancelSlotModal.confirmedCount === 1 ? '' : 's' }} currently booked into this class.
+          </p>
+
+          <div class="segmented-toggle" style="margin-bottom:14px">
+            <button type="button" ng-class="{active: vm.cancelSlotForm.mode === 'reschedule'}"
+              ng-click="vm.cancelSlotForm.mode = 'reschedule'">Propose new date</button>
+            <button type="button" ng-class="{active: vm.cancelSlotForm.mode === 'straight'}"
+              ng-click="vm.cancelSlotForm.mode = 'straight'">Cancel outright</button>
+          </div>
+
+          <div ng-if="vm.cancelSlotForm.mode === 'reschedule'">
+            <p class="text-muted" style="font-size:12px;margin-bottom:10px">
+              Each affected family will be asked to accept the new date or decline for a refund. No penalty to you unless a family declines.
+            </p>
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>New Date <span class="text-danger">*</span></label>
+                <input type="text" ng-model="vm.cancelSlotForm.proposedDate" placeholder="DD-MM-YYYY" fp-date />
+              </div>
+              <div class="form-group">
+                <label>Start Time <span class="text-danger">*</span></label>
+                <input type="text" ng-model="vm.cancelSlotForm.proposedTime" placeholder="04:00 PM" />
+              </div>
+              <div class="form-group">
+                <label>End Time <span class="text-danger">*</span></label>
+                <input type="text" ng-model="vm.cancelSlotForm.proposedEndTime" placeholder="05:00 PM" />
+              </div>
+            </div>
+          </div>
+
+          <div ng-if="vm.cancelSlotForm.mode === 'straight'">
+            <p class="text-danger" style="font-size:12px">
+              <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+              Every affected family is credited immediately with no reschedule offered. You'll be charged a 20% penalty on top of losing that revenue, and this counts as a dispute against your AI Speed Match score this month.
+            </p>
+          </div>
+
+          <p class="field-error" ng-if="vm.cancelSlotError">{{ vm.cancelSlotError }}</p>
+        </div>
+
+        <div class="modal-footer">
+          <div class="btn-row">
+            <button type="button" class="btn-outline" ng-click="vm.closeCancelSlotModal()">Back</button>
+            <button type="button" class="btn-danger" ng-click="vm.submitCancelSlot()" ng-disabled="vm.cancelSlotBusy">
+              {{ vm.cancelSlotBusy ? 'Cancelling...' : (vm.cancelSlotForm.mode === 'reschedule' ? 'Send Reschedule Proposal' : 'Cancel Outright') }}
             </button>
           </div>
         </div>
@@ -655,6 +745,300 @@
       <h3>Edit Profile Details</h3>
 
       <form ng-submit="vm.saveProfile()" class="profile-form">
+
+        <!-- ══════════════════════════════════════════════
+             VERIFICATION SECTION
+             ══════════════════════════════════════════════ -->
+        <div class="verif-section">
+
+          <!-- Header + progress -->
+          <div class="verif-header">
+            <div>
+              <p class="verif-title">
+                <i class="ti ti-shield-check" aria-hidden="true"></i>
+                Profile verification
+              </p>
+              <p class="verif-subtitle">Complete all required documents to unlock subject offerings.</p>
+            </div>
+            <div class="verif-progress-wrap">
+              <span class="verif-progress-label">{{ vm.mandatoryUploadedCount() }} of {{ vm.mandatoryTotal }} required docs uploaded</span>
+              <div class="verif-progress-bar">
+                <div class="verif-progress-fill" ng-style="{'width': vm.verifProgress()}"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status banners -->
+          <div class="verif-banner verif-banner--success" ng-if="vm.tutor.verificationStatus === 'approved'">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            <div><p>Profile verified</p><small>Your profile is verified. Subject offerings are unlocked.</small></div>
+          </div>
+
+          <div class="verif-banner verif-banner--warning" ng-if="vm.tutor.verificationStatus === 'pending'">
+            <i class="ti ti-clock" aria-hidden="true"></i>
+            <div><p>Under review</p><small>Admin will review your documents within 1–3 business days.</small></div>
+          </div>
+
+          <div class="verif-banner verif-banner--danger" ng-if="vm.hasRejectedDoc()">
+            <i class="ti ti-alert-circle" aria-hidden="true"></i>
+            <div>
+              <p>{{ vm.rejectedDocNote().type | verifDocLabel }} rejected</p>
+              <small>Admin note: "{{ vm.rejectedDocNote().note }}" — Please re-upload to resubmit.</small>
+            </div>
+          </div>
+
+          <div class="alert-success" ng-if="vm.verifSubmitSuccess">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            Submitted for verification. We'll notify you within 1–3 business days.
+          </div>
+          <div class="field-error" ng-if="vm.verifSubmitError">{{ vm.verifSubmitError }}</div>
+
+          <!-- ── 1. Identity ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-id" aria-hidden="true"></i> Identity verification</p>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>ID type <span class="text-danger">*</span></label>
+                <select ng-model="vm.verif.idType">
+                  <option value="NRIC">NRIC (Singapore)</option>
+                  <option value="MyKad">MyKad (Malaysia)</option>
+                  <option value="Passport">Passport</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ID number</label>
+                <input type="text" ng-model="vm.verif.idNumber" placeholder="e.g. S1234567A" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Photo holding your {{ vm.verif.idType }} <span class="text-danger">*</span></label>
+              <p class="text-muted" style="font-size:12px; margin-bottom:6px;">Take a selfie holding your ID clearly visible next to your face.</p>
+
+              <div ng-if="vm.getDoc('identity_photo')" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDoc('identity_photo').status === 'rejected'}">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getDoc('identity_photo').fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getDoc('identity_photo').fileSizeBytes) }}</span>
+                <input type="file" id="reupload_identity" accept="image/jpeg,image/png"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'identity_photo')" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="vm.getDoc('identity_photo').status === 'rejected'"
+                  ng-click="vm.triggerVerifUpload('reupload_identity')">Re-upload</button>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.removeVerifDoc(vm.getDoc('identity_photo').id)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDoc('identity_photo')" class="verif-upload-box">
+                <input type="file" id="upload_identity_photo" accept="image/jpeg,image/png"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'identity_photo')" />
+                <i class="ti ti-camera" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p ng-if="!vm.verif.uploadingMap['identity_photo']">Upload selfie with ID</p>
+                  <p ng-if="vm.verif.uploadingMap['identity_photo']" class="text-muted">Uploading...</p>
+                  <span>JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_identity_photo')"
+                  ng-disabled="vm.verif.uploadingMap['identity_photo']">Browse</button>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap['identity_photo']">{{ vm.verif.errorMap['identity_photo'] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 2. Academic qualifications ── -->
+          <div class="verif-card">
+            <p class="verif-card-title">
+              <i class="ti ti-school" aria-hidden="true"></i> Academic qualifications
+              <span class="verif-card-subtitle">Upload at least one level</span>
+            </p>
+
+            <div class="form-group" ng-repeat="ql in vm.academicLevels">
+              <label>{{ ql.label }} <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+
+              <div ng-if="vm.getDoc(ql.type)" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDoc(ql.type).status === 'rejected'}">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getDoc(ql.type).fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getDoc(ql.type).fileSizeBytes) }}</span>
+                <input type="file" id="reupload_{{ ql.type }}" accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], '{{ql.type}}')" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="vm.getDoc(ql.type).status === 'rejected'"
+                  ng-click="vm.triggerVerifUpload('reupload_' + ql.type)">Re-upload</button>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.removeVerifDoc(vm.getDoc(ql.type).id)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDoc(ql.type)" class="verif-upload-box">
+                <input type="file" id="upload_{{ ql.type }}" accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], '{{ql.type}}')" />
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p ng-if="!vm.verif.uploadingMap[ql.type]">Upload certificate</p>
+                  <p ng-if="vm.verif.uploadingMap[ql.type]" class="text-muted">Uploading...</p>
+                  <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_' + ql.type)"
+                  ng-disabled="vm.verif.uploadingMap[ql.type]">Browse</button>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap[ql.type]">{{ vm.verif.errorMap[ql.type] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 3. Teaching credentials ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-certificate" aria-hidden="true"></i> Teaching credentials</p>
+
+            <div class="form-group">
+              <label>NIE / DPLI / MOE teaching certificate <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+              <p class="text-muted" style="font-size:12px; margin-bottom:6px;">Unlocks the NIE Trained badge on your profile.</p>
+
+              <div ng-if="vm.getDoc('nie_cert')" class="verif-upload-done">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getDoc('nie_cert').fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getDoc('nie_cert').fileSizeBytes) }}</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.removeVerifDoc(vm.getDoc('nie_cert').id)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDoc('nie_cert')" class="verif-upload-box">
+                <input type="file" id="upload_nie_cert" accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'nie_cert')" />
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p ng-if="!vm.verif.uploadingMap['nie_cert']">Upload certificate</p>
+                  <p ng-if="vm.verif.uploadingMap['nie_cert']" class="text-muted">Uploading...</p>
+                  <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_nie_cert')"
+                  ng-disabled="vm.verif.uploadingMap['nie_cert']">Browse</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── 4. Intro video ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-video" aria-hidden="true"></i> Introduction video <span class="verif-card-subtitle">(optional)</span></p>
+
+            <div class="form-group">
+              <p class="text-muted" style="font-size:12px; margin-bottom:8px;">A 1–3 min self-introduction showing your teaching style. Significantly improves booking rate.</p>
+
+              <div ng-if="vm.getDoc('intro_video')" class="verif-upload-done">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">
+                  {{ vm.getDoc('intro_video').fileName || vm.getDoc('intro_video').externalUrl }}
+                </span>
+                <span class="verif-filesize" ng-if="vm.getDoc('intro_video').fileSizeBytes">
+                  {{ vm.formatFileSize(vm.getDoc('intro_video').fileSizeBytes) }}
+                </span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.removeVerifDoc(vm.getDoc('intro_video').id)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDoc('intro_video')">
+                <div class="verif-upload-box">
+                  <input type="file" id="upload_intro_video" accept="video/mp4,video/quicktime"
+                    style="display:none"
+                    onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'intro_video')" />
+                  <i class="ti ti-upload" aria-hidden="true"></i>
+                  <div class="verif-upload-box-text">
+                    <p ng-if="!vm.verif.uploadingMap['intro_video']">Upload video file</p>
+                    <p ng-if="vm.verif.uploadingMap['intro_video']" class="text-muted">Uploading...</p>
+                    <span>MP4, MOV · 10 MB – 100 MB</span>
+                  </div>
+                  <button type="button" class="verif-browse-btn"
+                    ng-click="vm.triggerVerifUpload('upload_intro_video')"
+                    ng-disabled="vm.verif.uploadingMap['intro_video']">Browse</button>
+                </div>
+                <div class="verif-or-divider"><span>or paste a link</span></div>
+                <div class="verif-link-row">
+                  <input type="url" ng-model="vm.verif.introVideoLink"
+                    placeholder="YouTube, Google Drive, or any public video URL" />
+                  <button type="button" class="btn-outline sm"
+                    ng-click="vm.saveIntroVideoLink()"
+                    ng-disabled="!vm.verif.introVideoLink">Save link</button>
+                </div>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap['intro_video']">{{ vm.verif.errorMap['intro_video'] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 5. Specialist certificates ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-award" aria-hidden="true"></i> Specialist certificates <span class="verif-card-subtitle">(optional)</span></p>
+            <p class="text-muted" style="font-size:12px; margin-bottom:12px;">IGCSE examiner, TESOL, ACCA, or any specialist cert. Each may unlock a specialist badge.</p>
+
+            <div class="form-group" ng-repeat="sc in vm.getSpecialistCerts() track by sc.id">
+              <label>Specialist cert {{ $index + 1 }}</label>
+              <div class="verif-upload-done">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ sc.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(sc.fileSizeBytes) }}</span>
+                <button type="button" class="verif-remove-btn" ng-click="vm.removeVerifDoc(sc.id)">Remove</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Specialist cert {{ vm.getSpecialistCerts().length + 1 }} <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+              <div class="verif-upload-box">
+                <input type="file" id="upload_specialist_cert" accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'specialist_cert')" />
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p ng-if="!vm.verif.uploadingMap['specialist_cert']">Upload certificate</p>
+                  <p ng-if="vm.verif.uploadingMap['specialist_cert']" class="text-muted">Uploading...</p>
+                  <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_specialist_cert')"
+                  ng-disabled="vm.verif.uploadingMap['specialist_cert']">Browse</button>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap['specialist_cert']">{{ vm.verif.errorMap['specialist_cert'] }}</p>
+            </div>
+          </div>
+
+          <!-- Privacy note -->
+          <div class="verif-privacy-note">
+            <i class="ti ti-lock" aria-hidden="true"></i>
+            <p>All documents are stored securely and only reviewed by LearnSphere admin. Subject offerings will be unlocked once all required documents are uploaded and verified. Review takes 1–3 business days.</p>
+          </div>
+
+          <!-- Submit -->
+          <div class="verif-submit-row">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus !== 'pending'">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              {{ vm.mandatoryTotal - vm.mandatoryUploadedCount() }} required document(s) still missing
+            </p>
+            <p class="verif-submit-hint" ng-if="vm.tutor.verificationStatus === 'pending'">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              Verification under review — you cannot resubmit until admin responds
+            </p>
+            <button type="button" class="btn-primary"
+              ng-click="vm.submitVerification()"
+              ng-disabled="!vm.canSubmitVerification()">
+              <i class="ti ti-send" style="font-size:13px; margin-right:5px;" aria-hidden="true"></i>
+              Submit for verification
+            </button>
+          </div>
+
+        </div>
+
+        <!-- ── Offerings lock notice ── -->
+        <div class="verif-lock-notice" ng-if="!vm.tutor.offeringsUnlocked">
+          <i class="ti ti-lock" aria-hidden="true"></i>
+          <p>Subject offerings are locked until your profile verification is approved.</p>
+        </div>
+        <p class="field-error" ng-if="vm.offeringLockedError">{{ vm.offeringLockedError }}</p>
 
         <div class="form-group">
           <label>Profile Photo <span class="text-danger">*</span></label>

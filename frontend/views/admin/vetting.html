@@ -9,38 +9,207 @@
       <a href="#!/admin/vetting" class="nav-item active">🛡️ Tutor Vetting Base</a>
       <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
       <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
 
   <main class="dashboard-main">
     <div class="card">
-      <span class="label-tag indigo">SECURITY VERIFICATION ENGINE</span>
-      <h3>Applicant Verification Queue</h3>
-      <p class="text-muted">Validate diplomas, certificates, and NIE credentials on the LearnSphere registry.</p>
+      <span class="label-tag indigo">
+        <i class="ti ti-shield-check" aria-hidden="true"></i>
+        Verification queue
+      </span>
+      <h3>Applicant verification queue</h3>
+      <p class="text-muted">Review uploaded documents for each tutor. Approve or reject each document individually, then confirm or notify.</p>
 
       <div class="empty-state-box" ng-if="!vm.unverifiedTutors.length">
-        ✓ All tutor applicants have been verified.
+        <i class="ti ti-circle-check" style="font-size:24px; color:#16a34a;" aria-hidden="true"></i>
+        <p>All tutor applicants have been verified.</p>
       </div>
 
       <div class="vetting-list">
         <div class="vetting-item" ng-repeat="t in vm.unverifiedTutors">
-          <div class="vetting-info">
-            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="avatar" alt="{{ t.name }}" />
-            <div ng-if="!t.imageUrl" class="avatar avatar-fallback" style="font-size:15px">{{ t.name[0] }}</div>
-            <div>
-              <strong>{{ t.name }}</strong>
-              <p>{{ t.subjects.join(' / ') }} • {{ t.experienceYears }} Years Exp</p>
-              <div class="qual-tags">
-                <span class="qual-tag" ng-repeat="q in t.qualifications">{{ q }}</span>
+
+          <!-- ── Tutor header row ── -->
+          <div class="vetting-header-row" ng-click="vm.toggleVettingExpand(t.id)">
+            <div class="vetting-info">
+              <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="avatar" alt="{{ t.name }}" />
+              <div ng-if="!t.imageUrl" class="avatar avatar-fallback">{{ t.name[0] }}</div>
+              <div>
+                <strong>{{ t.name }}</strong>
+                <p class="text-muted" style="font-size:12px; margin:2px 0 0;">
+                  {{ t.email }} · {{ t.experienceYears }} yrs exp
+                </p>
+                <div class="qual-tags" style="margin-top:4px;">
+                  <span class="qual-tag" ng-repeat="q in t.qualifications">{{ q }}</span>
+                </div>
               </div>
             </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="label-tag amber" ng-if="t.verificationStatus === 'pending'">
+                <i class="ti ti-clock" aria-hidden="true"></i> Pending review
+              </span>
+              <span class="label-tag red" ng-if="t.verificationStatus === 'rejected'">
+                <i class="ti ti-x" aria-hidden="true"></i> Rejected
+              </span>
+              <span style="font-size:12px; color:#94a3b8;">
+                {{ (t.documents || []).length }} document(s) submitted
+              </span>
+              <i class="ti ti-chevron-down"
+                style="font-size:16px; color:#94a3b8; transition:transform .2s;"
+                ng-style="{'transform': vm.expandedTutorId === t.id ? 'rotate(180deg)' : 'rotate(0)'}"
+                aria-hidden="true"></i>
+            </div>
           </div>
-          <div class="btn-row">
-            <button class="btn-outline">Deny Registry</button>
-            <button class="btn-success" ng-click="vm.verifyTutor(t)">
-              ✓ Validate Credentials & Verify
-            </button>
+
+          <!-- ── Expanded review panel ── -->
+          <div class="vetting-review-panel" ng-if="vm.expandedTutorId === t.id">
+
+            <!-- Document review list -->
+            <div class="vetting-doc-list">
+              <div class="vetting-doc-row" ng-repeat="doc in t.documents track by doc.id">
+
+                <!-- Doc info -->
+                <div class="vetting-doc-info">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                    <span class="vetting-doc-type-label">{{ vm.docTypeLabel(doc.documentType) }}</span>
+                    <span class="label-tag" style="font-size:10px;"
+                      ng-class="{
+                        'amber': doc.status === 'pending',
+                        'indigo': doc.status === 'approved',
+                        'red': doc.status === 'rejected'
+                      }">
+                      <i class="ti"
+                        ng-class="{
+                          'ti-clock': doc.status === 'pending',
+                          'ti-check': doc.status === 'approved',
+                          'ti-x': doc.status === 'rejected'
+                        }" aria-hidden="true"></i>
+                      {{ doc.status }}
+                    </span>
+                  </div>
+
+                  <!-- File link or external URL -->
+                  <div ng-if="doc.fileUrl">
+                    <a ng-href="{{ doc.fileUrl }}" target="_blank" class="vetting-doc-link">
+                      <i class="ti ti-external-link" style="font-size:12px;" aria-hidden="true"></i>
+                      {{ doc.fileName || 'View document' }}
+                      <span ng-if="doc.fileSizeBytes" class="text-muted" style="font-size:11px;">
+                        ({{ vm.formatFileSize(doc.fileSizeBytes) }})
+                      </span>
+                    </a>
+                  </div>
+                  <div ng-if="doc.externalUrl && !doc.fileUrl">
+                    <a ng-href="{{ doc.externalUrl }}" target="_blank" class="vetting-doc-link">
+                      <i class="ti ti-external-link" style="font-size:12px;" aria-hidden="true"></i>
+                      {{ doc.externalUrl }}
+                    </a>
+                  </div>
+
+                  <!-- Admin note if previously rejected -->
+                  <p class="vetting-prev-note" ng-if="doc.adminNote && doc.status === 'rejected'">
+                    <i class="ti ti-message" style="font-size:12px;" aria-hidden="true"></i>
+                    Previous note: "{{ doc.adminNote }}"
+                  </p>
+                </div>
+
+                <!-- Review controls -->
+                <div class="vetting-doc-controls" ng-init="rev = vm.getDocReview(doc.id)">
+
+                  <!-- Approve / Reject toggle -->
+                  <div class="vetting-action-btns" ng-if="!rev.saved && doc.status === 'pending'">
+                    <button type="button" class="vetting-approve-btn"
+                      ng-class="{active: rev.status === 'approved'}"
+                      ng-click="rev.status = 'approved'; rev.error = null">
+                      <i class="ti ti-check" aria-hidden="true"></i> Approve
+                    </button>
+                    <button type="button" class="vetting-reject-btn"
+                      ng-class="{active: rev.status === 'rejected'}"
+                      ng-click="rev.status = 'rejected'; rev.error = null">
+                      <i class="ti ti-x" aria-hidden="true"></i> Reject
+                    </button>
+                  </div>
+
+                  <!-- Re-review button if already reviewed -->
+                  <button type="button" class="btn-outline sm"
+                    ng-if="rev.saved || doc.status !== 'pending'"
+                    ng-click="doc.status = 'pending'; rev.saved = false; rev.status = null; rev.error = null">
+                    <i class="ti ti-refresh" aria-hidden="true"></i> Re-review
+                  </button>
+
+                  <!-- Rejection reason (shown when reject selected) -->
+                  <div class="vetting-reject-reason" ng-if="rev.status === 'rejected' && !rev.saved">
+                    <select ng-model="rev.selectedReason"
+                      ng-options="r for r in vm.getReasonsForType(doc.documentType)"
+                      ng-change="rev.error = null">
+                      <option value="">— Select rejection reason —</option>
+                    </select>
+                    <textarea ng-if="rev.selectedReason === 'Other'"
+                      ng-model="rev.freeText"
+                      placeholder="Enter specific rejection reason..."
+                      rows="2"
+                      style="margin-top:6px; width:100%; font-size:13px;"></textarea>
+                  </div>
+
+                  <!-- Save button -->
+                  <button type="button" class="btn-primary sm"
+                    ng-if="!rev.saved && rev.status"
+                    ng-click="vm.saveDocReview(t, doc)"
+                    ng-disabled="rev.saving">
+                    <i class="ti ti-device-floppy" style="font-size:13px;" aria-hidden="true"></i>
+                    {{ rev.saving ? 'Saving...' : 'Save' }}
+                  </button>
+
+                  <!-- Saved confirmation -->
+                  <span class="vetting-saved-badge" ng-if="rev.saved">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i> Saved
+                  </span>
+
+                  <!-- Error -->
+                  <p class="field-error" style="font-size:12px; margin:4px 0 0;" ng-if="rev.error">
+                    {{ rev.error }}
+                  </p>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Empty documents -->
+            <div class="vetting-no-docs" ng-if="!t.documents || !t.documents.length">
+              <i class="ti ti-file-off" aria-hidden="true"></i>
+              No documents submitted yet.
+            </div>
+
+            <!-- Action footer -->
+            <div class="vetting-action-footer">
+              <div>
+                <p class="field-error" ng-if="t.confirmError">{{ t.confirmError }}</p>
+                <p class="field-error" ng-if="t.rejectError">{{ t.rejectError }}</p>
+                <span class="vetting-saved-badge" ng-if="t.rejectSent">
+                  <i class="ti ti-mail" aria-hidden="true"></i>
+                  Rejection email sent to tutor
+                </span>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <button type="button" class="btn-warning"
+                  ng-if="vm.hasRejectedDocs(t)"
+                  ng-click="vm.rejectAndNotify(t)"
+                  ng-disabled="t.rejecting || t.rejectSent"
+                  title="Send rejection email listing all rejected documents">
+                  <i class="ti ti-mail" style="font-size:13px;" aria-hidden="true"></i>
+                  {{ t.rejecting ? 'Sending...' : 'Notify tutor of rejections' }}
+                </button>
+                <button type="button" class="btn-success"
+                  ng-click="vm.confirmTutor(t)"
+                  ng-disabled="!vm.canConfirmTutor(t) || t.confirming"
+                  title="{{ vm.canConfirmTutor(t) ? 'Approve and verify this tutor' : 'All uploaded documents must be individually approved first' }}">
+                  <i class="ti ti-shield-check" style="font-size:13px;" aria-hidden="true"></i>
+                  {{ t.confirming ? 'Confirming...' : 'Confirm and verify tutor' }}
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

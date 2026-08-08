@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS Tutors (
     Bio              LONGTEXT        NOT NULL,
     IsVerified       TINYINT(1)      NOT NULL DEFAULT 0,
     IsOnline         TINYINT(1)      NOT NULL DEFAULT 1,  -- offline hides the profile from parent search/booking entirely
+    VerificationStatus VARCHAR(20)   NOT NULL DEFAULT 'not_submitted', -- not_submitted | pending | approved | rejected
+    OfferingsUnlocked  TINYINT(1)    NOT NULL DEFAULT 0,  -- gates the offering builder until mandatory documents are approved
     CONSTRAINT FK_Tutors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -81,6 +83,31 @@ CREATE TABLE IF NOT EXISTS TutorOfferings (
     Qualification  LONGTEXT        NOT NULL,
     Price          DECIMAL(10,2)   NOT NULL DEFAULT 0,
     CONSTRAINT FK_TutorOfferings_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- TutorDocuments  (tutor verification uploads — identity, academic, teaching
+-- credentials, intro video, specialist certs. Every DocumentType upserts a single
+-- row except specialist_cert, which allows multiple, ordered by SortOrder.
+-- See TutorsController.SaveDocument/ReviewDocument.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorDocuments (
+    Id             INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId        INT             NOT NULL,
+    DocumentType   VARCHAR(30)     NOT NULL DEFAULT '', -- identity_photo | o_level | a_level | degree | postgrad | nie_cert | intro_video | specialist_cert
+    FileUrl        LONGTEXT        NULL,
+    ExternalUrl    LONGTEXT        NULL,                -- intro_video may be a pasted link instead of an upload
+    FileName       LONGTEXT        NULL,
+    FileSizeBytes  BIGINT          NULL,
+    IdType         VARCHAR(20)     NULL,                -- identity_photo only: NRIC | MyKad | Passport
+    IdNumber       LONGTEXT        NULL,                -- identity_photo only
+    SortOrder      INT             NOT NULL DEFAULT 0,
+    Status         VARCHAR(20)     NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+    AdminNote      LONGTEXT        NULL,
+    UploadedAt     DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ReviewedAt     DATETIME(6)     NULL,
+    KEY IX_TutorDocuments_TutorId (TutorId),
+    CONSTRAINT FK_TutorDocuments_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -319,6 +346,55 @@ CREATE TABLE IF NOT EXISTS Payouts (
     Amount    DECIMAL(10,2)   NOT NULL,
     Status    LONGTEXT        NOT NULL DEFAULT 'Processing', -- Processing | Completed
     CONSTRAINT FK_Payouts_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- PresetCancellationDecisions  (per-booking outcome when a tutor cancels a
+-- published preset-class slot — see TutorsController.DeleteSlot,
+-- PresetCancellationsController, AdminController). One row per affected
+-- BOOKING, not per cancellation event — a group class can have several
+-- independent families on the same slot, each deciding separately.
+-- Original*/PricePerLesson are snapshotted from the TutorTimeSlot at cancel
+-- time since that row is deleted immediately after.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PresetCancellationDecisions (
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId        INT             NOT NULL,
+    OriginalDate     LONGTEXT        NOT NULL,
+    OriginalTime     LONGTEXT        NOT NULL,
+    OriginalEndTime  LONGTEXT        NOT NULL,
+    PricePerLesson   DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    ProposedDate     LONGTEXT        NULL, -- NULL = straight cancel, no reschedule offered
+    ProposedTime     LONGTEXT        NULL,
+    ProposedEndTime  LONGTEXT        NULL,
+    Status           VARCHAR(20)     NOT NULL DEFAULT 'pending', -- pending | accepted | auto-accepted | pending-admin | resolved
+    AcknowledgedAt   DATETIME(6)     NULL, -- straight-cancel popup dismissal only; Path A decisions don't use this
+    CreatedAt        DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    DecidedAt        DATETIME(6)     NULL, -- when the parent (or the auto-accept sweep) made the call
+    ResolvedAt       DATETIME(6)     NULL, -- when the refund/penalty/dispute-score side effects actually ran
+    AdminNote        LONGTEXT        NULL,
+    KEY IX_PresetCancellationDecisions_BookingId (BookingId),
+    KEY IX_PresetCancellationDecisions_Status (Status),
+    CONSTRAINT FK_PresetCancellationDecisions_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- TutorPenalties  (deduction ledger against a tutor's future payout — e.g.
+-- the 20% penalty charged when a preset-class cancellation resolves toward a
+-- parent credit. Kept append-only rather than editing Payouts rows directly;
+-- PayoutsController's available-balance calc subtracts SUM(Amount) here.
+-- BookingId is a soft reference, not a hard FK — a penalty is a permanent
+-- ledger entry that should outlive the booking record it originated from.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorPenalties (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId    INT             NOT NULL,
+    BookingId  INT             NULL,
+    Amount     DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    Reason     LONGTEXT        NOT NULL,
+    CreatedAt  DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY IX_TutorPenalties_TutorId (TutorId),
+    CONSTRAINT FK_TutorPenalties_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
 -- ============================================================

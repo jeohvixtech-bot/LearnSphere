@@ -68,6 +68,23 @@ public class AdminStatsDto
     public decimal GrossRevenue { get; set; }
 }
 
+// Admin Tutor Vetting queue row — one tutor with a submitted (pending) verification,
+// including every document so the admin can review each one inline. Reuses
+// TutorDocumentDto for the same shape returned to the tutor themselves.
+public class AdminVettingTutorDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+    public int ExperienceYears { get; set; }
+    public bool IsVerified { get; set; }
+    public string VerificationStatus { get; set; } = string.Empty;
+    public bool OfferingsUnlocked { get; set; }
+    public List<string> Qualifications { get; set; } = new();
+    public List<TutorDocumentDto> Documents { get; set; } = new();
+}
+
 public class ScoringWeightageDto
 {
     public int Id { get; set; }

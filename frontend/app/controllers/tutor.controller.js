@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('TutorCtrl', ['$location', '$timeout', '$interval', '$rootScope', 'AuthService', 'TutorService',
+.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', 'AuthService', 'TutorService',
   'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog',
-function ($location, $timeout, $interval, $rootScope, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog) {
+function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -19,6 +19,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.modesLeft = [];
   self.modesRight = [];
   self.modesError = '';
+  self.offeringLockedError = '';
 
   function rebuildModePools(offeredModes) {
     var offered = offeredModes || [];
@@ -132,7 +133,10 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.loadChat = function (parentUserId) {
     self.activeParentUserId = parentUserId;
     self.activeParent = self.contactableParents.find(function (p) { return p.id === parentUserId; }) || null;
-    ChatService.getMessages(self.tutor.id, parentUserId).then(function (res) { self.chatMessages = res.data; });
+    ChatService.getMessages(self.tutor.id, parentUserId).then(function (res) {
+      self.chatMessages = res.data;
+      scrollChatToBottom();
+    });
   };
 
   // Computed props
@@ -602,22 +606,57 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   };
 
   // Cancelling a published slot that already has confirmed/pending student
-  // bookings cascades on the backend (cancels those bookings, voids unpaid
-  // invoices, notifies the parents) — so the confirmation here warns about
-  // that impact up front rather than letting it happen silently.
+  // bookings needs the tutor to choose up front: propose a replacement
+  // date/time (each affected family then Accepts/Rejects individually, no
+  // penalty either way — see PresetCancellationsController), or cancel outright
+  // with nothing offered (every affected family is credited immediately, and a
+  // penalty + dispute-score hit applies — see IPresetCancellationService).
   self.cancelSlotBusy = false;
+  self.cancelSlotModal = null; // the slot being cancelled, or null when closed
+  self.cancelSlotForm = { mode: 'reschedule', proposedDate: '', proposedTime: '04:00 PM', proposedEndTime: '05:00 PM' };
+  self.cancelSlotError = '';
 
-  self.cancelPublishedSlot = function (slot) {
-    var count = slot.confirmedCount || 0;
-    var msg = count > 0
-      ? 'This class has ' + count + ' student' + (count === 1 ? '' : 's') + ' booked. Cancelling will notify ' +
-        (count === 1 ? 'them' : 'them all') + ' and void any unpaid invoices for this class. Continue?'
-      : 'Cancel this class? It will be removed from your published slots.';
-    if (!confirm(msg)) return;
+  self.openCancelSlotModal = function (slot) {
+    self.cancelSlotModal = slot;
+    self.cancelSlotForm = { mode: 'reschedule', proposedDate: '', proposedTime: '04:00 PM', proposedEndTime: '05:00 PM' };
+    self.cancelSlotError = '';
+  };
+
+  self.closeCancelSlotModal = function () {
+    self.cancelSlotModal = null;
+  };
+
+  self.submitCancelSlot = function () {
+    var slot = self.cancelSlotModal;
+    if (!slot) return;
+    self.cancelSlotError = '';
+
+    var body = null;
+    if (self.cancelSlotForm.mode === 'reschedule') {
+      if (!self.cancelSlotForm.proposedDate || !self.cancelSlotForm.proposedTime || !self.cancelSlotForm.proposedEndTime) {
+        self.cancelSlotError = 'Please fill in the proposed date, start time, and end time.';
+        return;
+      }
+      // fp-date binds "DD-MM-YYYY" — convert to "YYYY-MM-DD" to match slot.Day's
+      // format (same conversion used for reschedule proposals, see submitCounter).
+      var d = parseLocalDate(self.cancelSlotForm.proposedDate);
+      if (isNaN(d.getTime())) {
+        self.cancelSlotError = 'Please enter a valid proposed date.';
+        return;
+      }
+      var mm = (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+      var dd = (d.getDate() < 10 ? '0' : '') + d.getDate();
+      body = {
+        proposedDate: d.getFullYear() + '-' + mm + '-' + dd,
+        proposedTime: self.cancelSlotForm.proposedTime,
+        proposedEndTime: self.cancelSlotForm.proposedEndTime
+      };
+    }
 
     self.cancelSlotBusy = true;
-    TutorService.deleteSlot(self.tutor.id, slot.id).then(function () {
+    TutorService.deleteSlot(self.tutor.id, slot.id, body).then(function () {
       self.cancelSlotBusy = false;
+      self.cancelSlotModal = null;
       TutorService.getByUser(user.userId).then(function (res) {
         self.tutor = res.data;
         rebuildSetupClassUniqueSubjects();
@@ -626,7 +665,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     }).catch(function (err) {
       self.cancelSlotBusy = false;
-      alert((err.data && err.data.message) ? err.data.message : 'Failed to cancel. Please try again.');
+      self.cancelSlotError = (err.data && err.data.message) ? err.data.message : 'Failed to cancel. Please try again.';
     });
   };
 
@@ -667,6 +706,15 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     var days = self.selectedCalDays.slice().sort(function (a, b) { return a - b; });
     if (!days.length) return '';
     return days.join(', ') + ' · ' + self.calYear;
+  };
+
+  // Setup Class needs at least one registered offering + teaching mode to
+  // publish against — without either, the Mode/Subject dropdowns would just be
+  // empty. Whether that's blocking (and what message explains it) also depends
+  // on verification status — see the Setup Class modal template.
+  self.tutorHasOfferings = function () {
+    return !!(self.tutor && self.tutor.offerings && self.tutor.offerings.length &&
+      self.tutor.modes && self.tutor.modes.length);
   };
 
   self.openSetupClass = function () {
@@ -1153,6 +1201,11 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   // Edit profile offerings
   self.addOffering = function () {
+    self.offeringLockedError = '';
+    if (!self.tutor.offeringsUnlocked) {
+      self.offeringLockedError = 'Complete your profile verification before adding subject offerings.';
+      return;
+    }
     var opt = self.newOffering.selectedOption;
     if (!self.newOffering.country || !opt || !self.newOffering.qualification || !self.modesRight.length) return;
     var price = parseFloat(self.newOffering.price) || 0;
@@ -1233,13 +1286,157 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     });
   };
 
+  // ── Verification helpers ──────────────────────────────────────────
+  self.verif = {
+    idType: 'NRIC',
+    idNumber: '',
+    introVideoLink: '',
+    uploadingMap: {},   // { documentType: true/false }
+    errorMap: {}        // { documentType: 'error message' }
+  };
+
+  self.getDoc = function (type) {
+    return (self.tutor.documents || []).find(function (d) { return d.documentType === type; });
+  };
+
+  self.getSpecialistCerts = function () {
+    return (self.tutor.documents || [])
+      .filter(function (d) { return d.documentType === 'specialist_cert'; })
+      .sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+  };
+
+  self.formatFileSize = function (bytes) {
+    if (!bytes) return '';
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return Math.round(bytes / 1024) + ' KB';
+  };
+
+  // Returns true if the tutor has at least one rejected document
+  self.hasRejectedDoc = function () {
+    return (self.tutor.documents || []).some(function (d) { return d.status === 'rejected'; });
+  };
+
+  // Returns the first rejected doc's adminNote (for the banner)
+  self.rejectedDocNote = function () {
+    var d = (self.tutor.documents || []).find(function (d) { return d.status === 'rejected'; });
+    return d ? { type: d.documentType, note: d.adminNote } : null;
+  };
+
+  var ACADEMIC_LEVEL_TYPES = ['o_level', 'a_level', 'degree', 'postgrad'];
+
+  // Static, not rebuilt per digest — ng-repeat over a fresh array literal in the
+  // template tears down and rebuilds every row each cycle (same trap documented
+  // on rebuildSetupClassUniqueSubjects/computeContactableParents above).
+  self.academicLevels = [
+    { type: 'o_level', label: 'O-Level / SPM' },
+    { type: 'a_level', label: 'A-Level / STPM / Diploma' },
+    { type: 'degree', label: "Bachelor's degree" },
+    { type: 'postgrad', label: "Master's / PhD" }
+  ];
+
+  // Count of mandatory doc slots filled: identity photo + at least one academic level
+  self.mandatoryUploadedCount = function () {
+    var docs = self.tutor.documents || [];
+    var count = 0;
+    if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; })) count++;
+    if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })) count++;
+    return count;
+  };
+
+  self.mandatoryTotal = 2;
+
+  self.verifProgress = function () {
+    return Math.round((self.mandatoryUploadedCount() / self.mandatoryTotal) * 100) + '%';
+  };
+
+  self.canSubmitVerification = function () {
+    return self.mandatoryUploadedCount() >= self.mandatoryTotal
+      && self.tutor.verificationStatus !== 'pending';
+  };
+
+  // Refreshes vm.tutor after any verification mutation. Deliberately uses
+  // getByUser (not getById/TutorService.getById) — GetById only returns tutors
+  // that are IsVerified && IsOnline, so it 404s for exactly the tutors this
+  // feature targets (mid-verification, not yet approved).
+  function refreshTutor() {
+    return TutorService.getByUser(user.userId).then(function (res) {
+      self.tutor = res.data;
+    });
+  }
+
+  self.uploadVerifDoc = function (file, docType) {
+    if (!file) return;
+    self.verif.uploadingMap[docType] = true;
+    self.verif.errorMap[docType] = null;
+
+    TutorService.uploadDocument(file, docType).then(function (res) {
+      return TutorService.saveDocument(self.tutor.id, {
+        documentType: docType,
+        fileUrl: res.data.url,
+        fileName: res.data.fileName,
+        fileSizeBytes: res.data.fileSizeBytes,
+        idType: docType === 'identity_photo' ? self.verif.idType : null,
+        idNumber: docType === 'identity_photo' ? self.verif.idNumber : null
+      });
+    }).then(refreshTutor).catch(function (err) {
+      self.verif.errorMap[docType] = err.data && err.data.message
+        ? err.data.message : 'Upload failed. Please try again.';
+    }).finally(function () {
+      self.verif.uploadingMap[docType] = false;
+    });
+  };
+
+  // Saves an intro video link (no file upload)
+  self.saveIntroVideoLink = function () {
+    if (!self.verif.introVideoLink) return;
+    TutorService.saveDocument(self.tutor.id, {
+      documentType: 'intro_video',
+      externalUrl: self.verif.introVideoLink
+    }).then(function () {
+      self.verif.introVideoLink = '';
+      return refreshTutor();
+    }).catch(function () {
+      self.verif.errorMap['intro_video'] = 'Failed to save link.';
+    });
+  };
+
+  self.removeVerifDoc = function (docId) {
+    TutorService.removeDocument(self.tutor.id, docId).then(refreshTutor);
+  };
+
+  self.verifSubmitSuccess = false;
+  self.verifSubmitError = '';
+
+  self.submitVerification = function () {
+    if (!self.canSubmitVerification()) return;
+    self.verifSubmitError = '';
+    TutorService.submitVerification(self.tutor.id).then(function () {
+      return refreshTutor();
+    }).then(function () {
+      self.verifSubmitSuccess = true;
+      $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
+    }).catch(function (err) {
+      self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Submission failed.';
+    });
+  };
+
+  // Triggers a hidden file input from a custom "Browse" button
+  self.triggerVerifUpload = function (inputId) {
+    document.getElementById(inputId).click();
+  };
+
   // Poll for booking updates (e.g. parent accepts counter proposal)
   var _pollInterval = $interval(function () {
     if (!self.rescheduleBooking && !self.counterBooking && !self.reportBooking && !self.editBooking) {
       BookingService.getAll().then(function (res) { self.bookings = res.data; });
     }
   }, 15000);
-  $rootScope.$on('$destroy', function () { $interval.cancel(_pollInterval); });
+  // $scope (not $rootScope) — $rootScope never actually fires '$destroy' on a
+  // route change in a normal SPA lifecycle, only on full app teardown, so an
+  // interval cancelled that way would never really stop; it'd just keep
+  // multiplying (uncancelled) every time this controller is re-instantiated by
+  // navigating between tutor pages. $scope IS destroyed on route change.
+  $scope.$on('$destroy', function () { $interval.cancel(_pollInterval); });
 
   self.sendMessage = function () {
     if (!self.chatText.trim() || !self.tutor || !self.activeParentUserId) return;
@@ -1247,6 +1444,33 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';
+        scrollChatToBottom();
       });
   };
+
+  // Auto-refresh the open conversation so a parent's reply shows up without the
+  // tutor needing to reload the page — see the matching comment in
+  // parent.controller.js. Only appends messages not already present (by id).
+  function mergeNewChatMessages(fetched) {
+    var seenIds = {};
+    self.chatMessages.forEach(function (m) { seenIds[m.id] = true; });
+    var added = false;
+    fetched.forEach(function (m) {
+      if (!seenIds[m.id]) { self.chatMessages.push(m); added = true; }
+    });
+    if (added) scrollChatToBottom();
+  }
+
+  function scrollChatToBottom() {
+    $timeout(function () {
+      var el = document.getElementById('chatMessages');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  var _chatPollInterval = $interval(function () {
+    if (!self.activeParentUserId || !self.tutor) return;
+    ChatService.getMessages(self.tutor.id, self.activeParentUserId).then(mergeNewChatMessages);
+  }, 4000);
+  $scope.$on('$destroy', function () { $interval.cancel(_chatPollInterval); });
 }]);

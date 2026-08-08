@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,8 +14,15 @@ namespace LearnSphere.API.Controllers;
 public class TutorsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IPresetCancellationService _cancellationService;
+    private readonly IEmailService _emailService;
 
-    public TutorsController(AppDbContext context) => _context = context;
+    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService, IEmailService emailService)
+    {
+        _context = context;
+        _cancellationService = cancellationService;
+        _emailService = emailService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search, [FromQuery] double? rating)
@@ -28,6 +36,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .Where(t => t.IsVerified && t.IsOnline)
             .AsQueryable();
 
@@ -81,10 +90,18 @@ public class TutorsController : ControllerBase
             .ToListAsync())
             .GroupBy(x => x.TutorId).ToDictionary(g => g.Key, g => g.Count());
 
+        // Combines parent-reported issues with tutor-cancelled preset classes that
+        // resolved toward a parent credit (straight cancels, and admin-approved
+        // rejections of a proposed reschedule — see IPresetCancellationService) —
+        // both count as a dispute against the tutor for this month.
         var disputesByTutor = (await _context.IssueReports
             .Where(ir => ir.CreatedAt >= monthStart && ir.CreatedAt < monthStart.AddMonths(1))
             .Select(ir => ir.Booking.TutorId)
             .ToListAsync())
+            .Concat(await _context.PresetCancellationDecisions
+                .Where(d => d.Status == "resolved" && d.ResolvedAt >= monthStart && d.ResolvedAt < monthStart.AddMonths(1))
+                .Select(d => d.Booking.TutorId)
+                .ToListAsync())
             .GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
 
         var results = tutors.Select(t =>
@@ -216,6 +233,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null || !tutor.IsVerified || !tutor.IsOnline) return NotFound();
@@ -286,6 +304,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == tutor.Id);
 
         return Ok(MapToDto(created!));
@@ -304,6 +323,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.UserId == userId);
 
         if (tutor == null) return NotFound();
@@ -391,6 +411,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         return Ok(MapToDto(updated!));
@@ -417,6 +438,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         return Ok(MapToDto(updated!));
@@ -446,6 +468,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         return Ok(MapToDto(updated!));
@@ -707,9 +730,24 @@ public class TutorsController : ControllerBase
         return Ok(new TimeSlotDto { Id = slot.Id, Day = slot.Day, Time = slot.Time, Status = slot.Status });
     }
 
+    // Cancelling a published slot with confirmed/pending bookings on it takes one
+    // of two paths, chosen by whether dto carries a proposed replacement date:
+    //   - Proposed date given ("Path A"): each affected booking gets a PENDING
+    //     decision — nothing about price/invoice changes yet. The parent is
+    //     forced to Accept (moves that session to the new date/time) or Reject
+    //     (queued for admin review; only once an admin approves it does the
+    //     refund/penalty actually happen — see AdminController). If the parent
+    //     never responds before the proposed date/time arrives, it auto-accepts
+    //     (checked lazily next time they load their dashboard).
+    //   - No proposed date ("Path B"): every affected booking is resolved
+    //     immediately toward a credit — no admin step, no real choice, the
+    //     parent just sees an acknowledge-only notice.
+    // Either way, the affected session is removed from the booking's active
+    // schedule right away (not left dangling on a date that's been cancelled);
+    // Path A re-adds it at the new date/time only once actually accepted.
     [HttpDelete("{id}/slots/{slotId}")]
     [Authorize]
-    public async Task<IActionResult> DeleteSlot(int id, int slotId)
+    public async Task<IActionResult> DeleteSlot(int id, int slotId, [FromBody] CancelSlotDto? dto)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id);
@@ -719,15 +757,16 @@ public class TutorsController : ControllerBase
         var slot = await _context.TutorTimeSlots.FirstOrDefaultAsync(s => s.Id == slotId && s.TutorId == id);
         if (slot == null) return NotFound();
 
+        var isReschedule = dto != null && !string.IsNullOrWhiteSpace(dto.ProposedDate) && !string.IsNullOrWhiteSpace(dto.ProposedTime);
+        if (isReschedule && string.IsNullOrWhiteSpace(dto!.ProposedEndTime))
+            return BadRequest(new { message = "A proposed end time is required when proposing a new date." });
+
         // Flow B preset slots track fills via ConfirmedCount/IsFull, not the legacy
         // Status flag (that only reflects unrelated time-overlap blocking — see
         // BookPreset), so any confirmed/pending bookings riding on this slot must be
         // dealt with explicitly. A booking can now span multiple occurrences of a
         // recurring series (see BookPreset/BookingPresetSlots) — cancelling one slot
-        // only removes THAT session from the booking, not the whole thing, unless it
-        // was the booking's only remaining session. Mirrors the parent-side cancel
-        // flow in BookingsController.CancelBooking: void the invoice (or shrink it),
-        // notify the other side — before the slot itself disappears.
+        // only affects THAT session within the booking, not the whole thing.
         var affectedBookingIds = await _context.BookingPresetSlots
             .Where(bps => bps.TutorTimeSlotId == slotId)
             .Select(bps => bps.BookingId)
@@ -746,30 +785,36 @@ public class TutorsController : ControllerBase
             .Where(b => affectedBookingIds.Contains(b.Id) && (b.Status == "confirmed" || b.Status == "pending"))
             .ToListAsync();
 
-        var cancelledCount = 0;
+        var resolvedCount = 0;
         foreach (var booking in affectedBookings)
         {
             var classToRemove = booking.Classes.FirstOrDefault(c => c.Date == slot.Day && c.Time.StartsWith(slot.Time));
             if (classToRemove != null) _context.BookingClasses.Remove(classToRemove);
             var presetSlotLink = booking.PresetSlots.FirstOrDefault(ps => ps.TutorTimeSlotId == slotId);
             if (presetSlotLink != null) _context.BookingPresetSlots.Remove(presetSlotLink);
+            // Reflect the removal immediately so ResolveTowardCreditAsync's
+            // remaining-session count (for Path B, below) is accurate.
+            if (classToRemove != null) booking.Classes.Remove(classToRemove);
 
-            var remainingSessions = booking.Classes.Count - (classToRemove != null ? 1 : 0);
-            var wholeBookingCancelled = remainingSessions <= 0;
+            var decision = new PresetCancellationDecision
+            {
+                BookingId = booking.Id,
+                OriginalDate = slot.Day,
+                OriginalTime = slot.Time,
+                OriginalEndTime = slot.EndTime ?? string.Empty,
+                PricePerLesson = slot.PricePerLesson,
+                ProposedDate = isReschedule ? dto!.ProposedDate : null,
+                ProposedTime = isReschedule ? dto!.ProposedTime : null,
+                ProposedEndTime = isReschedule ? dto!.ProposedEndTime : null,
+                Status = isReschedule ? "pending" : "resolved"
+            };
+            _context.PresetCancellationDecisions.Add(decision);
 
-            if (wholeBookingCancelled)
+            if (!isReschedule)
             {
-                booking.Status = "cancelled";
-                if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
-                    booking.Invoice.Status = "Cancelled";
-                cancelledCount++;
-            }
-            else
-            {
-                // Booking survives with fewer sessions — shrink its price/invoice to match.
-                booking.TotalPrice = Math.Max(0, booking.TotalPrice - slot.PricePerLesson);
-                if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
-                    booking.Invoice.Amount = booking.TotalPrice;
+                await _cancellationService.ResolveTowardCreditAsync(decision, booking,
+                    $"Tutor cancelled {booking.Subject} on {slot.Day} with no reschedule offered.");
+                resolvedCount++;
             }
 
             if (booking.Student?.ParentUser != null)
@@ -777,9 +822,10 @@ public class TutorsController : ControllerBase
                 _context.Notifications.Add(new Notification
                 {
                     UserId = booking.Student.ParentUser.Id,
-                    Title = wholeBookingCancelled ? "Class Cancelled by Tutor" : "One Session Cancelled by Tutor",
-                    Message = $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled by the tutor." +
-                        (wholeBookingCancelled ? "" : " The rest of this booking's sessions are unaffected."),
+                    Title = isReschedule ? "Class Rescheduled by Tutor — Action Needed" : "Class Cancelled by Tutor",
+                    Message = isReschedule
+                        ? $"{tutor.User.Name} needs to move your {booking.Subject} class on {slot.Day} to a new date. Check your dashboard to accept or decline."
+                        : $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled with no reschedule offered — you'll receive a credit.",
                     Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                     Type = "booking",
                     IsRead = false
@@ -789,7 +835,7 @@ public class TutorsController : ControllerBase
 
         _context.TutorTimeSlots.Remove(slot);
         await _context.SaveChangesAsync();
-        return Ok(new { cancelledBookings = cancelledCount, affectedBookings = affectedBookings.Count });
+        return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = isReschedule });
     }
 
     [HttpPost("{id}/reviews")]
@@ -853,9 +899,295 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
+            .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         return Ok(MapToDto(updated!));
+    }
+
+    // Mandatory documents an offering-unlock decision is based on: identity + at
+    // least one academic level. Kept in one place so SubmitVerification's
+    // pre-check and ConfirmVerification's unlock check can't drift apart.
+    private static readonly string[] AcademicLevelTypes = { "o_level", "a_level", "degree", "postgrad" };
+
+    private static readonly Dictionary<string, string> DocumentTypeLabels = new()
+    {
+        ["identity_photo"] = "Identity photo (selfie with ID)",
+        ["o_level"] = "O-Level / SPM certificate",
+        ["a_level"] = "A-Level / STPM / Diploma certificate",
+        ["degree"] = "Bachelor's degree certificate",
+        ["postgrad"] = "Master's / PhD certificate",
+        ["nie_cert"] = "NIE / teaching certificate",
+        ["intro_video"] = "Introduction video",
+        ["specialist_cert"] = "Specialist certificate"
+    };
+
+    private static readonly Dictionary<string, List<string>> RejectionReasons = new()
+    {
+        ["identity_photo"] = new List<string>
+        {
+            "Image too blurry", "Face not clearly visible", "ID number unreadable",
+            "Wrong document type uploaded", "ID appears expired", "Other"
+        },
+        ["o_level"] = new List<string>
+        {
+            "Certificate appears altered", "Wrong document uploaded", "Image too low resolution",
+            "Name on certificate does not match profile", "Certificate cannot be verified", "Other"
+        },
+        ["a_level"] = new List<string>
+        {
+            "Certificate appears altered", "Wrong document uploaded", "Image too low resolution",
+            "Name on certificate does not match profile", "Certificate cannot be verified", "Other"
+        },
+        ["degree"] = new List<string>
+        {
+            "Certificate appears altered", "Wrong document uploaded", "Image too low resolution",
+            "Name on certificate does not match profile", "Certificate cannot be verified", "Other"
+        },
+        ["postgrad"] = new List<string>
+        {
+            "Certificate appears altered", "Wrong document uploaded", "Image too low resolution",
+            "Name on certificate does not match profile", "Certificate cannot be verified", "Other"
+        },
+        ["nie_cert"] = new List<string>
+        {
+            "Certificate appears altered", "Not a recognised teaching qualification",
+            "Certificate cannot be verified", "Other"
+        },
+        ["intro_video"] = new List<string>
+        {
+            "Video link is broken or inaccessible", "Video too short (under 30 seconds)",
+            "Audio is inaudible", "Face not visible in video", "Other"
+        },
+        ["specialist_cert"] = new List<string>
+        {
+            "Certificate appears altered", "Not a recognised specialist qualification",
+            "Certificate cannot be verified", "Other"
+        }
+    };
+
+    [HttpGet("rejection-reasons")]
+    [Authorize(Roles = "admin")]
+    public IActionResult GetRejectionReasons()
+    {
+        return Ok(RejectionReasons);
+    }
+
+    [HttpPost("{id}/documents")]
+    [Authorize]
+    public async Task<IActionResult> SaveDocument(int id, [FromBody] SaveDocumentDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors
+            .Include(t => t.Documents)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(dto.DocumentType))
+            return BadRequest(new { message = "Document type is required." });
+
+        // For specialist certs, allow multiple — add new record.
+        // For every other type, upsert (replace existing of same type).
+        if (dto.DocumentType == "specialist_cert")
+        {
+            var doc = new TutorDocument
+            {
+                TutorId = id,
+                DocumentType = dto.DocumentType,
+                FileUrl = dto.FileUrl,
+                FileName = dto.FileName,
+                FileSizeBytes = dto.FileSizeBytes,
+                SortOrder = tutor.Documents.Count(d => d.DocumentType == "specialist_cert"),
+                Status = "pending"
+            };
+            _context.TutorDocuments.Add(doc);
+        }
+        else
+        {
+            var existing = tutor.Documents.FirstOrDefault(d => d.DocumentType == dto.DocumentType);
+            if (existing != null)
+            {
+                existing.FileUrl = dto.FileUrl;
+                existing.ExternalUrl = dto.ExternalUrl;
+                existing.FileName = dto.FileName;
+                existing.FileSizeBytes = dto.FileSizeBytes;
+                existing.IdType = dto.IdType;
+                existing.IdNumber = dto.IdNumber;
+                existing.Status = "pending";
+                existing.AdminNote = null;
+                existing.UploadedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.TutorDocuments.Add(new TutorDocument
+                {
+                    TutorId = id,
+                    DocumentType = dto.DocumentType,
+                    FileUrl = dto.FileUrl,
+                    ExternalUrl = dto.ExternalUrl,
+                    FileName = dto.FileName,
+                    FileSizeBytes = dto.FileSizeBytes,
+                    IdType = dto.IdType,
+                    IdNumber = dto.IdNumber,
+                    Status = "pending"
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Document saved." });
+    }
+
+    [HttpDelete("{id}/documents/{docId}")]
+    [Authorize]
+    public async Task<IActionResult> RemoveDocument(int id, int docId)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        var doc = await _context.TutorDocuments.FirstOrDefaultAsync(d => d.Id == docId && d.TutorId == id);
+        if (doc == null) return NotFound();
+        _context.TutorDocuments.Remove(doc);
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPost("{id}/submit-verification")]
+    [Authorize]
+    public async Task<IActionResult> SubmitVerification(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors
+            .Include(t => t.Documents)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        if (tutor.VerificationStatus == "pending")
+            return BadRequest(new { message = "Verification is already under review." });
+
+        var docs = tutor.Documents;
+        bool hasIdentity = docs.Any(d => d.DocumentType == "identity_photo" && d.FileUrl != null);
+        bool hasAcademic = docs.Any(d => AcademicLevelTypes.Contains(d.DocumentType) && d.FileUrl != null);
+
+        if (!hasIdentity || !hasAcademic)
+            return BadRequest(new { message = "Please upload all required documents before submitting." });
+
+        tutor.VerificationStatus = "pending";
+        // Reset previously-rejected documents back to pending on resubmit
+        foreach (var doc in docs.Where(d => d.Status == "rejected"))
+        {
+            doc.Status = "pending";
+            doc.AdminNote = null;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Verification submitted. Admin will review within 1-3 business days." });
+    }
+
+    // Saves a single document's review decision only — does not itself change the
+    // tutor's overall VerificationStatus/IsVerified/OfferingsUnlocked. Admin reviews
+    // documents one at a time, then explicitly confirms (ConfirmVerification) or
+    // notifies the tutor of rejections (RejectVerification) as a separate step.
+    [HttpPatch("{id}/documents/{docId}/review")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> ReviewDocument(int id, int docId, [FromBody] ReviewDocumentDto dto)
+    {
+        if (dto.Status != "approved" && dto.Status != "rejected")
+            return BadRequest(new { message = "Status must be 'approved' or 'rejected'." });
+
+        var tutor = await _context.Tutors.Include(t => t.Documents).FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        var doc = tutor.Documents.FirstOrDefault(d => d.Id == docId);
+        if (doc == null) return NotFound();
+
+        doc.Status = dto.Status;
+        doc.AdminNote = dto.Note;
+        doc.ReviewedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Document reviewed." });
+    }
+
+    [HttpPost("{id}/confirm-verification")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> ConfirmVerification(int id)
+    {
+        var tutor = await _context.Tutors
+            .Include(t => t.Documents)
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        var uploadedDocs = tutor.Documents.Where(d => d.FileUrl != null || d.ExternalUrl != null).ToList();
+
+        bool identityApproved = uploadedDocs.Any(d => d.DocumentType == "identity_photo" && d.Status == "approved");
+        bool academicApproved = uploadedDocs.Any(d => AcademicLevelTypes.Contains(d.DocumentType) && d.Status == "approved");
+        bool anyRejected = uploadedDocs.Any(d => d.Status == "rejected");
+
+        if (!identityApproved || !academicApproved)
+            return BadRequest(new { message = "All mandatory documents must be approved before confirming." });
+        if (anyRejected)
+            return BadRequest(new { message = "Please resolve all rejected documents before confirming." });
+
+        tutor.IsVerified = true;
+        tutor.OfferingsUnlocked = true;
+        tutor.VerificationStatus = "approved";
+
+        await _context.SaveChangesAsync();
+
+        await _emailService.SendAsync(
+            tutor.User.Email,
+            "LearnSphere — Profile verified",
+            $"Hi {tutor.User.Name},\n\n" +
+            "Congratulations! Your LearnSphere tutor profile has been verified.\n\n" +
+            "You can now log in and set up your subject offerings to start receiving bookings.\n\n" +
+            "Regards,\nLearnSphere Team"
+        );
+
+        return Ok(new { message = "Tutor verified and notified." });
+    }
+
+    [HttpPost("{id}/reject-verification")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> RejectVerification(int id)
+    {
+        var tutor = await _context.Tutors
+            .Include(t => t.Documents)
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        var rejectedDocs = tutor.Documents.Where(d => d.Status == "rejected" && !string.IsNullOrEmpty(d.AdminNote)).ToList();
+        if (rejectedDocs.Count == 0)
+            return BadRequest(new { message = "No rejected documents found to notify about." });
+
+        tutor.VerificationStatus = "rejected";
+        await _context.SaveChangesAsync();
+
+        var rejectionLines = rejectedDocs.Select(d =>
+        {
+            var label = DocumentTypeLabels.TryGetValue(d.DocumentType, out var l) ? l : d.DocumentType;
+            return $"• {label}\n  Reason: {d.AdminNote}";
+        });
+
+        var emailBody =
+            $"Hi {tutor.User.Name},\n\n" +
+            "Your LearnSphere profile verification requires attention. " +
+            "The following documents could not be accepted:\n\n" +
+            string.Join("\n\n", rejectionLines) +
+            "\n\nPlease log in to your LearnSphere profile, re-upload the affected documents, " +
+            "and resubmit for verification.\n\n" +
+            "Regards,\nLearnSphere Team";
+
+        await _emailService.SendAsync(tutor.User.Email, "LearnSphere — Profile verification update", emailBody);
+
+        return Ok(new { message = "Rejection sent and tutor notified." });
     }
 
     private static TutorDto MapToDto(Tutor t) => new()
@@ -876,6 +1208,14 @@ public class TutorsController : ControllerBase
         Qualifications = t.Qualifications.Select(q => q.Qualification).ToList(),
         IsVerified = t.IsVerified,
         IsOnline = t.IsOnline,
+        VerificationStatus = t.VerificationStatus,
+        OfferingsUnlocked = t.OfferingsUnlocked,
+        Documents = t.Documents.Select(d => new TutorDocumentDto
+        {
+            Id = d.Id, DocumentType = d.DocumentType, FileUrl = d.FileUrl, ExternalUrl = d.ExternalUrl,
+            FileName = d.FileName, FileSizeBytes = d.FileSizeBytes, IdType = d.IdType, IdNumber = d.IdNumber,
+            SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt
+        }).ToList(),
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto
         {

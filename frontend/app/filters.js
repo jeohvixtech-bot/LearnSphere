@@ -84,4 +84,20 @@ angular.module('learnSphereApp')
     if (!val) return '';
     return String(val).split(/\s*-\s*/).map(normalizeOne).join(' - ');
   };
+})
+// Display label for a TutorDocument.documentType value (verification section).
+.filter('verifDocLabel', function () {
+  var labels = {
+    identity_photo: 'Identity photo',
+    o_level: 'O-Level / SPM',
+    a_level: 'A-Level / STPM / Diploma',
+    degree: "Bachelor's degree",
+    postgrad: "Master's / PhD",
+    nie_cert: 'NIE / DPLI / MOE certificate',
+    intro_video: 'Introduction video',
+    specialist_cert: 'Specialist certificate'
+  };
+  return function (type) {
+    return labels[type] || type || '';
+  };
 });

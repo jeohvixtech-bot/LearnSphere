@@ -35,7 +35,18 @@ builder.Services.AddAuthorization();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+builder.Services.AddScoped<IPresetCancellationService, PresetCancellationService>();
+// Real SMTP delivery once BOTH "Smtp:Host" and "Smtp:Password" are set (Password
+// is meant to come from user-secrets/environment, never committed to
+// appsettings.json) — falls back to logging emails to the console otherwise, so
+// a half-configured Smtp section (e.g. Host set while still generating the app
+// password) degrades to the safe no-op instead of every email-sending endpoint
+// throwing.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Host"]) &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Password"]))
+    builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+else
+    builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 
 // CORS — origins configurable via appsettings.json "AllowedOrigins"
 // Set to ["*"] to allow all, or list specific origins e.g. ["http://localhost:4200","http://myserver:1002"]
@@ -317,6 +328,77 @@ using (var scope = app.Services.CreateScope())
             ('na1', 'NA', 0, 4),
             ('na2', 'NA', 0, 5)
     ");
+    // Per-booking outcome of a tutor cancelling a published preset-class slot —
+    // see TutorsController.DeleteSlot and PresetCancellationsController.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PresetCancellationDecisions` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BookingId` INT NOT NULL,
+            `OriginalDate` LONGTEXT NOT NULL,
+            `OriginalTime` LONGTEXT NOT NULL,
+            `OriginalEndTime` LONGTEXT NOT NULL,
+            `PricePerLesson` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `ProposedDate` LONGTEXT NULL,
+            `ProposedTime` LONGTEXT NULL,
+            `ProposedEndTime` LONGTEXT NULL,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+            `AcknowledgedAt` DATETIME(6) NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `DecidedAt` DATETIME(6) NULL,
+            `ResolvedAt` DATETIME(6) NULL,
+            `AdminNote` LONGTEXT NULL,
+            PRIMARY KEY (`Id`),
+            KEY `IX_PresetCancellationDecisions_BookingId` (`BookingId`),
+            KEY `IX_PresetCancellationDecisions_Status` (`Status`),
+            CONSTRAINT `FK_PresetCancellationDecisions_Bookings` FOREIGN KEY (`BookingId`) REFERENCES `Bookings` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    // Deduction ledger against a tutor's future payout (e.g. the 20% penalty on a
+    // preset-class cancellation resolved toward a parent credit) — see
+    // TutorPenalty.cs and PayoutsController's available-balance calculation.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorPenalties` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `BookingId` INT NULL,
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `Reason` LONGTEXT NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_TutorPenalties_TutorId` (`TutorId`),
+            CONSTRAINT `FK_TutorPenalties_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    // Tutor document verification — VerificationStatus tracks the submission workflow
+    // (not_submitted | pending | approved | rejected); OfferingsUnlocked gates the
+    // offering builder until every mandatory document is approved — see
+    // TutorsController.ReviewDocument / AddOffering guard in tutor.controller.js.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ADD COLUMN `VerificationStatus` VARCHAR(20) NOT NULL DEFAULT 'not_submitted'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ADD COLUMN `OfferingsUnlocked` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorDocuments` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `DocumentType` VARCHAR(30) NOT NULL DEFAULT '',
+            `FileUrl` LONGTEXT NULL,
+            `ExternalUrl` LONGTEXT NULL,
+            `FileName` LONGTEXT NULL,
+            `FileSizeBytes` BIGINT NULL,
+            `IdType` VARCHAR(20) NULL,
+            `IdNumber` LONGTEXT NULL,
+            `SortOrder` INT NOT NULL DEFAULT 0,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+            `AdminNote` LONGTEXT NULL,
+            `UploadedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `ReviewedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`),
+            KEY `IX_TutorDocuments_TutorId` (`TutorId`),
+            CONSTRAINT `FK_TutorDocuments_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
     await DbSeeder.SeedAsync(context);
 }
 
