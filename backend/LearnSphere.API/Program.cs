@@ -399,6 +399,10 @@ using (var scope = app.Services.CreateScope())
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
 
+    // Chat read/unread state — see ChatMessage.IsRead / ChatController.GetMessages.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ChatMessages` ADD COLUMN `IsRead` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+
     await DbSeeder.SeedAsync(context);
 }
 

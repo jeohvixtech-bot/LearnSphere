@@ -56,4 +56,8 @@ angular.module('learnSphereApp')
   self.rejectVerification = function (tutorId) {
     return $http.post(API_URL + '/tutors/' + tutorId + '/reject-verification', null, h());
   };
+
+  self.adminRemoveDocument = function (tutorId, docId) {
+    return $http.delete(API_URL + '/tutors/' + tutorId + '/documents/' + docId + '/admin-remove', h());
+  };
 }]);

@@ -415,6 +415,9 @@ CREATE TABLE IF NOT EXISTS FavoriteTutors (
 -- Added: ParentUserId — threads were keyed by TutorId alone, mixing every
 -- parent who messaged a given tutor into one conversation. The key is now
 -- (TutorId, ParentUserId).
+-- Added: IsRead — a thread is strictly 1:1, so one flag per message is enough
+-- to answer "has the recipient seen this" (no per-participant read table).
+-- Marked true as a side effect of the recipient calling GET /api/chat/{tutorId}/{parentUserId}.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ChatMessages (
     Id            INT AUTO_INCREMENT PRIMARY KEY,
@@ -422,7 +425,8 @@ CREATE TABLE IF NOT EXISTS ChatMessages (
     ParentUserId  INT         NOT NULL DEFAULT 0,
     Sender        LONGTEXT    NOT NULL, -- parent | tutor | system
     Text          LONGTEXT    NOT NULL,
-    Timestamp     LONGTEXT    NOT NULL
+    Timestamp     LONGTEXT    NOT NULL,
+    IsRead        TINYINT(1)  NOT NULL DEFAULT 0
 );
 
 -- ============================================================

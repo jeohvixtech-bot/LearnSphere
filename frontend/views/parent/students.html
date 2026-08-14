@@ -234,7 +234,8 @@
               <div class="form-row">
                 <div class="form-group">
                   <label>Full Name <span class="text-danger">*</span></label>
-                  <input type="text" ng-model="vm.editStudentForm.name" required />
+                  <input type="text" ng-model="vm.editStudentForm.name" ng-change="vm.validateEditStudentName()" required />
+                  <div class="field-error" ng-if="vm.editStudentNameError">{{ vm.editStudentNameError }}</div>
                 </div>
                 <div class="form-group">
                   <label>School</label>
@@ -326,10 +327,11 @@
                 <label>Learning Goals</label>
                 <textarea ng-model="vm.editStudentForm.learningGoal" rows="2"
                   placeholder="e.g. Prepare for O-Levels..."></textarea>
+                <div class="field-error" ng-if="vm.editStudentGoalError">{{ vm.editStudentGoalError }}</div>
               </div>
               <div class="btn-row">
                 <button type="button" class="btn-outline" ng-click="vm.cancelEditStudent()">Cancel</button>
-                <button type="submit" class="btn-primary">Save Changes</button>
+                <button type="submit" class="btn-primary" ng-disabled="!!vm.editStudentNameError">Save Changes</button>
               </div>
             </form>
           </div>
@@ -352,7 +354,8 @@
           <div class="profile-form-section">Basic Information</div>
           <div class="form-group">
             <label>Child Full Name <span class="text-danger">*</span></label>
-            <input type="text" ng-model="vm.studentForm.name" required placeholder="e.g. Jessica Tan" />
+            <input type="text" ng-model="vm.studentForm.name" ng-change="vm.validateStudentName()" required placeholder="e.g. Jessica Tan" />
+            <div class="field-error" ng-if="vm.studentNameError">{{ vm.studentNameError }}</div>
           </div>
 
           <div class="form-group" style="position:relative">
@@ -490,9 +493,10 @@
             <label>Milestones &amp; Objectives <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
             <textarea ng-model="vm.studentForm.learningGoal" rows="3"
               placeholder="e.g. Improve algebra speed, prepare for national exams..."></textarea>
+            <div class="field-error" ng-if="vm.studentGoalError">{{ vm.studentGoalError }}</div>
           </div>
 
-          <button type="submit" class="btn-primary full-width" style="margin-top:4px">
+          <button type="submit" class="btn-primary full-width" style="margin-top:4px" ng-disabled="!!vm.studentNameError">
             Create Child Profile →
           </button>
 

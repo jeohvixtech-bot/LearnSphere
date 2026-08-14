@@ -107,6 +107,12 @@
                     </a>
                   </div>
 
+                  <button type="button" class="vetting-doc-remove-btn"
+                    ng-click="vm.adminRemoveDoc(t, doc)"
+                    title="Remove this document">
+                    <i class="ti ti-trash" aria-hidden="true"></i> Remove
+                  </button>
+
                   <!-- Admin note if previously rejected -->
                   <p class="vetting-prev-note" ng-if="doc.adminNote && doc.status === 'rejected'">
                     <i class="ti ti-message" style="font-size:12px;" aria-hidden="true"></i>

@@ -1,8 +1,8 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AdminCtrl', ['$location', '$timeout', '$filter', 'AuthService', 'AdminService', 'TutorService', 'PresetCancellationService',
-function ($location, $timeout, $filter, AuthService, AdminService, TutorService, PresetCancellationService) {
+.controller('AdminCtrl', ['$location', '$timeout', '$filter', 'AuthService', 'AdminService', 'TutorService', 'PresetCancellationService', 'ProfanityFilterService',
+function ($location, $timeout, $filter, AuthService, AdminService, TutorService, PresetCancellationService, ProfanityFilterService) {
   var self = this;
   self.user = AuthService.getCurrentUser();
 
@@ -111,6 +111,8 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   };
 
   self.resolveRescheduleRejection = function (d) {
+    var noteError = ProfanityFilterService.validate(d._adminNote);
+    if (noteError) { alert(noteError); return; }
     self.rescheduleActionBusy = true;
     PresetCancellationService.resolveAdmin(d.id, d._adminNote).then(function () {
       self.rescheduleQueue = self.rescheduleQueue.filter(function (x) { return x.id !== d.id; });
@@ -199,6 +201,8 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     if (review.status === 'rejected') {
       var reason = review.selectedReason === 'Other' ? review.freeText : review.selectedReason;
       if (!reason) { review.error = 'Please select or enter a rejection reason.'; return; }
+      var reasonProfanityError = ProfanityFilterService.validate(reason);
+      if (reasonProfanityError) { review.error = reasonProfanityError; return; }
       note = reason;
     }
 
@@ -274,6 +278,22 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
         tutor.rejectError = err.data && err.data.message
           ? err.data.message : 'Failed to send rejection.';
         tutor.rejecting = false;
+      });
+  };
+
+  self.adminRemoveDoc = function (tutor, doc) {
+    if (!confirm('Remove this document? The tutor must re-upload if this field is rejected.'))
+      return;
+
+    AdminService.adminRemoveDocument(tutor.id, doc.id)
+      .then(function () {
+        var idx = tutor.documents.indexOf(doc);
+        if (idx > -1) tutor.documents.splice(idx, 1);
+        delete self.docReview[doc.id];
+        self.systemLogs.unshift('Removed document from tutor: ' + tutor.name + ' (Just now)');
+      })
+      .catch(function (err) {
+        alert((err.data && err.data.message) || 'Failed to remove document.');
       });
   };
 

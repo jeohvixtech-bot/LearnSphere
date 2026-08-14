@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', 'AuthService', 'TutorService',
-  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog',
-function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog) {
+  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService',
+function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -80,6 +80,14 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   function init() {
     TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
+      // Pre-fill identity fields from any already-uploaded doc, so a page reload
+      // doesn't blank the form back to the 'NRIC'/'' defaults.
+      var existingIdDoc = (self.tutor.documents || [])
+        .find(function (d) { return d.documentType === 'identity_photo'; });
+      if (existingIdDoc && existingIdDoc.idType) {
+        self.verif.idType = existingIdDoc.idType;
+        self.verif.idNumber = existingIdDoc.idNumber || '';
+      }
       self.blockedRanges = ScheduleService.getBlocked(res.data.id);
       self.profileForm = {
         imageUrl: res.data.imageUrl,
@@ -109,6 +117,11 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // of the two async calls above finishes last is what actually triggers this.
   self.contactableParents = [];
   self.activeParent = null;
+  self.unreadCounts = {}; // { parentUserId: count } — sidebar badges, see ChatController.GetUnreadCounts
+
+  self.loadUnreadCounts = function () {
+    ChatService.getUnreadCounts().then(function (res) { self.unreadCounts = res.data; });
+  };
 
   function computeContactableParents() {
     var seen = {};
@@ -125,6 +138,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   function maybeInitChat() {
     if ($location.path() !== '/tutor/chat' || !self.tutor) return;
     computeContactableParents();
+    self.loadUnreadCounts();
     if (!self.activeParentUserId && self.contactableParents.length) {
       self.loadChat(self.contactableParents[0].id);
     }
@@ -135,6 +149,10 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     self.activeParent = self.contactableParents.find(function (p) { return p.id === parentUserId; }) || null;
     ChatService.getMessages(self.tutor.id, parentUserId).then(function (res) {
       self.chatMessages = res.data;
+      // Opening the thread just marked its unread messages read server-side
+      // (see ChatController.GetMessages) — clear the badge immediately rather
+      // than waiting for the next poll tick.
+      self.unreadCounts[parentUserId] = 0;
       scrollChatToBottom();
     });
   };
@@ -1025,11 +1043,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     self.counterSuccess = false;
   };
 
+  self.hasProfaneCounterMessage = function () {
+    return ProfanityFilterService.containsProfanity(self.counterForm.message);
+  };
+
   self.submitCounter = function () {
     if (!self.counterBooking) return;
     if (self.hasInvalidCounter()) return;
     if (self.hasTooSoonCounter()) return;
     if (self.hasDuplicateCounter()) return;
+    if (self.hasProfaneCounterMessage()) return;
     BookingService.updateStatus(self.counterBooking.id, 'countered', {
       message: self.counterForm.message,
       classes: self.counterForm.classes.map(function (c) {
@@ -1158,10 +1181,15 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     self.reportBooking = booking;
     self.reportForm = { covered: '', performance: '', homework: '' };
     self.reportSuccess = false;
+    self.reportError = '';
   };
 
   self.submitReport = function () {
     if (!self.reportBooking) return;
+    self.reportError = ProfanityFilterService.validate(self.reportForm.covered)
+      || ProfanityFilterService.validate(self.reportForm.performance)
+      || ProfanityFilterService.validate(self.reportForm.homework);
+    if (self.reportError) return;
     BookingService.submitLessonReport(self.reportBooking.id, self.reportForm).then(function () {
       self.reportSuccess = true;
       self.reportBooking = null;
@@ -1169,6 +1197,8 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       $timeout(function () {
         self.reportSuccess = false;
       }, 2000);
+    }, function (err) {
+      self.reportError = (err.data && err.data.message) ? err.data.message : 'Failed to publish report. Please try again.';
     });
   };
 
@@ -1183,10 +1213,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       changesMade: ''
     };
     self.editSuccess = false;
+    self.editError = '';
   };
 
   self.submitEdit = function () {
     if (!self.editBooking) return;
+    self.editError = ProfanityFilterService.validate(self.editForm.covered)
+      || ProfanityFilterService.validate(self.editForm.performance)
+      || ProfanityFilterService.validate(self.editForm.homework)
+      || ProfanityFilterService.validate(self.editForm.changesMade);
+    if (self.editError) return;
     BookingService.editLessonReport(self.editBooking.id, self.editForm).then(function () {
       self.editSuccess = true;
       self.editBooking = null;
@@ -1194,6 +1230,8 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       $timeout(function () {
         self.editSuccess = false;
       }, 2000);
+    }, function (err) {
+      self.editError = (err.data && err.data.message) ? err.data.message : 'Failed to save changes. Please try again.';
     });
   };
 
@@ -1267,6 +1305,11 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       self.modesError = 'Please select at least one teaching mode.';
       return;
     }
+    var bioProfanityError = ProfanityFilterService.validate(self.profileForm.bio);
+    if (bioProfanityError) {
+      self.profileError = bioProfanityError;
+      return;
+    }
     var payload = {
       imageUrl: self.profileForm.imageUrl,
       bio: self.profileForm.bio,
@@ -1295,15 +1338,33 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     errorMap: {}        // { documentType: 'error message' }
   };
 
-  self.getDoc = function (type) {
+  // Single-upload types (identity_photo, intro_video) — one doc at most.
+  self.getDocSingle = function (type) {
     return (self.tutor.documents || []).find(function (d) { return d.documentType === type; });
   };
 
-  self.getSpecialistCerts = function () {
+  // Multi-upload types (o_level, a_level, degree, postgrad, nie_cert,
+  // specialist_cert) — up to 3, sorted for stable display order.
+  self.getDocs = function (type) {
     return (self.tutor.documents || [])
-      .filter(function (d) { return d.documentType === 'specialist_cert'; })
+      .filter(function (d) { return d.documentType === type; })
       .sort(function (a, b) { return a.sortOrder - b.sortOrder; });
   };
+
+  self.getDocCount = function (type) {
+    return self.getDocs(type).length;
+  };
+
+  self.isDocTypeFull = function (type) {
+    return self.getDocCount(type) >= 3;
+  };
+
+  self.getSpecialistCerts = function () {
+    return self.getDocs('specialist_cert');
+  };
+
+  // Alias — kept for any template reference still using the old name.
+  self.getDoc = self.getDocSingle;
 
   self.formatFileSize = function (bytes) {
     if (!bytes) return '';
@@ -1358,11 +1419,19 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // getByUser (not getById/TutorService.getById) — GetById only returns tutors
   // that are IsVerified && IsOnline, so it 404s for exactly the tutors this
   // feature targets (mid-verification, not yet approved).
-  function refreshTutor() {
+  self._refreshTutor = function () {
     return TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
+      // Re-sync idType/idNumber from the saved identity doc, so the form still
+      // reflects what's actually on file after a reload/refresh rather than
+      // resetting to the hardcoded 'NRIC'/'' defaults.
+      var idDoc = self.getDocSingle('identity_photo');
+      if (idDoc && idDoc.idType) {
+        self.verif.idType = idDoc.idType;
+        self.verif.idNumber = idDoc.idNumber || '';
+      }
     });
-  }
+  };
 
   self.uploadVerifDoc = function (file, docType) {
     if (!file) return;
@@ -1378,12 +1447,46 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
         idType: docType === 'identity_photo' ? self.verif.idType : null,
         idNumber: docType === 'identity_photo' ? self.verif.idNumber : null
       });
-    }).then(refreshTutor).catch(function (err) {
+    }).then(function () {
+      return self._refreshTutor();
+    }).catch(function (err) {
       self.verif.errorMap[docType] = err.data && err.data.message
         ? err.data.message : 'Upload failed. Please try again.';
     }).finally(function () {
       self.verif.uploadingMap[docType] = false;
     });
+  };
+
+  // Replaces a rejected document: removes the old one first, then uploads and
+  // saves the new file under the same type. Count stays the same (-1, +1) so
+  // this never trips the 3-attachment cap on its own.
+  self.reuploadVerifDoc = function (file, docType, docId) {
+    if (!file || !docId) return;
+    self.verif.uploadingMap[docType] = true;
+    self.verif.errorMap[docType] = null;
+
+    TutorService.removeDocument(self.tutor.id, parseInt(docId))
+      .then(function () {
+        return TutorService.uploadDocument(file, docType);
+      })
+      .then(function (res) {
+        return TutorService.saveDocument(self.tutor.id, {
+          documentType: docType,
+          fileUrl: res.data.url,
+          fileName: res.data.fileName,
+          fileSizeBytes: res.data.fileSizeBytes
+        });
+      })
+      .then(function () {
+        return self._refreshTutor();
+      })
+      .catch(function (err) {
+        self.verif.errorMap[docType] = err.data && err.data.message
+          ? err.data.message : 'Re-upload failed. Please try again.';
+      })
+      .finally(function () {
+        self.verif.uploadingMap[docType] = false;
+      });
   };
 
   // Saves an intro video link (no file upload)
@@ -1394,14 +1497,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       externalUrl: self.verif.introVideoLink
     }).then(function () {
       self.verif.introVideoLink = '';
-      return refreshTutor();
+      return self._refreshTutor();
     }).catch(function () {
       self.verif.errorMap['intro_video'] = 'Failed to save link.';
     });
   };
 
   self.removeVerifDoc = function (docId) {
-    TutorService.removeDocument(self.tutor.id, docId).then(refreshTutor);
+    TutorService.removeDocument(self.tutor.id, docId)
+      .then(function () { return self._refreshTutor(); })
+      .catch(function () { /* Non-fatal */ });
   };
 
   self.verifSubmitSuccess = false;
@@ -1411,7 +1516,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     if (!self.canSubmitVerification()) return;
     self.verifSubmitError = '';
     TutorService.submitVerification(self.tutor.id).then(function () {
-      return refreshTutor();
+      return self._refreshTutor();
     }).then(function () {
       self.verifSubmitSuccess = true;
       $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
@@ -1438,13 +1543,19 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // navigating between tutor pages. $scope IS destroyed on route change.
   $scope.$on('$destroy', function () { $interval.cancel(_pollInterval); });
 
+  self.chatError = '';
+
   self.sendMessage = function () {
     if (!self.chatText.trim() || !self.tutor || !self.activeParentUserId) return;
+    self.chatError = ProfanityFilterService.validate(self.chatText);
+    if (self.chatError) return;
     ChatService.send({ tutorId: self.tutor.id, parentUserId: self.activeParentUserId, text: self.chatText })
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';
         scrollChatToBottom();
+      }, function (err) {
+        self.chatError = (err.data && err.data.message) ? err.data.message : 'Failed to send. Please try again.';
       });
   };
 
@@ -1469,8 +1580,13 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   }
 
   var _chatPollInterval = $interval(function () {
-    if (!self.activeParentUserId || !self.tutor) return;
-    ChatService.getMessages(self.tutor.id, self.activeParentUserId).then(mergeNewChatMessages);
+    if (!self.tutor) return;
+    self.loadUnreadCounts();
+    if (!self.activeParentUserId) return;
+    ChatService.getMessages(self.tutor.id, self.activeParentUserId).then(function (res) {
+      mergeNewChatMessages(res.data);
+      self.unreadCounts[self.activeParentUserId] = 0;
+    });
   }, 4000);
   $scope.$on('$destroy', function () { $interval.cancel(_chatPollInterval); });
 }]);

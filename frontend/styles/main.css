@@ -891,6 +891,13 @@ a { text-decoration: none; color: inherit; }
 .chat-tutor-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; cursor: pointer; }
 .chat-tutor-item:hover { background: #f1f5f9; }
 .chat-tutor-item.active { background: #ecfdf5; }
+.chat-unread-badge {
+  margin-left: auto; flex-shrink: 0;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 100px; background: #ef4444; color: #fff;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
 .chat-tutor-item img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .chat-tutor-item span { font-size: 14px; font-weight: 600; color: #1e293b; }
 .chat-container.flex-1 { flex: 1; min-width: 0; }
@@ -2886,3 +2893,113 @@ a { text-decoration: none; color: inherit; }
 }
 .verif-lock-notice i { font-size: 15px; color: #94a3b8; }
 .verif-lock-notice p { font-size: 13px; color: #94a3b8; margin: 0; }
+
+/* ── Welcome page — hover pause scroll ─────────────────────── */
+.welcome-tutor-grid .tutor-card {
+  transition: transform .15s, box-shadow .15s;
+}
+.welcome-tutor-grid .tutor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.12);
+  border-color: #6ee7b7;
+}
+
+/* ── Pinned tutor card ──────────────────────────────────────── */
+.tutor-card--pinned {
+  border-color: #059669 !important;
+  box-shadow:
+    0 0 0 2px rgba(5, 150, 105, 0.15),
+    0 4px 20px rgba(5, 150, 105, 0.15) !important;
+  animation: pinned-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes pinned-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(5, 150, 105, 0.15),
+      0 4px 20px rgba(5, 150, 105, 0.12);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(5, 150, 105, 0.25),
+      0 6px 28px rgba(5, 150, 105, 0.22);
+  }
+}
+
+.tutor-card-main-wrap { display: flex; flex-direction: column; }
+
+.tutor-pinned-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 18px;
+  background: #ecfdf5;
+  border-bottom: 0.5px solid #a7f3d0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #059669;
+}
+.tutor-pinned-banner i { font-size: 14px; }
+
+/* ── Multi-upload count badge ───────────────────────────────── */
+.verif-upload-count {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ── Doc status badge (inline on upload-done row) ───────────── */
+.verif-doc-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 100px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.verif-doc-status-badge.badge-approved {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 0.5px solid #bbf7d0;
+}
+.verif-doc-status-badge.badge-rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 0.5px solid #fecaca;
+}
+.verif-doc-status-badge.badge-pending-sm {
+  background: #fffbeb;
+  color: #92400e;
+  border: 0.5px solid #fde68a;
+}
+
+/* ── Max reached notice ─────────────────────────────────────── */
+.verif-max-notice {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 0 0;
+}
+.verif-max-notice i { font-size: 13px; }
+
+/* ── Admin remove button in vetting panel ───────────────────── */
+.vetting-doc-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #dc2626;
+  background: none;
+  border: 0.5px solid #fecaca;
+  border-radius: 8px;
+  padding: 3px 8px;
+  cursor: pointer;
+  margin-top: 5px;
+  transition: background .12s;
+}
+.vetting-doc-remove-btn:hover { background: #fef2f2; }

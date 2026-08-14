@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', function ($location, AuthService, PendingMatchService) {
+.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', function ($location, AuthService, PendingMatchService, NameValidationService) {
   var self = this;
 
   // Redirect if already logged in
@@ -16,6 +16,7 @@ angular.module('learnSphereApp')
   self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
   self.showTerms = false;
   self.errorMsg = '';
+  self.nameError = '';
   self.loading = false;
   self.showRegisterPassword = false;
   self.showRegisterConfirmPassword = false;
@@ -82,8 +83,18 @@ angular.module('learnSphereApp')
       });
   };
 
+  // Full-name validation for registration — see NameValidationService for the
+  // actual rule (shared with child-profile name validation in parent.controller.js).
+  // Mirrored server-side in NameValidator.cs so this can't be bypassed by calling
+  // the API directly.
+  self.validateName = function () {
+    self.nameError = NameValidationService.validate(self.registerData.name);
+  };
+
   self.register = function () {
     self.errorMsg = '';
+    self.validateName();
+    if (self.nameError) { self.errorMsg = self.nameError; return; }
     if (self.registerData.password !== self.registerData.confirmPassword) {
       self.errorMsg = 'Passwords do not match.';
       return;

@@ -16,12 +16,14 @@ public class TutorsController : ControllerBase
     private readonly AppDbContext _context;
     private readonly IPresetCancellationService _cancellationService;
     private readonly IEmailService _emailService;
+    private readonly IWebHostEnvironment _env;
 
-    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService, IEmailService emailService)
+    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService, IEmailService emailService, IWebHostEnvironment env)
     {
         _context = context;
         _cancellationService = cancellationService;
         _emailService = emailService;
+        _env = env;
     }
 
     [HttpGet]
@@ -343,6 +345,12 @@ public class TutorsController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null) return NotFound();
+
+        if (dto.Bio != null)
+        {
+            var bioProfanityError = ProfanityFilter.Validate(dto.Bio);
+            if (bioProfanityError != null) return BadRequest(new { message = bioProfanityError });
+        }
 
         if (dto.ImageUrl != null) tutor.ImageUrl = dto.ImageUrl;
         if (dto.Bio != null) tutor.Bio = dto.Bio;
@@ -854,6 +862,9 @@ public class TutorsController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Text))
             return BadRequest(new { message = "Review text cannot be empty." });
 
+        var reviewProfanityError = ProfanityFilter.Validate(dto.Text);
+        if (reviewProfanityError != null) return BadRequest(new { message = reviewProfanityError });
+
         if (dto.BookingId.HasValue)
         {
             var booking = await _context.Bookings
@@ -988,23 +999,14 @@ public class TutorsController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.DocumentType))
             return BadRequest(new { message = "Document type is required." });
 
-        // For specialist certs, allow multiple — add new record.
-        // For every other type, upsert (replace existing of same type).
-        if (dto.DocumentType == "specialist_cert")
-        {
-            var doc = new TutorDocument
-            {
-                TutorId = id,
-                DocumentType = dto.DocumentType,
-                FileUrl = dto.FileUrl,
-                FileName = dto.FileName,
-                FileSizeBytes = dto.FileSizeBytes,
-                SortOrder = tutor.Documents.Count(d => d.DocumentType == "specialist_cert"),
-                Status = "pending"
-            };
-            _context.TutorDocuments.Add(doc);
-        }
-        else
+        // identity_photo/intro_video: single, upsert-in-place. Everything else
+        // (o_level, a_level, degree, postgrad, nie_cert, specialist_cert): up to
+        // 3 attachments, each its own record — see the RULES table this feature
+        // shipped with.
+        var singleUploadTypes = new[] { "identity_photo", "intro_video" };
+        var multiUploadTypes = new[] { "o_level", "a_level", "degree", "postgrad", "nie_cert", "specialist_cert" };
+
+        if (singleUploadTypes.Contains(dto.DocumentType))
         {
             var existing = tutor.Documents.FirstOrDefault(d => d.DocumentType == dto.DocumentType);
             if (existing != null)
@@ -1035,6 +1037,27 @@ public class TutorsController : ControllerBase
                 });
             }
         }
+        else if (multiUploadTypes.Contains(dto.DocumentType))
+        {
+            var existingCount = tutor.Documents.Count(d => d.DocumentType == dto.DocumentType);
+            if (existingCount >= 3)
+                return BadRequest(new { message = "Maximum 3 attachments allowed for this document type." });
+
+            _context.TutorDocuments.Add(new TutorDocument
+            {
+                TutorId = id,
+                DocumentType = dto.DocumentType,
+                FileUrl = dto.FileUrl,
+                FileName = dto.FileName,
+                FileSizeBytes = dto.FileSizeBytes,
+                SortOrder = existingCount,
+                Status = "pending"
+            });
+        }
+        else
+        {
+            return BadRequest(new { message = "Unknown document type." });
+        }
 
         await _context.SaveChangesAsync();
         return Ok(new { message = "Document saved." });
@@ -1054,6 +1077,51 @@ public class TutorsController : ControllerBase
         _context.TutorDocuments.Remove(doc);
         await _context.SaveChangesAsync();
         return Ok();
+    }
+
+    // Admin-side removal — distinct from the tutor's own RemoveDocument above (same
+    // underlying action, but this one is reachable by an admin regardless of who
+    // owns the tutor profile, and also cleans up the physical file). Deliberately
+    // does not touch VerificationStatus/IsVerified — removing one attachment isn't
+    // itself an approve/reject decision.
+    [HttpDelete("{id}/documents/{docId}/admin-remove")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> AdminRemoveDocument(int id, int docId)
+    {
+        var tutor = await _context.Tutors
+            .Include(t => t.Documents)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+
+        var doc = tutor.Documents.FirstOrDefault(d => d.Id == docId);
+        if (doc == null) return NotFound();
+
+        if (!string.IsNullOrEmpty(doc.FileUrl))
+        {
+            try
+            {
+                var uri = new Uri(doc.FileUrl);
+                var relativePath = uri.AbsolutePath.TrimStart('/');
+                var filePath = Path.Combine(_env.ContentRootPath, "wwwroot", relativePath);
+                if (System.IO.File.Exists(filePath))
+                    System.IO.File.Delete(filePath);
+            }
+            catch { /* Non-fatal — DB record removal below is what actually matters */ }
+        }
+
+        _context.TutorDocuments.Remove(doc);
+
+        // Re-sequence SortOrder for the remaining docs of the same type so display
+        // order stays compact (no gap left where the removed one was).
+        var remaining = tutor.Documents
+            .Where(d => d.DocumentType == doc.DocumentType && d.Id != docId)
+            .OrderBy(d => d.SortOrder)
+            .ToList();
+        for (int i = 0; i < remaining.Count; i++)
+            remaining[i].SortOrder = i;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Document removed by admin." });
     }
 
     [HttpPost("{id}/submit-verification")]
@@ -1099,6 +1167,9 @@ public class TutorsController : ControllerBase
     {
         if (dto.Status != "approved" && dto.Status != "rejected")
             return BadRequest(new { message = "Status must be 'approved' or 'rejected'." });
+
+        var noteProfanityError = ProfanityFilter.Validate(dto.Note);
+        if (noteProfanityError != null) return BadRequest(new { message = noteProfanityError });
 
         var tutor = await _context.Tutors.Include(t => t.Documents).FirstOrDefaultAsync(t => t.Id == id);
         if (tutor == null) return NotFound();

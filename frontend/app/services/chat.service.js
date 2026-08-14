@@ -12,4 +12,8 @@ angular.module('learnSphereApp')
   self.send = function (data) {
     return $http.post(API_URL + '/chat', data, h());
   };
+
+  self.getUnreadCounts = function () {
+    return $http.get(API_URL + '/chat/unread-counts', h());
+  };
 }]);

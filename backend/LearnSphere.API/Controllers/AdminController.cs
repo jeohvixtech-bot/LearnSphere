@@ -184,6 +184,9 @@ public class AdminController : ControllerBase
         if (decision.Status != "pending-admin")
             return BadRequest(new { message = "This decision isn't awaiting admin review." });
 
+        var adminNoteProfanityError = ProfanityFilter.Validate(dto.AdminNote);
+        if (adminNoteProfanityError != null) return BadRequest(new { message = adminNoteProfanityError });
+
         decision.AdminNote = dto.AdminNote;
         await _cancellationService.ResolveTowardCreditAsync(decision, decision.Booking,
             $"Admin-approved refund for {decision.Booking.Subject} on {decision.OriginalDate} (parent rejected the tutor's proposed reschedule).");

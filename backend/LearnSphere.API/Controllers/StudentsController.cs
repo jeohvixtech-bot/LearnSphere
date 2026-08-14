@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,12 @@ public class StudentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateStudentDto dto)
     {
+        var nameError = NameValidator.Validate(dto.Name);
+        if (nameError != null) return BadRequest(new { message = nameError });
+
+        var goalError = ProfanityFilter.Validate(dto.LearningGoal);
+        if (goalError != null) return BadRequest(new { message = goalError });
+
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var student = new Student
         {
@@ -55,7 +62,17 @@ public class StudentsController : ControllerBase
         var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
         if (student == null) return NotFound();
 
-        if (dto.Name != null) student.Name = dto.Name;
+        if (dto.Name != null)
+        {
+            var nameError = NameValidator.Validate(dto.Name);
+            if (nameError != null) return BadRequest(new { message = nameError });
+            student.Name = dto.Name;
+        }
+        if (dto.LearningGoal != null)
+        {
+            var goalError = ProfanityFilter.Validate(dto.LearningGoal);
+            if (goalError != null) return BadRequest(new { message = goalError });
+        }
         if (dto.BirthDate != null) student.BirthDate = dto.BirthDate;
         if (dto.School != null) student.School = dto.School;
         if (dto.EducationLevel != null) student.EducationLevel = dto.EducationLevel;

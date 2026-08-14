@@ -27,6 +27,7 @@
           <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" alt="{{ t.name }}" />
           <div ng-if="!t.imageUrl" class="avatar-fallback" style="width:36px;height:36px;border-radius:50%;font-size:14px;flex-shrink:0">{{ t.name[0] }}</div>
           <span>{{ t.name }}</span>
+          <span class="chat-unread-badge" ng-if="vm.unreadCounts[t.id]">{{ vm.unreadCounts[t.id] }}</span>
         </div>
         <p ng-if="!vm.contactableTutors.length" class="empty-state">
           No confirmed bookings yet. Once a tutor confirms a session, you'll be able to message them here.
@@ -63,6 +64,7 @@
           <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet. Start the conversation!</p>
         </div>
 
+        <p class="field-error" style="margin:0 16px" ng-if="vm.chatError">{{ vm.chatError }}</p>
         <form class="chat-input-row" ng-submit="vm.sendMessage()">
           <input type="text" ng-model="vm.chatText"
             placeholder="Type a message to the tutor..."

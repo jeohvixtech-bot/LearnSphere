@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -24,6 +24,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.invoices = [];
   self.chatMessages = [];
   self.selectedTutor = null;
+  self.pinnedTutorId = null;
 
   // AI Speed Match
   self.aiMatchSelectedStudentId = null;
@@ -604,14 +605,43 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       // that's already included in this response, no per-tutor round trip needed.
       // Computed once here (not from the template) to avoid $rootScope:infdig.
       self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
-      if (pendingTutorId) {
+
+      // A pending tutor WITH a preset group is the AI Speed Match "View & Book"
+      // hand-off — jump straight to that class's booking summary, same as
+      // clicking the chip directly would. Without a group (e.g. a signed-out
+      // visitor clicking a tutor card on the welcome page — see
+      // WelcomeCtrl.goToLogin), there's no specific class to jump to yet, so
+      // don't guess: just pin the card below instead of auto-opening anything.
+      if (pendingTutorId && pendingPresetGroupId) {
         var t = self.tutors.find(function (x) { return x.id === pendingTutorId; });
         if (t) {
-          // Carry the chip selection from AI Speed Match (if any) over onto this
+          // Carry the chip selection from AI Speed Match over onto this
           // freshly-loaded tutor object — selectTutor() below reads it straight
           // off the tutor, same as a chip clicked directly on this page would.
-          if (pendingPresetGroupId) t._selectedPresetGroupId = pendingPresetGroupId;
+          t._selectedPresetGroupId = pendingPresetGroupId;
           self.selectTutor(t, pendingStudentId);
+        }
+      }
+
+      // Pin — deliberately separate from the one-shot consume above.
+      // PendingMatchService.getTutor() doesn't clear its value on read, so this
+      // re-derives correctly every time ParentCtrl is re-instantiated (every
+      // /parent/* route change creates a fresh one), letting the pin survive
+      // navigating away and back until the user actually logs out.
+      var pinnedId = PendingMatchService.getTutor ? PendingMatchService.getTutor() : null;
+      if (pinnedId) {
+        var pinnedTutor = self.tutors.find(function (x) { return String(x.id) === String(pinnedId); });
+        if (pinnedTutor) {
+          // Auto-switch country filter to match the tutor's country so their
+          // pinned card is actually visible under the current filters.
+          if (pinnedTutor.country) {
+            self.selectedCountry = pinnedTutor.country;
+          } else if (pinnedTutor.offerings && pinnedTutor.offerings.length) {
+            self.selectedCountry = pinnedTutor.offerings[0].country || self.selectedCountry;
+          }
+          self.pinnedTutorId = pinnedId;
+        } else {
+          self.pinnedTutorId = null;
         }
       }
     });
@@ -633,8 +663,9 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       // pick the first contactable tutor once bookings are known, not an arbitrary
       // one from the full public catalog.
       computeContactableTutors();
-      if ($location.path() === '/parent/chat' && self.contactableTutors.length) {
-        self.loadChat(self.contactableTutors[0].id);
+      if ($location.path() === '/parent/chat') {
+        self.loadUnreadCounts();
+        if (self.contactableTutors.length) self.loadChat(self.contactableTutors[0].id);
       }
     });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
@@ -721,7 +752,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   // Filtered tutors
   self.filteredTutors = function () {
-    return self.tutors.filter(function (t) {
+    var all = self.tutors.filter(function (t) {
       var q = self.searchQuery.toLowerCase();
       var matchQuery = !q || t.name.toLowerCase().indexOf(q) >= 0 ||
         t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; }) ||
@@ -741,9 +772,23 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       // so hide them entirely rather than showing a card with no action on it.
       var hasPresetClasses = self.tutorHasAnySlots(t);
       return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience && hasPresetClasses;
-    }).sort(function (a, b) {
+    });
+
+    // Pinned tutor (see init()) always leads, regardless of filters below —
+    // the whole point is it stays visible after a welcome-page hand-off. The
+    // rest keeps the existing favorited-first ordering unchanged.
+    var pinned = null;
+    var rest = [];
+    all.forEach(function (t) {
+      if (String(t.id) === String(self.pinnedTutorId)) pinned = t;
+      else rest.push(t);
+    });
+
+    rest.sort(function (a, b) {
       return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
     });
+
+    return pinned ? [pinned].concat(rest) : rest;
   };
 
   // ── Next month label e.g. "Aug 2026" ──────────────────────────────
@@ -1275,12 +1320,17 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   };
 
   // Book a tutor
+  self.hasProfaneBookingMessage = function () {
+    return ProfanityFilterService.containsProfanity(self.bookingForm.message);
+  };
+
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
     if (self.hasTooSoonSession()) return;
     if (self.hasInvalidTimeRangeSession()) return;
     if (self.hasDurationMismatchSession()) return;
     if (self.hasDuplicateSessions()) return;
+    if (self.hasProfaneBookingMessage()) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
     var classes = self.bookingForm.sessions.map(function (session) {
       return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
@@ -1333,6 +1383,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.editStudentForm = { name: s.name, school: s.school, learningGoal: s.learningGoal || '' };
     self.editStudentSubjects = self.parseSubjectCombos(s.subjectSelect, s.educationLevel);
     self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
+    self.editStudentNameError = '';
+    self.editStudentGoalError = '';
     rebuildPreferredPools(s.preferredModes);
   };
 
@@ -1412,8 +1464,20 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   self.removeEditStudentSubject = function (i) { self.editStudentSubjects.splice(i, 1); };
 
+  // Child-name validation — same rule as registration (see NameValidationService).
+  self.editStudentNameError = '';
+  self.validateEditStudentName = function () {
+    self.editStudentNameError = NameValidationService.validate(self.editStudentForm.name);
+  };
+
+  self.editStudentGoalError = '';
+
   self.saveEditStudent = function () {
     if (!self.editingStudent || !self.editStudentForm.name.trim()) return;
+    self.validateEditStudentName();
+    if (self.editStudentNameError) return;
+    self.editStudentGoalError = ProfanityFilterService.validate(self.editStudentForm.learningGoal);
+    if (self.editStudentGoalError) return;
     self.preferredModesError = '';
     if (!self.preferredRight.length) {
       self.preferredModesError = 'Please select at least one preferred teaching mode.';
@@ -1553,10 +1617,20 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   // Add student
   self.studentSubjectsError = '';
+  self.studentNameError = '';
+  self.studentGoalError = '';
+  self.validateStudentName = function () {
+    self.studentNameError = NameValidationService.validate(self.studentForm.name);
+  };
+
   self.createStudent = function () {
     self.studentSubjectsError = '';
     self.newStudentPreferredModesError = '';
     if (!self.studentForm.name.trim()) return;
+    self.validateStudentName();
+    if (self.studentNameError) return;
+    self.studentGoalError = ProfanityFilterService.validate(self.studentForm.learningGoal);
+    if (self.studentGoalError) return;
     if (!self.studentSubjects.length) {
       self.studentSubjectsError = 'Please add at least one subject before creating the profile.';
       return;
@@ -1587,6 +1661,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         self.newlyAddedStudentId = student.id;
         self.studentSuccess = true;
         self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
+        self.studentNameError = '';
+        self.studentGoalError = '';
         self.studentSubjects = [];
         self.newStudentSubjectCombo = { country: '', selectedOption: null };
         self.newStudentPreferredLeft = TeachingModesCatalog.slice();
@@ -1678,9 +1754,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.issueForm.bookingId = bookingId;
     self.issueForm.details = '';
     self.issueSuccess = false;
+    self.issueError = '';
   };
 
   self.submitIssue = function () {
+    self.issueError = ProfanityFilterService.validate(self.issueForm.details);
+    if (self.issueError) return;
     BookingService.reportIssue(self.issueForm.bookingId, {
       issueType: self.issueForm.issueType,
       details: self.issueForm.details
@@ -1691,6 +1770,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       $timeout(function () {
         self.issueSuccess = false;
       }, 3000);
+    }, function (err) {
+      self.issueError = (err.data && err.data.message) ? err.data.message : 'Failed to submit. Please try again.';
     });
   };
 
@@ -1701,6 +1782,11 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // trips Angular's infinite-digest guard.
   self.contactableTutors = [];
   self.activeTutor = null;
+  self.unreadCounts = {}; // { tutorId: count } — sidebar badges, see ChatController.GetUnreadCounts
+
+  self.loadUnreadCounts = function () {
+    ChatService.getUnreadCounts().then(function (res) { self.unreadCounts = res.data; });
+  };
 
   function computeContactableTutors() {
     var seen = {};
@@ -1718,17 +1804,27 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.activeTutor = self.contactableTutors.find(function (t) { return t.id === tutorId; }) || null;
     ChatService.getMessages(tutorId, self.user.userId).then(function (res) {
       self.chatMessages = res.data;
+      // Opening the thread just marked its unread messages read server-side
+      // (see ChatController.GetMessages) — clear the badge immediately rather
+      // than waiting for the next poll tick.
+      self.unreadCounts[tutorId] = 0;
       scrollChatToBottom();
     });
   };
 
+  self.chatError = '';
+
   self.sendMessage = function () {
     if (!self.chatText.trim() || !self.activeTutorId) return;
+    self.chatError = ProfanityFilterService.validate(self.chatText);
+    if (self.chatError) return;
     ChatService.send({ tutorId: self.activeTutorId, parentUserId: self.user.userId, text: self.chatText })
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';
         scrollChatToBottom();
+      }, function (err) {
+        self.chatError = (err.data && err.data.message) ? err.data.message : 'Failed to send. Please try again.';
       });
   };
 
@@ -1756,8 +1852,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   }
 
   var _chatPollInterval = $interval(function () {
+    self.loadUnreadCounts();
     if (!self.activeTutorId) return;
-    ChatService.getMessages(self.activeTutorId, self.user.userId).then(mergeNewChatMessages);
+    ChatService.getMessages(self.activeTutorId, self.user.userId).then(function (res) {
+      mergeNewChatMessages(res.data);
+      self.unreadCounts[self.activeTutorId] = 0;
+    });
   }, 4000);
   $scope.$on('$destroy', function () { $interval.cancel(_chatPollInterval); });
 

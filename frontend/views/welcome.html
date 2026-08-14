@@ -24,7 +24,12 @@
 
   <!-- ── Tutor Grid (2 per row, read-only preview) ── -->
   <div class="welcome-tutor-grid">
-    <div class="tutor-card" ng-repeat="t in vm.tutors" ng-click="vm.goToLogin(t)" style="cursor:pointer">
+    <div class="tutor-card"
+      ng-repeat="t in vm.tutors"
+      ng-click="vm.goToLogin(t)"
+      ng-mouseenter="vm.pauseScroll()"
+      ng-mouseleave="vm.resumeScroll()"
+      style="cursor:pointer">
 
       <!-- ── Top row: avatar + info ── -->
       <div class="tutor-card-main">

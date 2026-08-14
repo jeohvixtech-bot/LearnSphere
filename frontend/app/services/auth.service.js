@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.service('AuthService', ['$http', '$q', 'API_URL', function ($http, $q, API_URL) {
+.service('AuthService', ['$http', '$q', 'API_URL', 'PendingMatchService', function ($http, $q, API_URL, PendingMatchService) {
   var self = this;
   var TOKEN_KEY = 'ls_token';
   var USER_KEY  = 'ls_user';
@@ -46,6 +46,12 @@ angular.module('learnSphereApp')
   self.logout = function () {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
+    // Single point of truth for "logout clears any pinned/pending tutor hand-off" —
+    // covers every real logout path (AppCtrl's Sign Out button, ParentCtrl's
+    // account-closure flow, change-password's "Sign out instead" link, and
+    // WelcomeCtrl's auto-logout-if-already-signed-in) without needing each of
+    // them to remember to call PendingMatchService.clear() themselves.
+    PendingMatchService.clear();
   };
 
   self.getToken = function () {

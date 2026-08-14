@@ -110,7 +110,10 @@
       <!-- ── Tutor Grid ───────────────────────────── -->
       <div class="tutor-grid">
         <div class="tutor-card" ng-repeat="t in vm.filteredTutors()"
-          ng-class="{'tutor-card--favorited': vm.isFavorited(t.id)}">
+          ng-class="{
+            'tutor-card--favorited': vm.isFavorited(t.id),
+            'tutor-card--pinned': String(t.id) === String(vm.pinnedTutorId)
+          }">
 
           <!-- Favourite button -->
           <button type="button" class="favorite-btn"
@@ -120,28 +123,34 @@
           </button>
 
           <!-- Top: avatar + info -->
-          <div class="tutor-card-main">
-            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
-            <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback">{{ t.name[0] }}</div>
-            <div class="tutor-card-body">
-              <div class="tutor-card-name-row">
-                <h4>{{ t.name }}</h4>
-                <span ng-if="t.isVerified" class="badge-verified">
-                  <i class="ti ti-check" style="font-size:10px; vertical-align:-1px;" aria-hidden="true"></i> Verified
-                </span>
+          <div class="tutor-card-main-wrap">
+            <div class="tutor-pinned-banner" ng-if="String(t.id) === String(vm.pinnedTutorId)">
+              <i class="ti ti-eye" aria-hidden="true"></i>
+              You were looking at this tutor
+            </div>
+            <div class="tutor-card-main">
+              <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
+              <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback">{{ t.name[0] }}</div>
+              <div class="tutor-card-body">
+                <div class="tutor-card-name-row">
+                  <h4>{{ t.name }}</h4>
+                  <span ng-if="t.isVerified" class="badge-verified">
+                    <i class="ti ti-check" style="font-size:10px; vertical-align:-1px;" aria-hidden="true"></i> Verified
+                  </span>
+                </div>
+                <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
+                <div class="qual-tags">
+                  <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
+                </div>
+                <div class="tutor-card-subjects-label">Teaches</div>
+                <div class="subject-list">
+                  <button ng-repeat="o in t.offerings" class="subject-chip"
+                    ng-click="vm.selectedCountry = o.country; vm.selectedSubject = vm.findSubjectCatalogEntry(o.country, o.subject, o.level)">
+                    {{ vm.abbreviateOffering(o) }}
+                  </button>
+                </div>
+                <p class="tutor-bio">"{{ t.bio }}"</p>
               </div>
-              <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
-              <div class="qual-tags">
-                <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
-              </div>
-              <div class="tutor-card-subjects-label">Teaches</div>
-              <div class="subject-list">
-                <button ng-repeat="o in t.offerings" class="subject-chip"
-                  ng-click="vm.selectedCountry = o.country; vm.selectedSubject = vm.findSubjectCatalogEntry(o.country, o.subject, o.level)">
-                  {{ vm.abbreviateOffering(o) }}
-                </button>
-              </div>
-              <p class="tutor-bio">"{{ t.bio }}"</p>
             </div>
           </div>
 
@@ -503,6 +512,7 @@
             <label>Message / Guidelines <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
             <textarea ng-model="vm.bookingForm.message" rows="2"
               placeholder="e.g. Please focus on quadratic equation formulas."></textarea>
+            <div class="field-error" ng-if="vm.hasProfaneBookingMessage()">Please remove inappropriate language before submitting.</div>
           </div>
 
           <div class="price-summary">
@@ -536,7 +546,7 @@
           </div>
 
           <button type="submit" class="btn-primary full-width"
-            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions() || vm.hasInvalidTimeRangeSession() || vm.hasDurationMismatchSession()">
+            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions() || vm.hasInvalidTimeRangeSession() || vm.hasDurationMismatchSession() || vm.hasProfaneBookingMessage()">
             Dispatch Booking Request →
           </button>
 

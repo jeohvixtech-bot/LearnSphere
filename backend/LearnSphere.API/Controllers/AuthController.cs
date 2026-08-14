@@ -25,6 +25,9 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
+        var nameError = NameValidator.Validate(dto.Name);
+        if (nameError != null) return BadRequest(new { message = nameError });
+
         var result = await _authService.RegisterAsync(dto);
         if (result == null) return BadRequest(new { message = "Email already in use." });
         return Ok(result);

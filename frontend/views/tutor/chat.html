@@ -21,6 +21,7 @@
           ng-click="vm.loadChat(p.id)">
           <div class="avatar-circle indigo" style="width:36px;height:36px;font-size:14px;flex-shrink:0">{{ p.name[0] }}</div>
           <span>{{ p.name }}<br/><small class="text-muted">Parent of {{ p.studentName }}</small></span>
+          <span class="chat-unread-badge" ng-if="vm.unreadCounts[p.id]">{{ vm.unreadCounts[p.id] }}</span>
         </div>
         <p ng-if="!vm.contactableParents.length" class="empty-state">
           No confirmed bookings yet. Once you confirm a booking, you'll be able to message that parent here.
@@ -57,6 +58,7 @@
           <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet.</p>
         </div>
 
+        <p class="field-error" style="margin:0 16px" ng-if="vm.chatError">{{ vm.chatError }}</p>
         <form class="chat-input-row" ng-submit="vm.sendMessage()">
           <input type="text" ng-model="vm.chatText"
             placeholder="Draft a response to the parent..."

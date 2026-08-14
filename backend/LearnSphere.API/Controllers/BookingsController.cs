@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -122,6 +123,9 @@ public class BookingsController : ControllerBase
 
         if (HasOverlappingClasses(dto.Classes.Select(c => (c.Date, c.Time))))
             return BadRequest(new { message = "Two or more classes in this booking overlap on the same date and time." });
+
+        var messageProfanityError = ProfanityFilter.Validate(dto.Message);
+        if (messageProfanityError != null) return BadRequest(new { message = messageProfanityError });
 
         if (dto.SlotId.HasValue)
         {
@@ -312,6 +316,12 @@ public class BookingsController : ControllerBase
         if (!isOwningParent && !isOwningTutor) return Forbid();
 
         var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
+
+        if (dto.Status == "countered" && dto.CounterProposal != null)
+        {
+            var counterProfanityError = ProfanityFilter.Validate(dto.CounterProposal.Message);
+            if (counterProfanityError != null) return BadRequest(new { message = counterProfanityError });
+        }
 
         if (dto.Status == "countered" && dto.CounterProposal != null
             && HasOverlappingClasses(dto.CounterProposal.Classes.Select(c =>
@@ -531,6 +541,11 @@ public class BookingsController : ControllerBase
     [HttpPost("{id}/lesson-report")]
     public async Task<IActionResult> SubmitLessonReport(int id, [FromBody] CreateLessonReportDto dto)
     {
+        var reportProfanityError = ProfanityFilter.Validate(dto.Covered)
+            ?? ProfanityFilter.Validate(dto.Performance)
+            ?? ProfanityFilter.Validate(dto.Homework);
+        if (reportProfanityError != null) return BadRequest(new { message = reportProfanityError });
+
         var booking = await _context.Bookings
             .Include(b => b.LessonReport)
             .Include(b => b.Student).ThenInclude(s => s.ParentUser)
@@ -579,6 +594,12 @@ public class BookingsController : ControllerBase
     [HttpPatch("{id}/lesson-report")]
     public async Task<IActionResult> EditLessonReport(int id, [FromBody] EditLessonReportDto dto)
     {
+        var editProfanityError = ProfanityFilter.Validate(dto.Covered)
+            ?? ProfanityFilter.Validate(dto.Performance)
+            ?? ProfanityFilter.Validate(dto.Homework)
+            ?? ProfanityFilter.Validate(dto.ChangesMade);
+        if (editProfanityError != null) return BadRequest(new { message = editProfanityError });
+
         var report = await _context.LessonReports
             .Include(r => r.EditHistory)
             .FirstOrDefaultAsync(r => r.BookingId == id);
@@ -601,6 +622,9 @@ public class BookingsController : ControllerBase
     [HttpPost("{id}/issue")]
     public async Task<IActionResult> ReportIssue(int id, [FromBody] CreateIssueReportDto dto)
     {
+        var issueProfanityError = ProfanityFilter.Validate(dto.Details);
+        if (issueProfanityError != null) return BadRequest(new { message = issueProfanityError });
+
         var booking = await _context.Bookings
             .Include(b => b.IssueReport)
             .FirstOrDefaultAsync(b => b.Id == id);

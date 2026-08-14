@@ -69,6 +69,7 @@
           <label>What happened? <span class="text-danger">*</span></label>
           <textarea ng-model="vm.issueForm.details" rows="3" required
             placeholder="Provide details about wait times, response, or other issues..."></textarea>
+          <div class="field-error" ng-if="vm.issueError">{{ vm.issueError }}</div>
         </div>
         <div class="btn-row">
           <button type="button" class="btn-outline" ng-click="vm.issueForm.bookingId = null">Cancel</button>

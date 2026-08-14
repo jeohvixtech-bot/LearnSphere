@@ -20,6 +20,16 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
   };
 
   self.tutors = [];
+  self.scrollPaused = false;
+
+  self.pauseScroll = function () {
+    self.scrollPaused = true;
+  };
+
+  self.resumeScroll = function () {
+    self.scrollPaused = false;
+  };
+
   TutorService.getAll().then(function (res) {
     self.tutors = res.data;
     // Wait for the tutor grid to render/paint before measuring scroll height
@@ -28,6 +38,7 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
 
   function startAutoScroll() {
     var scrollTimer = $interval(function () {
+      if (self.scrollPaused) return;
       var doc = $window.document.documentElement;
       var atBottom = $window.innerHeight + $window.scrollY >= doc.scrollHeight - 2;
       if (atBottom) {
