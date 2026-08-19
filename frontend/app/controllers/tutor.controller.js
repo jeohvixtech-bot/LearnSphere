@@ -520,6 +520,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     return d < today;
   };
 
+  // New classes (Setup Class + reschedule proposals) can only land next month
+  // or later — never the current month, no matter how many days are left in it.
+  function isBeforeNextMonth(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return true;
+    var now = new Date();
+    var nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return d < nextMonthStart;
+  }
+
   // ── Monthly calendar ────────────────────────────────────────────────
   var _monthNames = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December'];
@@ -664,8 +674,34 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       }
       var mm = (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
       var dd = (d.getDate() < 10 ? '0' : '') + d.getDate();
+      var proposedDateStr = d.getFullYear() + '-' + mm + '-' + dd;
+
+      if (isBeforeNextMonth(proposedDateStr)) {
+        self.cancelSlotError = 'The proposed date is not available — reschedules can only be set for next month onward.';
+        return;
+      }
+
+      var clockMin = function (timeStr) {
+        var m = String(timeStr || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!m) return null;
+        var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+        if (ampm === 'PM' && h !== 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        return h * 60 + min;
+      };
+      var startMin = clockMin(self.cancelSlotForm.proposedTime);
+      var endMin = clockMin(self.cancelSlotForm.proposedEndTime);
+      if (startMin == null || endMin == null) {
+        self.cancelSlotError = 'Please enter times in the format 04:00 PM.';
+        return;
+      }
+      if (endMin <= startMin) {
+        self.cancelSlotError = 'The end time must be after the start time.';
+        return;
+      }
+
       body = {
-        proposedDate: d.getFullYear() + '-' + mm + '-' + dd,
+        proposedDate: proposedDateStr,
         proposedTime: self.cancelSlotForm.proposedTime,
         proposedEndTime: self.cancelSlotForm.proposedEndTime
       };
@@ -940,11 +976,17 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     // sent as-is rather than derived from the form's single duration dropdown —
     // that duration only applies to a plain single-cell click/selection.
     var slots = [];
+    var earlyDate = null;
     Object.keys(self.setupClassSlots).forEach(function (dateStr) {
+      if (!earlyDate && isBeforeNextMonth(dateStr)) earlyDate = dateStr;
       (self.setupClassSlots[dateStr] || []).forEach(function (r) {
         slots.push({ date: dateStr, startTime: r.start, endTime: r.end, durationMinutes: r.endMin - r.startMin });
       });
     });
+    if (earlyDate) {
+      self.setupClassError = earlyDate + ' is not available — classes can only be set up for next month onward.';
+      return;
+    }
 
     self.setupClassSaving = true;
     TutorService.setupClass(self.tutor.id, {
@@ -1435,6 +1477,10 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
 
   self.uploadVerifDoc = function (file, docType) {
     if (!file) return;
+    if (docType === 'identity_photo' && !(self.verif.idNumber || '').trim()) {
+      self.verif.errorMap[docType] = 'Please enter your ID number before uploading.';
+      return;
+    }
     self.verif.uploadingMap[docType] = true;
     self.verif.errorMap[docType] = null;
 

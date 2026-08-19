@@ -1468,6 +1468,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.editStudentNameError = '';
   self.validateEditStudentName = function () {
     self.editStudentNameError = NameValidationService.validate(self.editStudentForm.name);
+    if (self.editStudentNameError) return;
+    var trimmed = (self.editStudentForm.name || '').trim().toLowerCase();
+    var isDuplicate = self.activeStudents().some(function (s) {
+      return s.id !== self.editingStudent.id && s.name.trim().toLowerCase() === trimmed;
+    });
+    if (isDuplicate) self.editStudentNameError = 'You already have a child profile with this name.';
   };
 
   self.editStudentGoalError = '';
@@ -1621,6 +1627,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.studentGoalError = '';
   self.validateStudentName = function () {
     self.studentNameError = NameValidationService.validate(self.studentForm.name);
+    if (self.studentNameError) return;
+    var trimmed = (self.studentForm.name || '').trim().toLowerCase();
+    var isDuplicate = self.activeStudents().some(function (s) {
+      return s.name.trim().toLowerCase() === trimmed;
+    });
+    if (isDuplicate) self.studentNameError = 'You already have a child profile with this name.';
   };
 
   self.createStudent = function () {
@@ -1673,6 +1685,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         self.schoolIsOther = false;
         self.schoolError = null;
         $timeout(function () { self.studentSuccess = false; }, 5000);
+      }).catch(function (err) {
+        self.studentNameError = (err.data && err.data.message) || 'Failed to create profile. Please try again.';
       });
     };
 

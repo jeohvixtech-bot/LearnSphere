@@ -39,6 +39,11 @@ public class StudentsController : ControllerBase
         if (goalError != null) return BadRequest(new { message = goalError });
 
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var nameTaken = await _context.Students.AnyAsync(s =>
+            s.ParentUserId == userId && !s.IsArchived && s.Name.ToLower() == dto.Name.Trim().ToLower());
+        if (nameTaken) return BadRequest(new { message = "You already have a child profile with this name." });
+
         var student = new Student
         {
             ParentUserId = userId,
@@ -66,6 +71,11 @@ public class StudentsController : ControllerBase
         {
             var nameError = NameValidator.Validate(dto.Name);
             if (nameError != null) return BadRequest(new { message = nameError });
+
+            var nameTaken = await _context.Students.AnyAsync(s =>
+                s.ParentUserId == userId && !s.IsArchived && s.Id != id && s.Name.ToLower() == dto.Name.Trim().ToLower());
+            if (nameTaken) return BadRequest(new { message = "You already have a child profile with this name." });
+
             student.Name = dto.Name;
         }
         if (dto.LearningGoal != null)

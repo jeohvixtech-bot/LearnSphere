@@ -71,10 +71,12 @@ angular.module('learnSphereApp')
   // body (optional): { proposedDate, proposedTime, proposedEndTime } to propose a
   // reschedule for affected students instead of a straight cancel — see
   // TutorsController.DeleteSlot. $http.delete's config supports a `data` property
-  // for a request body, same as post/put.
+  // for a request body, same as post/put — but unlike post/put, $http has no
+  // default Content-Type for delete, so it must be set explicitly or ASP.NET's
+  // [FromBody] binding 415s before the request ever reaches the controller.
   self.deleteSlot = function (tutorId, slotId, body) {
     return $http.delete(API_URL + '/tutors/' + tutorId + '/slots/' + slotId, {
-      headers: AuthService.authHeader(),
+      headers: angular.extend({ 'Content-Type': 'application/json' }, AuthService.authHeader()),
       data: body || {}
     });
   };

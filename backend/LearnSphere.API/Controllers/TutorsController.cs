@@ -644,6 +644,13 @@ public class TutorsController : ControllerBase
         if (dto.PricePerLesson <= 0)
             return BadRequest(new { message = "Please enter a price per lesson." });
 
+        // Classes can only be scheduled from next month onward — never the current
+        // month, regardless of how many days are left in it.
+        var minSetupDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddMonths(1);
+        var earlySlot = dto.Slots.FirstOrDefault(s => !DateTime.TryParse(s.Date, out var d) || d.Date < minSetupDate);
+        if (earlySlot != null)
+            return BadRequest(new { message = $"{earlySlot.Date} is not available — classes can only be set up for next month onward." });
+
         // The Setup Class UI only ever offers subjects/levels/modes the tutor has
         // already registered as an offering — this is the server-side backstop for
         // that, so a preset slot can never be published for a subject/level/mode the
@@ -768,6 +775,38 @@ public class TutorsController : ControllerBase
         var isReschedule = dto != null && !string.IsNullOrWhiteSpace(dto.ProposedDate) && !string.IsNullOrWhiteSpace(dto.ProposedTime);
         if (isReschedule && string.IsNullOrWhiteSpace(dto!.ProposedEndTime))
             return BadRequest(new { message = "A proposed end time is required when proposing a new date." });
+
+        if (isReschedule)
+        {
+            // Same "next month onward" window as Setup Class — a reschedule proposal
+            // can't land in the current month either.
+            var minRescheduleDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddMonths(1);
+            if (!DateTime.TryParse(dto!.ProposedDate, out var proposedDateParsed) || proposedDateParsed.Date < minRescheduleDate)
+                return BadRequest(new { message = "The proposed date is not available — reschedules can only be set for next month onward." });
+
+            var proposedStart = ParseClockMinutes(dto.ProposedTime);
+            var proposedEnd = ParseClockMinutes(dto.ProposedEndTime);
+            if (proposedStart == null || proposedEnd == null)
+                return BadRequest(new { message = "Invalid proposed time." });
+            if (proposedEnd <= proposedStart)
+                return BadRequest(new { message = "The proposed end time must be after the start time." });
+
+            // Guard against double-booking the tutor into another already-confirmed
+            // class — excludes the class actually being moved off this slot.
+            var otherConfirmedTimes = await _context.Bookings
+                .Where(b => b.TutorId == id && b.Status == "confirmed")
+                .SelectMany(b => b.Classes)
+                .Where(c => c.Date == dto.ProposedDate && !(c.Date == slot.Day && c.Time.StartsWith(slot.Time)))
+                .Select(c => c.Time)
+                .ToListAsync();
+            var hasConflict = otherConfirmedTimes.Any(t =>
+            {
+                var range = ParseTimeRangeMinutes(t);
+                return range != null && proposedStart < range.Value.End && range.Value.Start < proposedEnd;
+            });
+            if (hasConflict)
+                return BadRequest(new { message = "You already have a confirmed class at that date and time." });
+        }
 
         // Flow B preset slots track fills via ConfirmedCount/IsFull, not the legacy
         // Status flag (that only reflects unrelated time-overlap blocking — see
@@ -998,6 +1037,9 @@ public class TutorsController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(dto.DocumentType))
             return BadRequest(new { message = "Document type is required." });
+
+        if (dto.DocumentType == "identity_photo" && string.IsNullOrWhiteSpace(dto.IdNumber))
+            return BadRequest(new { message = "ID number is required." });
 
         // identity_photo/intro_video: single, upsert-in-place. Everything else
         // (o_level, a_level, degree, postgrad, nie_cert, specialist_cert): up to
