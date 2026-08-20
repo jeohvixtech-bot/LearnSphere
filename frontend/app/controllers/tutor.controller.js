@@ -1282,12 +1282,17 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // Edit profile offerings
   self.addOffering = function () {
     self.offeringLockedError = '';
-    if (!self.tutor.offeringsUnlocked) {
-      self.offeringLockedError = 'Complete your profile verification before adding subject offerings.';
+    // Offerings can be added once verification has been submitted (pending
+    // review) or fully approved — only blocked pre-submission.
+    if (self.tutor.verificationStatus === 'not_submitted') {
+      self.offeringLockedError = 'Submit your profile verification before adding subject offerings.';
       return;
     }
     var opt = self.newOffering.selectedOption;
-    if (!self.newOffering.country || !opt || !self.newOffering.qualification || !self.modesRight.length) return;
+    if (!self.newOffering.country) { self.offeringLockedError = 'Please select a country.'; return; }
+    if (!opt) { self.offeringLockedError = 'Please select a subject.'; return; }
+    if (!self.newOffering.qualification) { self.offeringLockedError = 'Please select a qualification.'; return; }
+    if (!self.modesRight.length) { self.offeringLockedError = 'Please drag at least one teaching mode into "Offered".'; return; }
     var price = parseFloat(self.newOffering.price) || 0;
     // One offering combo per mode currently in "Offered" — the offering builder no
     // longer asks for mode separately, it always matches whatever's selected above.
@@ -1453,8 +1458,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   };
 
   self.canSubmitVerification = function () {
-    return self.mandatoryUploadedCount() >= self.mandatoryTotal
-      && self.tutor.verificationStatus !== 'pending';
+    return self.mandatoryUploadedCount() >= self.mandatoryTotal;
   };
 
   // Refreshes vm.tutor after any verification mutation. Deliberately uses
@@ -1560,6 +1564,10 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
 
   self.submitVerification = function () {
     if (!self.canSubmitVerification()) return;
+    if (self.tutor.verificationStatus === 'pending') {
+      alert('Verification under review — you cannot resubmit until admin responds');
+      return;
+    }
     self.verifSubmitError = '';
     TutorService.submitVerification(self.tutor.id).then(function () {
       return self._refreshTutor();

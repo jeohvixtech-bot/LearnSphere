@@ -16,3 +16,4 @@ backend/**/appsettings.Development.json
 
 # User-uploaded documents (may contain PII — ID photos, certificates)
 backend/**/wwwroot/uploads/documents/
+backend/**/wwwroot/uploads/profiles/

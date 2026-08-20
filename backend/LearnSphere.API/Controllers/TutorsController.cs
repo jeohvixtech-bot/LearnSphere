@@ -357,6 +357,9 @@ public class TutorsController : ControllerBase
         if (dto.PricePerSession.HasValue) tutor.PricePerSession = dto.PricePerSession.Value;
         if (dto.ExperienceYears.HasValue) tutor.ExperienceYears = dto.ExperienceYears.Value;
 
+        if (dto.Offerings != null && dto.Offerings.Count > 0 && tutor.VerificationStatus == "not_submitted")
+            return BadRequest(new { message = "Submit your profile verification before adding subject offerings." });
+
         if (dto.Offerings != null)
         {
             _context.RemoveRange(tutor.Offerings);
@@ -831,6 +834,37 @@ public class TutorsController : ControllerBase
             .Include(b => b.PresetSlots)
             .Where(b => affectedBookingIds.Contains(b.Id) && (b.Status == "confirmed" || b.Status == "pending"))
             .ToListAsync();
+
+        // Nobody's booked this slot yet — no family to notify or ask for a decision,
+        // so a reschedule just moves it directly instead of going through the
+        // propose/accept dance (which only makes sense once someone has actually
+        // booked it).
+        if (isReschedule && affectedBookings.Count == 0)
+        {
+            var movedSlot = new TutorTimeSlot
+            {
+                TutorId = id,
+                Day = dto!.ProposedDate!,
+                Time = dto.ProposedTime!,
+                EndTime = dto.ProposedEndTime,
+                Status = "Available",
+                DurationMinutes = slot.DurationMinutes,
+                Mode = slot.Mode,
+                Subject = slot.Subject,
+                Level = slot.Level,
+                Country = slot.Country,
+                ClassSize = slot.ClassSize,
+                MaxStudents = slot.MaxStudents,
+                ConfirmedCount = 0,
+                IsFull = false,
+                PricePerLesson = slot.PricePerLesson,
+                PresetGroupId = slot.PresetGroupId
+            };
+            _context.TutorTimeSlots.Add(movedSlot);
+            _context.TutorTimeSlots.Remove(slot);
+            await _context.SaveChangesAsync();
+            return Ok(new { resolvedBookings = 0, affectedBookings = 0, pendingDecision = false, moved = true });
+        }
 
         var resolvedCount = 0;
         foreach (var booking in affectedBookings)

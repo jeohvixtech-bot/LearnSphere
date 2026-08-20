@@ -1097,13 +1097,9 @@
 
           <!-- Submit -->
           <div class="verif-submit-row">
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus !== 'pending'">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification()">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
               {{ vm.mandatoryTotal - vm.mandatoryUploadedCount() }} required document(s) still missing
-            </p>
-            <p class="verif-submit-hint" ng-if="vm.tutor.verificationStatus === 'pending'">
-              <i class="ti ti-clock" aria-hidden="true"></i>
-              Verification under review — you cannot resubmit until admin responds
             </p>
             <button type="button" class="btn-primary"
               ng-click="vm.submitVerification()"
@@ -1114,8 +1110,6 @@
           </div>
 
         </div>
-
-        <p class="field-error" ng-if="vm.offeringLockedError">{{ vm.offeringLockedError }}</p>
 
         <div ng-if="vm.tutor.verificationStatus !== 'not_submitted'">
 
@@ -1228,6 +1222,7 @@
             <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addOffering()">
               <i class="ti ti-plus" style="font-size:13px;" aria-hidden="true"></i> Add offering
             </button>
+            <p class="field-error" ng-if="vm.offeringLockedError">{{ vm.offeringLockedError }}</p>
           </div>
 
           <div class="chip-list" ng-if="vm.profileForm.offerings.length">

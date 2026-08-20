@@ -56,7 +56,7 @@ public class PresetCancellationsController : ControllerBase
         if (decision.Status != "pending") return BadRequest(new { message = "This decision has already been resolved." });
         if (string.IsNullOrWhiteSpace(decision.ProposedDate)) return BadRequest(new { message = "No reschedule was proposed for this class." });
 
-        ApplyAccept(decision);
+        await ApplyAccept(decision);
         await _context.SaveChangesAsync();
         return Ok();
     }
@@ -107,13 +107,13 @@ public class PresetCancellationsController : ControllerBase
         var expired = pending.Where(d => ParseDeadline(d.ProposedDate, d.ProposedTime) is DateTime dt && dt <= now).ToList();
         if (expired.Count == 0) return;
 
-        foreach (var decision in expired) ApplyAccept(decision, autoAccepted: true);
+        foreach (var decision in expired) await ApplyAccept(decision, autoAccepted: true);
         await _context.SaveChangesAsync();
     }
 
     // Moves the booking's session to the proposed date/time — no price/invoice
     // change, no penalty; the tutor still earns normally from this family.
-    private void ApplyAccept(PresetCancellationDecision decision, bool autoAccepted = false)
+    private async Task ApplyAccept(PresetCancellationDecision decision, bool autoAccepted = false)
     {
         _context.BookingClasses.Add(new BookingClass
         {
@@ -121,6 +121,33 @@ public class PresetCancellationsController : ControllerBase
             Date = decision.ProposedDate!,
             Time = decision.ProposedTime + " - " + decision.ProposedEndTime
         });
+
+        // The original TutorTimeSlot was deleted when the tutor proposed this
+        // reschedule (see TutorsController.DeleteSlot) — recreate one at the new
+        // date/time so the class shows up on the tutor's calendar again and can
+        // still be cancelled/rescheduled later through the normal slot flow,
+        // instead of being orphaned as a bare BookingClass with no slot behind it.
+        var newSlot = new TutorTimeSlot
+        {
+            TutorId = decision.Booking.TutorId,
+            Day = decision.ProposedDate!,
+            Time = decision.ProposedTime!,
+            EndTime = decision.ProposedEndTime,
+            Status = "Available",
+            DurationMinutes = (int)Math.Round(decision.Booking.DurationHours * 60),
+            Mode = decision.Booking.Mode,
+            Subject = decision.Booking.Subject,
+            ClassSize = "one-to-one",
+            MaxStudents = 1,
+            ConfirmedCount = 1,
+            IsFull = true,
+            PricePerLesson = decision.PricePerLesson
+        };
+        _context.TutorTimeSlots.Add(newSlot);
+        await _context.SaveChangesAsync();
+
+        _context.BookingPresetSlots.Add(new BookingPresetSlot { BookingId = decision.BookingId, TutorTimeSlotId = newSlot.Id });
+
         decision.Status = autoAccepted ? "auto-accepted" : "accepted";
         decision.DecidedAt = DateTime.UtcNow;
         decision.ResolvedAt = DateTime.UtcNow;
