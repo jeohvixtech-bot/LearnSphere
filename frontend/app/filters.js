@@ -89,6 +89,8 @@ angular.module('learnSphereApp')
 .filter('verifDocLabel', function () {
   var labels = {
     identity_photo: 'Identity photo',
+    identity_id: 'ID number',
+    profile_photo: 'Profile photo',
     o_level: 'O-Level / SPM',
     a_level: 'A-Level / STPM / Diploma',
     degree: "Bachelor's degree",

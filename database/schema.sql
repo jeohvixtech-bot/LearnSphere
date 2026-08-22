@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS Tutors (
     Bio              LONGTEXT        NOT NULL,
     IsVerified       TINYINT(1)      NOT NULL DEFAULT 0,
     IsOnline         TINYINT(1)      NOT NULL DEFAULT 1,  -- offline hides the profile from parent search/booking entirely
-    VerificationStatus VARCHAR(20)   NOT NULL DEFAULT 'not_submitted', -- not_submitted | pending | approved | rejected
+    VerificationStatus VARCHAR(20)   NOT NULL DEFAULT 'not_submitted', -- not_submitted | pending | approved (no separate terminal "rejected" — see TutorDocuments)
     OfferingsUnlocked  TINYINT(1)    NOT NULL DEFAULT 0,  -- gates the offering builder until mandatory documents are approved
     CONSTRAINT FK_Tutors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
@@ -87,25 +87,29 @@ CREATE TABLE IF NOT EXISTS TutorOfferings (
 
 -- ============================================================
 -- TutorDocuments  (tutor verification uploads — identity, academic, teaching
--- credentials, intro video, specialist certs. Every DocumentType upserts a single
--- row except specialist_cert, which allows multiple, ordered by SortOrder.
--- See TutorsController.SaveDocument/ReviewDocument.)
+-- credentials, intro video link, specialist certs. identity_photo and intro_video
+-- are single-slot; o_level/a_level/degree/postgrad/nie_cert/specialist_cert allow
+-- up to 3 rows each, ordered by SortOrder. Re-upload after rejection creates a new
+-- row (ReplacesDocumentId points at the old rejected row) instead of overwriting —
+-- see TutorsController.SaveDocument/ApplyVerificationDecisions.)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS TutorDocuments (
-    Id             INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId        INT             NOT NULL,
-    DocumentType   VARCHAR(30)     NOT NULL DEFAULT '', -- identity_photo | o_level | a_level | degree | postgrad | nie_cert | intro_video | specialist_cert
-    FileUrl        LONGTEXT        NULL,
-    ExternalUrl    LONGTEXT        NULL,                -- intro_video may be a pasted link instead of an upload
-    FileName       LONGTEXT        NULL,
-    FileSizeBytes  BIGINT          NULL,
-    IdType         VARCHAR(20)     NULL,                -- identity_photo only: NRIC | MyKad | Passport
-    IdNumber       LONGTEXT        NULL,                -- identity_photo only
-    SortOrder      INT             NOT NULL DEFAULT 0,
-    Status         VARCHAR(20)     NOT NULL DEFAULT 'pending', -- pending | approved | rejected
-    AdminNote      LONGTEXT        NULL,
-    UploadedAt     DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    ReviewedAt     DATETIME(6)     NULL,
+    Id                  INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId             INT             NOT NULL,
+    DocumentType        VARCHAR(30)     NOT NULL DEFAULT '', -- identity_photo | o_level | a_level | degree | postgrad | nie_cert | intro_video | specialist_cert
+    FileUrl             LONGTEXT        NULL,
+    ExternalUrl         LONGTEXT        NULL,                -- intro_video is link-only (no file upload)
+    FileName            LONGTEXT        NULL,
+    FileSizeBytes       BIGINT          NULL,
+    IdType              VARCHAR(20)     NULL,                -- identity_photo only: NRIC | WorkPassSG | MyKad | Passport
+    IdNumber            LONGTEXT        NULL,                -- identity_photo only
+    SortOrder           INT             NOT NULL DEFAULT 0,
+    Status              VARCHAR(20)     NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+    AdminNote           LONGTEXT        NULL,
+    UploadedAt          DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ReviewedAt          DATETIME(6)     NULL,
+    ReplacesDocumentId  INT             NULL,                -- self-referencing: the rejected row this re-upload supersedes
+    IsArchived          TINYINT(1)      NOT NULL DEFAULT 0,   -- superseded-and-approved rows are archived, not deleted (audit trail)
     KEY IX_TutorDocuments_TutorId (TutorId),
     CONSTRAINT FK_TutorDocuments_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );

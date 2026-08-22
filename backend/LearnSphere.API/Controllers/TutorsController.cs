@@ -352,40 +352,47 @@ public class TutorsController : ControllerBase
             if (bioProfanityError != null) return BadRequest(new { message = bioProfanityError });
         }
 
-        if (dto.ImageUrl != null) tutor.ImageUrl = dto.ImageUrl;
+        // ImageUrl is deliberately NOT settable here anymore — the public profile
+        // photo only changes once a "profile_photo" verification document is
+        // uploaded and approved by admin (see SaveDocument / ApplyVerificationDecisions),
+        // so an unapproved photo is never shown to parents.
         if (dto.Bio != null) tutor.Bio = dto.Bio;
         if (dto.PricePerSession.HasValue) tutor.PricePerSession = dto.PricePerSession.Value;
         if (dto.ExperienceYears.HasValue) tutor.ExperienceYears = dto.ExperienceYears.Value;
 
-        if (dto.Offerings != null && dto.Offerings.Count > 0 && tutor.VerificationStatus == "not_submitted")
-            return BadRequest(new { message = "Submit your profile verification before adding subject offerings." });
-
+        // Part 2 (profile, including offerings) is always editable regardless of
+        // VerificationStatus/lock state now — see Part A of the verification rework —
+        // so there's no gate here anymore.
         if (dto.Offerings != null)
         {
+            // Offerings are country+subject+level+mode — reject duplicates within the
+            // submitted batch as a defensive backstop (the offering-add UI already
+            // blocks this, but a direct API call could still send one).
+            var duplicateKey = dto.Offerings
+                .GroupBy(o => (o.Country, o.Subject, o.Level, o.Mode))
+                .FirstOrDefault(g => g.Count() > 1);
+            if (duplicateKey != null)
+                return BadRequest(new { message = $"Duplicate offering: {duplicateKey.Key.Subject} ({duplicateKey.Key.Level}) · {duplicateKey.Key.Mode} · {duplicateKey.Key.Country} is listed more than once." });
+
             _context.RemoveRange(tutor.Offerings);
             tutor.Offerings = dto.Offerings.Select(o => new TutorOffering
             {
-                TutorId = id, Country = o.Country, Subject = o.Subject, Level = o.Level,
-                Mode = o.Mode, Qualification = o.Qualification, Price = o.Price
+                TutorId = id, Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode
             }).ToList();
-
-            // Update pricePerSession to the lowest offering price so the catalog card reflects it
-            if (dto.Offerings.Count > 0)
-                tutor.PricePerSession = dto.Offerings.Min(o => o.Price);
 
             // Sync flat tables so search filters keep working. Modes is deliberately NOT
             // re-derived here — the tutor's overall teaching modes are independently
             // set via PATCH /api/tutors/{id}/modes (the drag-and-drop selector), which
-            // is now the sole source of truth for that list.
+            // is now the sole source of truth for that list. Qualifications are no
+            // longer part of an offering either, so they're left untouched here too —
+            // TutorOffering.Qualification/TutorQualification still exist, just not
+            // driven by the offering builder anymore.
             _context.RemoveRange(tutor.Subjects);
             tutor.Subjects = dto.Offerings.Select(o => o.Subject).Distinct()
                 .Select(s => new TutorSubject { TutorId = id, Subject = s }).ToList();
             _context.RemoveRange(tutor.Levels);
             tutor.Levels = dto.Offerings.Select(o => o.Level).Distinct()
                 .Select(l => new TutorLevel { TutorId = id, Level = l }).ToList();
-            _context.RemoveRange(tutor.Qualifications);
-            tutor.Qualifications = dto.Offerings.Select(o => o.Qualification).Distinct()
-                .Select(q => new TutorQualification { TutorId = id, Qualification = q }).ToList();
         }
         else
         {
@@ -624,6 +631,33 @@ public class TutorsController : ControllerBase
         return (start, end);
     }
 
+    // Shape-only validation (no checksum digit/letter) for the identity document's
+    // ID number, keyed by ID type. "Passport" and any unrecognized type intentionally
+    // have no pattern — admin relies on the identity photo vs. the typed value during
+    // review instead. Case-insensitive; dashes are stripped before matching (MyKad is
+    // sometimes typed with them even though it's stored without).
+    private static readonly Dictionary<string, string> IdNumberPatterns = new()
+    {
+        ["NRIC"] = @"^[ST]\d{7}[A-Z]$",
+        ["WorkPassSG"] = @"^[FGM]\d{7}[A-Z]$",
+        ["MyKad"] = @"^\d{12}$"
+    };
+
+    private static bool IsValidIdNumberFormat(string? idType, string? idNumber)
+    {
+        if (idType == null || !IdNumberPatterns.TryGetValue(idType, out var pattern)) return true;
+        var normalized = (idNumber ?? "").ToUpperInvariant().Replace("-", "");
+        return System.Text.RegularExpressions.Regex.IsMatch(normalized, pattern);
+    }
+
+    // "Has this document actually been submitted?" — identity_id has no file at all
+    // (just IdType/IdNumber), so the usual FileUrl/ExternalUrl check alone would never
+    // recognize it as submitted. Used everywhere a doc's presence gates something
+    // (Bug #6's pending-check, mandatory-doc checks, etc.).
+    private static bool HasContent(TutorDocument d) =>
+        d.FileUrl != null || d.ExternalUrl != null
+        || (d.DocumentType == "identity_id" && !string.IsNullOrWhiteSpace(d.IdNumber));
+
     // Publishes tutor-preset class slots (Flow B) — a parent books these directly
     // without a per-request confirmation step. Only the owning tutor can call this.
     [HttpPost("{id}/setup-class")]
@@ -694,7 +728,10 @@ public class TutorsController : ControllerBase
             var overlapsConfirmed = confirmedClasses.Where(c => c.Date == slot.Date).Any(c =>
             {
                 var range = ParseTimeRangeMinutes(c.Time);
-                return range != null && newStart < range.Value.End && range.Value.Start < end;
+                // Can't verify this existing class's time range — fail closed (treat as
+                // a conflict) rather than silently letting a possible double-booking through.
+                if (range == null) return true;
+                return newStart < range.Value.End && range.Value.Start < end;
             });
             if (overlapsConfirmed)
                 return BadRequest(new { message = $"You already have a confirmed class on {slot.Date} that overlaps this time." });
@@ -805,10 +842,31 @@ public class TutorsController : ControllerBase
             var hasConflict = otherConfirmedTimes.Any(t =>
             {
                 var range = ParseTimeRangeMinutes(t);
-                return range != null && proposedStart < range.Value.End && range.Value.Start < proposedEnd;
+                // Can't verify this existing class's time range — fail closed.
+                if (range == null) return true;
+                return proposedStart < range.Value.End && range.Value.Start < proposedEnd;
             });
             if (hasConflict)
                 return BadRequest(new { message = "You already have a confirmed class at that date and time." });
+
+            // Must land later than the earliest OTHER class still active in the same
+            // recurring series (same Setup Class submission) — moving one occurrence
+            // to before the series' current first class would scramble the sequence.
+            // Only applies when there's another slot in the group to compare against.
+            if (!string.IsNullOrEmpty(slot.PresetGroupId))
+            {
+                var earliestSiblingDate = await _context.TutorTimeSlots
+                    .Where(s => s.PresetGroupId == slot.PresetGroupId && s.Id != slot.Id)
+                    .OrderBy(s => s.Day)
+                    .Select(s => s.Day)
+                    .FirstOrDefaultAsync();
+                if (!string.IsNullOrEmpty(earliestSiblingDate)
+                    && DateTime.TryParse(earliestSiblingDate, out var earliestDate)
+                    && proposedDateParsed.Date <= earliestDate.Date)
+                {
+                    return BadRequest(new { message = $"The new date must be later than {earliestSiblingDate}, the earliest class still in this series." });
+                }
+            }
         }
 
         // Flow B preset slots track fills via ConfirmedCount/IsFull, not the legacy
@@ -997,6 +1055,8 @@ public class TutorsController : ControllerBase
     private static readonly Dictionary<string, string> DocumentTypeLabels = new()
     {
         ["identity_photo"] = "Identity photo (selfie with ID)",
+        ["identity_id"] = "ID number",
+        ["profile_photo"] = "Profile photo",
         ["o_level"] = "O-Level / SPM certificate",
         ["a_level"] = "A-Level / STPM / Diploma certificate",
         ["degree"] = "Bachelor's degree certificate",
@@ -1010,8 +1070,18 @@ public class TutorsController : ControllerBase
     {
         ["identity_photo"] = new List<string>
         {
-            "Image too blurry", "Face not clearly visible", "ID number unreadable",
+            "Image too blurry", "Face not clearly visible",
             "Wrong document type uploaded", "ID appears expired", "Other"
+        },
+        ["identity_id"] = new List<string>
+        {
+            "ID number unreadable in photo", "ID number doesn't match the uploaded photo",
+            "ID appears expired", "Other"
+        },
+        ["profile_photo"] = new List<string>
+        {
+            "Not a clear photo of the tutor's face", "Inappropriate image",
+            "Image too low resolution", "Other"
         },
         ["o_level"] = new List<string>
         {
@@ -1072,25 +1142,65 @@ public class TutorsController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.DocumentType))
             return BadRequest(new { message = "Document type is required." });
 
-        if (dto.DocumentType == "identity_photo" && string.IsNullOrWhiteSpace(dto.IdNumber))
-            return BadRequest(new { message = "ID number is required." });
+        if (dto.DocumentType == "identity_id")
+        {
+            if (string.IsNullOrWhiteSpace(dto.IdNumber))
+                return BadRequest(new { message = "ID number is required." });
+            if (!IsValidIdNumberFormat(dto.IdType, dto.IdNumber))
+                return BadRequest(new { message = "ID number doesn't match the expected format for the selected ID type." });
+        }
 
-        // identity_photo/intro_video: single, upsert-in-place. Everything else
-        // (o_level, a_level, degree, postgrad, nie_cert, specialist_cert): up to
-        // 3 attachments, each its own record — see the RULES table this feature
-        // shipped with.
-        var singleUploadTypes = new[] { "identity_photo", "intro_video" };
+        // identity_photo/identity_id/profile_photo/intro_video: single slot.
+        // Everything else (o_level, a_level, degree, postgrad, nie_cert,
+        // specialist_cert): up to 3 attachments, each its own record. intro_video is
+        // link-only (ExternalUrl); identity_id has no file at all, just IdType/IdNumber.
+        var singleUploadTypes = new[] { "identity_photo", "identity_id", "profile_photo", "intro_video" };
         var multiUploadTypes = new[] { "o_level", "a_level", "degree", "postgrad", "nie_cert", "specialist_cert" };
+        var activeDocs = tutor.Documents.Where(d => !d.IsArchived).ToList();
+
+        var noFileTypes = new[] { "intro_video", "identity_id" };
+        var fileUrl = noFileTypes.Contains(dto.DocumentType) ? null : dto.FileUrl;
+        var fileName = noFileTypes.Contains(dto.DocumentType) ? null : dto.FileName;
+        var fileSizeBytes = noFileTypes.Contains(dto.DocumentType) ? null : dto.FileSizeBytes;
 
         if (singleUploadTypes.Contains(dto.DocumentType))
         {
-            var existing = tutor.Documents.FirstOrDefault(d => d.DocumentType == dto.DocumentType);
-            if (existing != null)
+            var existing = activeDocs.FirstOrDefault(d => d.DocumentType == dto.DocumentType);
+
+            // While under review, this slot can only be touched by re-uploading over
+            // its own rejected row — everything else is locked (see Part A: Part 1
+            // fields lock on submit, only rejected fields unlock for the fix-and-
+            // resubmit loop).
+            if (tutor.VerificationStatus == "pending" && existing != null && existing.Status != "rejected")
+                return BadRequest(new { message = "This document is locked while your verification is under review." });
+
+            if (existing != null && existing.Status == "rejected")
             {
-                existing.FileUrl = dto.FileUrl;
+                // Dual-row: old rejected row stays exactly as-is (still visible as
+                // "current" until this new one is resolved) — a fresh row carries the
+                // re-upload.
+                _context.TutorDocuments.Add(new TutorDocument
+                {
+                    TutorId = id,
+                    DocumentType = dto.DocumentType,
+                    FileUrl = fileUrl,
+                    ExternalUrl = dto.ExternalUrl,
+                    FileName = fileName,
+                    FileSizeBytes = fileSizeBytes,
+                    IdType = dto.IdType,
+                    IdNumber = dto.IdNumber,
+                    Status = "pending",
+                    ReplacesDocumentId = existing.Id
+                });
+            }
+            else if (existing != null)
+            {
+                // Not yet submitted for review — plain upsert-in-place is fine (no
+                // rejected row to preserve, nothing to replace).
+                existing.FileUrl = fileUrl;
                 existing.ExternalUrl = dto.ExternalUrl;
-                existing.FileName = dto.FileName;
-                existing.FileSizeBytes = dto.FileSizeBytes;
+                existing.FileName = fileName;
+                existing.FileSizeBytes = fileSizeBytes;
                 existing.IdType = dto.IdType;
                 existing.IdNumber = dto.IdNumber;
                 existing.Status = "pending";
@@ -1103,10 +1213,10 @@ public class TutorsController : ControllerBase
                 {
                     TutorId = id,
                     DocumentType = dto.DocumentType,
-                    FileUrl = dto.FileUrl,
+                    FileUrl = fileUrl,
                     ExternalUrl = dto.ExternalUrl,
-                    FileName = dto.FileName,
-                    FileSizeBytes = dto.FileSizeBytes,
+                    FileName = fileName,
+                    FileSizeBytes = fileSizeBytes,
                     IdType = dto.IdType,
                     IdNumber = dto.IdNumber,
                     Status = "pending"
@@ -1115,20 +1225,44 @@ public class TutorsController : ControllerBase
         }
         else if (multiUploadTypes.Contains(dto.DocumentType))
         {
-            var existingCount = tutor.Documents.Count(d => d.DocumentType == dto.DocumentType);
-            if (existingCount >= 3)
-                return BadRequest(new { message = "Maximum 3 attachments allowed for this document type." });
-
-            _context.TutorDocuments.Add(new TutorDocument
+            if (dto.ReplacesDocumentId.HasValue)
             {
-                TutorId = id,
-                DocumentType = dto.DocumentType,
-                FileUrl = dto.FileUrl,
-                FileName = dto.FileName,
-                FileSizeBytes = dto.FileSizeBytes,
-                SortOrder = existingCount,
-                Status = "pending"
-            });
+                var oldDoc = activeDocs.FirstOrDefault(d => d.Id == dto.ReplacesDocumentId.Value && d.DocumentType == dto.DocumentType);
+                if (oldDoc == null || oldDoc.Status != "rejected")
+                    return BadRequest(new { message = "The document being replaced was not found, or isn't rejected." });
+
+                _context.TutorDocuments.Add(new TutorDocument
+                {
+                    TutorId = id,
+                    DocumentType = dto.DocumentType,
+                    FileUrl = fileUrl,
+                    FileName = fileName,
+                    FileSizeBytes = fileSizeBytes,
+                    SortOrder = oldDoc.SortOrder,
+                    Status = "pending",
+                    ReplacesDocumentId = oldDoc.Id
+                });
+            }
+            else
+            {
+                if (tutor.VerificationStatus == "pending")
+                    return BadRequest(new { message = "Documents are locked while your verification is under review. Re-upload a rejected document to fix it instead." });
+
+                var existingCount = activeDocs.Count(d => d.DocumentType == dto.DocumentType);
+                if (existingCount >= 3)
+                    return BadRequest(new { message = "Maximum 3 attachments allowed for this document type." });
+
+                _context.TutorDocuments.Add(new TutorDocument
+                {
+                    TutorId = id,
+                    DocumentType = dto.DocumentType,
+                    FileUrl = fileUrl,
+                    FileName = fileName,
+                    FileSizeBytes = fileSizeBytes,
+                    SortOrder = existingCount,
+                    Status = "pending"
+                });
+            }
         }
         else
         {
@@ -1150,6 +1284,8 @@ public class TutorsController : ControllerBase
 
         var doc = await _context.TutorDocuments.FirstOrDefaultAsync(d => d.Id == docId && d.TutorId == id);
         if (doc == null) return NotFound();
+        if (tutor.VerificationStatus == "pending")
+            return BadRequest(new { message = "Documents are locked while your verification is under review." });
         _context.TutorDocuments.Remove(doc);
         await _context.SaveChangesAsync();
         return Ok();
@@ -1211,59 +1347,56 @@ public class TutorsController : ControllerBase
         if (tutor == null) return NotFound();
         if (tutor.UserId != userId) return Forbid();
 
+        var docs = tutor.Documents.Where(d => !d.IsArchived).ToList();
+
         if (tutor.VerificationStatus == "pending")
-            return BadRequest(new { message = "Verification is already under review." });
-
-        var docs = tutor.Documents;
-        bool hasIdentity = docs.Any(d => d.DocumentType == "identity_photo" && d.FileUrl != null);
-        bool hasAcademic = docs.Any(d => AcademicLevelTypes.Contains(d.DocumentType) && d.FileUrl != null);
-
-        if (!hasIdentity || !hasAcademic)
-            return BadRequest(new { message = "Please upload all required documents before submitting." });
-
-        tutor.VerificationStatus = "pending";
-        // Reset previously-rejected documents back to pending on resubmit
-        foreach (var doc in docs.Where(d => d.Status == "rejected"))
         {
-            doc.Status = "pending";
-            doc.AdminNote = null;
+            // Resubmit after a mixed-result review round — this is the same button,
+            // clicked again to re-lock Part 1 and send the tutor's fixes back to
+            // admin. Every rejected document must already have a fresh replacement
+            // (a new pending row pointing back at it — see SaveDocument's dual-row
+            // re-upload) before this is allowed; nothing else to change here, since
+            // VerificationStatus is already "pending" and the new rows are already
+            // "pending" from the moment they were uploaded.
+            var unresolvedRejections = docs.Where(d => d.Status == "rejected"
+                && !docs.Any(r => r.ReplacesDocumentId == d.Id)).ToList();
+            if (unresolvedRejections.Count > 0)
+                return BadRequest(new { message = "Please re-upload every rejected document before resubmitting." });
+
+            tutor.LastSubmittedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Verification resubmitted. Admin will review within 1-3 business days." });
         }
 
+        bool hasIdentityPhoto = docs.Any(d => d.DocumentType == "identity_photo" && HasContent(d));
+        bool hasIdentityId = docs.Any(d => d.DocumentType == "identity_id" && HasContent(d));
+        bool hasProfilePhoto = docs.Any(d => d.DocumentType == "profile_photo" && HasContent(d));
+        bool hasAcademic = docs.Any(d => AcademicLevelTypes.Contains(d.DocumentType) && HasContent(d));
+
+        if (!hasIdentityPhoto || !hasIdentityId || !hasProfilePhoto || !hasAcademic)
+            return BadRequest(new { message = "Please upload all required documents before submitting." });
+
+        // Defense-in-depth: catches an ID number saved by an older client before
+        // this format check existed — reject the submit and prompt a re-upload rather
+        // than letting bad data through to admin review.
+        var idDoc = docs.FirstOrDefault(d => d.DocumentType == "identity_id" && HasContent(d));
+        if (idDoc != null && !IsValidIdNumberFormat(idDoc.IdType, idDoc.IdNumber))
+            return BadRequest(new { message = "Your ID number doesn't match the expected format for the selected ID type. Please correct and resave it." });
+
+        tutor.VerificationStatus = "pending";
+        tutor.LastSubmittedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return Ok(new { message = "Verification submitted. Admin will review within 1-3 business days." });
     }
 
-    // Saves a single document's review decision only — does not itself change the
-    // tutor's overall VerificationStatus/IsVerified/OfferingsUnlocked. Admin reviews
-    // documents one at a time, then explicitly confirms (ConfirmVerification) or
-    // notifies the tutor of rejections (RejectVerification) as a separate step.
-    [HttpPatch("{id}/documents/{docId}/review")]
+    // Applies a whole batch of per-document approve/reject decisions atomically —
+    // replaces the old ReviewDocument (per-document, applied immediately) +
+    // ConfirmVerification + RejectVerification split. Admin stages every decision
+    // client-side first (see admin.controller.js), then this is the single "Confirm
+    // & Verify" call that commits all of them together and sends one combined email.
+    [HttpPost("{id}/apply-verification-decisions")]
     [Authorize(Roles = "admin")]
-    public async Task<IActionResult> ReviewDocument(int id, int docId, [FromBody] ReviewDocumentDto dto)
-    {
-        if (dto.Status != "approved" && dto.Status != "rejected")
-            return BadRequest(new { message = "Status must be 'approved' or 'rejected'." });
-
-        var noteProfanityError = ProfanityFilter.Validate(dto.Note);
-        if (noteProfanityError != null) return BadRequest(new { message = noteProfanityError });
-
-        var tutor = await _context.Tutors.Include(t => t.Documents).FirstOrDefaultAsync(t => t.Id == id);
-        if (tutor == null) return NotFound();
-
-        var doc = tutor.Documents.FirstOrDefault(d => d.Id == docId);
-        if (doc == null) return NotFound();
-
-        doc.Status = dto.Status;
-        doc.AdminNote = dto.Note;
-        doc.ReviewedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-        return Ok(new { message = "Document reviewed." });
-    }
-
-    [HttpPost("{id}/confirm-verification")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> ConfirmVerification(int id)
+    public async Task<IActionResult> ApplyVerificationDecisions(int id, [FromBody] ApplyVerificationDecisionsDto dto)
     {
         var tutor = await _context.Tutors
             .Include(t => t.Documents)
@@ -1271,70 +1404,125 @@ public class TutorsController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
         if (tutor == null) return NotFound();
 
-        var uploadedDocs = tutor.Documents.Where(d => d.FileUrl != null || d.ExternalUrl != null).ToList();
+        if (dto.Decisions == null || dto.Decisions.Count == 0)
+            return BadRequest(new { message = "No decisions provided." });
 
-        bool identityApproved = uploadedDocs.Any(d => d.DocumentType == "identity_photo" && d.Status == "approved");
-        bool academicApproved = uploadedDocs.Any(d => AcademicLevelTypes.Contains(d.DocumentType) && d.Status == "approved");
-        bool anyRejected = uploadedDocs.Any(d => d.Status == "rejected");
-
-        if (!identityApproved || !academicApproved)
-            return BadRequest(new { message = "All mandatory documents must be approved before confirming." });
-        if (anyRejected)
-            return BadRequest(new { message = "Please resolve all rejected documents before confirming." });
-
-        tutor.IsVerified = true;
-        tutor.OfferingsUnlocked = true;
-        tutor.VerificationStatus = "approved";
-
-        await _context.SaveChangesAsync();
-
-        await _emailService.SendAsync(
-            tutor.User.Email,
-            "LearnSphere — Profile verified",
-            $"Hi {tutor.User.Name},\n\n" +
-            "Congratulations! Your LearnSphere tutor profile has been verified.\n\n" +
-            "You can now log in and set up your subject offerings to start receiving bookings.\n\n" +
-            "Regards,\nLearnSphere Team"
-        );
-
-        return Ok(new { message = "Tutor verified and notified." });
-    }
-
-    [HttpPost("{id}/reject-verification")]
-    [Authorize(Roles = "admin")]
-    public async Task<IActionResult> RejectVerification(int id)
-    {
-        var tutor = await _context.Tutors
-            .Include(t => t.Documents)
-            .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.Id == id);
-        if (tutor == null) return NotFound();
-
-        var rejectedDocs = tutor.Documents.Where(d => d.Status == "rejected" && !string.IsNullOrEmpty(d.AdminNote)).ToList();
-        if (rejectedDocs.Count == 0)
-            return BadRequest(new { message = "No rejected documents found to notify about." });
-
-        tutor.VerificationStatus = "rejected";
-        await _context.SaveChangesAsync();
-
-        var rejectionLines = rejectedDocs.Select(d =>
+        foreach (var decision in dto.Decisions)
         {
-            var label = DocumentTypeLabels.TryGetValue(d.DocumentType, out var l) ? l : d.DocumentType;
-            return $"• {label}\n  Reason: {d.AdminNote}";
-        });
+            if (decision.Status != "approved" && decision.Status != "rejected")
+                return BadRequest(new { message = "Each decision's status must be 'approved' or 'rejected'." });
+            if (decision.Status == "rejected")
+            {
+                if (string.IsNullOrWhiteSpace(decision.Note))
+                    return BadRequest(new { message = "A rejection reason is required for every rejected document." });
+                var noteProfanityError = ProfanityFilter.Validate(decision.Note);
+                if (noteProfanityError != null) return BadRequest(new { message = noteProfanityError });
+            }
+            if (!tutor.Documents.Any(d => d.Id == decision.DocId))
+                return BadRequest(new { message = $"Document {decision.DocId} does not belong to this tutor." });
+        }
+
+        // Bug fix: every uploaded, non-archived document must be covered by this
+        // batch (or already resolved from an earlier round) — nothing can be left
+        // sitting at "pending" outside it, or an admin could confirm a tutor while
+        // an untouched document sits unreviewed.
+        var decisionIds = dto.Decisions.Select(d => d.DocId).ToHashSet();
+        var uploadedDocs = tutor.Documents.Where(d => !d.IsArchived && HasContent(d)).ToList();
+        if (uploadedDocs.Any(d => d.Status == "pending" && !decisionIds.Contains(d.Id)))
+            return BadRequest(new { message = "Every uploaded document must be approved or rejected before confirming." });
+
+        var approvedLabels = new List<string>();
+        var rejectedLines = new List<string>();
+        var discardedIds = new HashSet<int>();
+
+        foreach (var decision in dto.Decisions)
+        {
+            var doc = tutor.Documents.First(d => d.Id == decision.DocId);
+            var label = DocumentTypeLabels.TryGetValue(doc.DocumentType, out var l) ? l : doc.DocumentType;
+
+            if (doc.ReplacesDocumentId.HasValue && decision.Status == "rejected")
+            {
+                // Re-upload rejected again — discard this new row entirely; the old
+                // row remains "current", refreshed with the latest reason so the
+                // tutor and admin both see what actually needs fixing now (rather
+                // than a stale reason from the first rejection).
+                var oldDoc = tutor.Documents.FirstOrDefault(d => d.Id == doc.ReplacesDocumentId.Value);
+                if (oldDoc != null)
+                {
+                    oldDoc.AdminNote = decision.Note;
+                    oldDoc.ReviewedAt = DateTime.UtcNow;
+                }
+                _context.TutorDocuments.Remove(doc);
+                discardedIds.Add(doc.Id);
+                rejectedLines.Add($"• {label}\n  Reason: {decision.Note}");
+                continue;
+            }
+
+            doc.Status = decision.Status;
+            doc.AdminNote = decision.Status == "rejected" ? decision.Note : null;
+            doc.ReviewedAt = DateTime.UtcNow;
+
+            if (decision.Status == "approved")
+            {
+                approvedLabels.Add(label);
+                // This new row supersedes the old rejected one — archive it (kept
+                // for audit trail, no longer surfaced to tutor or admin).
+                if (doc.ReplacesDocumentId.HasValue)
+                {
+                    var oldDoc = tutor.Documents.FirstOrDefault(d => d.Id == doc.ReplacesDocumentId.Value);
+                    if (oldDoc != null) oldDoc.IsArchived = true;
+                }
+                // The public-facing photo only goes live once THIS document is
+                // approved — hidden from parents/catalog until then.
+                if (doc.DocumentType == "profile_photo" && doc.FileUrl != null)
+                    tutor.ImageUrl = doc.FileUrl;
+            }
+            else
+            {
+                rejectedLines.Add($"• {label}\n  Reason: {decision.Note}");
+            }
+        }
+
+        var remainingDocs = tutor.Documents.Where(d => !d.IsArchived && !discardedIds.Contains(d.Id) && HasContent(d)).ToList();
+        bool identityPhotoApproved = remainingDocs.Any(d => d.DocumentType == "identity_photo" && d.Status == "approved");
+        bool identityIdApproved = remainingDocs.Any(d => d.DocumentType == "identity_id" && d.Status == "approved");
+        bool profilePhotoApproved = remainingDocs.Any(d => d.DocumentType == "profile_photo" && d.Status == "approved");
+        bool academicApproved = remainingDocs.Any(d => AcademicLevelTypes.Contains(d.DocumentType) && d.Status == "approved");
+        bool anyRejected = remainingDocs.Any(d => d.Status == "rejected");
+        bool fullyApproved = identityPhotoApproved && identityIdApproved && profilePhotoApproved && academicApproved && !anyRejected;
+
+        if (fullyApproved)
+        {
+            tutor.IsVerified = true;
+            tutor.OfferingsUnlocked = true;
+            tutor.VerificationStatus = "approved";
+        }
+        // Otherwise VerificationStatus stays "pending" — no separate terminal
+        // "rejected" status; the tutor loops via re-upload until everything's approved.
+
+        await _context.SaveChangesAsync();
+
+        var sections = new List<string>();
+        if (approvedLabels.Count > 0)
+            sections.Add("Approved this round:\n" + string.Join("\n", approvedLabels.Select(l => $"• {l}")));
+        if (rejectedLines.Count > 0)
+            sections.Add("Needs attention:\n" + string.Join("\n\n", rejectedLines));
+
+        var closing = fullyApproved
+            ? "Congratulations! Your profile is now fully verified — you can set up subject offerings and start receiving bookings."
+            : "Please log in to your LearnSphere profile to re-upload the documents listed above, then resubmit for verification.";
 
         var emailBody =
             $"Hi {tutor.User.Name},\n\n" +
-            "Your LearnSphere profile verification requires attention. " +
-            "The following documents could not be accepted:\n\n" +
-            string.Join("\n\n", rejectionLines) +
-            "\n\nPlease log in to your LearnSphere profile, re-upload the affected documents, " +
-            "and resubmit for verification.\n\n" +
-            "Regards,\nLearnSphere Team";
+            "Here's the latest update on your LearnSphere profile verification:\n\n" +
+            string.Join("\n\n", sections) +
+            $"\n\n{closing}\n\nRegards,\nLearnSphere Team";
 
-        await _emailService.SendAsync(tutor.User.Email, "LearnSphere — Profile verification update", emailBody);
+        await _emailService.SendAsync(tutor.User.Email,
+            fullyApproved ? "LearnSphere — Profile verified" : "LearnSphere — Profile verification update",
+            emailBody);
 
-        return Ok(new { message = "Rejection sent and tutor notified." });
+        return Ok(new { message = "Decisions applied and tutor notified.", verified = fullyApproved });
     }
 
     private static TutorDto MapToDto(Tutor t) => new()
@@ -1349,7 +1537,7 @@ public class TutorsController : ControllerBase
         SubjectDetails = t.Subjects.Select(s => new SubjectDetailDto { Name = s.Subject, Price = s.Price }).ToList(),
         Levels = t.Levels.Select(l => l.Level).ToList(),
         Modes = t.Modes.Select(m => m.Mode).ToList(),
-        PricePerSession = t.Offerings.Count > 0 ? t.Offerings.Min(o => o.Price) : t.PricePerSession,
+        PricePerSession = t.PricePerSession,
         ExperienceYears = t.ExperienceYears,
         Bio = t.Bio,
         Qualifications = t.Qualifications.Select(q => q.Qualification).ToList(),
@@ -1357,11 +1545,13 @@ public class TutorsController : ControllerBase
         IsOnline = t.IsOnline,
         VerificationStatus = t.VerificationStatus,
         OfferingsUnlocked = t.OfferingsUnlocked,
-        Documents = t.Documents.Select(d => new TutorDocumentDto
+        LastSubmittedAt = t.LastSubmittedAt,
+        Documents = t.Documents.Where(d => !d.IsArchived).Select(d => new TutorDocumentDto
         {
             Id = d.Id, DocumentType = d.DocumentType, FileUrl = d.FileUrl, ExternalUrl = d.ExternalUrl,
             FileName = d.FileName, FileSizeBytes = d.FileSizeBytes, IdType = d.IdType, IdNumber = d.IdNumber,
-            SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt
+            SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt,
+            ReplacesDocumentId = d.ReplacesDocumentId
         }).ToList(),
         Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto
@@ -1371,6 +1561,6 @@ public class TutorsController : ControllerBase
             ClassSize = s.ClassSize, MaxStudents = s.MaxStudents, ConfirmedCount = s.ConfirmedCount,
             IsFull = s.IsFull, PricePerLesson = s.PricePerLesson, PresetGroupId = s.PresetGroupId
         }).ToList(),
-        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode, Qualification = o.Qualification, Price = o.Price }).ToList()
+        Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode }).ToList()
     };
 }

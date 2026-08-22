@@ -106,6 +106,11 @@
                       {{ doc.externalUrl }}
                     </a>
                   </div>
+                  <!-- identity_id has no file — just the typed ID type/number -->
+                  <div ng-if="doc.documentType === 'identity_id'" class="vetting-doc-link">
+                    <i class="ti ti-id-badge-2" style="font-size:12px;" aria-hidden="true"></i>
+                    {{ doc.idType }}: {{ doc.idNumber }}
+                  </div>
 
                   <button type="button" class="vetting-doc-remove-btn"
                     ng-click="vm.adminRemoveDoc(t, doc)"
@@ -118,13 +123,20 @@
                     <i class="ti ti-message" style="font-size:12px;" aria-hidden="true"></i>
                     Previous note: "{{ doc.adminNote }}"
                   </p>
+
+                  <!-- Replacement indicator — this doc is a fresh re-upload fixing a
+                       previously rejected one (shown just above, same slot) -->
+                  <p class="text-muted" style="font-size:11px; margin:4px 0 0;" ng-if="doc.replacesDocumentId">
+                    <i class="ti ti-arrow-back-up" aria-hidden="true"></i> Replacement for the rejected upload above
+                  </p>
                 </div>
 
-                <!-- Review controls -->
+                <!-- Review controls — staged locally, nothing hits the backend until
+                     "Confirm & Verify" applies everything in one batch. -->
                 <div class="vetting-doc-controls" ng-init="rev = vm.getDocReview(doc.id)">
 
                   <!-- Approve / Reject toggle -->
-                  <div class="vetting-action-btns" ng-if="!rev.saved && doc.status === 'pending'">
+                  <div class="vetting-action-btns" ng-if="!rev.staged && doc.status === 'pending'">
                     <button type="button" class="vetting-approve-btn"
                       ng-class="{active: rev.status === 'approved'}"
                       ng-click="rev.status = 'approved'; rev.error = null">
@@ -137,15 +149,15 @@
                     </button>
                   </div>
 
-                  <!-- Re-review button if already reviewed -->
+                  <!-- Re-pick button if already staged -->
                   <button type="button" class="btn-outline sm"
-                    ng-if="rev.saved || doc.status !== 'pending'"
-                    ng-click="doc.status = 'pending'; rev.saved = false; rev.status = null; rev.error = null">
-                    <i class="ti ti-refresh" aria-hidden="true"></i> Re-review
+                    ng-if="rev.staged"
+                    ng-click="rev.staged = false; rev.status = null; rev.error = null">
+                    <i class="ti ti-refresh" aria-hidden="true"></i> Re-pick
                   </button>
 
                   <!-- Rejection reason (shown when reject selected) -->
-                  <div class="vetting-reject-reason" ng-if="rev.status === 'rejected' && !rev.saved">
+                  <div class="vetting-reject-reason" ng-if="rev.status === 'rejected' && !rev.staged">
                     <select ng-model="rev.selectedReason"
                       ng-options="r for r in vm.getReasonsForType(doc.documentType)"
                       ng-change="rev.error = null">
@@ -158,18 +170,18 @@
                       style="margin-top:6px; width:100%; font-size:13px;"></textarea>
                   </div>
 
-                  <!-- Save button -->
+                  <!-- Stage button -->
                   <button type="button" class="btn-primary sm"
-                    ng-if="!rev.saved && rev.status"
-                    ng-click="vm.saveDocReview(t, doc)"
-                    ng-disabled="rev.saving">
+                    ng-if="!rev.staged && rev.status"
+                    ng-click="vm.stageDocReview(doc)">
                     <i class="ti ti-device-floppy" style="font-size:13px;" aria-hidden="true"></i>
-                    {{ rev.saving ? 'Saving...' : 'Save' }}
+                    Stage decision
                   </button>
 
-                  <!-- Saved confirmation -->
-                  <span class="vetting-saved-badge" ng-if="rev.saved">
-                    <i class="ti ti-circle-check" aria-hidden="true"></i> Saved
+                  <!-- Staged confirmation -->
+                  <span class="vetting-saved-badge" ng-if="rev.staged">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                    Staged: {{ rev.status }}
                   </span>
 
                   <!-- Error -->
@@ -191,27 +203,14 @@
             <div class="vetting-action-footer">
               <div>
                 <p class="field-error" ng-if="t.confirmError">{{ t.confirmError }}</p>
-                <p class="field-error" ng-if="t.rejectError">{{ t.rejectError }}</p>
-                <span class="vetting-saved-badge" ng-if="t.rejectSent">
-                  <i class="ti ti-mail" aria-hidden="true"></i>
-                  Rejection email sent to tutor
-                </span>
               </div>
               <div style="display:flex; gap:10px; align-items:center;">
-                <button type="button" class="btn-warning"
-                  ng-if="vm.hasRejectedDocs(t)"
-                  ng-click="vm.rejectAndNotify(t)"
-                  ng-disabled="t.rejecting || t.rejectSent"
-                  title="Send rejection email listing all rejected documents">
-                  <i class="ti ti-mail" style="font-size:13px;" aria-hidden="true"></i>
-                  {{ t.rejecting ? 'Sending...' : 'Notify tutor of rejections' }}
-                </button>
                 <button type="button" class="btn-success"
-                  ng-click="vm.confirmTutor(t)"
+                  ng-click="vm.confirmAndVerify(t)"
                   ng-disabled="!vm.canConfirmTutor(t) || t.confirming"
-                  title="{{ vm.canConfirmTutor(t) ? 'Approve and verify this tutor' : 'All uploaded documents must be individually approved first' }}">
+                  title="{{ vm.canConfirmTutor(t) ? 'Apply all staged decisions and notify the tutor' : 'Every pending document must have a staged decision first' }}">
                   <i class="ti ti-shield-check" style="font-size:13px;" aria-hidden="true"></i>
-                  {{ t.confirming ? 'Confirming...' : 'Confirm and verify tutor' }}
+                  {{ t.confirming ? 'Applying...' : 'Confirm & Verify' }}
                 </button>
               </div>
             </div>

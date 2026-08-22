@@ -309,11 +309,6 @@
               &bull; ⭐ {{ vm.selectedTutor.rating }} ({{ vm.selectedTutor.reviewCount }} reviews)
             </p>
           </div>
-          <div class="tutor-detail-rate">
-            <small>Session Rate</small>
-            <div class="price">${{ vm.selectedTutor.pricePerSession }}/hr</div>
-            <span class="rating-badge" style="margin-top:8px;display:inline-flex">⭐ {{ vm.selectedTutor.rating }}</span>
-          </div>
         </div>
 
         <div class="tutor-detail-bio-row">
@@ -515,10 +510,7 @@
             <div class="field-error" ng-if="vm.hasProfaneBookingMessage()">Please remove inappropriate language before submitting.</div>
           </div>
 
-          <div class="price-summary">
-            <span>💳 Estimated Monthly Total</span>
-            <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.classesPerMonth }}.00 / month</strong>
-          </div>
+          <p class="text-muted" style="font-size:12px">Price will be confirmed by the tutor once they review this request.</p>
 
           <div class="block-conflict-alert" ng-if="vm.hasBlockedSessionDate()">
             <div class="block-conflict-header">⚠️ Tutor unavailable on selected dates</div>

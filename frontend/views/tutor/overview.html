@@ -403,15 +403,15 @@
             <div class="setup-inputs-row-4">
               <div class="form-group">
                 <label>Teaching Mode</label>
-                <select ng-model="vm.setupClassForm.mode">
+                <select ng-model="vm.setupClassForm.mode" ng-change="vm.onModeChange()">
                   <option value="">— Mode —</option>
-                  <option ng-repeat="m in vm.tutor.modes" value="{{ m }}">{{ m }}</option>
+                  <option ng-repeat="m in vm.setupClassModesList" value="{{ m }}">{{ m }}</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>Subject</label>
-                <select ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()">
-                  <option value="">— Subject —</option>
+                <select ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()" ng-disabled="!vm.setupClassForm.mode">
+                  <option value="">{{ vm.setupClassForm.mode ? '— Subject —' : 'Select mode first' }}</option>
                   <option ng-repeat="o in vm.setupClassUniqueSubjectsList" value="{{ o.subject }}">{{ o.key }}</option>
                 </select>
               </div>
@@ -800,20 +800,41 @@
           <div class="verif-card">
             <p class="verif-card-title"><i class="ti ti-id" aria-hidden="true"></i> Identity verification</p>
 
+            <!-- ID number/type — reviewed independently from the photo below,
+                 own status and own reject/re-fix loop. -->
             <div class="form-row">
               <div class="form-group">
                 <label>ID type <span class="text-danger">*</span></label>
-                <select ng-model="vm.verif.idType">
+                <select ng-model="vm.verif.idType" ng-disabled="!vm.canEditIdNumber()">
                   <option value="NRIC">NRIC (Singapore)</option>
+                  <option value="WorkPassSG">Work Pass (Singapore)</option>
                   <option value="MyKad">MyKad (Malaysia)</option>
                   <option value="Passport">Passport</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>ID number <span class="text-danger">*</span></label>
-                <input type="text" ng-model="vm.verif.idNumber" placeholder="e.g. S1234567A" />
+                <input type="text" ng-model="vm.verif.idNumber" ng-disabled="!vm.canEditIdNumber()" placeholder="e.g. S1234567A" />
+                <p class="field-error" ng-if="vm.idNumberFormatError()">{{ vm.idNumberFormatError() }}</p>
               </div>
             </div>
+
+            <div ng-if="vm.getDocSingle('identity_id')" class="verif-upload-done"
+              ng-class="{'verif-upload-done--rejected': vm.getDocSingle('identity_id').status === 'rejected'}">
+              <i class="ti ti-file-check" aria-hidden="true"></i>
+              <span class="verif-filename">{{ vm.getDocSingle('identity_id').idType }}: {{ vm.getDocSingle('identity_id').idNumber }}</span>
+              <span class="verif-doc-status-badge"
+                ng-class="{
+                  'badge-approved': vm.getDocSingle('identity_id').status === 'approved',
+                  'badge-rejected': vm.getDocSingle('identity_id').status === 'rejected',
+                  'badge-pending-sm': vm.getDocSingle('identity_id').status === 'pending'
+                }">{{ vm.getDocSingle('identity_id').status }}</span>
+            </div>
+
+            <p class="text-muted" style="font-size:11px; margin-top:6px" ng-if="vm.canEditIdNumber() && vm.verif.idNumber">
+              <i class="ti ti-info-circle" aria-hidden="true"></i> Saved when you submit for verification below.
+            </p>
+            <p class="field-error" ng-if="vm.verif.errorMap['identity_id']">{{ vm.verif.errorMap['identity_id'] }}</p>
 
             <div class="form-group">
               <label>Photo holding your {{ vm.verif.idType }} <span class="text-danger">*</span></label>
@@ -831,10 +852,11 @@
                   ng-if="vm.getDocSingle('identity_photo').status === 'rejected'"
                   ng-click="vm.triggerVerifUpload('reupload_identity')">Re-upload</button>
                 <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
                   ng-click="vm.removeVerifDoc(vm.getDocSingle('identity_photo').id)">Remove</button>
               </div>
 
-              <div ng-if="!vm.getDocSingle('identity_photo')" class="verif-upload-box">
+              <div ng-if="!vm.getDocSingle('identity_photo') && vm.canUploadNew()" class="verif-upload-box">
                 <input type="file" id="upload_identity_photo" accept="image/jpeg,image/png"
                   style="display:none"
                   onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'identity_photo')" />
@@ -852,6 +874,53 @@
             </div>
           </div>
 
+          <!-- ── 1b. Profile photo — the public-facing photo shown to parents, only
+               goes live once admin approves it (see ApplyVerificationDecisions). ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-user-circle" aria-hidden="true"></i> Profile photo</p>
+            <div class="form-group">
+              <p class="text-muted" style="font-size:12px; margin-bottom:6px;">Shown to parents on your public profile once approved. A clear photo of your face.</p>
+
+              <div ng-if="vm.getDocSingle('profile_photo')" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDocSingle('profile_photo').status === 'rejected'}">
+                <img ng-if="vm.getDocSingle('profile_photo').fileUrl" ng-src="{{ vm.getDocSingle('profile_photo').fileUrl }}"
+                  class="preview-avatar" alt="Preview" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />
+                <span class="verif-filename">{{ vm.getDocSingle('profile_photo').fileName }}</span>
+                <span class="verif-doc-status-badge"
+                  ng-class="{
+                    'badge-approved': vm.getDocSingle('profile_photo').status === 'approved',
+                    'badge-rejected': vm.getDocSingle('profile_photo').status === 'rejected',
+                    'badge-pending-sm': vm.getDocSingle('profile_photo').status === 'pending'
+                  }">{{ vm.getDocSingle('profile_photo').status }}</span>
+                <input type="file" id="reupload_profile_photo" accept="image/jpeg,image/png"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'profile_photo')" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="vm.getDocSingle('profile_photo').status === 'rejected'"
+                  ng-click="vm.triggerVerifUpload('reupload_profile_photo')">Re-upload</button>
+                <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('profile_photo').id)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('profile_photo') && vm.canUploadNew()" class="verif-upload-box">
+                <input type="file" id="upload_profile_photo" accept="image/jpeg,image/png"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'profile_photo')" />
+                <i class="ti ti-camera" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p ng-if="!vm.verif.uploadingMap['profile_photo']">Upload profile photo</p>
+                  <p ng-if="vm.verif.uploadingMap['profile_photo']" class="text-muted">Uploading...</p>
+                  <span>JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_profile_photo')"
+                  ng-disabled="vm.verif.uploadingMap['profile_photo']">Browse</button>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap['profile_photo']">{{ vm.verif.errorMap['profile_photo'] }}</p>
+            </div>
+          </div>
+
           <!-- ── 2. Academic qualifications ── -->
           <div class="verif-card">
             <p class="verif-card-title">
@@ -860,7 +929,7 @@
             </p>
 
             <div class="form-group" ng-repeat="ql in vm.academicLevels">
-              <label>{{ ql.label }} <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+              <label>{{ ql.label }}</label>
 
               <!-- Existing uploads for this type -->
               <div class="verif-upload-done"
@@ -886,11 +955,12 @@
                   Re-upload
                 </button>
                 <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
                   ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
               </div>
 
-              <!-- Add another — only shown under limit of 3 -->
-              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull(ql.type)">
+              <!-- Add another — only shown under limit of 3, and while unlocked -->
+              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull(ql.type) && vm.canUploadNew()">
                 <input type="file" id="upload_{{ ql.type }}_{{ vm.getDocCount(ql.type) }}"
                   data-doc-type="{{ ql.type }}"
                   accept="image/jpeg,image/png,application/pdf"
@@ -911,9 +981,13 @@
               </div>
 
               <!-- Max reached notice -->
-              <p class="verif-max-notice" ng-if="vm.isDocTypeFull(ql.type)">
+              <p class="verif-max-notice" ng-if="vm.isDocTypeFull(ql.type) && vm.canUploadNew()">
                 <i class="ti ti-info-circle" aria-hidden="true"></i>
                 Maximum 3 attachments. Remove one to replace it.
+              </p>
+              <p class="verif-max-notice" ng-if="!vm.canUploadNew() && !vm.isDocTypeFull(ql.type)">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
               </p>
 
               <p class="field-error" ng-if="vm.verif.errorMap[ql.type]">{{ vm.verif.errorMap[ql.type] }}</p>
@@ -951,10 +1025,11 @@
                   Re-upload
                 </button>
                 <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
                   ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
               </div>
 
-              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('nie_cert')">
+              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('nie_cert') && vm.canUploadNew()">
                 <input type="file" id="upload_nie_cert_{{ vm.getDocCount('nie_cert') }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
@@ -973,9 +1048,13 @@
                   ng-disabled="vm.verif.uploadingMap['nie_cert']">Browse</button>
               </div>
 
-              <p class="verif-max-notice" ng-if="vm.isDocTypeFull('nie_cert')">
+              <p class="verif-max-notice" ng-if="vm.isDocTypeFull('nie_cert') && vm.canUploadNew()">
                 <i class="ti ti-info-circle" aria-hidden="true"></i>
                 Maximum 3 attachments. Remove one to replace it.
+              </p>
+              <p class="verif-max-notice" ng-if="!vm.canUploadNew() && !vm.isDocTypeFull('nie_cert')">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
               </p>
 
               <p class="field-error" ng-if="vm.verif.errorMap['nie_cert']">{{ vm.verif.errorMap['nie_cert'] }}</p>
@@ -989,7 +1068,8 @@
             <div class="form-group">
               <p class="text-muted" style="font-size:12px; margin-bottom:8px;">A 1–3 min self-introduction showing your teaching style. Significantly improves booking rate.</p>
 
-              <div ng-if="vm.getDocSingle('intro_video')" class="verif-upload-done">
+              <div ng-if="vm.getDocSingle('intro_video')" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDocSingle('intro_video').status === 'rejected'}">
                 <i class="ti ti-file-check" aria-hidden="true"></i>
                 <span class="verif-filename">
                   {{ vm.getDocSingle('intro_video').fileName || vm.getDocSingle('intro_video').externalUrl }}
@@ -997,26 +1077,18 @@
                 <span class="verif-filesize" ng-if="vm.getDocSingle('intro_video').fileSizeBytes">
                   {{ vm.formatFileSize(vm.getDocSingle('intro_video').fileSizeBytes) }}
                 </span>
+                <span class="verif-doc-status-badge"
+                  ng-class="{
+                    'badge-approved': vm.getDocSingle('intro_video').status === 'approved',
+                    'badge-rejected': vm.getDocSingle('intro_video').status === 'rejected',
+                    'badge-pending-sm': vm.getDocSingle('intro_video').status === 'pending'
+                  }">{{ vm.getDocSingle('intro_video').status }}</span>
                 <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
                   ng-click="vm.removeVerifDoc(vm.getDocSingle('intro_video').id)">Remove</button>
               </div>
 
-              <div ng-if="!vm.getDocSingle('intro_video')">
-                <div class="verif-upload-box">
-                  <input type="file" id="upload_intro_video" accept="video/mp4,video/quicktime"
-                    style="display:none"
-                    onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'intro_video')" />
-                  <i class="ti ti-upload" aria-hidden="true"></i>
-                  <div class="verif-upload-box-text">
-                    <p ng-if="!vm.verif.uploadingMap['intro_video']">Upload video file</p>
-                    <p ng-if="vm.verif.uploadingMap['intro_video']" class="text-muted">Uploading...</p>
-                    <span>MP4, MOV · 10 MB – 100 MB</span>
-                  </div>
-                  <button type="button" class="verif-browse-btn"
-                    ng-click="vm.triggerVerifUpload('upload_intro_video')"
-                    ng-disabled="vm.verif.uploadingMap['intro_video']">Browse</button>
-                </div>
-                <div class="verif-or-divider"><span>or paste a link</span></div>
+              <div ng-if="vm.canEditIntroVideo()">
                 <div class="verif-link-row">
                   <input type="url" ng-model="vm.verif.introVideoLink"
                     placeholder="YouTube, Google Drive, or any public video URL" />
@@ -1025,6 +1097,11 @@
                     ng-disabled="!vm.verif.introVideoLink">Save link</button>
                 </div>
               </div>
+
+              <p class="verif-max-notice" ng-if="!vm.getDocSingle('intro_video') && !vm.canEditIntroVideo()">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
+              </p>
               <p class="field-error" ng-if="vm.verif.errorMap['intro_video']">{{ vm.verif.errorMap['intro_video'] }}</p>
             </div>
           </div>
@@ -1057,11 +1134,12 @@
                 Re-upload
               </button>
               <button type="button" class="verif-remove-btn"
+                ng-if="!vm.isVerifLocked()"
                 ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
             </div>
 
             <div class="form-group">
-              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('specialist_cert')">
+              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('specialist_cert') && vm.canUploadNew()">
                 <input type="file" id="upload_specialist_cert_{{ vm.getDocCount('specialist_cert') }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
@@ -1080,9 +1158,13 @@
                   ng-disabled="vm.verif.uploadingMap['specialist_cert']">Browse</button>
               </div>
 
-              <p class="verif-max-notice" ng-if="vm.isDocTypeFull('specialist_cert')">
+              <p class="verif-max-notice" ng-if="vm.isDocTypeFull('specialist_cert') && vm.canUploadNew()">
                 <i class="ti ti-info-circle" aria-hidden="true"></i>
                 Maximum 3 attachments. Remove one to replace it.
+              </p>
+              <p class="verif-max-notice" ng-if="!vm.canUploadNew() && !vm.isDocTypeFull('specialist_cert')">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
               </p>
 
               <p class="field-error" ng-if="vm.verif.errorMap['specialist_cert']">{{ vm.verif.errorMap['specialist_cert'] }}</p>
@@ -1097,9 +1179,13 @@
 
           <!-- Submit -->
           <div class="verif-submit-row">
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification()">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.mandatoryUploadedCount() < vm.mandatoryTotal">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
               {{ vm.mandatoryTotal - vm.mandatoryUploadedCount() }} required document(s) still missing
+            </p>
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.mandatoryUploadedCount() >= vm.mandatoryTotal">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              Verification under review — re-upload any rejected document to resubmit
             </p>
             <button type="button" class="btn-primary"
               ng-click="vm.submitVerification()"
@@ -1112,21 +1198,6 @@
         </div>
 
         <div ng-if="vm.tutor.verificationStatus !== 'not_submitted'">
-
-        <div class="form-group">
-          <label>Profile Photo <span class="text-danger">*</span></label>
-          <div class="photo-upload-row">
-            <img ng-if="vm.profileForm.imageUrl" ng-src="{{ vm.profileForm.imageUrl }}" class="preview-avatar" alt="Preview" />
-            <div class="photo-upload-controls">
-              <input type="file" id="photoUpload" accept="image/jpeg,image/png,image/webp" style="display:none"
-                onchange="angular.element(this).scope().vm.onFileSelect(this)" />
-              <label for="photoUpload" class="btn-outline-sm photo-browse-btn">📁 Browse & Upload</label>
-              <span ng-if="vm.uploading" class="text-muted">Uploading...</span>
-              <span ng-if="!vm.uploading && vm.profileForm.imageUrl" class="text-success">✓ Photo ready</span>
-              <span ng-if="!vm.uploading && !vm.profileForm.imageUrl" class="field-error">Required</span>
-            </div>
-          </div>
-        </div>
 
         <div class="form-group">
           <label>Bio</label>
@@ -1199,26 +1270,6 @@
               <p class="field-error" style="margin-top:8px" ng-if="vm.modesError">{{ vm.modesError }}</p>
             </div>
 
-            <div class="form-group">
-              <label>Qualification</label>
-              <select ng-model="vm.newOffering.qualification">
-                <option value="">— Qualification —</option>
-                <option>Bachelor's Degree</option>
-                <option>Master's Degree</option>
-                <option>PhD / Doctorate</option>
-                <option>PGDE (Postgrad Diploma in Education)</option>
-                <option>NIE Trained Teacher</option>
-                <option>MOE Registered Teacher</option>
-                <option>Diploma</option>
-                <option>Professional Certificate</option>
-                <option>IB Certified Teacher</option>
-                <option>Verified by operations team</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Price per Session ($)</label>
-              <input type="number" ng-model="vm.newOffering.price" placeholder="0.00" min="0" step="0.01" />
-            </div>
             <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addOffering()">
               <i class="ti ti-plus" style="font-size:13px;" aria-hidden="true"></i> Add offering
             </button>
@@ -1227,8 +1278,7 @@
 
           <div class="chip-list" ng-if="vm.profileForm.offerings.length">
             <span class="chip offering-chip" ng-repeat="o in vm.profileForm.offerings">
-              <span class="offering-chip-text">{{ o.country }} · {{ o.subject }} · {{ o.level }} · {{ o.mode }} · {{ o.qualification }}</span>
-              <span class="chip-price">${{ o.price }}</span>
+              <span class="offering-chip-text">{{ o.country }} · {{ o.subject }} · {{ o.level }} · {{ o.mode }}</span>
               <button type="button" class="chip-remove" ng-click="vm.removeOffering($index)">×</button>
             </span>
           </div>
@@ -1239,7 +1289,7 @@
           <input type="number" ng-model="vm.profileForm.experienceYears" min="0" />
         </div>
 
-        <button type="submit" class="btn-indigo full-width" ng-disabled="!vm.profileForm.imageUrl || vm.uploading">Save Profile</button>
+        <button type="submit" class="btn-indigo full-width">Save Profile</button>
 
         </div><!-- end verificationStatus !== 'not_submitted' -->
 

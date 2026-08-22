@@ -41,20 +41,17 @@ angular.module('learnSphereApp')
     return $http.get(API_URL + '/tutors/rejection-reasons', h());
   };
 
-  self.reviewDocument = function (tutorId, docId, status, note) {
-    return $http.patch(
-      API_URL + '/tutors/' + tutorId + '/documents/' + docId + '/review',
-      { status: status, note: note },
+  // decisions: [{ docId, status, note }, ...] — every currently-pending document
+  // for this tutor must be covered. Applies all of them atomically and sends one
+  // combined email. Replaces the old reviewDocument (per-doc, applied immediately)
+  // + confirmVerification + rejectVerification split — see
+  // TutorsController.ApplyVerificationDecisions.
+  self.applyVerificationDecisions = function (tutorId, decisions) {
+    return $http.post(
+      API_URL + '/tutors/' + tutorId + '/apply-verification-decisions',
+      { decisions: decisions },
       h()
     );
-  };
-
-  self.confirmVerification = function (tutorId) {
-    return $http.post(API_URL + '/tutors/' + tutorId + '/confirm-verification', null, h());
-  };
-
-  self.rejectVerification = function (tutorId) {
-    return $http.post(API_URL + '/tutors/' + tutorId + '/reject-verification', null, h());
   };
 
   self.adminRemoveDocument = function (tutorId, docId) {

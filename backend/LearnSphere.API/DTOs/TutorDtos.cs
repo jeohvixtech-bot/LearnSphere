@@ -1,13 +1,17 @@
 namespace LearnSphere.API.DTOs;
 
+// Price is deliberately not part of an offering anymore — it's set per preset
+// class at Setup Class time (TutorTimeSlot.PricePerLesson), not at the tutor-
+// profile level. See TutorsController.SetupClass.
+// Qualification is deliberately not part of an offering — TutorOffering still has
+// the column (kept for existing data / possible future use), but the offering
+// builder no longer collects or sends it. An offering is country+subject+level+mode.
 public class TutorOfferingDto
 {
     public string Country { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Level { get; set; } = string.Empty;
     public string Mode { get; set; } = string.Empty;
-    public string Qualification { get; set; } = string.Empty;
-    public decimal Price { get; set; }
 }
 
 public class SubjectDetailDto
@@ -36,6 +40,7 @@ public class TutorDto
     public bool IsOnline { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
     public bool OfferingsUnlocked { get; set; }
+    public DateTime? LastSubmittedAt { get; set; }
     public List<TutorDocumentDto> Documents { get; set; } = new();
     public List<ReviewDto> Reviews { get; set; } = new();
     public List<TimeSlotDto> Timetable { get; set; } = new();
@@ -56,6 +61,7 @@ public class TutorDocumentDto
     public string Status { get; set; } = string.Empty;
     public string? AdminNote { get; set; }
     public DateTime UploadedAt { get; set; }
+    public int? ReplacesDocumentId { get; set; }
 }
 
 public class SaveDocumentDto
@@ -67,12 +73,21 @@ public class SaveDocumentDto
     public long? FileSizeBytes { get; set; }
     public string? IdType { get; set; }
     public string? IdNumber { get; set; }
+    // Set when re-uploading over a rejected document — the rejected row's Id.
+    // Creates a new row instead of overwriting; see TutorsController.SaveDocument.
+    public int? ReplacesDocumentId { get; set; }
 }
 
-public class ReviewDocumentDto
+public class VerificationDecisionDto
 {
-    public string Status { get; set; } = string.Empty; // "approved" | "rejected"
+    public int DocId { get; set; }
+    public string Status { get; set; } = string.Empty; // approved | rejected
     public string? Note { get; set; }
+}
+
+public class ApplyVerificationDecisionsDto
+{
+    public List<VerificationDecisionDto> Decisions { get; set; } = new();
 }
 
 public class ReviewDto

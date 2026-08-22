@@ -53,12 +53,14 @@ public class BookingsController : ControllerBase
         for (int i = 0; i < list.Count; i++)
         {
             var r1 = ParseTimeRangeMinutes(list[i].Time);
-            if (r1 == null) continue;
+            // Can't verify this class's own time range — fail closed (treat as an
+            // overlap) rather than silently letting malformed data through unchecked.
+            if (r1 == null) return true;
             for (int j = i + 1; j < list.Count; j++)
             {
                 if (list[i].Date != list[j].Date) continue;
                 var r2 = ParseTimeRangeMinutes(list[j].Time);
-                if (r2 == null) continue;
+                if (r2 == null) return true;
                 if (r1.Value.Start < r2.Value.End && r2.Value.Start < r1.Value.End) return true;
             }
         }
@@ -222,10 +224,17 @@ public class BookingsController : ControllerBase
         foreach (var slot in slots)
         {
             var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
-            var alreadyBooked = slotRange != null && studentConfirmedClasses.Where(c => c.Date == slot.Day).Any(c =>
+            // Can't determine this slot's own time range (e.g. a null/malformed EndTime)
+            // — fail closed instead of silently treating it as "no conflict, must be fine."
+            if (slotRange == null)
+                return BadRequest(new { message = $"This class has an invalid time range and can't be booked — contact support." });
+
+            var alreadyBooked = studentConfirmedClasses.Where(c => c.Date == slot.Day).Any(c =>
             {
                 var r = ParseTimeRangeMinutes(c.Time);
-                return r != null && slotRange.Value.Start < r.Value.End && r.Value.Start < slotRange.Value.End;
+                // Can't verify this existing confirmed class's time range — fail closed.
+                if (r == null) return true;
+                return slotRange.Value.Start < r.Value.End && r.Value.Start < slotRange.Value.End;
             });
             if (alreadyBooked)
                 return BadRequest(new { message = $"This child already has a confirmed class on {slot.Day} that overlaps this time." });
@@ -430,12 +439,17 @@ public class BookingsController : ControllerBase
                 foreach (var c in booking.Classes)
                 {
                     var classRange = ParseTimeRangeMinutes(c.Time);
-                    if (classRange == null) continue;
                     foreach (var slot in overlappingPresetSlots)
                     {
                         if (slot.Day != c.Date) continue;
                         var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
-                        if (slotRange == null) continue;
+                        // Can't verify one side's time range — fail closed and hide the
+                        // preset slot rather than silently risk a double-booking.
+                        if (classRange == null || slotRange == null)
+                        {
+                            slot.Status = "Booked";
+                            continue;
+                        }
                         if (classRange.Value.Start < slotRange.Value.End && slotRange.Value.Start < classRange.Value.End)
                             slot.Status = "Booked";
                     }

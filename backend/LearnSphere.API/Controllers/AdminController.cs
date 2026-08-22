@@ -64,11 +64,12 @@ public class AdminController : ControllerBase
             VerificationStatus = t.VerificationStatus,
             OfferingsUnlocked = t.OfferingsUnlocked,
             Qualifications = t.Qualifications.Select(q => q.Qualification).ToList(),
-            Documents = t.Documents.Select(d => new TutorDocumentDto
+            Documents = t.Documents.Where(d => !d.IsArchived).Select(d => new TutorDocumentDto
             {
                 Id = d.Id, DocumentType = d.DocumentType, FileUrl = d.FileUrl, ExternalUrl = d.ExternalUrl,
                 FileName = d.FileName, FileSizeBytes = d.FileSizeBytes, IdType = d.IdType, IdNumber = d.IdNumber,
-                SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt
+                SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt,
+                ReplacesDocumentId = d.ReplacesDocumentId
             }).ToList()
         }));
     }

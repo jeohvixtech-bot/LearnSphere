@@ -51,8 +51,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self.profileForm = {};
   self.profileSuccess = false;
   self.profileError = '';
-  self.uploading = false;
-  self.newOffering = { country: '', selectedOption: null, qualification: '', price: null };
+  self.newOffering = { country: '', selectedOption: null };
 
   // Report forms
   self.reportBooking = null;
@@ -80,27 +79,26 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   function init() {
     TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
-      // Pre-fill identity fields from any already-uploaded doc, so a page reload
-      // doesn't blank the form back to the 'NRIC'/'' defaults.
+      // Pre-fill identity fields from any already-saved ID number doc, so a page
+      // reload doesn't blank the form back to the 'NRIC'/'' defaults.
       var existingIdDoc = (self.tutor.documents || [])
-        .find(function (d) { return d.documentType === 'identity_photo'; });
+        .find(function (d) { return d.documentType === 'identity_id'; });
       if (existingIdDoc && existingIdDoc.idType) {
         self.verif.idType = existingIdDoc.idType;
         self.verif.idNumber = existingIdDoc.idNumber || '';
       }
       self.blockedRanges = ScheduleService.getBlocked(res.data.id);
       self.profileForm = {
-        imageUrl: res.data.imageUrl,
         bio: res.data.bio,
         experienceYears: res.data.experienceYears,
         offerings: res.data.offerings && res.data.offerings.length
           ? res.data.offerings.map(function(o) {
-              return { country: o.country, subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
+              return { country: o.country, subject: o.subject, level: o.level, mode: o.mode };
             })
           : []
       };
       rebuildModePools(res.data.modes);
-      rebuildSetupClassUniqueSubjects();
+      rebuildSetupClassModesList();
       maybeInitChat();
     });
     BookingService.getAll().then(function (res) {
@@ -713,7 +711,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       self.cancelSlotModal = null;
       TutorService.getByUser(user.userId).then(function (res) {
         self.tutor = res.data;
-        rebuildSetupClassUniqueSubjects();
+        rebuildSetupClassModesList();
       });
       BookingService.getAll().then(function (res) { self.bookings = res.data; });
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
@@ -773,14 +771,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
 
   self.openSetupClass = function () {
     if (!self.selectedCalDays.length || !self.tutor) return;
-    rebuildSetupClassUniqueSubjects();
     self.setupClassSlots = {};
     self.setupClassSelectedDates().forEach(function (key) { self.setupClassSlots[key] = []; });
-    self.setupClassForm.mode = self.tutor.modes && self.tutor.modes[0] ? self.tutor.modes[0] : '';
-    var firstOffering = self.tutor.offerings && self.tutor.offerings[0];
-    self.setupClassForm.subject = firstOffering ? firstOffering.subject : '';
-    self.setupClassForm.level = firstOffering ? firstOffering.level : '';
-    self.setupClassForm.country = firstOffering ? firstOffering.country : '';
+    // Mode must be picked first — Subject stays blank/hidden until then (see
+    // onModeChange), so nothing is pre-selected here.
+    rebuildSetupClassModesList();
+    self.setupClassForm.mode = '';
+    self.setupClassForm.subject = '';
+    self.setupClassForm.level = '';
+    self.setupClassForm.country = '';
+    self.setupClassUniqueSubjectsList = [];
     self.setupClassForm.classSize = 'one-to-one';
     self.setupClassForm.maxStudents = 1;
     self.setupClassError = '';
@@ -944,10 +944,18 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // blank on every digest (same trap computeContactableParents() above avoids).
   self.setupClassUniqueSubjectsList = [];
 
-  function rebuildSetupClassUniqueSubjects() {
-    if (!self.tutor || !self.tutor.offerings) { self.setupClassUniqueSubjectsList = []; return; }
+  // Mode is picked FIRST — Subject only becomes visible/selectable once a mode is
+  // chosen, and only shows subject+level combos actually offered under that mode
+  // (sourced from the tutor's real offerings, not the separate "Teaching Modes
+  // Offered" drag-pool, which can drift out of sync — see the Home Visit gap).
+  function rebuildSetupClassSubjectsForMode() {
+    if (!self.tutor || !self.tutor.offerings || !self.setupClassForm.mode) {
+      self.setupClassUniqueSubjectsList = [];
+      return;
+    }
     var seen = {}, out = [];
     self.tutor.offerings.forEach(function (o) {
+      if (o.mode !== self.setupClassForm.mode) return;
       var key = o.subject + ' (' + o.level + ')';
       if (seen[key]) return;
       seen[key] = true;
@@ -955,6 +963,27 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     });
     self.setupClassUniqueSubjectsList = out;
   }
+
+  // All distinct modes across every offering — unfiltered, shown first.
+  self.setupClassModesList = [];
+
+  function rebuildSetupClassModesList() {
+    if (!self.tutor || !self.tutor.offerings) { self.setupClassModesList = []; return; }
+    var seen = {}, out = [];
+    self.tutor.offerings.forEach(function (o) {
+      if (seen[o.mode]) return;
+      seen[o.mode] = true;
+      out.push(o.mode);
+    });
+    self.setupClassModesList = out;
+  }
+
+  self.onModeChange = function () {
+    self.setupClassForm.subject = '';
+    self.setupClassForm.level = '';
+    self.setupClassForm.country = '';
+    rebuildSetupClassSubjectsForMode();
+  };
 
   self.onSubjectChange = function () {
     var match = self.setupClassUniqueSubjectsList.find(function (o) { return o.subject === self.setupClassForm.subject; });
@@ -1004,7 +1033,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       self.selectedCalDays = [];
       TutorService.getByUser(user.userId).then(function (res) {
         self.tutor = res.data;
-        rebuildSetupClassUniqueSubjects();
+        rebuildSetupClassModesList();
       });
     }).catch(function (err) {
       self.setupClassSaving = false;
@@ -1291,45 +1320,34 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     var opt = self.newOffering.selectedOption;
     if (!self.newOffering.country) { self.offeringLockedError = 'Please select a country.'; return; }
     if (!opt) { self.offeringLockedError = 'Please select a subject.'; return; }
-    if (!self.newOffering.qualification) { self.offeringLockedError = 'Please select a qualification.'; return; }
     if (!self.modesRight.length) { self.offeringLockedError = 'Please drag at least one teaching mode into "Offered".'; return; }
-    var price = parseFloat(self.newOffering.price) || 0;
     // One offering combo per mode currently in "Offered" — the offering builder no
     // longer asks for mode separately, it always matches whatever's selected above.
+    // Offerings are country+subject+level+mode only — duplicates (same combo
+    // already offered) are rejected with an explicit error instead of silently
+    // skipped, so the tutor knows why nothing new appeared.
+    var duplicateModes = [];
     self.modesRight.forEach(function (m) {
       var exists = self.profileForm.offerings.some(function (o) {
         return o.country === self.newOffering.country && o.subject === opt.subject &&
-          o.level === opt.level && o.mode === m.mode && o.qualification === self.newOffering.qualification;
+          o.level === opt.level && o.mode === m.mode;
       });
-      if (exists) return;
+      if (exists) { duplicateModes.push(m.mode); return; }
       self.profileForm.offerings.push({
         country: self.newOffering.country,
         subject: opt.subject,
         level: opt.level,
-        mode: m.mode,
-        qualification: self.newOffering.qualification,
-        price: price
+        mode: m.mode
       });
     });
-    self.newOffering = { country: self.newOffering.country, selectedOption: null, qualification: '', price: null };
+    if (duplicateModes.length) {
+      self.offeringLockedError = 'You already offer ' + opt.subject + ' (' + opt.level + ') for: ' + duplicateModes.join(', ') + '.';
+    }
+    self.newOffering = { country: self.newOffering.country, selectedOption: null };
   };
 
   self.removeOffering = function (index) {
     self.profileForm.offerings.splice(index, 1);
-  };
-
-  self.onFileSelect = function (element) {
-    var file = element.files[0];
-    if (!file) return;
-    self.uploading = true;
-    self.profileError = '';
-    TutorService.uploadImage(file).then(function (res) {
-      self.profileForm.imageUrl = res.data.url;
-      self.uploading = false;
-    }, function () {
-      self.profileError = 'Image upload failed. Please try again.';
-      self.uploading = false;
-    });
   };
 
   self.toggleOnlineStatus = function () {
@@ -1344,10 +1362,6 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     self.profileSuccess = false;
     self.profileError = '';
     self.modesError = '';
-    if (!self.profileForm.imageUrl) {
-      self.profileError = 'Please upload a profile photo before saving.';
-      return;
-    }
     if (!self.modesRight.length) {
       self.modesError = 'Please select at least one teaching mode.';
       return;
@@ -1357,8 +1371,10 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       self.profileError = bioProfanityError;
       return;
     }
+    if (!confirm('Save changes to your profile?')) return;
+    // imageUrl is deliberately not sent — the public photo is only set once a
+    // "profile_photo" verification document is approved by admin (see Part 1).
     var payload = {
-      imageUrl: self.profileForm.imageUrl,
       bio: self.profileForm.bio,
       experienceYears: self.profileForm.experienceYears,
       offerings: self.profileForm.offerings
@@ -1368,7 +1384,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       return TutorService.updateModes(self.tutor.id, modes);
     }).then(function (res) {
       self.tutor = res.data;
-      rebuildSetupClassUniqueSubjects();
+      rebuildSetupClassModesList();
       self.profileSuccess = true;
       $timeout(function () { self.profileSuccess = false; }, 3000);
     }, function () {
@@ -1385,16 +1401,56 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     errorMap: {}        // { documentType: 'error message' }
   };
 
+  // Shape-only validation (no checksum) — mirrors TutorsController.SaveDocument's
+  // server-side patterns. Passport intentionally has no pattern: admin relies on
+  // the identity photo vs. typed value during review instead.
+  var ID_NUMBER_PATTERNS = {
+    NRIC: { regex: /^[ST]\d{7}[A-Z]$/, example: 'S1234567A' },
+    WorkPassSG: { regex: /^[FGM]\d{7}[A-Z]$/, example: 'F1234567N' },
+    MyKad: { regex: /^\d{12}$/, example: '990101011234' }
+  };
+
+  // Returns an error message if vm.verif.idNumber doesn't match the shape expected
+  // for vm.verif.idType, or '' if it's fine (including Passport, which has no format).
+  self.idNumberFormatError = function () {
+    var spec = ID_NUMBER_PATTERNS[self.verif.idType];
+    if (!spec) return '';
+    var value = (self.verif.idNumber || '').trim().toUpperCase().replace(/-/g, '');
+    if (!value) return '';
+    return spec.regex.test(value) ? '' : ('Doesn\'t match the expected ' + self.verif.idType + ' format, e.g. ' + spec.example);
+  };
+
+  // A rejected doc that's been re-uploaded gets a NEW row (see SaveDocument's
+  // dual-row handling) rather than being overwritten — the old rejected row stays
+  // in the API response (admin still needs to see it) but is "superseded" from
+  // the tutor's own point of view, so it's filtered out of what they see here.
+  function isSuperseded(doc) {
+    return (self.tutor.documents || []).some(function (d) { return d.replacesDocumentId === doc.id; });
+  }
+
+  // Part 1 (documents) locks once verification is submitted — only a rejected
+  // field (with no replacement uploaded yet) stays editable, for the fix-and-
+  // resubmit loop. See TutorsController.SaveDocument for the matching backend gate.
+  self.isVerifLocked = function () {
+    return !!self.tutor && self.tutor.verificationStatus === 'pending';
+  };
+
+  // Whether a brand-new (non-replacement) upload can start for a slot — false
+  // while locked, since new/blank slots can't be touched mid-review either.
+  self.canUploadNew = function () {
+    return !self.isVerifLocked();
+  };
+
   // Single-upload types (identity_photo, intro_video) — one doc at most.
   self.getDocSingle = function (type) {
-    return (self.tutor.documents || []).find(function (d) { return d.documentType === type; });
+    return (self.tutor.documents || []).find(function (d) { return d.documentType === type && !isSuperseded(d); });
   };
 
   // Multi-upload types (o_level, a_level, degree, postgrad, nie_cert,
   // specialist_cert) — up to 3, sorted for stable display order.
   self.getDocs = function (type) {
     return (self.tutor.documents || [])
-      .filter(function (d) { return d.documentType === type; })
+      .filter(function (d) { return d.documentType === type && !isSuperseded(d); })
       .sort(function (a, b) { return a.sortOrder - b.sortOrder; });
   };
 
@@ -1420,13 +1476,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   };
 
   // Returns true if the tutor has at least one rejected document
+  // Excludes superseded docs — once the tutor re-uploads a fix, the old rejected
+  // row is superseded (see isSuperseded) and shouldn't keep showing a "please
+  // re-upload" banner for something already fixed and awaiting admin.
   self.hasRejectedDoc = function () {
-    return (self.tutor.documents || []).some(function (d) { return d.status === 'rejected'; });
+    return (self.tutor.documents || []).some(function (d) { return d.status === 'rejected' && !isSuperseded(d); });
   };
 
-  // Returns the first rejected doc's adminNote (for the banner)
+  // Returns the first still-unfixed rejected doc's adminNote (for the banner)
   self.rejectedDocNote = function () {
-    var d = (self.tutor.documents || []).find(function (d) { return d.status === 'rejected'; });
+    var d = (self.tutor.documents || []).find(function (d) { return d.status === 'rejected' && !isSuperseded(d); });
     return d ? { type: d.documentType, note: d.adminNote } : null;
   };
 
@@ -1434,7 +1493,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
 
   // Static, not rebuilt per digest — ng-repeat over a fresh array literal in the
   // template tears down and rebuilds every row each cycle (same trap documented
-  // on rebuildSetupClassUniqueSubjects/computeContactableParents above).
+  // on rebuildSetupClassSubjectsForMode/computeContactableParents above).
   self.academicLevels = [
     { type: 'o_level', label: 'O-Level / SPM' },
     { type: 'a_level', label: 'A-Level / STPM / Diploma' },
@@ -1442,23 +1501,34 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     { type: 'postgrad', label: "Master's / PhD" }
   ];
 
-  // Count of mandatory doc slots filled: identity photo + at least one academic level
+  // Count of mandatory slots filled: identity photo, ID number, profile photo,
+  // and at least one academic level — each reviewed independently by admin.
   self.mandatoryUploadedCount = function () {
     var docs = self.tutor.documents || [];
     var count = 0;
     if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; })) count++;
+    // ID number has no separate save step anymore — a typed, not-yet-saved value
+    // counts too, since "Submit for verification" saves it as part of submitting.
+    if ((self.verif.idNumber || '').trim() || docs.some(function (d) { return d.documentType === 'identity_id' && d.idNumber; })) count++;
+    if (docs.some(function (d) { return d.documentType === 'profile_photo' && d.fileUrl; })) count++;
     if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })) count++;
     return count;
   };
 
-  self.mandatoryTotal = 2;
+  self.mandatoryTotal = 4;
 
   self.verifProgress = function () {
     return Math.round((self.mandatoryUploadedCount() / self.mandatoryTotal) * 100) + '%';
   };
 
   self.canSubmitVerification = function () {
-    return self.mandatoryUploadedCount() >= self.mandatoryTotal;
+    if (self.mandatoryUploadedCount() < self.mandatoryTotal) return false;
+    if (self.idNumberFormatError()) return false;
+    // Disabled while under review, unless every rejected document already has a
+    // fresh replacement ready — i.e. first-time setup, or a genuine fix-and-
+    // resubmit round, not "just sitting under review with nothing changed yet."
+    if (self.tutor.verificationStatus === 'pending' && !self.canResubmitAfterRejection()) return false;
+    return true;
   };
 
   // Refreshes vm.tutor after any verification mutation. Deliberately uses
@@ -1468,10 +1538,11 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self._refreshTutor = function () {
     return TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
-      // Re-sync idType/idNumber from the saved identity doc, so the form still
+      // Re-sync idType/idNumber from the saved identity_id doc (reviewed
+      // independently from the photo — see SaveDocument), so the form still
       // reflects what's actually on file after a reload/refresh rather than
       // resetting to the hardcoded 'NRIC'/'' defaults.
-      var idDoc = self.getDocSingle('identity_photo');
+      var idDoc = self.getDocSingle('identity_id');
       if (idDoc && idDoc.idType) {
         self.verif.idType = idDoc.idType;
         self.verif.idNumber = idDoc.idNumber || '';
@@ -1479,12 +1550,27 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     });
   };
 
+  // ID type/number is reviewed independently from the identity photo — its own
+  // document row, own status, own reject/re-fix loop. No separate save button —
+  // the typed value is saved as part of clicking "Submit for verification" (see
+  // submitVerification), same as saveIntroVideoLink's link-only pattern otherwise.
+  self.canEditIdNumber = function () {
+    if (!self.isVerifLocked()) return true;
+    var d = self.getDocSingle('identity_id');
+    return !!d && d.status === 'rejected';
+  };
+
+  // Same lock/unlock rule as canEditIdNumber — intro_video is link-only too, so
+  // a rejected link needs the same "type a new value, no separate file input"
+  // fix path rather than a re-upload button.
+  self.canEditIntroVideo = function () {
+    if (!self.isVerifLocked()) return true;
+    var d = self.getDocSingle('intro_video');
+    return !!d && d.status === 'rejected';
+  };
+
   self.uploadVerifDoc = function (file, docType) {
     if (!file) return;
-    if (docType === 'identity_photo' && !(self.verif.idNumber || '').trim()) {
-      self.verif.errorMap[docType] = 'Please enter your ID number before uploading.';
-      return;
-    }
     self.verif.uploadingMap[docType] = true;
     self.verif.errorMap[docType] = null;
 
@@ -1493,9 +1579,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
         documentType: docType,
         fileUrl: res.data.url,
         fileName: res.data.fileName,
-        fileSizeBytes: res.data.fileSizeBytes,
-        idType: docType === 'identity_photo' ? self.verif.idType : null,
-        idNumber: docType === 'identity_photo' ? self.verif.idNumber : null
+        fileSizeBytes: res.data.fileSizeBytes
       });
     }).then(function () {
       return self._refreshTutor();
@@ -1507,24 +1591,23 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     });
   };
 
-  // Replaces a rejected document: removes the old one first, then uploads and
-  // saves the new file under the same type. Count stays the same (-1, +1) so
-  // this never trips the 3-attachment cap on its own.
+  // Replaces a rejected document — does NOT touch the old row (it stays exactly
+  // as rejected, still visible to admin as "current" until this is resolved).
+  // The new upload is a separate row, linked via replacesDocumentId. See
+  // TutorsController.SaveDocument's dual-row re-upload handling.
   self.reuploadVerifDoc = function (file, docType, docId) {
     if (!file || !docId) return;
     self.verif.uploadingMap[docType] = true;
     self.verif.errorMap[docType] = null;
 
-    TutorService.removeDocument(self.tutor.id, parseInt(docId))
-      .then(function () {
-        return TutorService.uploadDocument(file, docType);
-      })
+    TutorService.uploadDocument(file, docType)
       .then(function (res) {
         return TutorService.saveDocument(self.tutor.id, {
           documentType: docType,
           fileUrl: res.data.url,
           fileName: res.data.fileName,
-          fileSizeBytes: res.data.fileSizeBytes
+          fileSizeBytes: res.data.fileSizeBytes,
+          replacesDocumentId: parseInt(docId)
         });
       })
       .then(function () {
@@ -1554,6 +1637,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   };
 
   self.removeVerifDoc = function (docId) {
+    if (self.isVerifLocked()) return;
     TutorService.removeDocument(self.tutor.id, docId)
       .then(function () { return self._refreshTutor(); })
       .catch(function () { /* Non-fatal */ });
@@ -1562,21 +1646,61 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self.verifSubmitSuccess = false;
   self.verifSubmitError = '';
 
-  self.submitVerification = function () {
-    if (!self.canSubmitVerification()) return;
-    if (self.tutor.verificationStatus === 'pending') {
-      alert('Verification under review — you cannot resubmit until admin responds');
-      return;
-    }
-    self.verifSubmitError = '';
-    TutorService.submitVerification(self.tutor.id).then(function () {
-      return self._refreshTutor();
-    }).then(function () {
-      self.verifSubmitSuccess = true;
-      $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
-    }).catch(function (err) {
-      self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Submission failed.';
+  // True once every currently-rejected document has a fresh replacement uploaded
+  // (a new pending row pointing back at it) — i.e. genuinely ready to go back to
+  // admin, not just sitting under review with nothing changed yet.
+  self.canResubmitAfterRejection = function () {
+    var docs = self.tutor.documents || [];
+    var lastSubmittedAt = self.tutor.lastSubmittedAt ? new Date(self.tutor.lastSubmittedAt) : null;
+    var rejected = docs.filter(function (d) { return d.status === 'rejected'; });
+    if (!rejected.length) return false;
+    return rejected.every(function (d) {
+      var replacement = docs.find(function (r) { return r.replacesDocumentId === d.id; });
+      if (replacement) {
+        // A replacement that's already been submitted (uploaded before the last
+        // submit) isn't a NEW fix — it's already with admin, so it doesn't count
+        // toward re-enabling the button again.
+        if (!lastSubmittedAt) return true;
+        return new Date(replacement.uploadedAt) > lastSubmittedAt;
+      }
+      // ID number has no separate save step — a freshly typed value (about to be
+      // saved by submitVerification itself) counts as "fixed and ready" too.
+      if (d.documentType === 'identity_id' && self.canEditIdNumber() && (self.verif.idNumber || '').trim()) return true;
+      return false;
     });
+  };
+
+  self.submitVerification = function () {
+    // Button is disabled in every case this would otherwise block (see
+    // canSubmitVerification) — nothing more to check here.
+    if (!self.canSubmitVerification()) return;
+    if (!confirm('You won\'t be able to change these documents until admin reviews them — submit for verification?')) return;
+    self.verifSubmitError = '';
+
+    var finishSubmit = function () {
+      TutorService.submitVerification(self.tutor.id).then(function () {
+        return self._refreshTutor();
+      }).then(function () {
+        self.verifSubmitSuccess = true;
+        $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
+      }).catch(function (err) {
+        self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Submission failed.';
+      });
+    };
+
+    // ID number has no separate save button — save it here as part of submitting,
+    // same as every other document was already saved individually beforehand.
+    if (self.canEditIdNumber() && (self.verif.idNumber || '').trim()) {
+      TutorService.saveDocument(self.tutor.id, {
+        documentType: 'identity_id',
+        idType: self.verif.idType,
+        idNumber: self.verif.idNumber
+      }).then(finishSubmit).catch(function (err) {
+        self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Failed to save ID number.';
+      });
+    } else {
+      finishSubmit();
+    }
   };
 
   // Triggers a hidden file input from a custom "Browse" button

@@ -135,7 +135,7 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   init();
 
   // Kept for compatibility — no longer called from vetting.html (superseded by
-  // the per-document review + confirmTutor/rejectAndNotify flow below), but left
+  // the staged per-document review + confirmAndVerify flow below), but left
   // in place in case anything else still calls it.
   self.verifyTutor = function (tutor) {
     AdminService.verifyTutor(tutor.id).then(function () {
@@ -147,10 +147,13 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   };
 
   // ── Tutor Vetting: per-document review ──────────────────────────────
+  // Decisions are staged client-side only — nothing hits the backend per document
+  // anymore. "Confirm & Verify" is the single action that applies every staged
+  // decision in one batch (see TutorsController.ApplyVerificationDecisions).
   self.rejectionReasons = {};
   self.expandedTutorId = null;
 
-  // Per-document review state: { [docId]: { status, selectedReason, freeText, saving, error } }
+  // Per-document staged decision: { [docId]: { status, selectedReason, freeText, staged, error } }
   self.docReview = {};
 
   AdminService.getRejectionReasons().then(function (res) {
@@ -170,8 +173,7 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
         status: null,
         selectedReason: '',
         freeText: '',
-        saving: false,
-        saved: false,
+        staged: false,
         error: null
       };
     }
@@ -194,90 +196,79 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     return Math.round(bytes / 1024) + ' KB';
   };
 
-  self.saveDocReview = function (tutor, doc) {
+  // A doc that already has a linked replacement (a newer pending row pointing
+  // back at it) doesn't need its own decision this round — the replacement is
+  // what's actually being reviewed now.
+  function isSuperseded(tutor, doc) {
+    return (tutor.documents || []).some(function (d) { return d.replacesDocumentId === doc.id; });
+  }
+
+  // identity_id has no file at all (just idType/idNumber), so the usual
+  // fileUrl/externalUrl check alone would never recognize it as submitted —
+  // mirrors TutorsController.HasContent.
+  function hasContent(d) {
+    return !!(d.fileUrl || d.externalUrl || (d.documentType === 'identity_id' && d.idNumber));
+  }
+
+  function docsNeedingDecision(tutor) {
+    return (tutor.documents || []).filter(function (d) {
+      return d.status === 'pending' && hasContent(d) && !isSuperseded(tutor, d);
+    });
+  }
+
+  // Validates and stages a single document's decision locally — no backend call.
+  self.stageDocReview = function (doc) {
     var review = self.getDocReview(doc.id);
     if (!review.status) { review.error = 'Please select approve or reject.'; return; }
-    var note = null;
     if (review.status === 'rejected') {
       var reason = review.selectedReason === 'Other' ? review.freeText : review.selectedReason;
       if (!reason) { review.error = 'Please select or enter a rejection reason.'; return; }
       var reasonProfanityError = ProfanityFilterService.validate(reason);
       if (reasonProfanityError) { review.error = reasonProfanityError; return; }
-      note = reason;
     }
-
-    review.saving = true;
     review.error = null;
-
-    AdminService.reviewDocument(tutor.id, doc.id, review.status, note)
-      .then(function () {
-        doc.status = review.status;
-        doc.adminNote = note;
-        review.saved = true;
-        review.saving = false;
-      })
-      .catch(function () {
-        review.error = 'Failed to save. Please try again.';
-        review.saving = false;
-      });
+    review.staged = true;
   };
 
-  // Check if all uploaded mandatory docs are approved
+  // Ready to confirm once every document actually awaiting a decision this round
+  // has been staged — mirrors the backend's own check (Bug #6 fix) so the button
+  // is disabled before a doomed request is even sent.
   self.canConfirmTutor = function (tutor) {
-    var docs = tutor.documents || [];
-    var uploaded = docs.filter(function (d) { return d.fileUrl || d.externalUrl; });
-    if (!uploaded.length) return false;
-
-    var hasIdentityApproved = uploaded.some(function (d) {
-      return d.documentType === 'identity_photo' && d.status === 'approved';
-    });
-    var hasAcademicApproved = uploaded.some(function (d) {
-      return ['o_level', 'a_level', 'degree', 'postgrad'].indexOf(d.documentType) >= 0
-        && d.status === 'approved';
-    });
-    var anyRejected = uploaded.some(function (d) { return d.status === 'rejected'; });
-    var anyPending = uploaded.some(function (d) { return d.status === 'pending'; });
-
-    return hasIdentityApproved && hasAcademicApproved && !anyRejected && !anyPending;
+    var pending = docsNeedingDecision(tutor);
+    if (!pending.length) return false;
+    return pending.every(function (d) { return self.getDocReview(d.id).staged; });
   };
 
-  self.hasRejectedDocs = function (tutor) {
-    return (tutor.documents || []).some(function (d) {
-      return d.status === 'rejected' && d.adminNote;
-    });
-  };
+  self.confirmAndVerify = function (tutor) {
+    if (!self.canConfirmTutor(tutor)) return;
+    if (!confirm('Apply all staged decisions and notify ' + tutor.name + '?')) return;
 
-  self.confirmTutor = function (tutor) {
+    var decisions = docsNeedingDecision(tutor).map(function (d) {
+      var review = self.getDocReview(d.id);
+      var note = review.status === 'rejected'
+        ? (review.selectedReason === 'Other' ? review.freeText : review.selectedReason)
+        : null;
+      return { docId: d.id, status: review.status, note: note };
+    });
+
     tutor.confirming = true;
     tutor.confirmError = null;
-    AdminService.confirmVerification(tutor.id)
-      .then(function () {
-        self.unverifiedTutors = self.unverifiedTutors.filter(function (t) { return t.id !== tutor.id; });
+    AdminService.applyVerificationDecisions(tutor.id, decisions)
+      .then(function (res) {
+        tutor.confirming = false;
         self.expandedTutorId = null;
-        self.systemLogs.unshift('Approved tutor: ' + tutor.name + ' (Just now)');
-        AdminService.getStats().then(function (res) { self.stats = res.data; });
+        self.docReview = {};
+        self.systemLogs.unshift((res.data.verified ? 'Approved tutor: ' : 'Sent verification update to: ')
+          + tutor.name + ' (Just now)');
+        AdminService.getStats().then(function (r) { self.stats = r.data; });
+        // Re-fetch — dual-row archiving/discarding happens server-side, easier to
+        // reflect the fresh state than reconcile it locally.
+        AdminService.getUnverifiedTutors().then(function (r) { self.unverifiedTutors = r.data; });
       })
       .catch(function (err) {
         tutor.confirmError = err.data && err.data.message
-          ? err.data.message : 'Failed to confirm. Please try again.';
+          ? err.data.message : 'Failed to apply decisions. Please try again.';
         tutor.confirming = false;
-      });
-  };
-
-  self.rejectAndNotify = function (tutor) {
-    tutor.rejecting = true;
-    tutor.rejectError = null;
-    AdminService.rejectVerification(tutor.id)
-      .then(function () {
-        tutor.verificationStatus = 'rejected';
-        tutor.rejecting = false;
-        tutor.rejectSent = true;
-        self.systemLogs.unshift('Rejection sent to tutor: ' + tutor.name + ' (Just now)');
-      })
-      .catch(function (err) {
-        tutor.rejectError = err.data && err.data.message
-          ? err.data.message : 'Failed to send rejection.';
-        tutor.rejecting = false;
       });
   };
 

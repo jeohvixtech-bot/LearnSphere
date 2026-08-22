@@ -31,7 +31,14 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
   };
 
   TutorService.getAll().then(function (res) {
-    self.tutors = res.data;
+    // Same rule as the parent catalog's filteredTutors() (tutorHasAnySlots) — a
+    // tutor with no published preset class is a dead end (nothing to book once a
+    // visitor clicks through), so don't feature them here either. A slot's mode
+    // being set is what distinguishes a real preset-class slot from a plain
+    // availability block — see publishedSlotsOnDay in tutor.controller.js.
+    self.tutors = (res.data || []).filter(function (t) {
+      return (t.timetable || []).some(function (s) { return !!s.mode; });
+    });
     // Wait for the tutor grid to render/paint before measuring scroll height
     $timeout(startAutoScroll, 300);
   });

@@ -2572,6 +2572,8 @@ a { text-decoration: none; color: inherit; }
 /* Inputs panel below the grid */
 .setup-inputs-panel { background: var(--pool-muted-bg); border-radius: 12px; padding: 16px 20px; }
 .setup-inputs-row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+.setup-inputs-row-4 .form-group { min-width: 0; }
+.setup-inputs-row-4 select { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .setup-inputs-row-4 { grid-template-columns: 1fr 1fr; } }
 
 .segmented-toggle { display: flex; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }

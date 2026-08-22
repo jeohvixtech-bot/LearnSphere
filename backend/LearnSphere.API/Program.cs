@@ -370,13 +370,18 @@ using (var scope = app.Services.CreateScope())
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
     // Tutor document verification — VerificationStatus tracks the submission workflow
-    // (not_submitted | pending | approved | rejected); OfferingsUnlocked gates the
-    // offering builder until every mandatory document is approved — see
-    // TutorsController.ReviewDocument / AddOffering guard in tutor.controller.js.
+    // (not_submitted | pending | approved). There's no separate terminal "rejected"
+    // status: a mixed-result review round leaves the tutor at "pending" with the
+    // individual rejected TutorDocument rows driving the re-upload loop, until every
+    // mandatory document is approved — see TutorsController.ApplyVerificationDecisions.
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Tutors` ADD COLUMN `VerificationStatus` VARCHAR(20) NOT NULL DEFAULT 'not_submitted'"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Tutors` ADD COLUMN `OfferingsUnlocked` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    // See Tutor.LastSubmittedAt — distinguishes an unsent re-upload from one
+    // already submitted and waiting on admin.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ADD COLUMN `LastSubmittedAt` DATETIME(6) NULL"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(@"
         CREATE TABLE IF NOT EXISTS `TutorDocuments` (
             `Id` INT NOT NULL AUTO_INCREMENT,
@@ -398,6 +403,11 @@ using (var scope = app.Services.CreateScope())
             CONSTRAINT `FK_TutorDocuments_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
+    // Dual-row re-upload-after-rejection — see TutorDocument.ReplacesDocumentId/IsArchived.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorDocuments` ADD COLUMN `ReplacesDocumentId` INT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorDocuments` ADD COLUMN `IsArchived` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
 
     // Chat read/unread state — see ChatMessage.IsRead / ChatController.GetMessages.
     try { await context.Database.ExecuteSqlRawAsync(

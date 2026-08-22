@@ -752,7 +752,17 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   // Filtered tutors
   self.filteredTutors = function () {
-    var all = self.tutors.filter(function (t) {
+    // Pinned tutor (see init()) always leads and is pulled out of the SOURCE list
+    // before any filter runs — including hasPresetClasses — so it stays visible
+    // after a welcome-page hand-off even with zero live preset slots. It's re-
+    // prepended after filtering/sorting the rest.
+    var pinned = null;
+    var source = self.tutors.filter(function (t) {
+      if (String(t.id) === String(self.pinnedTutorId)) { pinned = t; return false; }
+      return true;
+    });
+
+    var all = source.filter(function (t) {
       var q = self.searchQuery.toLowerCase();
       var matchQuery = !q || t.name.toLowerCase().indexOf(q) >= 0 ||
         t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; }) ||
@@ -774,21 +784,15 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience && hasPresetClasses;
     });
 
-    // Pinned tutor (see init()) always leads, regardless of filters below —
-    // the whole point is it stays visible after a welcome-page hand-off. The
-    // rest keeps the existing favorited-first ordering unchanged.
-    var pinned = null;
-    var rest = [];
-    all.forEach(function (t) {
-      if (String(t.id) === String(self.pinnedTutorId)) pinned = t;
-      else rest.push(t);
+    // Favorited-first, then rating descending as a tiebreaker within each group —
+    // without this, order within a group was whatever it happened to be beforehand.
+    all.sort(function (a, b) {
+      var favDiff = (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
+      if (favDiff !== 0) return favDiff;
+      return (b.rating || 0) - (a.rating || 0);
     });
 
-    rest.sort(function (a, b) {
-      return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
-    });
-
-    return pinned ? [pinned].concat(rest) : rest;
+    return pinned ? [pinned].concat(all) : all;
   };
 
   // ── Next month label e.g. "Aug 2026" ──────────────────────────────

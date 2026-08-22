@@ -16,11 +16,17 @@ public class Tutor
 
     // Document verification (identity, academic, teaching credentials, etc. — see
     // TutorDocument). VerificationStatus is separate from IsVerified: IsVerified is
-    // the long-standing "listed in search results" flag set by ReviewDocument once
-    // every mandatory document is approved; VerificationStatus tracks the submission
-    // workflow itself (not_submitted | pending | approved | rejected).
+    // the long-standing "listed in search results" flag set once every mandatory
+    // document is approved (see TutorsController.ApplyVerificationDecisions);
+    // VerificationStatus tracks the submission workflow itself (not_submitted |
+    // pending | approved — no separate terminal "rejected", see TutorDocument).
     public string VerificationStatus { get; set; } = "not_submitted";
     public bool OfferingsUnlocked { get; set; } = false;
+    // Set every time SubmitVerification succeeds (first submit or resubmit).
+    // Distinguishes "replacement doc uploaded but not yet sent to admin" (its
+    // UploadedAt is newer than this) from "already sent, waiting on admin" (its
+    // UploadedAt is older) — see canResubmitAfterRejection in tutor.controller.js.
+    public DateTime? LastSubmittedAt { get; set; }
     public List<TutorDocument> Documents { get; set; } = new();
 
     public List<TutorSubject> Subjects { get; set; } = new();
@@ -36,8 +42,10 @@ public class Tutor
 
 // One row per uploaded/linked verification document. DocumentType distinguishes what
 // it is: identity_photo | o_level | a_level | degree | postgrad | nie_cert |
-// intro_video | specialist_cert. Every type upserts a single row except specialist_cert,
-// which allows multiple (ordered by SortOrder) — see TutorsController.SaveDocument.
+// intro_video | specialist_cert. identity_photo and intro_video upsert a single row;
+// o_level, a_level, degree, postgrad, nie_cert, and specialist_cert each allow up to
+// 3 rows (ordered by SortOrder) — see TutorsController.SaveDocument. intro_video is
+// link-only (ExternalUrl), no file upload.
 public class TutorDocument
 {
     public int Id { get; set; }
@@ -55,6 +63,16 @@ public class TutorDocument
     public string? AdminNote { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ReviewedAt { get; set; }
+
+    // Re-upload-after-rejection creates a new row instead of overwriting the old
+    // one in place — ReplacesDocumentId points at the rejected row this one is
+    // meant to supersede once approved. The old row stays visible ("current") to
+    // both tutor and admin until this new row is resolved: approved archives the
+    // old row (IsArchived = true, kept for audit trail); rejected again discards
+    // this new row and leaves the old one as "current". See
+    // TutorsController.SaveDocument / ApplyVerificationDecisions.
+    public int? ReplacesDocumentId { get; set; }
+    public bool IsArchived { get; set; } = false;
 }
 
 public class TutorOffering
