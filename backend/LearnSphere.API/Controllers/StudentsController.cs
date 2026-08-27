@@ -216,7 +216,7 @@ public class StudentsController : ControllerBase
             .Include(b => b.Student)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
+            .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
             .Where(b => studentIds.Contains(b.StudentId))
             .ToListAsync();
@@ -250,15 +250,18 @@ public class StudentsController : ControllerBase
                         ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
                     }).ToList() ?? new()
                 },
-                LessonReport = b.LessonReport == null ? null : new LessonReportDto
+                LessonReports = b.LessonReports?.OrderBy(r => r.SessionDate).Select(r => new LessonReportSummaryDto
                 {
-                    Id = b.LessonReport.Id,
-                    Covered = b.LessonReport.Covered,
-                    Performance = b.LessonReport.Performance,
-                    Homework = b.LessonReport.Homework,
-                    SubmitDate = b.LessonReport.SubmitDate,
-                    EditHistory = b.LessonReport.EditHistory?.Select(e => new LessonReportEditDto { Date = e.Date, Changes = e.Changes }).ToList() ?? new()
-                },
+                    Id = r.Id,
+                    StudentId = r.StudentId,
+                    SessionDate = r.SessionDate,
+                    Attendance = r.Attendance,
+                    Engagement = r.Engagement,
+                    Understanding = r.Understanding,
+                    HomeworkCompletion = r.HomeworkCompletion,
+                    Remarks = r.Remarks,
+                    SubmittedAt = r.SubmittedAt.ToString("MMM d, yyyy")
+                }).ToList() ?? new(),
                 IssueReport = b.IssueReport == null ? null : new IssueReportDto
                 {
                     IssueType = b.IssueReport.IssueType,

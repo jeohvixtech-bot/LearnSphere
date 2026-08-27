@@ -18,9 +18,10 @@ public class BookingDto
     public string Status { get; set; } = string.Empty;
     public string BookingNumber { get; set; } = string.Empty;
     public string BookingType { get; set; } = string.Empty; // parent-offer | tutor-preset
+    public bool IsFirstClass { get; set; } = false;
     public List<BookingClassDto> Classes { get; set; } = new();
     public CounterProposalDto? CounterProposal { get; set; }
-    public LessonReportDto? LessonReport { get; set; }
+    public List<LessonReportSummaryDto> LessonReports { get; set; } = new();
     public IssueReportDto? IssueReport { get; set; }
 }
 
@@ -72,35 +73,28 @@ public class CounterProposalClassDto
     public string ProposedTime { get; set; } = string.Empty;
 }
 
-public class LessonReportDto
+public class LessonReportSummaryDto
 {
     public int Id { get; set; }
-    public string Covered { get; set; } = string.Empty;
-    public string Performance { get; set; } = string.Empty;
-    public string Homework { get; set; } = string.Empty;
-    public string SubmitDate { get; set; } = string.Empty;
-    public List<LessonReportEditDto> EditHistory { get; set; } = new();
+    public int StudentId { get; set; }
+    public string SessionDate { get; set; } = string.Empty;
+    public string Attendance { get; set; } = string.Empty;
+    public int? Engagement { get; set; }
+    public string? Understanding { get; set; }
+    public string? HomeworkCompletion { get; set; }
+    public string? Remarks { get; set; }
+    public string SubmittedAt { get; set; } = string.Empty;
 }
 
-public class LessonReportEditDto
+public class SubmitLessonReportDto
 {
-    public string Date { get; set; } = string.Empty;
-    public string Changes { get; set; } = string.Empty;
-}
-
-public class CreateLessonReportDto
-{
-    public string Covered { get; set; } = string.Empty;
-    public string Performance { get; set; } = string.Empty;
-    public string Homework { get; set; } = string.Empty;
-}
-
-public class EditLessonReportDto
-{
-    public string Covered { get; set; } = string.Empty;
-    public string Performance { get; set; } = string.Empty;
-    public string Homework { get; set; } = string.Empty;
-    public string ChangesMade { get; set; } = string.Empty;
+    public int StudentId { get; set; }
+    public string SessionDate { get; set; } = string.Empty; // YYYY-MM-DD
+    public string Attendance { get; set; } = string.Empty; // present|late|absent
+    public int? Engagement { get; set; } // 1–5, null if absent
+    public string? Understanding { get; set; } // excellent|good|needs_improvement|struggling
+    public string? HomeworkCompletion { get; set; } // completed|incomplete|no_homework_given
+    public string? Remarks { get; set; }
 }
 
 public class IssueReportDto

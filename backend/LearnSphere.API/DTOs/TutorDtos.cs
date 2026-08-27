@@ -117,6 +117,7 @@ public class TimeSlotDto
     public bool IsFull { get; set; }
     public decimal PricePerLesson { get; set; }
     public string? PresetGroupId { get; set; }
+    public List<string> SyllabusTopics { get; set; } = new();
 }
 
 public class VerifyTutorDto
@@ -157,6 +158,14 @@ public class SetupClassDto
     public string ClassSize { get; set; } = "one-to-one";
     public int MaxStudents { get; set; } = 1;
     public decimal PricePerLesson { get; set; } = 0;
+    public List<int> SyllabusTopicIds { get; set; } = new();
+}
+
+public class SyllabusTopicDto
+{
+    public int Id { get; set; }
+    public string Topic { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
 }
 
 public class PresetSlotDto

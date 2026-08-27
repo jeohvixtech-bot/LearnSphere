@@ -25,6 +25,15 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.chatMessages = [];
   self.selectedTutor = null;
   self.pinnedTutorId = null;
+  // AngularJS template expressions run in a sandboxed evaluator that doesn't
+  // expose global functions like String() — calling it there silently returns
+  // undefined instead of throwing, so String(t.id) === String(vm.pinnedTutorId)
+  // used directly in ng-if/ng-class always reduces to undefined === undefined
+  // (always true). Do the comparison here in real JS instead and call this
+  // from the template.
+  self.isPinnedTutor = function (t) {
+    return String(t.id) === String(self.pinnedTutorId);
+  };
 
   // AI Speed Match
   self.aiMatchSelectedStudentId = null;
@@ -848,7 +857,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         pricePerLesson: s.pricePerLesson,
         confirmedCount: s.confirmedCount,
         maxStudents: s.maxStudents,
-        presetGroupId: s.presetGroupId
+        presetGroupId: s.presetGroupId,
+        syllabusTopics: s.syllabusTopics || []
       };
     });
 
@@ -874,6 +884,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
           startTime: s.startTime,
           endTime: s.endTime,
           recurrenceLabel: '',
+          syllabusTopics: s.syllabusTopics || [],
           slots: []
         };
       }
@@ -942,7 +953,6 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.modeIcon = function (mode) {
     var map = {
       'Online': 'video',
-      'Home Visit': 'home',
       'Tutor Place': 'building',
       'Tuition Center': 'building'
     };
@@ -975,40 +985,62 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // clipping entirely, since fixed positioning is relative to the viewport,
   // not any scrolling ancestor.
   self.showRowTooltip = function (sg, $event) {
-    var rowRect = $event.currentTarget.getBoundingClientRect();
-    // Anchored below the WHOLE scrollable list (.tutor-slot-list), not just the
-    // hovered row — anchoring to the row alone let the tooltip overlap
-    // whichever sibling row(s) happened to sit right below it, leaving that
-    // row's own View & Book button peeking out beside the tooltip looking
-    // like a dangling, disconnected control. Below the full list, it never
-    // overlaps any row regardless of which one is hovered.
-    var listEl = $event.currentTarget.closest('.tutor-slot-list') || $event.currentTarget;
-    var listRect = listEl.getBoundingClientRect();
+    // Cancel any pending hide from a moment ago (e.g. the cursor briefly left
+    // the row and came straight back) so it doesn't fire after this call.
+    if (sg._tooltipHideTimer) { $timeout.cancel(sg._tooltipHideTimer); sg._tooltipHideTimer = null; }
 
-    // Flip upward when there isn't reasonably enough room below (e.g. the card
-    // is scrolled near the bottom of the viewport) — otherwise the tooltip
-    // runs off the bottom of the screen instead of being fully visible.
-    // Anchoring with `bottom` (grows upward) rather than computing `top` from
-    // an estimated height means this works regardless of the tooltip's actual
-    // rendered height, which varies with how many dates are in the schedule.
-    var spaceBelow = window.innerHeight - listRect.bottom;
+    var rowRect = $event.currentTarget.getBoundingClientRect();
+
+    // Clamp so a row hovered near the right edge doesn't push the tooltip
+    // off-screen — keep tooltipWidth in sync with .slot-tooltip's width in main.css.
+    var tooltipWidth = 435;
+    var left = Math.min(rowRect.left, window.innerWidth - tooltipWidth - 12);
+
+    // Anchored directly below the hovered row by default — may overlap
+    // whichever sibling row sits right beneath it, an accepted tradeoff so
+    // the tooltip appears next to the subject you're hovering rather than at
+    // one shared position regardless of which row triggered it. Flips ABOVE
+    // the row only when there isn't enough room left below it in the
+    // viewport, so a row near the bottom of the screen doesn't get its
+    // tooltip clipped by the browser window instead. Anchoring with `bottom`
+    // (grows upward) rather than computing `top` from an estimated height
+    // works regardless of the tooltip's actual rendered height, which varies
+    // with how many dates are in the schedule.
+    var spaceBelow = window.innerHeight - rowRect.bottom;
     var flipUp = spaceBelow < 260;
 
     sg._tooltipStyle = flipUp ? {
       display: 'block',
       top: 'auto',
-      bottom: (window.innerHeight - listRect.top + 6) + 'px',
-      left: rowRect.left + 'px'
+      bottom: (window.innerHeight - rowRect.top + 6) + 'px',
+      left: left + 'px'
     } : {
       display: 'block',
-      top: (listRect.bottom + 6) + 'px',
+      top: (rowRect.bottom + 6) + 'px',
       bottom: 'auto',
-      left: rowRect.left + 'px'
+      left: left + 'px'
     };
   };
 
+  // Hides after a short delay rather than immediately — ng-if destroys the
+  // tooltip element the instant _tooltipStyle goes null, so an immediate hide
+  // on the row's mouseleave removes it before the cursor can ever cross the
+  // gap and land on the tooltip itself (which has the matching mouseenter
+  // below to cancel this timer). Re-entering either the row or the tooltip
+  // within the delay window cancels it; only truly leaving both hides it.
   self.hideRowTooltip = function (sg) {
-    sg._tooltipStyle = null;
+    if (sg._tooltipHideTimer) $timeout.cancel(sg._tooltipHideTimer);
+    sg._tooltipHideTimer = $timeout(function () {
+      sg._tooltipStyle = null;
+      sg._tooltipHideTimer = null;
+    }, 200);
+  };
+
+  // Bound to the tooltip's own mouseenter — the cursor has successfully
+  // crossed the gap, so cancel the pending hide without recomputing position
+  // (unlike showRowTooltip, which needs the ROW's rect, not the tooltip's).
+  self.keepTooltipOpen = function (sg) {
+    if (sg._tooltipHideTimer) { $timeout.cancel(sg._tooltipHideTimer); sg._tooltipHideTimer = null; }
   };
 
   // 'YYYY-MM-DD' (as stored/returned by the API) -> 'DD-MM-YYYY' (what the

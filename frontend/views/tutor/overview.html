@@ -171,7 +171,7 @@
     </div>
 
     <!-- Calendar (Monthly View) -->
-    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
+    <div class="card" ng-if="!vm.counterBooking">
       <div class="card-header">
         <span class="label-tag indigo">TUTOR SCHEDULER</span>
         <h3><i class="ti ti-calendar" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Calendar & Payout Coordinator</h3>
@@ -206,16 +206,18 @@
       <div class="cal-grid">
         <span class="cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
         <button class="cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
-          ng-click="vm.toggleCalDay(d)"
-          ng-disabled="vm.isPastDay(d)"
+          ng-click="vm.onCalDayClick(d)"
           ng-class="{
             'selected': vm.isCalDaySelected(d),
+            'report-day-selected': vm.isPastDay(d) && vm.isReportSelectedDay(d),
             'past-day': vm.isPastDay(d),
             'blocked': !vm.isPastDay(d) && vm.isBlocked(d),
             'public-holiday-sg': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
             'public-holiday': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d) && !vm.isSgHoliday(d),
             'has-paid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayAllBookingsPaid(d),
-            'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayHasUnpaidBooking(d)
+            'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayHasUnpaidBooking(d),
+            'report-dot-amber': vm.reportDotsByDay[d] === 'amber',
+            'report-dot-green': vm.reportDotsByDay[d] === 'green'
           }">
           <span class="day-num">{{ d }}</span>
           <span class="day-published-dot" ng-if="!vm.isPastDay(d) && vm.publishedSlotsOnDay(d).length" title="{{ vm.publishedSlotsOnDay(d).length }} published slot(s)"></span>
@@ -328,7 +330,7 @@
     </div>
 
     <!-- Setup Class Modal -->
-    <div class="modal-overlay" ng-if="vm.setupClassOpen">
+    <div class="modal-overlay" ng-if="vm.setupClassOpen" ng-click="vm.closeSyllabusDropdown()">
       <div class="modal-card setup-class-modal">
         <div class="modal-header">
           <div>
@@ -438,6 +440,95 @@
               <input type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
             </div>
 
+            <!-- Syllabus topics -->
+            <div class="form-group">
+              <label>
+                Syllabus topics
+                <span class="text-muted" style="font-weight:400; font-size:11px;">
+                  Optional — select up to 6
+                </span>
+              </label>
+
+              <!-- Dropdown trigger -->
+              <div class="syllabus-dropdown-wrap" ng-click="$event.stopPropagation()"
+                ng-class="{'syllabus-dropdown-disabled': !vm.syllabusTopics.length}">
+
+                <button type="button" class="syllabus-dropdown-btn"
+                  ng-click="vm.toggleSyllabusDropdown()"
+                  ng-disabled="!vm.syllabusTopics.length">
+                  <span ng-if="vm.syllabusSelectedCount() === 0" class="text-muted">
+                    {{ !vm.setupClassForm.subject ? 'Select subject first' : (vm.syllabusTopics.length ? '— Select topics —' : 'No syllabus topics available yet (optional)') }}
+                  </span>
+                  <span ng-if="vm.syllabusSelectedCount() > 0">
+                    {{ vm.syllabusSelectedCount() }} / 6 topics selected
+                  </span>
+                  <i class="ti ti-chevron-down"
+                    ng-style="{'transform': vm.syllabusDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'}"
+                    style="font-size:13px; margin-left:auto; transition:transform .15s;"
+                    aria-hidden="true"></i>
+                </button>
+
+                <!-- Dropdown panel -->
+                <div class="syllabus-dropdown-panel" ng-if="vm.syllabusDropdownOpen">
+
+                  <!-- Autocomplete search -->
+                  <div class="syllabus-search-wrap">
+                    <i class="ti ti-search" style="font-size:13px; color:#94a3b8;" aria-hidden="true"></i>
+                    <input type="text"
+                      ng-model="vm.syllabusSearch"
+                      placeholder="Search topics..."
+                      class="syllabus-search-input" />
+                  </div>
+
+                  <!-- Topic checkboxes -->
+                  <div class="syllabus-topic-list">
+                    <div class="syllabus-topic-item"
+                      ng-repeat="t in vm.filteredSyllabusTopics() track by t.id"
+                      ng-class="{
+                        'selected': vm.isSyllabusTopicSelected(t.id),
+                        'disabled': !vm.isSyllabusTopicSelected(t.id) && vm.syllabusSelectedCount() >= 6
+                      }"
+                      ng-click="vm.toggleSyllabusTopic(t.id)">
+                      <span class="syllabus-checkbox">
+                        <i class="ti"
+                          ng-class="vm.isSyllabusTopicSelected(t.id) ? 'ti-check' : ''"
+                          style="font-size:11px;"
+                          aria-hidden="true"></i>
+                      </span>
+                      <span class="syllabus-topic-name">{{ t.topic }}</span>
+                    </div>
+                    <div ng-if="vm.filteredSyllabusTopics().length === 0" class="syllabus-no-results">
+                      No topics found
+                    </div>
+                  </div>
+
+                  <div class="syllabus-dropdown-footer">
+                    <span class="text-muted" style="font-size:11px;">
+                      {{ vm.syllabusSelectedCount() }} of 6 selected
+                    </span>
+                    <button type="button" class="btn-link"
+                      ng-click="vm.closeSyllabusDropdown()">Done</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Selected chips -->
+              <div class="syllabus-chips-row" ng-if="vm.syllabusSelectedCount() > 0">
+                <span class="syllabus-chip"
+                  ng-repeat="topicId in vm.setupClassForm.syllabusTopicIds track by topicId">
+                  {{ vm.syllabusTopicName(topicId) }}
+                  <button type="button" class="syllabus-chip-remove"
+                    ng-click="vm.removeSyllabusTopic(topicId)">
+                    <i class="ti ti-x" style="font-size:10px;" aria-hidden="true"></i>
+                  </button>
+                </span>
+              </div>
+
+              <p class="field-hint" ng-if="vm.syllabusTopics.length > 0 && vm.syllabusSelectedCount() >= 6">
+                Maximum 6 topics selected.
+              </p>
+            </div>
+
             <p class="field-error" ng-if="vm.setupClassError">{{ vm.setupClassError }}</p>
           </div>
         </div>
@@ -451,7 +542,7 @@
           <div class="btn-row">
             <button type="button" class="btn-outline" ng-click="vm.closeSetupClass()">Cancel</button>
             <button type="button" class="btn-primary" ng-click="vm.submitSetupClass()"
-              ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings()">
+              ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings() || !vm.setupClassFormValid()">
               {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
             </button>
           </div>
@@ -599,7 +690,7 @@
     </div>
 
     <!-- Confirmed Classes -->
-    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking && !vm.rescheduleBooking">
+    <div class="card" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
       <h3><i class="ti ti-checkbox" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Confirmed Classes Checklist</h3>
       <p ng-if="!vm.confirmedClasses().length" class="empty-state">No active class appointments.</p>
       <div class="session-item" ng-repeat="b in vm.confirmedClasses()"
@@ -639,106 +730,254 @@
       </div>
     </div>
 
-    <!-- Class Reports Portal -->
-    <div class="card" ng-if="!vm.counterBooking && !vm.reportBooking && !vm.editBooking">
-      <h3><i class="ti ti-file-text" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Class Reports Portal</h3>
+    <!-- ── Class Reports Portal (merged with day detail) ── -->
+    <div class="card" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
+      <h3>
+        <i class="ti ti-file-text" style="font-size:16px; color:#059669;" aria-hidden="true"></i>
+        Class Reports
+      </h3>
 
-      <!-- Needs reports -->
-      <div ng-if="vm.needsReport().length">
-        <div class="report-needed" ng-repeat="b in vm.needsReport()">
-          <div>
-            <span class="badge-amber">
-              <i class="ti ti-alert-circle" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
-              Report required
+      <!-- No date selected -->
+      <div ng-if="!vm.reportSelectedDay" class="empty-state" style="text-align:center; padding:24px 0;">
+        <i class="ti ti-calendar-event" style="font-size:28px; color:#cbd5e1;" aria-hidden="true"></i>
+        <p style="margin:8px 0 0; color:#94a3b8;">Select a completed class date from the calendar above to view or fill reports.</p>
+      </div>
+
+      <!-- Date selected -->
+      <div ng-if="vm.reportSelectedDay">
+
+        <div class="report-day-header">
+          <span class="badge-subject">{{ vm.formatSessionDate(vm.reportSelectedDay) }}</span>
+          <span ng-if="vm.reportAllSubmittedOnSelectedDay" class="badge-green">
+            <i class="ti ti-circle-check" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+            All reports submitted
+          </span>
+          <span ng-if="!vm.reportAllSubmittedOnSelectedDay && vm.reportSelectedDayStudents.length" class="badge-amber">
+            <i class="ti ti-alert-circle" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+            Reports pending
+          </span>
+        </div>
+
+        <!-- No completed class on selected date -->
+        <div ng-if="!vm.reportSelectedDayStudents.length" class="empty-state">
+          <p>No reports yet — this class hasn't taken place.</p>
+        </div>
+
+        <!-- Student list for selected date -->
+        <div ng-if="vm.reportSelectedDayStudents.length">
+          <p class="section-label" style="margin-bottom:8px;">
+            {{ vm.reportSelectedDayStudents.length }}
+            student(s) in this session
+          </p>
+
+          <div class="report-student-row"
+            ng-repeat="s in vm.reportSelectedDayStudents track by s.studentId">
+
+            <div class="report-student-info">
+              <div class="avatar-sm">{{ s.studentName[0] }}</div>
+              <div>
+                <strong>{{ s.studentName }}</strong>
+              </div>
+            </div>
+
+            <!-- Submitted -->
+            <span ng-if="s.submitted" class="badge-green">
+              <i class="ti ti-check" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+              Submitted
             </span>
-            <strong>{{ b.subject }} — {{ b.classes.length }} class(es)</strong>
-            <p>Child: {{ b.studentName }}</p>
+
+            <!-- Pending — fill report button -->
+            <span ng-if="!s.submitted" class="badge-amber" style="margin-right:8px;">Pending</span>
+            <button ng-if="!s.submitted && !vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]"
+              class="btn-outline sm"
+              ng-click="vm.openReportForm(s.studentId, s.sessionDate, s.booking)">
+              <i class="ti ti-edit" style="font-size:12px; vertical-align:-1px;" aria-hidden="true"></i>
+              Fill report
+            </button>
+
+            <!-- Success flash -->
+            <span ng-if="vm.reportSuccess[vm._reportKey(s.studentId, s.sessionDate)]"
+              class="text-success" style="font-size:12px;">
+              <i class="ti ti-circle-check" style="font-size:13px; vertical-align:-2px;" aria-hidden="true"></i>
+              Report submitted!
+            </span>
+
+            <!-- Assessment form — inline below student row -->
+            <div class="report-form-wrap"
+              ng-if="vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]">
+
+              <div class="report-form-header">
+                <div>
+                  <strong style="font-size:13px;">{{ s.studentName }}</strong>
+                  <span style="font-size:12px; color:#94a3b8; margin-left:8px;">
+                    {{ vm.formatSessionDate(s.sessionDate) }}
+                  </span>
+                </div>
+                <button class="btn-link"
+                  ng-click="vm.closeReportForm(s.studentId, s.sessionDate)">
+                  <i class="ti ti-x" style="font-size:15px;" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <!-- Attendance -->
+              <div class="form-group">
+                <label>Attendance</label>
+                <div class="chip-row">
+                  <button type="button" class="chip-btn"
+                    ng-class="{'active-green': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'present'}"
+                    ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'present'">
+                    <i class="ti ti-circle-check" style="font-size:12px;" aria-hidden="true"></i> Present
+                  </button>
+                  <button type="button" class="chip-btn"
+                    ng-class="{'active-amber': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'late'}"
+                    ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'late'">
+                    <i class="ti ti-clock" style="font-size:12px;" aria-hidden="true"></i> Late
+                  </button>
+                  <button type="button" class="chip-btn"
+                    ng-class="{'active-red': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'}"
+                    ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'absent'">
+                    <i class="ti ti-circle-x" style="font-size:12px;" aria-hidden="true"></i> Absent
+                  </button>
+                </div>
+                <p class="field-hint">Other fields will be disabled if absent.</p>
+              </div>
+
+              <!-- Remaining fields — disabled when absent -->
+              <div ng-class="{'report-fields-disabled': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'}">
+
+                <!-- Engagement -->
+                <div class="form-group">
+                  <label>Engagement</label>
+                  <div class="star-rating-row">
+                    <button type="button" class="star-btn"
+                      ng-repeat="n in [1,2,3,4,5]"
+                      ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement = n"
+                      ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'">
+                      <i class="ti"
+                        ng-class="n <= vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement ? 'ti-star' : 'ti-star'"
+                        ng-style="{'color': n <= vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement ? '#f59e0b' : '#e2e8f0', 'font-size': '22px'}"
+                        aria-hidden="true"></i>
+                    </button>
+                    <span class="text-muted" style="font-size:12px; margin-left:6px;">
+                      {{ vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement || 0 }} / 5
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Understanding -->
+                <div class="form-group">
+                  <label>Understanding</label>
+                  <div class="chip-row">
+                    <button type="button" class="chip-btn"
+                      ng-repeat="u in ['excellent','good','needs_improvement','struggling']"
+                      ng-class="{'active': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].understanding === u}"
+                      ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'"
+                      ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].understanding = u">
+                      {{ u === 'needs_improvement' ? 'Needs improvement' : (u | capitalize) }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Homework -->
+                <div class="form-group">
+                  <label>Homework completion</label>
+                  <div class="chip-row">
+                    <button type="button" class="chip-btn"
+                      ng-repeat="h in ['completed','incomplete','no_homework_given']"
+                      ng-class="{'active-green': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].homeworkCompletion === h}"
+                      ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'"
+                      ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].homeworkCompletion = h">
+                      {{ h === 'no_homework_given' ? 'No homework given' : (h | capitalize) }}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Remarks — always enabled -->
+              <div class="form-group">
+                <label>Tutor remarks <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+                <textarea rows="2"
+                  ng-model="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].remarks"
+                  placeholder="Personalised note for this student's parent..."></textarea>
+              </div>
+
+              <p class="field-error" ng-if="vm.reportError[vm._reportKey(s.studentId, s.sessionDate)]">
+                {{ vm.reportError[vm._reportKey(s.studentId, s.sessionDate)] }}
+              </p>
+
+              <div class="btn-row" style="margin-top:8px;">
+                <button type="button" class="btn-outline"
+                  ng-click="vm.closeReportForm(s.studentId, s.sessionDate)">Cancel</button>
+                <button type="button" class="btn-primary"
+                  ng-click="vm.confirmSubmitReport(s.studentId, s.sessionDate)"
+                  ng-disabled="vm.reportSubmitting[vm._reportKey(s.studentId, s.sessionDate)]">
+                  <i class="ti ti-send" style="font-size:13px;" aria-hidden="true"></i>
+                  Submit report
+                </button>
+              </div>
+
+              <!-- Confirmation modal -->
+              <div class="report-confirm-modal"
+                ng-if="vm.reportConfirm[vm._reportKey(s.studentId, s.sessionDate)]">
+                <div class="report-confirm-inner">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <i class="ti ti-alert-circle"
+                      style="font-size:20px; color:#f59e0b;" aria-hidden="true"></i>
+                    <strong>Submit lesson report?</strong>
+                  </div>
+                  <p style="font-size:13px; color:#64748b; margin:0 0 14px; line-height:1.6;">
+                    Once submitted, this report cannot be edited. The parent will be notified.
+                  </p>
+                  <div class="btn-row">
+                    <button type="button" class="btn-outline"
+                      ng-click="vm.cancelConfirmReport(s.studentId, s.sessionDate)">Cancel</button>
+                    <button type="button" class="btn-primary"
+                      ng-click="vm.submitReport(s.studentId, s.sessionDate)"
+                      ng-disabled="vm.reportSubmitting[vm._reportKey(s.studentId, s.sessionDate)]">
+                      Confirm and submit
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <!-- end assessment form -->
+
           </div>
-          <button class="btn-indigo" ng-click="vm.startReport(b)">Submit Lesson Report</button>
+          <!-- end student list -->
         </div>
-      </div>
 
-      <!-- Published reports -->
-      <div ng-if="vm.hasReport().length">
-        <h5 class="section-label">Published Reports Log</h5>
-        <div class="report-row" ng-repeat="b in vm.hasReport()">
-          <div>
-            <strong>{{ b.subject }} Report</strong>
-            <small>Published {{ b.lessonReport.submitDate }}</small>
+        <!-- Submitted reports log — grouped by preset group -->
+        <div ng-if="vm.reportGroups.length" style="margin-top:16px;">
+          <h5 class="section-label">Submitted reports</h5>
+
+          <div class="report-log-group"
+            ng-repeat="group in vm.reportGroups track by group.presetGroupId">
+
+            <div class="report-log-date-group"
+              ng-repeat="report in group.reports track by $index">
+              <div class="report-log-row">
+                <i class="ti ti-file-check"
+                  style="font-size:14px; color:#16a34a; flex-shrink:0;" aria-hidden="true"></i>
+                <div style="flex:1;">
+                  <strong style="font-size:13px;">{{ report.studentName }}</strong>
+                  <span style="font-size:12px; color:#94a3b8; margin-left:6px;">
+                    {{ vm.formatSessionDate(report.sessionDate) }}
+                  </span>
+                </div>
+                <span class="badge-green">Submitted</span>
+              </div>
+            </div>
+
           </div>
-          <button class="btn-link indigo" ng-click="vm.startEdit(b)">✏️ Edit Report</button>
         </div>
-      </div>
 
-      <p ng-if="!vm.needsReport().length && !vm.hasReport().length" class="empty-state">
-        No class reports yet. Complete sessions will appear here.
-      </p>
-    </div>
+      </div>
+      <!-- end date selected -->
 
-    <!-- Submit Report Form -->
-    <div class="card max-w-lg" ng-if="vm.reportBooking">
-      <button class="btn-link" ng-click="vm.cancelReport()">← Cancel</button>
-      <div class="alert-success" ng-if="vm.reportSuccess">
-        ✓ Lesson report published and shared with parent.
-      </div>
-      <div ng-if="!vm.reportSuccess">
-        <span class="label-tag">Lesson Evaluation Form</span>
-        <h3>Compile Report for {{ vm.reportBooking.studentName }}</h3>
-        <p class="text-muted">Class: {{ vm.reportBooking.subject }} — {{ vm.reportBooking.classes.length }} session(s)</p>
-        <form ng-submit="vm.submitReport()">
-          <div class="form-group">
-            <label>Syllabus Covered & Focus Areas <span class="text-danger">*</span></label>
-            <textarea ng-model="vm.reportForm.covered" rows="3" required
-              placeholder="e.g. Solving simultaneous quadratic equations..."></textarea>
-          </div>
-          <div class="form-group">
-            <label>Child Performance & Classroom Alignment <span class="text-danger">*</span></label>
-            <textarea ng-model="vm.reportForm.performance" rows="3" required
-              placeholder="e.g. Excellent focus. Solved algebraic tasks correctly..."></textarea>
-          </div>
-          <div class="form-group">
-            <label>Homework Instructions <span class="text-danger">*</span></label>
-            <input type="text" ng-model="vm.reportForm.homework" required
-              placeholder="e.g. Worksheet 4 (Q1-10). Due next Friday." />
-          </div>
-          <p class="field-error" ng-if="vm.reportError">{{ vm.reportError }}</p>
-          <button type="submit" class="btn-indigo full-width">Publish Lesson Report</button>
-        </form>
-      </div>
     </div>
-
-    <!-- Edit Report Form -->
-    <div class="card max-w-lg" ng-if="vm.editBooking">
-      <button class="btn-link" ng-click="vm.cancelEdit()">← Dismiss</button>
-      <div class="alert-success" ng-if="vm.editSuccess">
-        ✓ Report modifications saved to audit ledger.
-      </div>
-      <div ng-if="!vm.editSuccess">
-        <span class="label-tag amber">Incident Audit Log Active</span>
-        <h3>Modify Published Report</h3>
-        <form ng-submit="vm.submitEdit()">
-          <div class="form-group">
-            <label>Syllabus Covered <span class="text-danger">*</span></label>
-            <textarea ng-model="vm.editForm.covered" rows="2" required></textarea>
-          </div>
-          <div class="form-group">
-            <label>Child Performance <span class="text-danger">*</span></label>
-            <textarea ng-model="vm.editForm.performance" rows="2" required></textarea>
-          </div>
-          <div class="form-group">
-            <label>Homework <span class="text-danger">*</span></label>
-            <input type="text" ng-model="vm.editForm.homework" required />
-          </div>
-          <div class="form-group audit-reason">
-            <label>Reason for Modification (Public audit log) <span class="text-danger">*</span></label>
-            <input type="text" ng-model="vm.editForm.changesMade" required
-              placeholder="e.g. Corrected typo in worksheet reference." />
-          </div>
-          <p class="field-error" ng-if="vm.editError">{{ vm.editError }}</p>
-          <button type="submit" class="btn-amber full-width">Commit to Audit Ledger</button>
-        </form>
-      </div>
-    </div>
+    <!-- end Class Reports Portal -->
 
     </div><!-- end overview tab -->
 

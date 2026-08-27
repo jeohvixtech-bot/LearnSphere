@@ -316,22 +316,31 @@
           <p class="counter-message" ng-if="b.counterProposal.message">"{{ b.counterProposal.message }}"</p>
         </div>
 
-        <!-- Lesson report panel -->
-        <div class="lesson-report-panel" ng-if="b.lessonReport">
-          <div class="lesson-report-header">📋 Lesson Report</div>
-          <div class="lesson-report-grid">
-            <div>
-              <span class="lesson-report-label">Topics Covered</span>
-              <p>{{ b.lessonReport.covered }}</p>
+        <!-- Lesson report panel — one entry per session date -->
+        <div class="lesson-report-panel" ng-if="b.lessonReports.length">
+          <div class="lesson-report-header">📋 Lesson Reports</div>
+          <div class="lesson-report-entry" ng-repeat="r in b.lessonReports track by r.id">
+            <div class="lesson-report-entry-header">
+              <strong>{{ r.sessionDate | dmy }}</strong>
+              <span class="badge-green" ng-if="r.attendance === 'present'">Present</span>
+              <span class="badge-amber" ng-if="r.attendance === 'late'">Late</span>
+              <span class="status-badge cancelled" ng-if="r.attendance === 'absent'">Absent</span>
             </div>
-            <div>
-              <span class="lesson-report-label">Performance</span>
-              <p>{{ b.lessonReport.performance }}</p>
+            <div class="lesson-report-grid" ng-if="r.attendance !== 'absent'">
+              <div>
+                <span class="lesson-report-label">Engagement</span>
+                <p>{{ r.engagement }} / 5 ⭐</p>
+              </div>
+              <div>
+                <span class="lesson-report-label">Understanding</span>
+                <p>{{ r.understanding | capitalize }}</p>
+              </div>
+              <div>
+                <span class="lesson-report-label">Homework</span>
+                <p>{{ r.homeworkCompletion | capitalize }}</p>
+              </div>
             </div>
-            <div>
-              <span class="lesson-report-label">Homework</span>
-              <p>{{ b.lessonReport.homework }}</p>
-            </div>
+            <p class="text-muted" ng-if="r.remarks" style="margin-top:6px">"{{ r.remarks }}"</p>
           </div>
         </div>
 

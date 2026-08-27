@@ -80,7 +80,6 @@
           <select class="filter-select-sm" ng-model="vm.selectedMode">
             <option value="All">All Modes</option>
             <option value="Online">Online</option>
-            <option value="Home Visit">Home Visit</option>
             <option value="Tutor Place">Tutor Place</option>
             <option value="Tuition Center">Tuition Center</option>
           </select>
@@ -112,7 +111,7 @@
         <div class="tutor-card" ng-repeat="t in vm.filteredTutors()"
           ng-class="{
             'tutor-card--favorited': vm.isFavorited(t.id),
-            'tutor-card--pinned': String(t.id) === String(vm.pinnedTutorId)
+            'tutor-card--pinned': vm.isPinnedTutor(t)
           }">
 
           <!-- Favourite button -->
@@ -124,7 +123,7 @@
 
           <!-- Top: avatar + info -->
           <div class="tutor-card-main-wrap">
-            <div class="tutor-pinned-banner" ng-if="String(t.id) === String(vm.pinnedTutorId)">
+            <div class="tutor-pinned-banner" ng-if="vm.isPinnedTutor(t)">
               <i class="ti ti-eye" aria-hidden="true"></i>
               You were looking at this tutor
             </div>
@@ -189,8 +188,12 @@
 
                   <!-- Tooltip: full month details, on hover — position:fixed,
                        computed in JS (see showRowTooltip), so it isn't clipped by
-                       the scrollable .tutor-slot-list box it lives inside. -->
-                  <div class="slot-tooltip slot-tooltip-fixed" ng-if="sg._tooltipStyle" ng-style="sg._tooltipStyle">
+                       the scrollable .tutor-slot-list box it lives inside. Its own
+                       mouseenter/mouseleave (rather than relying on the row's alone)
+                       is what lets the cursor actually cross the gap between row and
+                       tooltip without the delayed hide in hideRowTooltip firing first. -->
+                  <div class="slot-tooltip slot-tooltip-fixed" ng-if="sg._tooltipStyle" ng-style="sg._tooltipStyle"
+                    ng-mouseenter="vm.keepTooltipOpen(sg)" ng-mouseleave="vm.hideRowTooltip(sg)">
                     <p class="slot-tooltip-title">{{ sg.subject }} · {{ sg.level }}</p>
                     <div class="slot-tooltip-meta">
                       <div class="slot-tooltip-meta-row">
@@ -214,6 +217,15 @@
                         <span class="slot-price">
                           ${{ sg.pricePerLesson }} / lesson
                           <span class="slot-price-est">· est. ${{ sg.pricePerLesson * sg.slots.length }} / month</span>
+                        </span>
+                      </div>
+                      <div class="slot-tooltip-meta-row" ng-if="sg.syllabusTopics && sg.syllabusTopics.length">
+                        <i class="ti ti-book" aria-hidden="true"></i>
+                        <span>
+                          Syllabus covered:
+                          <span ng-repeat="topic in sg.syllabusTopics">
+                            – {{ topic }}<span ng-if="!$last"> </span>
+                          </span>
                         </span>
                       </div>
                     </div>

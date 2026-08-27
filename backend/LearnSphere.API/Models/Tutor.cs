@@ -163,3 +163,25 @@ public class TutorTimeSlot
     // id of the first slot in the batch (same convention as Booking/InvoiceNumber).
     public string? PresetGroupId { get; set; }
 }
+
+// Platform-defined syllabus topics per country + subject + level.
+// Seeded by admin via SQL. Read-only at runtime — no tutor can modify these.
+public class SyllabusTopic
+{
+    public int Id { get; set; }
+    public string Country { get; set; } = string.Empty; // "Singapore" | "Malaysia"
+    public string Subject { get; set; } = string.Empty;
+    public string Level   { get; set; } = string.Empty;
+    public string Topic   { get; set; } = string.Empty;
+    public int SortOrder  { get; set; } = 0;
+}
+
+// Records which syllabus topics a tutor selected for a preset group.
+// One row per selected topic per preset group (up to 6).
+public class PresetGroupSyllabus
+{
+    public int Id              { get; set; }
+    public string PresetGroupId { get; set; } = string.Empty; // FK to TutorTimeSlot.PresetGroupId
+    public int SyllabusTopicId { get; set; }
+    public SyllabusTopic SyllabusTopic { get; set; } = null!;
+}

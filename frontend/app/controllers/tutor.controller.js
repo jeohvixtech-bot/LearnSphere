@@ -53,14 +53,111 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self.profileError = '';
   self.newOffering = { country: '', selectedOption: null };
 
-  // Report forms
-  self.reportBooking = null;
-  self.reportForm = { covered: '', performance: '', homework: '' };
-  self.reportSuccess = false;
+  // ── Lesson report state ──────────────────────────────────────────
+  self.reportSelectedDay = null;  // the calendar day currently selected for reports
+  self.reportForm        = {};    // { [studentId_sessionDate]: { attendance, engagement, understanding, homeworkCompletion, remarks } }
+  self.reportOpen        = {};    // { [studentId_sessionDate]: true/false } — is form open for this student+date
+  self.reportConfirm     = {};    // { [studentId_sessionDate]: true/false } — is confirm modal shown
+  self.reportSubmitting  = {};    // { [studentId_sessionDate]: true/false }
+  self.reportError       = {};    // { [studentId_sessionDate]: 'error message' }
+  self.reportSuccess     = {};    // { [studentId_sessionDate]: true/false }
 
-  self.editBooking = null;
-  self.editForm = { covered: '', performance: '', homework: '', changesMade: '' };
-  self.editSuccess = false;
+  // Key helper
+  self._reportKey = function (studentId, sessionDate) {
+    return studentId + '_' + sessionDate;
+  };
+
+  // Precomputed report-view state — NEVER call a function that allocates fresh
+  // arrays/objects directly from a template binding (ng-repeat/ng-class/{{}}).
+  // Same trap this file already avoids elsewhere (see rebuildSetupClassModesList/
+  // computeContactableParents): a function invoked fresh every digest never
+  // stabilizes and trips Angular's $rootScope:infdig. These are recomputed only
+  // at well-defined points (bookings reload, report day change) via
+  // _recomputeReportView(), and the template just reads the plain result.
+  self.reportDotsByDay = {};              // { dayNum: 'amber'|'green' } — for the month currently on screen
+  self.reportSelectedDayStudents = [];    // student rows for vm.reportSelectedDay
+  self.reportAllSubmittedOnSelectedDay = false;
+  self.reportGroups = [];                 // submitted reports log
+
+  function sessionDatesForBooking(b) {
+    return (b.classes || []).map(function (c) { return c.date; });
+  }
+
+  function recomputeReportDots() {
+    var dots = {};
+    self.bookings.forEach(function (b) {
+      if (b.status !== 'completed') return;
+      sessionDatesForBooking(b).forEach(function (dateStr) {
+        var d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime()) || d.getFullYear() !== self.calYear || d.getMonth() !== self.calMonth) return;
+        var dayNum = d.getDate();
+        var hasReport = (b.lessonReports || []).some(function (r) {
+          return r.studentId === b.studentId && r.sessionDate === dateStr;
+        });
+        dots[dayNum] = dots[dayNum] === undefined ? hasReport : (dots[dayNum] && hasReport);
+      });
+    });
+    var result = {};
+    Object.keys(dots).forEach(function (dayNum) { result[dayNum] = dots[dayNum] ? 'green' : 'amber'; });
+    self.reportDotsByDay = result;
+  }
+
+  function recomputeReportSelectedDayStudents() {
+    if (!self.reportSelectedDay) {
+      self.reportSelectedDayStudents = [];
+      self.reportAllSubmittedOnSelectedDay = false;
+      return;
+    }
+    var dateStr = self.reportSelectedDay;
+    var rows = self.bookings
+      .filter(function (b) { return b.status === 'completed' && sessionDatesForBooking(b).indexOf(dateStr) >= 0; })
+      .map(function (b) {
+        var report = (b.lessonReports || []).find(function (r) {
+          return r.studentId === b.studentId && r.sessionDate === dateStr;
+        });
+        return {
+          booking: b, studentId: b.studentId, studentName: b.studentName,
+          sessionDate: dateStr, submitted: !!report, report: report || null
+        };
+      });
+    self.reportSelectedDayStudents = rows;
+    self.reportAllSubmittedOnSelectedDay = rows.length > 0 && rows.every(function (s) { return s.submitted; });
+  }
+
+  function recomputeReportGroups() {
+    var groups = {};
+    self.bookings.forEach(function (b) {
+      if (b.status !== 'completed') return;
+      var reports = b.lessonReports || [];
+      if (!reports.length) return;
+      var groupKey = 'booking_' + b.id;
+      if (!groups[groupKey]) groups[groupKey] = { presetGroupId: groupKey, reports: [] };
+      reports.forEach(function (r) {
+        groups[groupKey].reports.push({
+          studentName: b.studentName, sessionDate: r.sessionDate, attendance: r.attendance,
+          engagement: r.engagement, understanding: r.understanding, homeworkCompletion: r.homeworkCompletion,
+          remarks: r.remarks, submittedAt: r.submittedAt
+        });
+      });
+    });
+    self.reportGroups = Object.keys(groups).map(function (k) {
+      groups[k].reports.sort(function (a, b) { return a.sessionDate.localeCompare(b.sessionDate); });
+      return groups[k];
+    });
+  }
+
+  self._recomputeReportView = function () {
+    recomputeReportDots();
+    recomputeReportSelectedDayStudents();
+    recomputeReportGroups();
+  };
+
+  // Every BookingService.getAll() call site in this controller routes through
+  // here so the report-view state above always stays in sync with self.bookings.
+  self._setBookings = function (data) {
+    self.bookings = data;
+    self._recomputeReportView();
+  };
 
   self.counterBooking = null;
   self.counterForm = { message: '', classes: [] };
@@ -102,7 +199,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       maybeInitChat();
     });
     BookingService.getAll().then(function (res) {
-      self.bookings = res.data;
+      self._setBookings(res.data);
       maybeInitChat();
     });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
@@ -187,12 +284,110 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     });
   };
 
-  self.needsReport = function () {
-    return self.completedClasses().filter(function (b) { return !b.lessonReport; });
+  // ── Open assessment form for a student + date ─────────────────────
+  self.openReportForm = function (studentId, sessionDate, booking) {
+    var key = self._reportKey(studentId, sessionDate);
+    self.reportOpen[key] = true;
+    self.reportForm[key] = {
+      attendance:         '',
+      engagement:         0,
+      understanding:      '',
+      homeworkCompletion: '',
+      remarks:            '',
+      bookingId:          booking.id
+    };
+    self.reportError[key]   = null;
+    self.reportSuccess[key] = false;
+    self.reportConfirm[key] = false;
   };
 
-  self.hasReport = function () {
-    return self.completedClasses().filter(function (b) { return !!b.lessonReport; });
+  self.closeReportForm = function (studentId, sessionDate) {
+    var key = self._reportKey(studentId, sessionDate);
+    self.reportOpen[key]    = false;
+    self.reportConfirm[key] = false;
+    self.reportError[key]   = null;
+  };
+
+  // ── Show confirmation modal ───────────────────────────────────────
+  self.confirmSubmitReport = function (studentId, sessionDate) {
+    var key = self._reportKey(studentId, sessionDate);
+    var form = self.reportForm[key];
+    if (!form) return;
+
+    // Frontend validation
+    if (!form.attendance) {
+      self.reportError[key] = 'Please select attendance.';
+      return;
+    }
+    if (form.attendance !== 'absent') {
+      if (!form.engagement || form.engagement < 1) {
+        self.reportError[key] = 'Please rate engagement.';
+        return;
+      }
+      if (!form.understanding) {
+        self.reportError[key] = 'Please select understanding level.';
+        return;
+      }
+      if (!form.homeworkCompletion) {
+        self.reportError[key] = 'Please select homework completion.';
+        return;
+      }
+    }
+
+    self.reportError[key]   = null;
+    self.reportConfirm[key] = true;
+  };
+
+  self.cancelConfirmReport = function (studentId, sessionDate) {
+    var key = self._reportKey(studentId, sessionDate);
+    self.reportConfirm[key] = false;
+  };
+
+  // ── Final submit ──────────────────────────────────────────────────
+  self.submitReport = function (studentId, sessionDate) {
+    var key  = self._reportKey(studentId, sessionDate);
+    var form = self.reportForm[key];
+    if (!form) return;
+
+    self.reportSubmitting[key] = true;
+    self.reportError[key]      = null;
+    self.reportConfirm[key]    = false;
+
+    var payload = {
+      studentId:          studentId,
+      sessionDate:        sessionDate,
+      attendance:         form.attendance,
+      engagement:         form.attendance === 'absent' ? null : form.engagement,
+      understanding:      form.attendance === 'absent' ? null : form.understanding,
+      homeworkCompletion: form.attendance === 'absent' ? null : form.homeworkCompletion,
+      remarks:            form.remarks || null
+    };
+
+    BookingService.submitLessonReport(form.bookingId, payload)
+      .then(function () {
+        self.reportSuccess[key]    = true;
+        self.reportOpen[key]       = false;
+        self.reportSubmitting[key] = false;
+        // Refresh bookings so report status updates immediately
+        return BookingService.getAll();
+      })
+      .then(function (res) {
+        self._setBookings(res.data);
+      })
+      .catch(function (err) {
+        self.reportError[key] = (err.data && err.data.message)
+          ? err.data.message : 'Failed to submit report. Please try again.';
+        self.reportSubmitting[key] = false;
+      });
+  };
+
+  // ── Format session date for display ──────────────────────────────
+  self.formatSessionDate = function (dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr + 'T00:00:00');
+    var days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
   };
 
   // ── Malaysia + Singapore public holidays ────────────────────────────
@@ -538,12 +733,16 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     if (self.calMonth === 0) { self.calMonth = 11; self.calYear--; }
     else { self.calMonth--; }
     self.selectedCalDays = [];
+    self.reportSelectedDay = null;
+    self._recomputeReportView();
   };
 
   self.nextMonth = function () {
     if (self.calMonth === 11) { self.calMonth = 0; self.calYear++; }
     else { self.calMonth++; }
     self.selectedCalDays = [];
+    self.reportSelectedDay = null;
+    self._recomputeReportView();
   };
 
   self.calDaysArray = function () {
@@ -575,6 +774,30 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     if (idx > -1) { self.selectedCalDays.splice(idx, 1); return; }
     if (self.selectedCalDays.length >= 5) return;
     self.selectedCalDays.push(d);
+    // After setting selectedCalDays, also update reportSelectedDay
+    self.reportSelectedDay = calDayStr(d);
+    self._recomputeReportView();
+  };
+
+  // Calendar days are split into two click paths: toggleCalDay's multi-select
+  // (used by "Setup class") is deliberately future-only — you can't schedule a
+  // class in the past. But a completed class, by definition, is ALWAYS in the
+  // past (see BookingsController.GetAll's auto-complete rule), so the Class
+  // Reports Portal below needs past days to stay clickable even though Setup
+  // Class must keep rejecting them. A past-day click here only ever updates
+  // reportSelectedDay — it never touches selectedCalDays/Setup Class state.
+  self.onCalDayClick = function (d) {
+    if (!d) return;
+    if (self.isPastDay(d)) {
+      self.reportSelectedDay = calDayStr(d);
+      self._recomputeReportView();
+      return;
+    }
+    self.toggleCalDay(d);
+  };
+
+  self.isReportSelectedDay = function (d) {
+    return !!d && self.reportSelectedDay === calDayStr(d);
   };
 
   self.isCalDaySelected = function (d) { return self.selectedCalDays.indexOf(d) > -1; };
@@ -713,7 +936,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
         self.tutor = res.data;
         rebuildSetupClassModesList();
       });
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     }).catch(function (err) {
       self.cancelSlotBusy = false;
@@ -728,8 +951,13 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self.setupClassForm = {
     mode: '', subject: '', level: '', country: '',
     classSize: 'one-to-one', maxStudents: 1,
-    pricePerLesson: 0
+    pricePerLesson: 0,
+    syllabusTopicIds: []   // selected topic IDs (max 6)
   };
+
+  self.syllabusTopics       = [];   // available topics loaded from API
+  self.syllabusSearch       = '';   // autocomplete filter text
+  self.syllabusDropdownOpen = false;
   self.setupClassSlots = {}; // { "YYYY-MM-DD": ["09:00 AM", ...], ... }
 
   // Grid rows are 30-minute slots (8:00 AM – 9:30 PM) — each row IS an exact,
@@ -783,6 +1011,10 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     self.setupClassUniqueSubjectsList = [];
     self.setupClassForm.classSize = 'one-to-one';
     self.setupClassForm.maxStudents = 1;
+    self.setupClassForm.syllabusTopicIds = [];
+    self.syllabusTopics = [];
+    self.syllabusSearch = '';
+    self.syllabusDropdownOpen = false;
     self.setupClassError = '';
     self._slotDrag = null;
     self.setupClassOpen = true;
@@ -982,12 +1214,88 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     self.setupClassForm.subject = '';
     self.setupClassForm.level = '';
     self.setupClassForm.country = '';
+    self.setupClassForm.syllabusTopicIds = [];
+    self.syllabusTopics = [];
+    self.syllabusSearch = '';
     rebuildSetupClassSubjectsForMode();
   };
 
   self.onSubjectChange = function () {
     var match = self.setupClassUniqueSubjectsList.find(function (o) { return o.subject === self.setupClassForm.subject; });
     if (match) { self.setupClassForm.level = match.level; self.setupClassForm.country = match.country; }
+
+    // Reset and load syllabus topics for the now-resolved country+subject+level
+    self.setupClassForm.syllabusTopicIds = [];
+    self.syllabusTopics = [];
+    self.syllabusSearch = '';
+
+    if (match) {
+      TutorService.getSyllabusTopics(match.country, self.setupClassForm.subject, match.level).then(function (res) {
+        self.syllabusTopics = res.data || [];
+      });
+    }
+  };
+
+  // ── Syllabus topic dropdown helpers ───────────────────────────────
+  // Filtered topics based on autocomplete search
+  self.filteredSyllabusTopics = function () {
+    var q = (self.syllabusSearch || '').toLowerCase();
+    return self.syllabusTopics.filter(function (t) {
+      return !q || t.topic.toLowerCase().indexOf(q) >= 0;
+    });
+  };
+
+  // Toggle a topic selection
+  self.toggleSyllabusTopic = function (topicId) {
+    var idx = self.setupClassForm.syllabusTopicIds.indexOf(topicId);
+    if (idx > -1) {
+      self.setupClassForm.syllabusTopicIds.splice(idx, 1);
+    } else {
+      if (self.setupClassForm.syllabusTopicIds.length >= 6) return;
+      self.setupClassForm.syllabusTopicIds.push(topicId);
+    }
+  };
+
+  self.isSyllabusTopicSelected = function (topicId) {
+    return self.setupClassForm.syllabusTopicIds.indexOf(topicId) > -1;
+  };
+
+  self.syllabusSelectedCount = function () {
+    return self.setupClassForm.syllabusTopicIds.length;
+  };
+
+  // Topic name by ID
+  self.syllabusTopicName = function (topicId) {
+    var t = self.syllabusTopics.find(function (t) { return t.id === topicId; });
+    return t ? t.topic : '';
+  };
+
+  // Remove a selected topic chip
+  self.removeSyllabusTopic = function (topicId) {
+    var idx = self.setupClassForm.syllabusTopicIds.indexOf(topicId);
+    if (idx > -1) self.setupClassForm.syllabusTopicIds.splice(idx, 1);
+  };
+
+  self.toggleSyllabusDropdown = function () {
+    self.syllabusDropdownOpen = !self.syllabusDropdownOpen;
+    if (self.syllabusDropdownOpen) self.syllabusSearch = '';
+  };
+
+  self.closeSyllabusDropdown = function () {
+    self.syllabusDropdownOpen = false;
+  };
+
+  // Mirrors the validation checks in submitSetupClass below — used to drive the
+  // Setup Class modal's submit button disabled state.
+  self.setupClassFormValid = function () {
+    var f = self.setupClassForm;
+    var hasSlots = self.setupClassTotalSlots() > 0;
+    return hasSlots
+      && f.mode
+      && f.subject
+      && f.classSize
+      && f.maxStudents > 0
+      && f.pricePerLesson > 0;
   };
 
   self.submitSetupClass = function () {
@@ -1026,7 +1334,8 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       country: self.setupClassForm.country,
       classSize: self.setupClassForm.classSize,
       maxStudents: self.setupClassForm.maxStudents,
-      pricePerLesson: self.setupClassForm.pricePerLesson
+      pricePerLesson: self.setupClassForm.pricePerLesson,
+      syllabusTopicIds: self.setupClassForm.syllabusTopicIds
     }).then(function () {
       self.setupClassSaving = false;
       self.setupClassOpen = false;
@@ -1053,7 +1362,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // Actions
   self.confirmBooking = function (booking) {
     BookingService.updateStatus(booking.id, 'confirmed', null).then(function () {
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     });
   };
@@ -1136,7 +1445,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     }).then(function () {
       self.counterSuccess = true;
       self.counterBooking = null;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       $timeout(function () {
         self.counterSuccess = false;
       }, 2000);
@@ -1230,7 +1539,7 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
       self.rescheduleSuccess = true;
       self.blockConflicts = [];
       self.cancelTutorReschedule();
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       $timeout(function () {
         self.rescheduleSuccess = false;
       }, 2500);
@@ -1241,72 +1550,12 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self.acceptCounterProposal = function (booking) {
     BookingService.updateStatus(booking.id, 'confirmed', null).then(function () {
       self.counterAcceptSuccess = true;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       $timeout(function () {
         self.counterAcceptSuccess = false;
       }, 2500);
     });
   };
-
-  self.startReport = function (booking) {
-    self.reportBooking = booking;
-    self.reportForm = { covered: '', performance: '', homework: '' };
-    self.reportSuccess = false;
-    self.reportError = '';
-  };
-
-  self.submitReport = function () {
-    if (!self.reportBooking) return;
-    self.reportError = ProfanityFilterService.validate(self.reportForm.covered)
-      || ProfanityFilterService.validate(self.reportForm.performance)
-      || ProfanityFilterService.validate(self.reportForm.homework);
-    if (self.reportError) return;
-    BookingService.submitLessonReport(self.reportBooking.id, self.reportForm).then(function () {
-      self.reportSuccess = true;
-      self.reportBooking = null;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
-      $timeout(function () {
-        self.reportSuccess = false;
-      }, 2000);
-    }, function (err) {
-      self.reportError = (err.data && err.data.message) ? err.data.message : 'Failed to publish report. Please try again.';
-    });
-  };
-
-  self.cancelReport = function () { self.reportBooking = null; };
-
-  self.startEdit = function (booking) {
-    self.editBooking = booking;
-    self.editForm = {
-      covered: booking.lessonReport.covered,
-      performance: booking.lessonReport.performance,
-      homework: booking.lessonReport.homework,
-      changesMade: ''
-    };
-    self.editSuccess = false;
-    self.editError = '';
-  };
-
-  self.submitEdit = function () {
-    if (!self.editBooking) return;
-    self.editError = ProfanityFilterService.validate(self.editForm.covered)
-      || ProfanityFilterService.validate(self.editForm.performance)
-      || ProfanityFilterService.validate(self.editForm.homework)
-      || ProfanityFilterService.validate(self.editForm.changesMade);
-    if (self.editError) return;
-    BookingService.editLessonReport(self.editBooking.id, self.editForm).then(function () {
-      self.editSuccess = true;
-      self.editBooking = null;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
-      $timeout(function () {
-        self.editSuccess = false;
-      }, 2000);
-    }, function (err) {
-      self.editError = (err.data && err.data.message) ? err.data.message : 'Failed to save changes. Please try again.';
-    });
-  };
-
-  self.cancelEdit = function () { self.editBooking = null; };
 
   // Edit profile offerings
   self.addOffering = function () {
@@ -1710,8 +1959,8 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
 
   // Poll for booking updates (e.g. parent accepts counter proposal)
   var _pollInterval = $interval(function () {
-    if (!self.rescheduleBooking && !self.counterBooking && !self.reportBooking && !self.editBooking) {
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    if (!self.rescheduleBooking && !self.counterBooking) {
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
     }
   }, 15000);
   // $scope (not $rootScope) — $rootScope never actually fires '$destroy' on a

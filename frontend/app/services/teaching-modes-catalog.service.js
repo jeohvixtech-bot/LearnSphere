@@ -6,7 +6,6 @@
 angular.module('learnSphereApp')
 .constant('TeachingModesCatalog', [
   { mode: 'Online', description: 'Remote via video call', icon: 'ti-video' },
-  { mode: 'Home Visit', description: 'Tutor travels to student', icon: 'ti-home' },
   { mode: 'Tutor Place', description: "At the tutor's own place", icon: 'ti-map-pin' },
   { mode: 'Tuition Center', description: 'At a learning center', icon: 'ti-building' }
 ]);

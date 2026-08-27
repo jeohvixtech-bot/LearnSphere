@@ -60,7 +60,9 @@ public class TutorsController : ControllerBase
             query = query.Where(t => t.Rating >= rating.Value);
 
         var tutors = await query.ToListAsync();
-        return Ok(tutors.Select(MapToDto));
+        var syllabusMap = await LoadSyllabusMapAsync(
+            tutors.SelectMany(t => t.TimeSlots).Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(tutors.Select(t => MapToDto(t, syllabusMap)));
     }
 
     // AI Speed Match score, one row per verified/online tutor. Reads live weightage
@@ -239,7 +241,9 @@ public class TutorsController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null || !tutor.IsVerified || !tutor.IsOnline) return NotFound();
-        return Ok(MapToDto(tutor));
+        var syllabusMap = await LoadSyllabusMapAsync(
+            tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(MapToDto(tutor, syllabusMap));
     }
 
     [HttpDelete("{id}")]
@@ -309,6 +313,7 @@ public class TutorsController : ControllerBase
             .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == tutor.Id);
 
+        // Freshly-registered tutor has no TimeSlots yet, so no syllabus map needed.
         return Ok(MapToDto(created!));
     }
 
@@ -329,7 +334,9 @@ public class TutorsController : ControllerBase
             .FirstOrDefaultAsync(t => t.UserId == userId);
 
         if (tutor == null) return NotFound();
-        return Ok(MapToDto(tutor));
+        var syllabusMap = await LoadSyllabusMapAsync(
+            tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(MapToDto(tutor, syllabusMap));
     }
 
     [HttpPut("{id}")]
@@ -432,7 +439,9 @@ public class TutorsController : ControllerBase
             .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
-        return Ok(MapToDto(updated!));
+        var syllabusMapUpdate = await LoadSyllabusMapAsync(
+            updated!.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(MapToDto(updated!, syllabusMapUpdate));
     }
 
     [HttpPatch("{id}/online-status")]
@@ -459,7 +468,9 @@ public class TutorsController : ControllerBase
             .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
-        return Ok(MapToDto(updated!));
+        var syllabusMapOnline = await LoadSyllabusMapAsync(
+            updated!.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(MapToDto(updated!, syllabusMapOnline));
     }
 
     // Sole source of truth for a tutor's overall teaching modes (the drag-and-drop
@@ -489,7 +500,9 @@ public class TutorsController : ControllerBase
             .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
-        return Ok(MapToDto(updated!));
+        var syllabusMapModes = await LoadSyllabusMapAsync(
+            updated!.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(MapToDto(updated!, syllabusMapModes));
     }
 
     // A student's subjects live packed into SubjectSelect as one or more
@@ -658,6 +671,41 @@ public class TutorsController : ControllerBase
         d.FileUrl != null || d.ExternalUrl != null
         || (d.DocumentType == "identity_id" && !string.IsNullOrWhiteSpace(d.IdNumber));
 
+    // Platform-defined syllabus topics for a country+subject+level combination —
+    // read-only reference data, no auth required (same tier as the public catalog).
+    [HttpGet("syllabus-topics")]
+    public async Task<IActionResult> GetSyllabusTopics(
+        [FromQuery] string country,
+        [FromQuery] string subject,
+        [FromQuery] string level)
+    {
+        var topics = await _context.SyllabusTopics
+            .Where(t =>
+                t.Country == country &&
+                t.Subject  == subject &&
+                t.Level    == level)
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new SyllabusTopicDto { Id = t.Id, Topic = t.Topic, SortOrder = t.SortOrder })
+            .ToListAsync();
+
+        return Ok(topics);
+    }
+
+    // Batch-loads syllabus topics for every preset group id given, keyed by
+    // PresetGroupId — used by MapToDto so a tutor's whole Timetable can be mapped
+    // with a single query instead of one per slot.
+    private async Task<Dictionary<string, List<string>>> LoadSyllabusMapAsync(IEnumerable<string> presetGroupIds)
+    {
+        var ids = presetGroupIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<string, List<string>>();
+
+        return await _context.PresetGroupSyllabuses
+            .Include(pgs => pgs.SyllabusTopic)
+            .Where(pgs => ids.Contains(pgs.PresetGroupId))
+            .GroupBy(pgs => pgs.PresetGroupId)
+            .ToDictionaryAsync(g => g.Key, g => g.Select(pgs => pgs.SyllabusTopic.Topic).ToList());
+    }
+
     // Publishes tutor-preset class slots (Flow B) — a parent books these directly
     // without a per-request confirmation step. Only the owning tutor can call this.
     [HttpPost("{id}/setup-class")]
@@ -680,6 +728,30 @@ public class TutorsController : ControllerBase
             return BadRequest(new { message = "Please select a subject." });
         if (dto.PricePerLesson <= 0)
             return BadRequest(new { message = "Please enter a price per lesson." });
+
+        // Syllabus topic selection is optional — not every subject+level has
+        // platform-seeded topics yet (e.g. Mother Tongue), and a tutor shouldn't be
+        // blocked from publishing a class just because that reference data is
+        // incomplete. Still capped at 6, and whatever IS selected must be real and
+        // match this class's country+subject+level.
+        dto.SyllabusTopicIds ??= new List<int>();
+        if (dto.SyllabusTopicIds.Count > 6)
+            return BadRequest(new { message = "You may select a maximum of 6 syllabus topics." });
+
+        if (dto.SyllabusTopicIds.Count > 0)
+        {
+            var validTopicIds = await _context.SyllabusTopics
+                .Where(t =>
+                    t.Country == dto.Country &&
+                    t.Subject  == dto.Subject &&
+                    t.Level    == dto.Level &&
+                    dto.SyllabusTopicIds.Contains(t.Id))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            if (validTopicIds.Count != dto.SyllabusTopicIds.Count)
+                return BadRequest(new { message = "One or more selected syllabus topics are invalid for this subject and level." });
+        }
 
         // Classes can only be scheduled from next month onward — never the current
         // month, regardless of how many days are left in it.
@@ -766,6 +838,17 @@ public class TutorsController : ControllerBase
         // happen to share the same subject.
         var presetGroupId = "PRESET" + createdSlots[0].Id.ToString("D6");
         foreach (var s in createdSlots) s.PresetGroupId = presetGroupId;
+        await _context.SaveChangesAsync();
+
+        // Save syllabus topic selections for this preset group
+        foreach (var topicId in dto.SyllabusTopicIds)
+        {
+            _context.PresetGroupSyllabuses.Add(new PresetGroupSyllabus
+            {
+                PresetGroupId   = presetGroupId,
+                SyllabusTopicId = topicId
+            });
+        }
         await _context.SaveChangesAsync();
 
         return Ok(new { slotIds = createdSlots.Select(s => s.Id).ToList(), presetGroupId });
@@ -1044,7 +1127,9 @@ public class TutorsController : ControllerBase
             .Include(t => t.Documents)
             .FirstOrDefaultAsync(t => t.Id == id);
 
-        return Ok(MapToDto(updated!));
+        var syllabusMapReview = await LoadSyllabusMapAsync(
+            updated!.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
+        return Ok(MapToDto(updated!, syllabusMapReview));
     }
 
     // Mandatory documents an offering-unlock decision is based on: identity + at
@@ -1525,7 +1610,10 @@ public class TutorsController : ControllerBase
         return Ok(new { message = "Decisions applied and tutor notified.", verified = fullyApproved });
     }
 
-    private static TutorDto MapToDto(Tutor t) => new()
+    private static TutorDto MapToDto(Tutor t, Dictionary<string, List<string>>? syllabusMap = null)
+    {
+        var sm = syllabusMap ?? new Dictionary<string, List<string>>();
+        return new()
     {
         Id = t.Id,
         UserId = t.UserId,
@@ -1559,8 +1647,11 @@ public class TutorsController : ControllerBase
             Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId,
             EndTime = s.EndTime, Mode = s.Mode, Subject = s.Subject, Level = s.Level, Country = s.Country,
             ClassSize = s.ClassSize, MaxStudents = s.MaxStudents, ConfirmedCount = s.ConfirmedCount,
-            IsFull = s.IsFull, PricePerLesson = s.PricePerLesson, PresetGroupId = s.PresetGroupId
+            IsFull = s.IsFull, PricePerLesson = s.PricePerLesson, PresetGroupId = s.PresetGroupId,
+            SyllabusTopics = s.PresetGroupId != null && sm.TryGetValue(s.PresetGroupId, out var topics)
+                ? topics : new List<string>()
         }).ToList(),
         Offerings = t.Offerings.Select(o => new TutorOfferingDto { Country = o.Country, Subject = o.Subject, Level = o.Level, Mode = o.Mode }).ToList()
     };
+    }
 }

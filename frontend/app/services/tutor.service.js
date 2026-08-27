@@ -58,6 +58,12 @@ angular.module('learnSphereApp')
     });
   };
 
+  self.getSyllabusTopics = function (country, subject, level) {
+    return $http.get(API_URL + '/tutors/syllabus-topics', {
+      params: { country: country, subject: subject, level: level }
+    });
+  };
+
   self.getMatchScores = function () {
     return $http.get(API_URL + '/tutors/match-scores');
   };

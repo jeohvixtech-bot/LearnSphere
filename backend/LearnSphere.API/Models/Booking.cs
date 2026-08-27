@@ -26,7 +26,7 @@ public class Booking
     public ICollection<BookingClass> Classes { get; set; } = new List<BookingClass>();
     public ICollection<BookingPresetSlot> PresetSlots { get; set; } = new List<BookingPresetSlot>();
     public ICollection<CounterProposal> CounterProposals { get; set; } = new List<CounterProposal>();
-    public LessonReport? LessonReport { get; set; }
+    public ICollection<LessonReport> LessonReports { get; set; } = new List<LessonReport>();
     public IssueReport? IssueReport { get; set; }
     public Invoice? Invoice { get; set; }
 }
@@ -50,6 +50,7 @@ public class BookingPresetSlot
     public int BookingId { get; set; }
     public Booking Booking { get; set; } = null!;
     public int TutorTimeSlotId { get; set; }
+    public TutorTimeSlot? TutorTimeSlot { get; set; }
 }
 
 public class CounterProposal
@@ -75,26 +76,43 @@ public class CounterProposalClass
     public string ProposedTime { get; set; } = string.Empty;
 }
 
+// One report per student per session date — not per booking.
+// For group classes (one-to-many), each student gets their own report
+// for the same session date. Absent students still get a report
+// (other fields are null/empty).
 public class LessonReport
 {
     public int Id { get; set; }
+
     public int BookingId { get; set; }
     public Booking Booking { get; set; } = null!;
-    public string Covered { get; set; } = string.Empty;
-    public string Performance { get; set; } = string.Empty;
-    public string Homework { get; set; } = string.Empty;
-    public string SubmitDate { get; set; } = string.Empty;
 
-    public List<LessonReportEdit> EditHistory { get; set; } = new();
-}
+    public int StudentId { get; set; }
+    public Student Student { get; set; } = null!;
 
-public class LessonReportEdit
-{
-    public int Id { get; set; }
-    public int LessonReportId { get; set; }
-    public LessonReport LessonReport { get; set; } = null!;
-    public string Date { get; set; } = string.Empty;
-    public string Changes { get; set; } = string.Empty;
+    // The specific session date this report covers (YYYY-MM-DD)
+    // Matches BookingClass.Date (Flow A) or TutorTimeSlot.Day (Flow B)
+    public string SessionDate { get; set; } = string.Empty;
+
+    // Assessment fields
+    // Attendance: "present" | "late" | "absent"
+    public string Attendance { get; set; } = string.Empty;
+
+    // Engagement: 1–5 stars. Null when absent.
+    public int? Engagement { get; set; }
+
+    // Understanding: "excellent" | "good" | "needs_improvement" | "struggling"
+    // Null when absent.
+    public string? Understanding { get; set; }
+
+    // HomeworkCompletion: "completed" | "incomplete" | "no_homework_given"
+    // Null when absent.
+    public string? HomeworkCompletion { get; set; }
+
+    // Remarks: free text, optional even when present.
+    public string? Remarks { get; set; }
+
+    public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class IssueReport

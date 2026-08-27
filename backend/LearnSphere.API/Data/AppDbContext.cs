@@ -23,7 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<CounterProposal> CounterProposals { get; set; }
     public DbSet<CounterProposalClass> CounterProposalClasses { get; set; }
     public DbSet<LessonReport> LessonReports { get; set; }
-    public DbSet<LessonReportEdit> LessonReportEdits { get; set; }
+    public DbSet<StudentTutorFirstClass> StudentTutorFirstClasses { get; set; }
     public DbSet<IssueReport> IssueReports { get; set; }
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<Notification> Notifications { get; set; }
@@ -36,6 +36,8 @@ public class AppDbContext : DbContext
     public DbSet<ScoringWeightage> ScoringWeightages { get; set; }
     public DbSet<PresetCancellationDecision> PresetCancellationDecisions { get; set; }
     public DbSet<TutorPenalty> TutorPenalties { get; set; }
+    public DbSet<SyllabusTopic> SyllabusTopics { get; set; }
+    public DbSet<PresetGroupSyllabus> PresetGroupSyllabuses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -84,6 +86,12 @@ public class AppDbContext : DbContext
             .WithMany(b => b.Classes)
             .HasForeignKey(bc => bc.BookingId);
 
+        modelBuilder.Entity<BookingPresetSlot>()
+            .HasOne(bps => bps.TutorTimeSlot)
+            .WithMany()
+            .HasForeignKey(bps => bps.TutorTimeSlotId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<CounterProposal>()
             .HasOne(cp => cp.Booking)
             .WithMany(b => b.CounterProposals)
@@ -94,10 +102,47 @@ public class AppDbContext : DbContext
             .WithMany(cp => cp.Classes)
             .HasForeignKey(c => c.CounterProposalId);
 
-        modelBuilder.Entity<LessonReport>()
-            .HasOne(lr => lr.Booking)
-            .WithOne(b => b.LessonReport)
-            .HasForeignKey<LessonReport>(lr => lr.BookingId);
+        modelBuilder.Entity<LessonReport>(entity =>
+        {
+            // One report per student per session date per booking
+            entity.HasIndex(e => new
+            {
+                e.BookingId, e.StudentId, e.SessionDate
+            }).IsUnique().HasDatabaseName("UQ_LessonReport_BookingStudentDate");
+
+            entity.HasOne(e => e.Booking)
+                .WithMany(b => b.LessonReports)
+                .HasForeignKey(e => e.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Student)
+                .WithMany()
+                .HasForeignKey(e => e.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StudentTutorFirstClass>(entity =>
+        {
+            entity.HasIndex(e => new
+            {
+                e.Country, e.Subject, e.Level, e.TutorId, e.StudentId
+            }).IsUnique().HasDatabaseName("UQ_StudentTutorFirstClass");
+
+            entity.HasOne(e => e.Tutor)
+                .WithMany()
+                .HasForeignKey(e => e.TutorId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Student)
+                .WithMany()
+                .HasForeignKey(e => e.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Booking)
+                .WithMany()
+                .HasForeignKey(e => e.BookingId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
 
         modelBuilder.Entity<IssueReport>()
             .HasOne(ir => ir.Booking)
@@ -152,5 +197,24 @@ public class AppDbContext : DbContext
             .HasIndex(r => new { r.TutorId, r.BookingId })
             .IsUnique()
             .HasFilter("[BookingId] IS NOT NULL");
+
+        modelBuilder.Entity<SyllabusTopic>(entity =>
+        {
+            entity.HasIndex(e => new { e.Country, e.Subject, e.Level, e.Topic })
+                  .IsUnique()
+                  .HasDatabaseName("UQ_SyllabusTopic");
+        });
+
+        modelBuilder.Entity<PresetGroupSyllabus>(entity =>
+        {
+            entity.HasIndex(e => new { e.PresetGroupId, e.SyllabusTopicId })
+                  .IsUnique()
+                  .HasDatabaseName("UQ_PresetGroupSyllabus");
+
+            entity.HasOne(e => e.SyllabusTopic)
+                  .WithMany()
+                  .HasForeignKey(e => e.SyllabusTopicId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }

@@ -162,6 +162,37 @@ CREATE TABLE IF NOT EXISTS TutorTimeSlots (
 );
 
 -- ============================================================
+-- SyllabusTopics — platform-defined topics per country+subject+level.
+-- Seeded once by admin. Max 6 topics per subject+level combination.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS SyllabusTopics (
+    Id          INT          NOT NULL AUTO_INCREMENT,
+    Country     VARCHAR(10)  NOT NULL DEFAULT '',
+    Subject     VARCHAR(100) NOT NULL DEFAULT '',
+    Level       VARCHAR(100) NOT NULL DEFAULT '',
+    Topic       VARCHAR(200) NOT NULL DEFAULT '',
+    SortOrder   INT          NOT NULL DEFAULT 0,
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_SyllabusTopic (Country, Subject, Level, Topic),
+    KEY IX_SyllabusTopics_Country_Subject_Level (Country, Subject, Level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- PresetGroupSyllabuses — topics a tutor selected for a preset group (max 6).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PresetGroupSyllabuses (
+    Id              INT          NOT NULL AUTO_INCREMENT,
+    PresetGroupId   VARCHAR(20)  NOT NULL DEFAULT '',
+    SyllabusTopicId INT          NOT NULL,
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_PresetGroupSyllabus (PresetGroupId, SyllabusTopicId),
+    KEY IX_PresetGroupSyllabuses_PresetGroupId (PresetGroupId),
+    CONSTRAINT FK_PresetGroupSyllabuses_SyllabusTopics
+        FOREIGN KEY (SyllabusTopicId) REFERENCES SyllabusTopics(Id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
 -- Students
 -- ============================================================
 CREATE TABLE IF NOT EXISTS Students (
@@ -179,12 +210,39 @@ CREATE TABLE IF NOT EXISTS Students (
 );
 
 -- ============================================================
+-- StudentTutorFirstClasses  (tracks the first confirmed lesson between a
+-- student and a tutor for a given country+subject+level combination —
+-- inserted on booking confirmed (Flow A) and auto-confirmed (Flow B).
+-- Fee logic is a TODO, wired in once pricing rules are finalised.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS StudentTutorFirstClasses (
+    Id        INT          NOT NULL AUTO_INCREMENT,
+    Country   VARCHAR(50)  NOT NULL DEFAULT '',
+    Subject   VARCHAR(100) NOT NULL DEFAULT '',
+    Level     VARCHAR(100) NOT NULL DEFAULT '',
+    TutorId   INT          NOT NULL,
+    StudentId INT          NOT NULL,
+    BookingId INT          NULL,
+    CreatedAt DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_StudentTutorFirstClass (Country, Subject, Level, TutorId, StudentId),
+    KEY IX_STFC_TutorId   (TutorId),
+    KEY IX_STFC_StudentId (StudentId),
+    CONSTRAINT FK_STFC_Tutors
+        FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)    ON DELETE CASCADE,
+    CONSTRAINT FK_STFC_Students
+        FOREIGN KEY (StudentId) REFERENCES Students(Id)  ON DELETE CASCADE,
+    CONSTRAINT FK_STFC_Bookings
+        FOREIGN KEY (BookingId) REFERENCES Bookings(Id)  ON DELETE SET NULL
+);
+
+-- ============================================================
 -- StudentPreferredModes  (ranked teaching-mode preference per child)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS StudentPreferredModes (
     Id         INT AUTO_INCREMENT PRIMARY KEY,
     StudentId  INT          NOT NULL,
-    Mode       VARCHAR(50)  NOT NULL, -- Online | Home Visit | Tutor Place | Tuition Center
+    Mode       VARCHAR(50)  NOT NULL, -- Online | Tutor Place | Tuition Center
     Sequence   INT          NOT NULL DEFAULT 0, -- preference order, ascending
     KEY IX_StudentPreferredModes_StudentId (StudentId),
     CONSTRAINT FK_StudentPreferredModes_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE CASCADE
@@ -288,29 +346,32 @@ CREATE TABLE IF NOT EXISTS CounterProposalClasses (
 );
 
 -- ============================================================
--- LessonReports  (1-to-1 with Booking)
+-- LessonReports — one report per student per session date.
+-- For group classes each student gets their own personalised report.
+-- Reports cannot be edited after submission.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS LessonReports (
-    Id          INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId   INT         NOT NULL UNIQUE,
-    Covered     LONGTEXT    NOT NULL,
-    Performance LONGTEXT    NOT NULL,
-    Homework    LONGTEXT    NOT NULL,
-    SubmitDate  LONGTEXT    NOT NULL,
-    CONSTRAINT FK_LessonReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+    Id                  INT          NOT NULL AUTO_INCREMENT,
+    BookingId           INT          NOT NULL,
+    StudentId           INT          NOT NULL,
+    SessionDate         VARCHAR(20)  NOT NULL DEFAULT '',
+    Attendance          VARCHAR(20)  NOT NULL DEFAULT '',
+    Engagement          INT          NULL,
+    Understanding       VARCHAR(30)  NULL,
+    HomeworkCompletion  VARCHAR(30)  NULL,
+    Remarks             LONGTEXT     NULL,
+    SubmittedAt         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_LessonReport_BookingStudentDate
+        (BookingId, StudentId, SessionDate),
+    KEY IX_LessonReports_BookingId (BookingId),
+    KEY IX_LessonReports_StudentId (StudentId),
+    CONSTRAINT FK_LessonReports_Bookings
+        FOREIGN KEY (BookingId)  REFERENCES Bookings(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_LessonReports_Students
+        FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT
 );
-
--- ============================================================
--- LessonReportEdits  (edit history for a lesson report)
--- ============================================================
-CREATE TABLE IF NOT EXISTS LessonReportEdits (
-    Id               INT AUTO_INCREMENT PRIMARY KEY,
-    LessonReportId   INT         NOT NULL,
-    Date             LONGTEXT    NOT NULL,
-    Changes          LONGTEXT    NOT NULL,
-    CONSTRAINT FK_LessonReportEdits_LessonReports
-        FOREIGN KEY (LessonReportId) REFERENCES LessonReports(Id) ON DELETE CASCADE
-);
+-- LessonReportEdits removed — reports are immutable after submission
 
 -- ============================================================
 -- IssueReports  (1-to-1 with Booking)

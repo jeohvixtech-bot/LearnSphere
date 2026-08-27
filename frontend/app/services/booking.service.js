@@ -24,12 +24,12 @@ angular.module('learnSphereApp')
     }, h());
   };
 
-  self.submitLessonReport = function (id, data) {
-    return $http.post(API_URL + '/bookings/' + id + '/lesson-report', data, h());
+  self.submitLessonReport = function (bookingId, data) {
+    return $http.post(API_URL + '/bookings/' + bookingId + '/lesson-reports', data, h());
   };
 
-  self.editLessonReport = function (id, data) {
-    return $http.patch(API_URL + '/bookings/' + id + '/lesson-report', data, h());
+  self.getLessonReports = function (bookingId) {
+    return $http.get(API_URL + '/bookings/' + bookingId + '/lesson-reports', h());
   };
 
   self.reportIssue = function (id, data) {

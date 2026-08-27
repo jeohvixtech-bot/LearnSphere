@@ -102,4 +102,10 @@ angular.module('learnSphereApp')
   return function (type) {
     return labels[type] || type || '';
   };
+})
+.filter('capitalize', function () {
+  return function (s) {
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
+  };
 });
