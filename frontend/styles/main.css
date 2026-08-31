@@ -16,6 +16,21 @@
   --pool-danger: #dc2626;
 }
 
+/* Broadsheet-redesign override of the --pool-* tokens above, scoped to .bs-scope
+   so un-migrated pages (e.g. parent/students.html) keep the original values —
+   only pages wrapped in .bs-scope (currently tutor/overview.html) pick up the
+   new palette for the setup-class grid, offering-mode drag pools, and their
+   shared legend dots. */
+.bs-scope {
+  --pool-accent: var(--color-accent);
+  --pool-accent-bg: var(--color-accent-100);
+  --pool-accent-border: var(--color-accent-300);
+  --pool-success: var(--color-accent-700);
+  --pool-muted: var(--color-neutral-500);
+  --pool-muted-bg: var(--color-neutral-100);
+  --pool-danger: var(--color-accent-2-700);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -347,6 +362,7 @@ a { text-decoration: none; color: inherit; }
 .badge-country { background: #ecfdf5; color: #047857; font-size: 11px; font-weight: 700; padding: 2px 5px; border-radius: 4px; border: 1px solid #a7f3d0; }
 .badge-type { background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 700; padding: 2px 5px; border-radius: 4px; border: 1px solid #e2e8f0; margin-left: 4px; }
 .badge-amber { background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: monospace; text-transform: uppercase; }
+.bs-scope .badge-amber { background: var(--color-accent-2-100); color: var(--color-accent-2-800); font-family: inherit; }
 .badge-school { background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; display: inline-block; margin-top: 4px; }
 .rating-badge { background: #fef9c3; color: #a16207; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1px solid #fde047; }
 .online-badge { color: #16a34a; font-size: 12px; font-weight: 700; text-transform: uppercase; }
@@ -612,6 +628,9 @@ a { text-decoration: none; color: inherit; }
 .school-option { text-align: left; width: 100%; background: none; border: none; border-radius: 8px; padding: 8px; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .school-option:hover { background: #ecfdf5; }
 .school-option-other { margin-top: 4px; border-top: 1px dashed #e2e8f0; border-radius: 0; padding-top: 10px; color: #0d9488; font-weight: 600; }
+.bs-scope .school-option:hover { background: var(--color-accent-100); }
+.bs-scope .school-option-other { color: var(--color-accent-800); }
+.bs-scope .school-dropdown { background: var(--color-surface); border-color: var(--color-divider); }
 
 /* ---- Session / Booking Table ---- */
 .table-wrap { overflow-x: auto; }
@@ -1823,6 +1842,7 @@ a { text-decoration: none; color: inherit; }
   transition: all .12s;
 }
 .filter-chip.active { background: #059669; color: #fff; border-color: #059669; }
+.bs-scope .filter-chip.active { background: var(--color-accent); border-color: var(--color-accent); }
 .filter-select-sm {
   font-size: 13px;
   font-weight: 500;
@@ -2607,7 +2627,7 @@ a { text-decoration: none; color: inherit; }
   transition: background .12s, color .12s;
 }
 .segmented-toggle button:hover:not(.active) { background: #e2e8f0; }
-.segmented-toggle button.active { background: #059669; color: #fff; box-shadow: inset 0 0 0 1px #047857; }
+.segmented-toggle button.active { background: var(--color-accent); color: #fff; box-shadow: inset 0 0 0 1px var(--color-accent-700); }
 
 .setup-footer-legend { display: flex; align-items: center; gap: 14px; font-size: 12px; flex-wrap: wrap; }
 .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
@@ -2805,6 +2825,7 @@ a { text-decoration: none; color: inherit; }
   height: 100%; background: #059669;
   border-radius: 100px; transition: width .3s;
 }
+.bs-scope .verif-progress-fill { background: var(--color-accent); }
 
 .verif-banner {
   display: flex; align-items: flex-start; gap: 10px;
@@ -2816,6 +2837,9 @@ a { text-decoration: none; color: inherit; }
 .verif-banner--success { background: #f0fdf4; border: 0.5px solid #bbf7d0; color: #15803d; }
 .verif-banner--warning { background: #fffbeb; border: 0.5px solid #fde68a; color: #92400e; }
 .verif-banner--danger  { background: #fef2f2; border: 0.5px solid #fecaca; color: #b91c1c; }
+.bs-scope .verif-banner--success { background: var(--color-accent-100); border-color: var(--color-accent-300); color: var(--color-accent-800); }
+.bs-scope .verif-banner--warning,
+.bs-scope .verif-banner--danger { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); color: var(--color-accent-2-800); }
 
 .verif-card {
   background: #fafafa; border: 0.5px solid #e2e8f0;
@@ -2846,6 +2870,7 @@ a { text-decoration: none; color: inherit; }
 .verif-upload-box-text { flex: 1; }
 .verif-upload-box-text p { font-size: 13px; color: #475569; margin: 0; }
 .verif-upload-box-text span { font-size: 11px; color: #94a3b8; }
+.bs-scope .verif-upload-box:hover { border-color: var(--color-accent); }
 
 .verif-browse-btn {
   font-size: 12px; font-weight: 600;
@@ -2855,6 +2880,7 @@ a { text-decoration: none; color: inherit; }
   white-space: nowrap; cursor: pointer;
 }
 .verif-browse-btn:disabled { opacity: .45; cursor: not-allowed; }
+.bs-scope .verif-browse-btn { color: var(--color-accent-800); background: var(--color-accent-100); border-color: var(--color-accent-300); }
 
 .verif-upload-done {
   display: flex; align-items: center; gap: 8px;
@@ -2880,6 +2906,16 @@ a { text-decoration: none; color: inherit; }
   border-radius: 6px; padding: 3px 8px;
   cursor: pointer; flex-shrink: 0;
 }
+.bs-scope .verif-upload-done { background: var(--color-accent-100); border-color: var(--color-accent-300); }
+.bs-scope .verif-upload-done--rejected { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
+.bs-scope .verif-upload-done i { color: var(--color-accent-700); }
+.bs-scope .verif-upload-done--rejected i { color: var(--color-accent-2-700); }
+.bs-scope .verif-filename { color: var(--color-accent-800); }
+.bs-scope .verif-upload-done--rejected .verif-filename { color: var(--color-accent-2-800); }
+.bs-scope .verif-filesize { color: var(--color-accent-800); }
+.bs-scope .verif-remove-btn,
+.bs-scope .verif-reupload-btn { color: var(--color-accent-2-700); }
+.bs-scope .verif-reupload-btn { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
 
 .verif-or-divider {
   display: flex; align-items: center; gap: 8px; margin: 8px 0;
@@ -3000,6 +3036,9 @@ a { text-decoration: none; color: inherit; }
   color: #92400e;
   border: 0.5px solid #fde68a;
 }
+.bs-scope .verif-doc-status-badge.badge-approved { background: var(--color-accent-100); color: var(--color-accent-800); border-color: var(--color-accent-300); }
+.bs-scope .verif-doc-status-badge.badge-rejected { background: var(--color-accent-2-100); color: var(--color-accent-2-800); border-color: var(--color-accent-2-300); }
+.bs-scope .verif-doc-status-badge.badge-pending-sm { background: var(--color-neutral-100); color: var(--color-neutral-700); border-color: var(--color-neutral-300); }
 
 /* ── Max reached notice ─────────────────────────────────────── */
 .verif-max-notice {
@@ -3032,6 +3071,7 @@ a { text-decoration: none; color: inherit; }
 
 /* ── Lesson reports (Class Reports Portal) ──────────────────── */
 .badge-green { background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: monospace; text-transform: uppercase; }
+.bs-scope .badge-green { background: var(--color-accent-100); color: var(--color-accent-800); font-family: inherit; }
 
 /* ── Parent-side lesson report entries (sessions.html) ──────── */
 .lesson-report-entry { padding: 8px 0; border-top: 1px dashed #bbf7d0; }
@@ -3084,6 +3124,7 @@ a { text-decoration: none; color: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 500; flex-shrink: 0;
 }
+.bs-scope .avatar-sm { background: var(--color-accent-100); color: var(--color-accent-800); font-family: var(--font-heading); }
 
 /* ── Assessment form wrap ───────────────────────────────────── */
 .report-form-wrap {
@@ -3095,6 +3136,7 @@ a { text-decoration: none; color: inherit; }
   margin-top: 8px;
   position: relative;
 }
+.bs-scope .report-form-wrap { background: var(--color-bg); border-color: var(--color-divider); }
 .report-form-header {
   display: flex;
   align-items: center;
@@ -3117,6 +3159,10 @@ a { text-decoration: none; color: inherit; }
 .chip-btn.active-green { background: #ecfdf5; border-color: #a7f3d0; color: #059669; font-weight: 500; }
 .chip-btn.active-amber { background: #fef9c3; border-color: #fde047; color: #854d0e; font-weight: 500; }
 .chip-btn.active-red   { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; font-weight: 500; }
+.bs-scope .chip-btn.active,
+.bs-scope .chip-btn.active-green { background: var(--color-accent-100); border-color: var(--color-accent-300); color: var(--color-accent-800); }
+.bs-scope .chip-btn.active-amber { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); color: var(--color-accent-2-800); }
+.bs-scope .chip-btn.active-red { background: var(--color-accent-2-100); border-color: var(--color-accent-2-400); color: var(--color-accent-2-800); }
 .chip-btn:disabled { opacity: .35; cursor: not-allowed; }
 
 /* ── Star rating ────────────────────────────────────────────── */
@@ -3176,7 +3222,7 @@ a { text-decoration: none; color: inherit; }
   text-align: left;
   transition: border-color .12s;
 }
-.syllabus-dropdown-btn:hover { border-color: #059669; }
+.syllabus-dropdown-btn:hover { border-color: var(--color-accent); }
 .syllabus-dropdown-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .syllabus-dropdown-panel {
@@ -3223,7 +3269,7 @@ a { text-decoration: none; color: inherit; }
   transition: background .1s;
 }
 .syllabus-topic-item:hover { background: #f8fafc; }
-.syllabus-topic-item.selected { background: #ecfdf5; color: #047857; }
+.syllabus-topic-item.selected { background: var(--color-accent-100); color: var(--color-accent-800); }
 .syllabus-topic-item.disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
 
 .syllabus-checkbox {
@@ -3236,8 +3282,8 @@ a { text-decoration: none; color: inherit; }
   font-size: 11px;
 }
 .syllabus-topic-item.selected .syllabus-checkbox {
-  background: #059669;
-  border-color: #059669;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
@@ -3270,9 +3316,9 @@ a { text-decoration: none; color: inherit; }
   align-items: center;
   gap: 5px;
   padding: 3px 8px;
-  background: #ecfdf5;
-  border: 0.5px solid #a7f3d0;
-  color: #047857;
+  background: var(--color-accent-100);
+  border: 0.5px solid var(--color-accent-300);
+  color: var(--color-accent-800);
   border-radius: 100px;
   font-size: 12px;
   font-weight: 500;
@@ -3281,10 +3327,336 @@ a { text-decoration: none; color: inherit; }
   background: none;
   border: none;
   cursor: pointer;
-  color: #047857;
+  color: var(--color-accent-800);
   padding: 0;
   display: flex;
   align-items: center;
   opacity: .7;
 }
 .syllabus-chip-remove:hover { opacity: 1; }
+
+/* ============================================================
+   Broadsheet — redesign design system (design_handoff_learnsphere_redesign)
+   Ported from design-system/styles.css. Everything below is namespaced
+   under .bs-scope and bs- prefixed class names so it can be rolled out
+   screen-by-screen without touching the legacy look of un-migrated
+   views — the old .card/.btn-primary/etc rules above stay exactly as
+   they are for any view that hasn't been rebuilt yet. Once every view
+   is migrated, the .bs- prefix and .bs-scope wrapper can be dropped.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap');
+
+:root {
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-text: #201e1d;
+  --color-accent: #0088b0;
+  --color-accent-2: #d6006c;
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #e9f8ff;
+  --color-accent-200: #cbeeff;
+  --color-accent-300: #99e0ff;
+  --color-accent-400: #62c5ee;
+  --color-accent-500: #38a6cf;
+  --color-accent-600: #1186ac;
+  --color-accent-700: #006786;
+  --color-accent-800: #004961;
+  --color-accent-900: #0a303e;
+
+  --color-accent-2-100: #fff1f4;
+  --color-accent-2-200: #ffdee6;
+  --color-accent-2-300: #ffc0d0;
+  --color-accent-2-400: #ff90b1;
+  --color-accent-2-500: #ff458e;
+  --color-accent-2-600: #d82071;
+  --color-accent-2-700: #aa0b56;
+  --color-accent-2-800: #790e3d;
+  --color-accent-2-900: #4b1528;
+
+  --font-heading: "Source Serif 4", system-ui, sans-serif;
+  --font-heading-weight: 600;
+  --font-body: "Source Serif 4", system-ui, sans-serif;
+
+  --space-1: 5px;
+  --space-2: 10px;
+  --space-3: 15px;
+  --space-4: 20px;
+  --space-6: 30px;
+  --space-8: 40px;
+
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+}
+
+.bs-scope {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 400;
+}
+.bs-scope h1, .bs-scope h2, .bs-scope h3, .bs-scope h4, .bs-scope h5, .bs-scope h6 {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+}
+.bs-scope h1 { font-size: 42px; }
+.bs-scope h2 { font-size: 32px; }
+.bs-scope h3 { font-size: 25px; }
+.bs-scope h4 { font-size: 20px; }
+.bs-scope h5 { font-size: 16px; }
+.bs-scope h6 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+.bs-scope p { margin: 0 0 var(--space-3); }
+.bs-scope a { color: var(--color-accent); text-underline-offset: 3px; }
+.bs-scope img { display: block; max-width: 100%; }
+.bs-scope figure { margin: 0; }
+.bs-scope figcaption {
+  font-size: 11px; margin-top: var(--space-1);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.bs-scope :focus { outline: none; }
+.bs-scope :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.bs-scope ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+.bs-text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.bs-hr { height: 1px; border: 0; margin: var(--space-4) 0; background: var(--color-divider); }
+
+.bs-halftone { position: relative; filter: grayscale(0.35) contrast(1.15); overflow: hidden; }
+.bs-halftone::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(0,0,0,0.22) 30%, transparent 32%);
+  background-size: 3px 3px; mix-blend-mode: multiply;
+}
+
+/* — buttons — */
+.bs-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; line-height: 1.2; color: var(--color-text);
+  background: transparent; border: 1px solid transparent;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border-radius: var(--radius-md);
+}
+.bs-btn svg { display: block; }
+.bs-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.bs-btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.bs-btn-primary:hover { background: var(--color-accent-600); }
+.bs-btn-primary:active { background: var(--color-accent-700); }
+.bs-btn-secondary { border-color: var(--color-divider); }
+.bs-btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.bs-btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.bs-btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+.bs-btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.bs-btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.bs-btn-icon { width: 36px; height: 36px; padding: 0; }
+.bs-btn-block { width: 100%; margin-top: var(--space-2); }
+
+/* — forms — */
+.bs-field > label {
+  display: block; font-size: 12px; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.bs-input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.bs-input::placeholder { color: color-mix(in srgb, var(--color-text) 65%, transparent); opacity: 1; }
+.bs-input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.bs-input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+textarea.bs-input { min-height: 90px; resize: vertical; }
+.bs-radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+.bs-radio input, .bs-seg-opt input {
+  position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+}
+.bs-radio .dot {
+  width: 16px; height: 16px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--color-divider);
+}
+.bs-radio:hover .dot { border-color: var(--color-accent); }
+.bs-radio input:checked + .dot {
+  border-color: var(--color-accent); background: var(--color-accent);
+  box-shadow: inset 0 0 0 4px var(--color-bg);
+}
+.bs-radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.bs-seg {
+  display: inline-flex; overflow: hidden;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.bs-seg-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; font-size: 13px; cursor: pointer;
+}
+.bs-seg-opt + .bs-seg-opt { border-left: 1px solid var(--color-divider); }
+.bs-seg-opt:has(input:checked) { background: var(--color-accent); color: var(--color-bg); }
+.bs-seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.bs-seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+/* — cards — */
+.bs-card {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+}
+.bs-card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.bs-card-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 17px; line-height: 1.2;
+}
+.bs-card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
+.bs-card-meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.bs-elev-sm { box-shadow: var(--shadow-sm); }
+.bs-elev-md { box-shadow: var(--shadow-md); }
+.bs-elev-lg { box-shadow: var(--shadow-lg); }
+
+/* — tags — */
+.bs-tag {
+  display: inline-flex; align-items: center; font-size: 11px;
+  letter-spacing: 0.02em; padding: 3px 10px;
+  border-radius: calc(var(--radius-md) * 0.75);
+}
+.bs-tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+.bs-tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+.bs-tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.bs-tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* — navigation — */
+.bs-nav {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: none;
+}
+.bs-nav-brand {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 18px; margin-right: auto;
+}
+.bs-nav a { color: inherit; text-decoration: none; font-size: 14px; }
+.bs-nav a:hover, .bs-nav a[aria-current='page'] { color: var(--color-accent); }
+
+/* — sidebar nav (not in the source design system, which uses a top nav only;
+   added so pages that keep the app's existing left-sidebar layout during the
+   incremental rollout can still use accent-consistent nav links) — */
+.bs-sidebar-link { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-md); font-size: 14px; color: var(--color-text); text-decoration: none; }
+.bs-sidebar-link:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.bs-sidebar-link.active { background: var(--color-accent); color: var(--color-bg); }
+
+/* — tables — */
+.bs-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.bs-table th {
+  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  padding: var(--space-2); border-bottom: 1px solid var(--color-divider);
+}
+.bs-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+.bs-table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+
+/* — dialog — */
+.bs-dialog-backdrop {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  padding: var(--space-4); z-index: 1000;
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.bs-dialog {
+  width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+}
+.bs-dialog-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 20px;
+}
+.bs-dialog-body { font-size: 14px; opacity: 0.85; }
+.bs-dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* — calendar (not in the source design system — the README only specifies dot
+   semantics for a simple month view: accent-2/magenta = pending action,
+   accent/cyan = confirmed, neutral = completed. Extended consistently here to
+   the tutor calendar's extra states, which the simple parent calendar doesn't
+   have: holidays and self-blocked ranges get a de-emphasized neutral treatment
+   so they don't compete with the two real accent colors.) — */
+.bs-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 600; color: var(--color-neutral-600); margin-bottom: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-divider); }
+.bs-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.bs-cal-day-empty { display: block; min-height: 42px; }
+.bs-cal-day {
+  position: relative; min-height: 42px; padding: 5px 4px; border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider); background: var(--color-bg); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-family: inherit; color: inherit;
+}
+.bs-cal-day:hover { background: var(--color-surface); }
+.bs-cal-day:disabled { cursor: not-allowed; }
+.bs-cal-day .day-num { font-size: 12px; font-weight: 500; }
+.bs-cal-day.selected { border: 1.5px solid var(--color-accent); background: var(--color-accent-100); }
+.bs-cal-day.selected .day-num { color: var(--color-accent-800); }
+.bs-cal-day.has-paid { background: #f0fdf4; border-color: #22c55e; }
+.bs-cal-day.has-paid .day-num { color: #15803d; }
+.bs-cal-day.has-unpaid { background: var(--color-accent-2-100); border-color: var(--color-accent-2-400); border-style: dashed; }
+.bs-cal-day.stud-has-class { background: var(--color-accent-100); border-color: var(--color-accent-400); }
+.bs-cal-day.stud-has-class .day-num { color: var(--color-accent-800); font-weight: 700; }
+.bs-cal-day .day-dot { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); margin: 2px auto 0; }
+/* MY vs SG public holidays deliberately get distinct, non-palette colors (blue
+   vs pink) rather than shades of the same neutral — with only cyan/magenta/
+   neutral otherwise on this calendar, two holiday types in shades of gray were
+   indistinguishable at a glance. Reuses the original app's blue/pink pairing,
+   which was already known to read clearly apart. */
+.bs-cal-day.public-holiday { background: #e0f7fe; border-color: #38bdf8; border-width: 2px; }
+.bs-cal-day.public-holiday-sg { background: #fce7f3; border-color: #f472b6; border-width: 2px; }
+.bs-cal-day.public-holiday .day-num { color: #0369a1; font-weight: 700; }
+.bs-cal-day.public-holiday-sg .day-num { color: #be185d; font-weight: 700; }
+/* A date that's a holiday in both MY and SG (e.g. Thaipusam, Good Friday) gets
+   its own diagonal-split treatment rather than picking one country's color —
+   it was silently dropping the "also MY" fact before by always deferring to SG. */
+.bs-cal-day.public-holiday.public-holiday-sg {
+  background: linear-gradient(135deg, #e0f7fe 0%, #e0f7fe 50%, #fce7f3 50%, #fce7f3 100%);
+  border-color: #a855f7;
+}
+.bs-cal-day.public-holiday.public-holiday-sg .day-num { color: #7e22ce; font-weight: 700; }
+.bs-cal-day.public-holiday.public-holiday-sg .day-holiday-name { color: #7e22ce; }
+.bs-cal-day.blocked { background: var(--color-bg); border-color: var(--color-neutral-600); border-width: 2px; border-style: dashed; cursor: not-allowed; overflow: visible; }
+.bs-cal-day.blocked .day-num { color: var(--color-neutral-600); font-weight: 400; }
+.bs-cal-day.past-day { opacity: 0.55; }
+.bs-cal-day.past-day .day-num { color: var(--color-neutral-500); font-weight: 400; }
+.bs-cal-day.past-day.report-dot-amber, .bs-cal-day.past-day.report-dot-green { opacity: 1; }
+.bs-cal-day.report-day-selected { border: 1.5px solid var(--color-accent); background: var(--color-accent-100); opacity: 1; }
+.bs-cal-day.report-day-selected .day-num { color: var(--color-accent-800); font-weight: 600; }
+.bs-cal-day .day-published-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+.bs-cal-day .day-blocked-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; opacity: .5; line-height: 1; pointer-events: none; }
+.bs-cal-day .day-holiday-name { font-size: 8px; font-weight: 700; line-height: 1.2; display: block; }
+.bs-cal-day.public-holiday .day-holiday-name { color: #0369a1; }
+.bs-cal-day.public-holiday-sg .day-holiday-name { color: #9d174d; }
+.bs-cal-day .day-label { font-size: 8px; }
+.bs-cal-day-detail { margin-top: var(--space-3); background: var(--color-bg); border-radius: var(--radius-md); padding: var(--space-3); }
+.bs-cal-day-detail h4 { font-size: 13px; font-weight: 600; color: var(--color-text); margin-bottom: var(--space-2); }
+.bs-legend-swatch { width: 20px; height: 20px; border-radius: var(--radius-sm); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; }
+.bs-legend-swatch.selected { background: var(--color-accent-100); border: 1.5px solid var(--color-accent); }
+.bs-legend-swatch.paid { background: #f0fdf4; border: 2px solid #22c55e; }
+.bs-legend-swatch.unpaid { background: var(--color-accent-2-100); border: 2px dashed var(--color-accent-2-400); }
+.bs-legend-swatch.holiday { background: #e0f7fe; border: 2px solid #38bdf8; }
+.bs-legend-swatch.holiday-both { background: linear-gradient(135deg, #e0f7fe 0%, #e0f7fe 50%, #fce7f3 50%, #fce7f3 100%); border: 2px solid #a855f7; }
+.bs-legend-swatch.blocked { background: var(--color-bg); border: 2px dashed var(--color-neutral-600); }
+.bs-legend-swatch.past { background: var(--color-neutral-100); border: 1px solid var(--color-neutral-300); opacity: .8; }
+.bs-legend-swatch.published { background: var(--color-bg); border: 2px solid var(--color-divider); position: relative; }
+.bs-legend-swatch.published::after { content: ''; position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }

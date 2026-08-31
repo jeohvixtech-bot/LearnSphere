@@ -801,7 +801,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       return (b.rating || 0) - (a.rating || 0);
     });
 
-    return pinned ? [pinned].concat(all) : all;
+    // The pin bypasses subject/mode/rating/experience/preset-slot filters (see
+    // comment above) but not Country — a tutor with zero offerings in the
+    // selected country has nothing to show here regardless of the pin.
+    var pinnedMatchesCountry = pinned && (pinned.offerings || []).some(function (o) {
+      return o.country === self.selectedCountry;
+    });
+
+    return pinnedMatchesCountry ? [pinned].concat(all) : all;
   };
 
   // ── Next month label e.g. "Aug 2026" ──────────────────────────────

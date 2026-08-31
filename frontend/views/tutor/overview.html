@@ -1,35 +1,35 @@
-<div class="dashboard-layout">
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <div class="sidebar-col">
-    <aside class="sidebar sidebar-indigo">
-      <div class="sidebar-user">
-        <div class="avatar-circle indigo">{{ vm.user.name[0] }}</div>
-        <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
+    <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+        <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+        <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Tutor Dashboard</small></div>
       </div>
-      <nav class="sidebar-nav">
-        <a href="#!/tutor/overview" class="nav-item active">
+      <nav style="display:flex; flex-direction:column; gap:2px;">
+        <a href="#!/tutor/overview" class="bs-sidebar-link active">
           <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
         </a>
-        <a href="#!/tutor/chat" class="nav-item">
+        <a href="#!/tutor/chat" class="bs-sidebar-link">
           <i class="ti ti-message" aria-hidden="true"></i> Direct messages
         </a>
       </nav>
     </aside>
 
     <!-- Calendar Legend -->
-    <div class="card calendar-legend" ng-if="vm.activeTab === 'overview'">
-      <h4 style="font-size:13px; font-weight:500; color:#64748b; margin-bottom:10px;">
-        <i class="ti ti-book-2" style="font-size:14px; vertical-align:-2px; margin-right:5px;" aria-hidden="true"></i>
+    <div class="bs-card bs-elev-sm" ng-if="vm.activeTab === 'overview'">
+      <div style="font-size:13px; font-weight:600; color:var(--color-text); margin-bottom:var(--space-2);">
+        <i class="ti ti-book-2" aria-hidden="true"></i>
         Calendar legend
-      </h4>
-      <div class="legend-grid">
-        <div class="legend-item"><span class="legend-swatch legend-selected"></span> Selected Day</div>
-        <div class="legend-item"><span class="legend-swatch legend-paid"></span> Paid Session</div>
-        <div class="legend-item"><span class="legend-swatch legend-unpaid"></span> Unpaid Session</div>
-        <div class="legend-item"><span class="legend-swatch legend-holiday"></span> MY Public Holiday</div>
-        <div class="legend-item"><span class="legend-swatch legend-holiday-sg"></span> SG Public Holiday</div>
-        <div class="legend-item"><span class="legend-swatch legend-blocked">🚫</span> Blocked by You</div>
-        <div class="legend-item"><span class="legend-swatch legend-past"></span> Past Date</div>
-        <div class="legend-item"><span class="legend-swatch legend-published"></span> Your Published Slots</div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px 16px;">
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch selected"></span> Selected Day</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch paid"></span> Paid Session</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch unpaid"></span> Unpaid Session</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch holiday"></span> MY Public Holiday</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch holiday-both"></span> Public Holiday (MY &amp; SG)</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch blocked">🚫</span> Blocked by You</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch past"></span> Past Date</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch published"></span> Your Published Slots</div>
       </div>
     </div>
   </div>
@@ -37,11 +37,13 @@
   <main class="dashboard-main">
 
     <!-- Tab Bar -->
-    <div class="tab-bar">
-      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'overview'}" ng-click="vm.activeTab = 'overview'">
+    <div class="bs-seg">
+      <button type="button" class="bs-seg-opt" ng-click="vm.activeTab = 'overview'"
+        ng-style="{background: vm.activeTab === 'overview' ? 'var(--color-accent)' : 'transparent', color: vm.activeTab === 'overview' ? 'var(--color-bg)' : 'inherit'}">
         <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
       </button>
-      <button class="tab-btn" ng-class="{'active': vm.activeTab === 'profile'}" ng-click="vm.activeTab = 'profile'">
+      <button type="button" class="bs-seg-opt" ng-click="vm.activeTab = 'profile'"
+        ng-style="{background: vm.activeTab === 'profile' ? 'var(--color-accent)' : 'transparent', color: vm.activeTab === 'profile' ? 'var(--color-bg)' : 'inherit'}">
         <i class="ti ti-edit" aria-hidden="true"></i> Edit profile
       </button>
     </div>
@@ -50,162 +52,165 @@
     <div ng-if="vm.activeTab === 'overview'">
 
     <!-- Tutor Stats Banner -->
-    <div class="tutor-banner" ng-if="vm.tutor">
-      <div class="tutor-banner-left">
-        <img ng-if="vm.tutor.imageUrl" ng-src="{{ vm.tutor.imageUrl }}" class="avatar-lg" alt="{{ vm.tutor.name }}" />
-        <div ng-if="!vm.tutor.imageUrl" class="avatar-lg avatar-fallback" style="font-size:22px">{{ vm.tutor.name[0] }}</div>
+    <div class="bs-card bs-elev-sm" style="flex-direction:row; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-4);" ng-if="vm.tutor">
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <img ng-if="vm.tutor.imageUrl" ng-src="{{ vm.tutor.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ vm.tutor.name }}" />
+        <div ng-if="!vm.tutor.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:22px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ vm.tutor.name[0] }}</div>
         <div>
-          <h2>
-            {{ vm.tutor.name }}
-            <span class="badge-gold">
-              <i class="ti ti-trophy" style="font-size:12px; vertical-align:-1px;" aria-hidden="true"></i> Gold teacher
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <h3 style="margin:0;">{{ vm.tutor.name }}</h3>
+            <span class="bs-tag bs-tag-accent-2">
+              <i class="ti ti-trophy" style="font-size:12px;" aria-hidden="true"></i> Gold teacher
             </span>
-            <span class="badge-verified" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">
-              <i class="ti ti-check" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i> Verified
+            <span class="bs-tag bs-tag-accent" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">
+              <i class="ti ti-check" style="font-size:11px;" aria-hidden="true"></i> Verified
             </span>
-            <span class="badge-pending" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">
-              <i class="ti ti-clock" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i> Pending
+            <span class="bs-tag bs-tag-neutral" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">
+              <i class="ti ti-clock" style="font-size:11px;" aria-hidden="true"></i> Pending
             </span>
-            <button type="button" class="status-switch" ng-class="{'is-online': vm.tutor.isOnline}" ng-click="vm.toggleOnlineStatus()"
+            <button type="button" class="bs-btn" ng-class="vm.tutor.isOnline ? 'bs-btn-primary' : 'bs-btn-secondary'" ng-click="vm.toggleOnlineStatus()"
               title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
-              <span class="status-switch-knob"></span>{{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
+              {{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
             </button>
-          </h2>
-          <p>{{ vm.tutor.experienceYears }} Years Active MOE Teacher</p>
+          </div>
+          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.tutor.experienceYears }} Years Active MOE Teacher</p>
         </div>
       </div>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <small>COMPLETED IN THIS MONTH</small>
-          <strong class="green">{{ vm.completedThisMonth().length }} sessions</strong>
+      <div style="display:flex; gap:var(--space-6);">
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ vm.completedThisMonth().length }}</div>
+          <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Sessions this month</div>
         </div>
-        <div class="stat-card">
-          <small>RATING</small>
-          <strong class="amber">⭐ {{ vm.tutor.rating }}</strong>
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">★ {{ vm.tutor.rating }}</div>
+          <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Rating</div>
         </div>
-        <div class="stat-card">
-          <small>READY BALANCE</small>
-          <strong>$1,200.00</strong>
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">$1,200.00</div>
+          <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Ready balance</div>
         </div>
       </div>
     </div>
 
     <!-- Pending Booking Requests -->
-    <div class="card" ng-if="vm.pendingRequests().length">
-      <h3><i class="ti ti-clock" style="font-size:16px; color:#f59e0b;" aria-hidden="true"></i> Parents booking requests ({{ vm.pendingRequests().length }})</h3>
-      <div class="request-list">
-        <div class="request-item" ng-repeat="b in vm.pendingRequests()">
+    <div class="bs-card bs-elev-sm" ng-if="vm.pendingRequests().length">
+      <div class="bs-card-title"><i class="ti ti-clock" aria-hidden="true"></i> Parents booking requests ({{ vm.pendingRequests().length }})</div>
+      <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);" ng-repeat="b in vm.pendingRequests()">
           <div>
-            <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
-            <span class="badge-subject">{{ b.subject }}</span>
-            <strong>{{ b.studentName }}</strong>
-            <p ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} • {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
-            <em ng-if="b.message">"{{ b.message }}"</em>
+            <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
+            <span class="bs-text-muted" style="font-size:12px;">#{{ b.bookingNumber }}</span>
+            <div style="font-weight:600; margin-top:2px;">{{ b.studentName }}</div>
+            <p class="bs-text-muted" style="margin:2px 0 0; font-size:13px;" ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
+            <em ng-if="b.message" style="font-size:13px;">"{{ b.message }}"</em>
           </div>
-          <div class="btn-row">
-            <button class="btn-outline" ng-click="vm.startCounter(b)">Counter Propose Time</button>
-            <button class="btn-success" ng-click="vm.confirmBooking(b)">Confirm Class</button>
+          <div style="display:flex; gap:8px;">
+            <button class="bs-btn bs-btn-secondary" ng-click="vm.startCounter(b)">Counter Propose Time</button>
+            <button class="bs-btn bs-btn-primary" ng-click="vm.confirmBooking(b)">Confirm Class</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Counter Proposal Form -->
-    <div class="card" ng-if="vm.counterBooking">
-      <button class="btn-link" ng-click="vm.cancelCounter()">← Cancel</button>
-      <div class="alert-success" ng-if="vm.counterSuccess">
+    <div class="bs-card bs-elev-sm" ng-if="vm.counterBooking">
+      <button class="bs-btn bs-btn-ghost" style="align-self:flex-start;" ng-click="vm.cancelCounter()">← Cancel</button>
+      <div ng-if="vm.counterSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
         ✓ Counter-proposal dispatched. Waiting for parent approval.
       </div>
       <div ng-if="!vm.counterSuccess">
-        <span class="label-tag">Time Rescheduling</span>
-        <h3>Counter Propose Booking Slot</h3>
-        <p class="text-muted">For: {{ vm.counterBooking.subject }} · {{ vm.counterBooking.studentName }}</p>
-        <form ng-submit="vm.submitCounter()">
-          <div class="counter-classes-table">
-            <div class="counter-class-row counter-class-header">
+        <span class="bs-tag bs-tag-accent">Time Rescheduling</span>
+        <h3 style="margin-top:var(--space-2);">Counter Propose Booking Slot</h3>
+        <p class="bs-text-muted">For: {{ vm.counterBooking.subject }} · {{ vm.counterBooking.studentName }}</p>
+        <form ng-submit="vm.submitCounter()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+            <div style="display:grid; grid-template-columns:30px 1fr 1fr 1fr; gap:var(--space-2); font-size:11px; text-transform:uppercase; opacity:0.6;">
               <span>#</span>
               <span>Parent Requested</span>
-              <span>Your Proposed Date <span class="text-danger">*</span></span>
-              <span>Your Proposed Time <span class="text-danger">*</span></span>
+              <span>Your Proposed Date <span style="color:var(--color-accent-2);">*</span></span>
+              <span>Your Proposed Time <span style="color:var(--color-accent-2);">*</span></span>
             </div>
-            <div class="counter-class-row" ng-repeat="c in vm.counterForm.classes track by $index"
-              ng-class="{'counter-class-row-blocked': vm.isProposedDateBlocked(c.originalDate)}">
-              <span class="counter-class-num">{{ $index + 1 }}</span>
-              <span class="counter-original">
+            <div style="display:grid; grid-template-columns:30px 1fr 1fr 1fr; gap:var(--space-2); align-items:start; padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
+              ng-repeat="c in vm.counterForm.classes track by $index"
+              ng-style="vm.isProposedDateBlocked(c.originalDate) ? {background:'var(--color-accent-2-100)'} : {}">
+              <span class="bs-text-muted">{{ $index + 1 }}</span>
+              <span>
                 <strong>{{ c.originalDate | dmy }}</strong>
-                <span class="badge-blocked" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
-                <small>{{ c.originalTime | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
+                <span class="bs-tag bs-tag-accent-2" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
+                <small class="bs-text-muted">{{ c.originalTime | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
               </span>
-              <div class="form-group mb-0">
-                <input type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
-                  ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
-                <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)">
+              <div class="bs-field" style="margin:0;">
+                <input class="bs-input" type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
+                  ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+                <span ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)" style="color:var(--color-accent-2-700); font-size:12px;">
                   ⚠️ This date is in a blocked period
                 </span>
               </div>
-              <div class="form-group mb-0">
-                <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+              <div class="bs-field" style="margin:0;">
+                <input class="bs-input" type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
                   ng-change="vm.onCounterStartTimeChange(c)"
-                  ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
-                <small class="text-muted" style="font-size:11px;display:block">→ {{ (vm.counterEndTime(c) || '—') | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
+                  ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+                <small class="bs-text-muted" style="font-size:11px;display:block">→ {{ (vm.counterEndTime(c) || '—') | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
               </div>
-              <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
+              <span ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)" style="grid-column:1/-1; color:var(--color-accent-2-700); font-size:12px;">
                 ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
               </span>
             </div>
           </div>
-          <span class="blocked-date-hint" ng-if="vm.hasDuplicateCounter()">
+          <p ng-if="vm.hasDuplicateCounter()" style="color:var(--color-accent-2-700); font-size:13px; margin:0;">
             ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
-          </span>
-          <span class="blocked-date-hint" ng-if="vm.hasInvalidCounter()">
+          </p>
+          <p ng-if="vm.hasInvalidCounter()" style="color:var(--color-accent-2-700); font-size:13px; margin:0;">
             ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
-          </span>
-          <div class="form-group mt-3">
+          </p>
+          <div class="bs-field" style="margin:0;">
             <label>Explanation to Parent</label>
-            <textarea ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
-            <div class="field-error" ng-if="vm.hasProfaneCounterMessage()">Please remove inappropriate language before submitting.</div>
+            <textarea class="bs-input" ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
+            <div ng-if="vm.hasProfaneCounterMessage()" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">Please remove inappropriate language before submitting.</div>
           </div>
-          <button type="submit" class="btn-primary full-width" ng-disabled="vm.hasInvalidCounter() || vm.hasTooSoonCounter() || vm.hasDuplicateCounter() || vm.hasProfaneCounterMessage()">Dispatch Counter Proposal</button>
+          <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="vm.hasInvalidCounter() || vm.hasTooSoonCounter() || vm.hasDuplicateCounter() || vm.hasProfaneCounterMessage()">Dispatch Counter Proposal</button>
         </form>
       </div>
     </div>
 
     <!-- Calendar (Monthly View) -->
-    <div class="card" ng-if="!vm.counterBooking">
-      <div class="card-header">
-        <span class="label-tag indigo">TUTOR SCHEDULER</span>
-        <h3><i class="ti ti-calendar" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Calendar & Payout Coordinator</h3>
-        <div class="cal-nav-row">
-          <button class="btn-outline sm" ng-click="vm.prevMonth()">‹ Prev</button>
-          <span class="cal-month-label"><i class="ti ti-calendar" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ vm.calYear }}</span>
-          <button class="btn-outline sm" ng-click="vm.nextMonth()">Next ›</button>
-          <button class="btn-primary sm" ng-click="vm.openSetupClass()" ng-disabled="vm.selectedCalDays.length === 0">
-            <i class="ti ti-calendar-plus"></i> Setup class
-          </button>
-          <button class="btn-outline sm" ng-click="vm.resetCalDaySelection()" ng-disabled="vm.selectedCalDays.length === 0">
-            <i class="ti ti-x"></i> Reset
-          </button>
-        </div>
+    <div class="bs-card bs-elev-sm" ng-if="!vm.counterBooking">
+      <div>
+        <span class="bs-tag bs-tag-accent">TUTOR SCHEDULER</span>
+        <h3 style="margin-top:var(--space-2);"><i class="ti ti-calendar" aria-hidden="true"></i> Calendar &amp; Class Coordinator</h3>
       </div>
-      <p class="text-muted" style="margin:-6px 0 8px">{{ vm.selectedCalDays.length }} of 5 dates selected</p>
-      <div class="cal-stats-row">
-        <div class="cal-stat amber">
-          <small>Pending Confirmation</small>
-          <strong>{{ vm.pendingRequests().length }} Session(s)</strong>
-          <span ng-if="vm.pendingRequests().length" class="pulse-badge"><i class="ti ti-clock" style="font-size:11px;" aria-hidden="true"></i> Action required</span>
-          <span ng-if="!vm.pendingRequests().length" class="ok-badge"><i class="ti ti-check" style="font-size:11px;" aria-hidden="true"></i> All clear</span>
+
+      <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px; background:var(--color-accent-2-100); border-radius:var(--radius-md); padding:var(--space-3);">
+          <small class="bs-text-muted">Pending Confirmation</small>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:18px;">{{ vm.pendingRequests().length }} Session(s)</div>
+          <span ng-if="vm.pendingRequests().length" class="bs-tag bs-tag-accent-2" style="margin-top:4px;"><i class="ti ti-clock" aria-hidden="true"></i> Action required</span>
+          <span ng-if="!vm.pendingRequests().length" class="bs-tag bs-tag-accent" style="margin-top:4px;"><i class="ti ti-check" aria-hidden="true"></i> All clear</span>
         </div>
-        <div class="cal-stat indigo">
-          <small ng-if="vm.selectedCalDays[0]">Sessions on {{ vm.calMonthName() }} {{ vm.selectedCalDays[0] }}</small>
-          <small ng-if="!vm.selectedCalDays[0]">Select a day</small>
-          <strong>{{ vm.confirmedOnDay(vm.selectedCalDays[0]).length }} Lesson(s)</strong>
+        <div style="flex:1; min-width:200px; background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);">
+          <small class="bs-text-muted" ng-if="vm.selectedCalDays[0]">Sessions on {{ vm.calMonthName() }} {{ vm.selectedCalDays[0] }}</small>
+          <small class="bs-text-muted" ng-if="!vm.selectedCalDays[0]">Select a day</small>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:18px;">{{ vm.confirmedOnDay(vm.selectedCalDays[0]).length }} Lesson(s)</div>
         </div>
       </div>
 
-      <div class="cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
-      <div class="cal-grid">
-        <span class="cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
-        <button class="cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
+      <div style="display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+        <button class="bs-btn bs-btn-secondary" ng-click="vm.prevMonth()">‹ Prev</button>
+        <span style="font-weight:600; min-width:120px; text-align:center;"><i class="ti ti-calendar" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ vm.calYear }}</span>
+        <button class="bs-btn bs-btn-secondary" ng-click="vm.nextMonth()">Next ›</button>
+        <button class="bs-btn bs-btn-primary" ng-click="vm.openSetupClass()" ng-disabled="vm.selectedCalDays.length === 0">
+          <i class="ti ti-calendar-plus"></i> Setup class
+        </button>
+        <button class="bs-btn bs-btn-secondary" ng-click="vm.resetCalDaySelection()" ng-disabled="vm.selectedCalDays.length === 0">
+          <i class="ti ti-x"></i> Reset
+        </button>
+      </div>
+      <p class="bs-text-muted" style="margin:0;">{{ vm.selectedCalDays.length }} of 5 dates selected</p>
+
+      <div class="bs-cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+      <div class="bs-cal-grid">
+        <span class="bs-cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
+        <button type="button" class="bs-cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
           ng-click="vm.onCalDayClick(d)"
           ng-class="{
             'selected': vm.isCalDaySelected(d),
@@ -213,7 +218,7 @@
             'past-day': vm.isPastDay(d),
             'blocked': !vm.isPastDay(d) && vm.isBlocked(d),
             'public-holiday-sg': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
-            'public-holiday': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d) && !vm.isSgHoliday(d),
+            'public-holiday': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d),
             'has-paid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayAllBookingsPaid(d),
             'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayHasUnpaidBooking(d),
             'report-dot-amber': vm.reportDotsByDay[d] === 'amber',
@@ -221,42 +226,38 @@
           }">
           <span class="day-num">{{ d }}</span>
           <span class="day-published-dot" ng-if="!vm.isPastDay(d) && vm.publishedSlotsOnDay(d).length" title="{{ vm.publishedSlotsOnDay(d).length }} published slot(s)"></span>
-          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)"><i class="ti ti-ban" style="font-size:10px; color:#ef4444;" aria-hidden="true"></i></span>
+          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)"><i class="ti ti-ban" aria-hidden="true"></i></span>
           <span class="day-holiday-name" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
           <span class="day-label" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length">
             <i class="ti" ng-class="vm.dayHasUnpaidBooking(d) ? 'ti-lock' : 'ti-circle-check'"
-              ng-style="{color: vm.dayHasUnpaidBooking(d) ? '#f59e0b' : '#16a34a'}"
+              ng-style="{color: vm.dayHasUnpaidBooking(d) ? 'var(--color-accent-2)' : '#16a34a'}"
               style="font-size:9px;" aria-hidden="true"></i>
           </span>
         </button>
       </div>
 
-      <div class="day-detail" ng-repeat="day in vm.sortedSelectedCalDays() track by day">
+      <div class="bs-cal-day-detail" ng-repeat="day in vm.sortedSelectedCalDays() track by day">
         <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> Scheduled Classes for {{ vm.calMonthName() }} {{ day }}, {{ vm.calYear }}</h4>
-        <p ng-if="!vm.bookingsOnDay(day).length" class="empty-state">No lessons on this day.</p>
-        <div class="booking-detail-card" ng-repeat="b in vm.bookingsOnDay(day)">
-          <div class="booking-detail-header">
-            <span class="badge-subject">{{ b.subject }}</span>
-            <strong>Child: {{ b.studentName }}</strong>
-            <p>{{ vm.classOnDay(b, day).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
-          </div>
-          <p ng-if="vm.isPaid(b.id)" class="text-success">✓ Payment verified. Workspace unlocked.</p>
-          <p ng-if="!vm.isPaid(b.id)" class="text-amber">⏳ Awaiting parent payment to unlock workspace.</p>
+        <p class="bs-text-muted" ng-if="!vm.bookingsOnDay(day).length">No lessons on this day.</p>
+        <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); margin-bottom:8px;" ng-repeat="b in vm.bookingsOnDay(day)">
+          <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
+          <strong style="display:block; margin-top:4px;">Child: {{ b.studentName }}</strong>
+          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.classOnDay(b, day).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
+          <p ng-if="vm.isPaid(b.id)" style="color:var(--color-accent-700); font-size:13px; margin-top:4px;">✓ Payment verified. Workspace unlocked.</p>
+          <p ng-if="!vm.isPaid(b.id)" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">⏳ Awaiting parent payment to unlock workspace.</p>
         </div>
 
         <div ng-if="vm.publishedSlotsOnDay(day).length">
-          <h5 class="section-label" style="margin-top:14px">
-            <span class="published-dot-inline"></span> Your Published Slots
+          <h5 style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; margin:var(--space-3) 0 6px;">
+            Your Published Slots
           </h5>
-          <div class="booking-detail-card published-slot-card" ng-repeat="slot in vm.publishedSlotsOnDay(day)">
-            <div class="booking-detail-header">
-              <span class="badge-subject">{{ slot.subject }}<span ng-if="slot.level"> · {{ slot.level }}</span></span>
-              <strong>{{ slot.time | hhmma }} – {{ slot.endTime | hhmma }}</strong>
-              <p>{{ slot.mode }} · {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }} · ${{ slot.pricePerLesson }}/lesson</p>
-            </div>
-            <p ng-if="slot.isFull" class="text-danger">Full — no more bookings accepted</p>
-            <p ng-if="!slot.isFull" class="text-muted">Open for booking · not yet claimed by a parent</p>
-            <button class="btn-outline sm text-danger" ng-click="vm.openCancelSlotModal(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px">
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); margin-bottom:8px;" ng-repeat="slot in vm.publishedSlotsOnDay(day)">
+            <span class="bs-tag bs-tag-accent">{{ slot.subject }}<span ng-if="slot.level"> · {{ slot.level }}</span></span>
+            <strong style="display:block; margin-top:4px;">{{ slot.time | hhmma }} – {{ slot.endTime | hhmma }}</strong>
+            <p class="bs-text-muted" style="margin:2px 0 0;">{{ slot.mode }} · {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }} · ${{ slot.pricePerLesson }}/lesson</p>
+            <p ng-if="slot.isFull" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">Full — no more bookings accepted</p>
+            <p class="bs-text-muted" ng-if="!slot.isFull" style="font-size:13px; margin-top:4px;">Open for booking · not yet claimed by a parent</p>
+            <button class="bs-btn bs-btn-secondary" ng-click="vm.openCancelSlotModal(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px; color:var(--color-accent-2);">
               <i class="ti ti-x" aria-hidden="true"></i> Cancel class
             </button>
           </div>
@@ -264,23 +265,23 @@
       </div>
 
       <!-- Block Unavailable Dates -->
-      <div class="block-dates-panel">
-        <div class="block-dates-title">
-          <i class="ti ti-ban" style="font-size:15px; color:#ef4444;" aria-hidden="true"></i>
+      <div style="border-top:1px solid var(--color-divider); padding-top:var(--space-3); margin-top:var(--space-2);">
+        <div style="font-weight:600; display:flex; align-items:center; gap:6px;">
+          <i class="ti ti-ban" aria-hidden="true"></i>
           Block unavailable date range
         </div>
-        <div class="block-dates-form">
-          <div class="block-dates-field">
-            <label>Start Date <span class="text-danger">*</span></label>
-            <input type="text" ng-model="vm.blockForm.startDate" ng-change="vm.clearBlockConflicts()"
+        <div style="display:flex; gap:var(--space-3); flex-wrap:wrap; align-items:flex-end; margin-top:var(--space-2);">
+          <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
+            <label>Start Date <span style="color:var(--color-accent-2);">*</span></label>
+            <input class="bs-input" type="text" ng-model="vm.blockForm.startDate" ng-change="vm.clearBlockConflicts()"
               placeholder="DD-MM-YYYY" fp-date />
           </div>
-          <div class="block-dates-field">
-            <label>End Date <span class="text-danger">*</span></label>
-            <input type="text" ng-model="vm.blockForm.endDate" ng-change="vm.clearBlockConflicts()"
+          <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
+            <label>End Date <span style="color:var(--color-accent-2);">*</span></label>
+            <input class="bs-input" type="text" ng-model="vm.blockForm.endDate" ng-change="vm.clearBlockConflicts()"
               placeholder="DD-MM-YYYY" fp-date />
           </div>
-          <button class="btn-block-confirm"
+          <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
             ng-click="vm.confirmBlock()"
             ng-disabled="!vm.blockForm.startDate || !vm.blockForm.endDate">
             Confirm Block
@@ -288,42 +289,38 @@
         </div>
 
         <!-- Overlap with an existing blocked range -->
-        <div class="block-conflict-alert" ng-if="vm.blockOverlapError">
-          <div class="block-conflict-header">
-            ⚠️ Already Blocked
-          </div>
-          <p class="block-conflict-sub">{{ vm.blockOverlapError }}</p>
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockOverlapError">
+          <strong>⚠️ Already Blocked</strong>
+          <p style="margin:2px 0 0;">{{ vm.blockOverlapError }}</p>
         </div>
 
         <!-- Active preset (Flow B) class bookings in the newly-blocked range -->
-        <div class="block-conflict-alert" ng-if="vm.blockPresetWarning">
-          <div class="block-conflict-header">⚠️ Active class bookings in this range</div>
-          <p class="block-conflict-sub">{{ vm.blockPresetWarning }}</p>
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockPresetWarning">
+          <strong>⚠️ Active class bookings in this range</strong>
+          <p style="margin:2px 0 0;">{{ vm.blockPresetWarning }}</p>
         </div>
 
         <!-- Conflict alert -->
-        <div class="block-conflict-alert" ng-if="vm.blockConflicts.length">
-          <div class="block-conflict-header">
-            ⚠️ Change of class date required
-          </div>
-          <p class="block-conflict-sub">The selected period overlaps with {{ vm.blockConflicts.length }} confirmed class{{ vm.blockConflicts.length !== 1 ? 'es' : '' }}. Please reschedule before blocking.</p>
-          <div class="block-conflict-list">
-            <div class="block-conflict-item" ng-repeat="c in vm.blockConflicts">
-              <span class="badge-subject">{{ c.subject }}</span>
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockConflicts.length">
+          <strong>⚠️ Change of class date required</strong>
+          <p style="margin:2px 0 0;">The selected period overlaps with {{ vm.blockConflicts.length }} confirmed class{{ vm.blockConflicts.length !== 1 ? 'es' : '' }}. Please reschedule before blocking.</p>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="c in vm.blockConflicts">
+              <span class="bs-tag bs-tag-accent">{{ c.subject }}</span>
               <span>{{ c.student }}</span>
-              <span class="block-conflict-date">📅 {{ c.date | dmy }} &bull; {{ c.time | hhmma }} ({{ c.duration }}h)</span>
-              <button class="btn-warning sm" ng-click="vm.startTutorRescheduleById(c.bookingId)">
+              <span class="bs-text-muted" style="font-size:12px;">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ c.duration }}h)</span>
+              <button class="bs-btn bs-btn-secondary" style="margin-left:auto;" ng-click="vm.startTutorRescheduleById(c.bookingId)">
                 Reschedule →
               </button>
             </div>
           </div>
         </div>
 
-        <div class="blocked-ranges-list" ng-if="vm.blockedRanges.length">
-          <div class="blocked-range-item" ng-repeat="r in vm.blockedRanges track by $index">
-            <span class="blocked-range-icon">🚫</span>
-            <span class="blocked-range-dates">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
-            <button class="btn-link" ng-click="vm.removeBlock($index)">✕ Remove</button>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:var(--space-2);" ng-if="vm.blockedRanges.length">
+          <div style="display:flex; align-items:center; gap:8px; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="r in vm.blockedRanges track by $index">
+            <span>🚫</span>
+            <span style="flex:1;">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
+            <button class="bs-btn bs-btn-ghost" ng-click="vm.removeBlock($index)">✕ Remove</button>
           </div>
         </div>
       </div>
@@ -335,7 +332,7 @@
         <div class="modal-header">
           <div>
             <h3>Setup class</h3>
-            <p class="text-muted">{{ vm.setupClassSelectedDatesLabel() }}</p>
+            <p class="bs-text-muted">{{ vm.setupClassSelectedDatesLabel() }}</p>
           </div>
           <button type="button" class="modal-close" ng-click="vm.closeSetupClass()">&times;</button>
         </div>
@@ -351,23 +348,23 @@
                    NOT blocking — nothing server-side stops this today, so they
                    can still prep classes ahead of approval; just an FYI banner
                    above the still-functional form. -->
-          <div class="empty-state-box" ng-if="!vm.tutorHasOfferings() && !vm.tutor.isVerified">
-            <p><i class="ti ti-alert-triangle" aria-hidden="true"></i> Please complete your tutor profile — including at least one teaching offering (subject, level, and mode) — before you can publish a class.</p>
-            <button type="button" class="btn-primary sm" style="margin-top:10px"
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Please complete your tutor profile — including at least one teaching offering (subject, level, and mode) — before you can publish a class.</p>
+            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
               ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
           </div>
-          <div class="empty-state-box" ng-if="!vm.tutorHasOfferings() && vm.tutor.isVerified">
-            <p><i class="ti ti-alert-triangle" aria-hidden="true"></i> Add at least one teaching offering (subject + level + mode) under Edit Profile before you can publish a class.</p>
-            <button type="button" class="btn-primary sm" style="margin-top:10px"
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && vm.tutor.isVerified">
+            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Add at least one teaching offering (subject + level + mode) under Edit Profile before you can publish a class.</p>
+            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
               ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
           </div>
-          <p class="text-muted" style="margin:0 0 12px" ng-if="vm.tutorHasOfferings() && !vm.tutor.isVerified">
+          <p class="bs-text-muted" style="margin:0 0 12px" ng-if="vm.tutorHasOfferings() && !vm.tutor.isVerified">
             <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
             Your profile is currently being verified by our operations team. You can still set up classes now — they just won't be visible to parents until verification is complete.
           </p>
 
           <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()" ng-mouseleave="vm._slotDrag = null">
-            <p class="text-muted" style="margin:0 0 8px;font-size:11px">
+            <p class="bs-text-muted" style="margin:0 0 8px;font-size:11px">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
               Click a single slot, or click-and-drag down a column to combine several into one class (first slot's start time to last slot's end time). Grayed-out slots are already-scheduled classes or published slots you've already set up.
             </p>
@@ -403,21 +400,21 @@
 
           <div class="setup-inputs-panel" ng-if="vm.tutorHasOfferings()">
             <div class="setup-inputs-row-4">
-              <div class="form-group">
+              <div class="bs-field">
                 <label>Teaching Mode</label>
-                <select ng-model="vm.setupClassForm.mode" ng-change="vm.onModeChange()">
+                <select class="bs-input" ng-model="vm.setupClassForm.mode" ng-change="vm.onModeChange()">
                   <option value="">— Mode —</option>
                   <option ng-repeat="m in vm.setupClassModesList" value="{{ m }}">{{ m }}</option>
                 </select>
               </div>
-              <div class="form-group">
+              <div class="bs-field">
                 <label>Subject</label>
-                <select ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()" ng-disabled="!vm.setupClassForm.mode">
+                <select class="bs-input" ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()" ng-disabled="!vm.setupClassForm.mode">
                   <option value="">{{ vm.setupClassForm.mode ? '— Subject —' : 'Select mode first' }}</option>
                   <option ng-repeat="o in vm.setupClassUniqueSubjectsList" value="{{ o.subject }}">{{ o.key }}</option>
                 </select>
               </div>
-              <div class="form-group">
+              <div class="bs-field">
                 <label>Class Size</label>
                 <div class="segmented-toggle">
                   <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-one'}"
@@ -426,25 +423,25 @@
                     ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">Group Class</button>
                 </div>
               </div>
-              <div class="form-group">
+              <div class="bs-field">
                 <label>Max Students</label>
-                <input type="number" ng-model="vm.setupClassForm.maxStudents"
+                <input class="bs-input" type="number" ng-model="vm.setupClassForm.maxStudents"
                   ng-disabled="vm.setupClassForm.classSize === 'one-to-one'"
                   min="2" max="30" />
-                <span class="text-muted" style="font-size:11px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for Personal Class</span>
+                <span class="bs-text-muted" style="font-size:11px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for Personal Class</span>
               </div>
             </div>
 
-            <div class="form-group">
+            <div class="bs-field">
               <label>Price per lesson (RM / SGD based on country)</label>
-              <input type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
+              <input class="bs-input" type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
             </div>
 
             <!-- Syllabus topics -->
-            <div class="form-group">
+            <div class="bs-field">
               <label>
                 Syllabus topics
-                <span class="text-muted" style="font-weight:400; font-size:11px;">
+                <span class="bs-text-muted" style="font-weight:400; font-size:11px;">
                   Optional — select up to 6
                 </span>
               </label>
@@ -456,7 +453,7 @@
                 <button type="button" class="syllabus-dropdown-btn"
                   ng-click="vm.toggleSyllabusDropdown()"
                   ng-disabled="!vm.syllabusTopics.length">
-                  <span ng-if="vm.syllabusSelectedCount() === 0" class="text-muted">
+                  <span ng-if="vm.syllabusSelectedCount() === 0" class="bs-text-muted">
                     {{ !vm.setupClassForm.subject ? 'Select subject first' : (vm.syllabusTopics.length ? '— Select topics —' : 'No syllabus topics available yet (optional)') }}
                   </span>
                   <span ng-if="vm.syllabusSelectedCount() > 0">
@@ -503,10 +500,10 @@
                   </div>
 
                   <div class="syllabus-dropdown-footer">
-                    <span class="text-muted" style="font-size:11px;">
+                    <span class="bs-text-muted" style="font-size:11px;">
                       {{ vm.syllabusSelectedCount() }} of 6 selected
                     </span>
-                    <button type="button" class="btn-link"
+                    <button type="button" class="bs-btn bs-btn-ghost"
                       ng-click="vm.closeSyllabusDropdown()">Done</button>
                   </div>
                 </div>
@@ -524,24 +521,24 @@
                 </span>
               </div>
 
-              <p class="field-hint" ng-if="vm.syllabusTopics.length > 0 && vm.syllabusSelectedCount() >= 6">
+              <p class="bs-text-muted" style="font-size:11px;" ng-if="vm.syllabusTopics.length > 0 && vm.syllabusSelectedCount() >= 6">
                 Maximum 6 topics selected.
               </p>
             </div>
 
-            <p class="field-error" ng-if="vm.setupClassError">{{ vm.setupClassError }}</p>
+            <p ng-if="vm.setupClassError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.setupClassError }}</p>
           </div>
         </div>
 
         <div class="modal-footer">
-          <div class="setup-footer-legend">
+          <div style="display:flex; align-items:center; gap:14px; font-size:12px; flex-wrap:wrap;">
             <span><span class="legend-dot selected"></span> Selected</span>
             <span><span class="legend-dot booked"></span> Booked</span>
-            <span class="text-muted">{{ vm.setupClassTotalSlots() }} class(es) selected across {{ vm.setupClassSelectedDates().length }} date(s)</span>
+            <span class="bs-text-muted">{{ vm.setupClassTotalSlots() }} class(es) selected across {{ vm.setupClassSelectedDates().length }} date(s)</span>
           </div>
-          <div class="btn-row">
-            <button type="button" class="btn-outline" ng-click="vm.closeSetupClass()">Cancel</button>
-            <button type="button" class="btn-primary" ng-click="vm.submitSetupClass()"
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeSetupClass()">Cancel</button>
+            <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.submitSetupClass()"
               ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings() || !vm.setupClassFormValid()">
               {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
             </button>
@@ -556,13 +553,13 @@
         <div class="modal-header">
           <div>
             <h3>Cancel class</h3>
-            <p class="text-muted">{{ vm.cancelSlotModal.subject }}<span ng-if="vm.cancelSlotModal.level"> · {{ vm.cancelSlotModal.level }}</span> — {{ vm.cancelSlotModal.day | dmy }} at {{ vm.cancelSlotModal.time | hhmma }}</p>
+            <p class="bs-text-muted">{{ vm.cancelSlotModal.subject }}<span ng-if="vm.cancelSlotModal.level"> · {{ vm.cancelSlotModal.level }}</span> — {{ vm.cancelSlotModal.day | dmy }} at {{ vm.cancelSlotModal.time | hhmma }}</p>
           </div>
           <button type="button" class="modal-close" ng-click="vm.closeCancelSlotModal()">&times;</button>
         </div>
 
         <div class="modal-body">
-          <p class="text-muted" ng-if="vm.cancelSlotModal.confirmedCount > 0" style="margin-bottom:14px">
+          <p class="bs-text-muted" ng-if="vm.cancelSlotModal.confirmedCount > 0" style="margin-bottom:14px">
             {{ vm.cancelSlotModal.confirmedCount }} student{{ vm.cancelSlotModal.confirmedCount === 1 ? '' : 's' }} currently booked into this class.
           </p>
 
@@ -574,39 +571,39 @@
           </div>
 
           <div ng-if="vm.cancelSlotForm.mode === 'reschedule'">
-            <p class="text-muted" style="font-size:12px;margin-bottom:10px">
+            <p class="bs-text-muted" style="font-size:12px;margin-bottom:10px">
               Each affected family will be asked to accept the new date or decline for a refund. No penalty to you unless a family declines.
             </p>
-            <div class="form-row-3">
-              <div class="form-group">
-                <label>New Date <span class="text-danger">*</span></label>
-                <input type="text" ng-model="vm.cancelSlotForm.proposedDate" placeholder="DD-MM-YYYY" fp-date />
+            <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>New Date <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="vm.cancelSlotForm.proposedDate" placeholder="DD-MM-YYYY" fp-date />
               </div>
-              <div class="form-group">
-                <label>Start Time <span class="text-danger">*</span></label>
-                <input type="text" ng-model="vm.cancelSlotForm.proposedTime" placeholder="04:00 PM" />
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>Start Time <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="vm.cancelSlotForm.proposedTime" placeholder="04:00 PM" />
               </div>
-              <div class="form-group">
-                <label>End Time <span class="text-danger">*</span></label>
-                <input type="text" ng-model="vm.cancelSlotForm.proposedEndTime" placeholder="05:00 PM" />
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>End Time <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="vm.cancelSlotForm.proposedEndTime" placeholder="05:00 PM" />
               </div>
             </div>
           </div>
 
           <div ng-if="vm.cancelSlotForm.mode === 'straight'">
-            <p class="text-danger" style="font-size:12px">
+            <p style="color:var(--color-accent-2-700); font-size:12px;">
               <i class="ti ti-alert-triangle" aria-hidden="true"></i>
               Every affected family is credited immediately with no reschedule offered. You'll be charged a 20% penalty on top of losing that revenue, and this counts as a dispute against your AI Speed Match score this month.
             </p>
           </div>
 
-          <p class="field-error" ng-if="vm.cancelSlotError">{{ vm.cancelSlotError }}</p>
+          <p ng-if="vm.cancelSlotError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.cancelSlotError }}</p>
         </div>
 
         <div class="modal-footer">
-          <div class="btn-row">
-            <button type="button" class="btn-outline" ng-click="vm.closeCancelSlotModal()">Back</button>
-            <button type="button" class="btn-danger" ng-click="vm.submitCancelSlot()" ng-disabled="vm.cancelSlotBusy">
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeCancelSlotModal()">Back</button>
+            <button type="button" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);" ng-click="vm.submitCancelSlot()" ng-disabled="vm.cancelSlotBusy">
               {{ vm.cancelSlotBusy ? 'Cancelling...' : (vm.cancelSlotForm.mode === 'reschedule' ? 'Send Reschedule Proposal' : 'Cancel Outright') }}
             </button>
           </div>
@@ -615,157 +612,156 @@
     </div>
 
     <!-- Reschedule Success -->
-    <div class="alert-success" ng-if="vm.rescheduleSuccess">
+    <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
       ✓ Reschedule proposal sent. The parent will be notified to confirm the new dates.
     </div>
 
     <!-- Accept Counter Success -->
-    <div class="alert-success" ng-if="vm.counterAcceptSuccess">
+    <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
       ✓ Reschedule accepted. The booking has been updated.
     </div>
 
     <!-- Reschedule Form -->
-    <div class="card reschedule-panel" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
-      <div class="reschedule-header">
-        <div class="reschedule-title-row">
-          <span class="reschedule-icon">📅</span>
-          <div>
-            <h3>Propose Reschedule</h3>
-            <p>{{ vm.rescheduleBooking.subject }} &bull; Child: {{ vm.rescheduleBooking.studentName }}</p>
-          </div>
+    <div class="bs-card bs-elev-sm" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
+      <div style="display:flex; align-items:flex-start; gap:var(--space-3);">
+        <div>
+          <h3 style="margin:0;">Propose Reschedule</h3>
+          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.rescheduleBooking.subject }} · Child: {{ vm.rescheduleBooking.studentName }}</p>
         </div>
-        <button class="btn-link" ng-click="vm.cancelTutorReschedule()">✕ Cancel</button>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelTutorReschedule()">✕ Cancel</button>
       </div>
-      <p class="reschedule-sub" ng-if="vm.isTutorBookingConflicted(vm.rescheduleBooking)">
+      <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isTutorBookingConflicted(vm.rescheduleBooking)">
         ⚠️ Some class dates overlap with your blocked period. Propose new dates for the parent to confirm.
       </p>
-      <p class="reschedule-sub" ng-if="!vm.isTutorBookingConflicted(vm.rescheduleBooking)" style="background:#f0fdf4;border-left-color:#16a34a">
+      <p style="font-size:13px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isTutorBookingConflicted(vm.rescheduleBooking)">
         Enter the new proposed dates below. The parent will receive a notification to accept.
       </p>
-      <form ng-submit="vm.submitTutorReschedule()" class="form-stack">
-        <div class="session-slot" ng-repeat="c in vm.rescheduleForm.classes track by $index"
-          ng-class="{'slot-blocked': vm.isOriginalDateBlocked(c.originalDate)}">
-          <div class="session-slot-label" style="display:flex;align-items:center;gap:8px">
+      <form ng-submit="vm.submitTutorReschedule()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+        <div ng-repeat="c in vm.rescheduleForm.classes track by $index" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);"
+          ng-style="vm.isOriginalDateBlocked(c.originalDate) ? {outline:'1px solid var(--color-accent-2)'} : {}">
+          <div style="display:flex;align-items:center;gap:8px; font-size:12px; font-weight:600; margin-bottom:6px;">
             Class {{ $index + 1 }}
-            <span class="badge-blocked" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
+            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
           </div>
-          <div class="reschedule-orig-date">
+          <div class="bs-text-muted" style="font-size:12px; margin-bottom:6px;">
             Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
-          <div class="form-row-3">
-            <div class="form-group">
-              <label>New Date <span class="text-danger">*</span></label>
-              <input type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
-                ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
-              <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)">
+          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+            <div class="bs-field" style="flex:1; min-width:140px; margin:0;">
+              <label>New Date <span style="color:var(--color-accent-2);">*</span></label>
+              <input class="bs-input" type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
+                ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+              <span ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)" style="color:var(--color-accent-2-700); font-size:12px;">
                 ⚠️ This date is also in a blocked period
               </span>
             </div>
-            <div class="form-group">
-              <label>New Start Time <span class="text-danger">*</span></label>
-              <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+            <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+              <label>New Start Time <span style="color:var(--color-accent-2);">*</span></label>
+              <input class="bs-input" type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
                 ng-change="vm.onTutorRescheduleStartTimeChange(c)"
-                ng-class="{'input-blocked': c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)}" />
+                ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
             </div>
-            <div class="form-group">
+            <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
               <label>New End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
-              <input type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
+              <input class="bs-input" type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
             </div>
           </div>
-          <span class="blocked-date-hint" ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)">
+          <span ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)" style="color:var(--color-accent-2-700); font-size:12px;">
             ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
           </span>
         </div>
-        <p class="reschedule-sub" ng-if="vm.hasDuplicateTutorReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+        <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateTutorReschedule()">
           ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
-        <p class="reschedule-sub" ng-if="vm.hasInvalidTutorReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+        <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidTutorReschedule()">
           ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
         </p>
-        <div class="btn-row" style="margin-top:4px">
-          <button type="button" class="btn-outline" ng-click="vm.cancelTutorReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary" ng-disabled="vm.hasInvalidTutorReschedule() || vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelTutorReschedule()">Cancel</button>
+          <button type="submit" class="bs-btn bs-btn-primary" ng-disabled="vm.hasInvalidTutorReschedule() || vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
         </div>
       </form>
     </div>
 
     <!-- Confirmed Classes -->
-    <div class="card" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
-      <h3><i class="ti ti-checkbox" style="font-size:16px; color:#059669;" aria-hidden="true"></i> Confirmed Classes Checklist</h3>
-      <p ng-if="!vm.confirmedClasses().length" class="empty-state">No active class appointments.</p>
-      <div class="session-item" ng-repeat="b in vm.confirmedClasses()"
-        ng-class="{'session-conflicted': vm.isTutorBookingConflicted(b)}">
+    <div class="bs-card bs-elev-sm" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
+      <div class="bs-card-title"><i class="ti ti-checkbox" aria-hidden="true"></i> Confirmed Classes Checklist</div>
+      <p class="bs-text-muted" ng-if="!vm.confirmedClasses().length">No active class appointments.</p>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
+        ng-repeat="b in vm.confirmedClasses()"
+        ng-style="vm.isTutorBookingConflicted(b) ? {background:'var(--color-accent-2-100)'} : {}">
         <div style="flex:1">
-          <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
-          <span class="badge-subject">{{ b.subject }}</span>
-          <strong>Child: {{ b.studentName }}</strong>
+          <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
+          <span class="bs-text-muted" style="font-size:12px;">#{{ b.bookingNumber }}</span>
+          <strong style="display:block; margin-top:2px;">Child: {{ b.studentName }}</strong>
           <!-- Countered: show proposed dates, pending acceptance -->
           <div ng-if="b.status === 'countered' && b.counterProposal">
-            <div class="class-date-row" ng-repeat="c in b.counterProposal.classes track by $index">
-              <p style="text-decoration:line-through;color:#94a3b8;font-size:12px">{{ c.originalDate | dmy }}</p>
-              <p>{{ c.proposedDate | dmy }} • {{ c.proposedTime | hhmma }} ({{ b.durationHours }}h)
-                <span class="badge-amber" style="font-size:10px;margin-left:4px" ng-if="b.counterProposal.proposedBy === 'tutor'">⏳ Awaiting parent's acceptance</span>
-                <span class="badge-amber" style="font-size:10px;margin-left:4px" ng-if="b.counterProposal.proposedBy !== 'tutor'">⏳ Parent proposed — awaiting your acceptance</span>
+            <div style="display:flex; align-items:center; gap:8px;" ng-repeat="c in b.counterProposal.classes track by $index">
+              <p style="text-decoration:line-through; color:var(--color-neutral-500); font-size:12px; margin:0;">{{ c.originalDate | dmy }}</p>
+              <p style="margin:0; font-size:13px;">{{ c.proposedDate | dmy }} · {{ c.proposedTime | hhmma }} ({{ b.durationHours }}h)
+                <span class="bs-tag bs-tag-accent-2" ng-if="b.counterProposal.proposedBy === 'tutor'">⏳ Awaiting parent's acceptance</span>
+                <span class="bs-tag bs-tag-accent-2" ng-if="b.counterProposal.proposedBy !== 'tutor'">⏳ Parent proposed — awaiting your acceptance</span>
               </p>
             </div>
           </div>
           <!-- Confirmed: show actual booking classes -->
           <div ng-if="b.status !== 'countered' || !b.counterProposal">
-            <div class="class-date-row" ng-repeat="c in b.classes track by $index">
-              <p>{{ c.date | dmy }} • {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
-              <span class="status-badge confirmed" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
+            <div style="display:flex; align-items:center; gap:8px;" ng-repeat="c in b.classes track by $index">
+              <p class="bs-text-muted" style="margin:0; font-size:13px;">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
+              <span class="bs-tag bs-tag-accent" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
             </div>
           </div>
         </div>
-        <button class="btn-primary sm"
+        <button class="bs-btn bs-btn-primary"
           ng-if="b.status === 'countered' && b.counterProposal && b.counterProposal.proposedBy !== 'tutor'"
           ng-click="vm.acceptCounterProposal(b)">
           ✓ Accept Proposal
         </button>
-        <button ng-class="vm.isTutorBookingConflicted(b) ? 'btn-warning sm' : 'btn-outline sm'"
+        <button class="bs-btn" ng-class="vm.isTutorBookingConflicted(b) ? '' : 'bs-btn-secondary'"
+          ng-style="vm.isTutorBookingConflicted(b) ? {background:'var(--color-accent-2)', color:'var(--color-bg)'} : {}"
           ng-click="vm.startTutorReschedule(b)">
           <span ng-if="vm.isTutorBookingConflicted(b)">⚠️ Reschedule Required</span>
-          <span ng-if="!vm.isTutorBookingConflicted(b)">📅 Reschedule</span>
+          <span ng-if="!vm.isTutorBookingConflicted(b)">Reschedule</span>
         </button>
       </div>
     </div>
 
     <!-- ── Class Reports Portal (merged with day detail) ── -->
-    <div class="card" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
-      <h3>
-        <i class="ti ti-file-text" style="font-size:16px; color:#059669;" aria-hidden="true"></i>
+    <div class="bs-card bs-elev-sm" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
+      <div class="bs-card-title">
+        <i class="ti ti-file-text" aria-hidden="true"></i>
         Class Reports
-      </h3>
+      </div>
 
       <!-- No date selected -->
-      <div ng-if="!vm.reportSelectedDay" class="empty-state" style="text-align:center; padding:24px 0;">
-        <i class="ti ti-calendar-event" style="font-size:28px; color:#cbd5e1;" aria-hidden="true"></i>
-        <p style="margin:8px 0 0; color:#94a3b8;">Select a completed class date from the calendar above to view or fill reports.</p>
+      <div ng-if="!vm.reportSelectedDay" style="text-align:center; padding:24px 0;">
+        <i class="ti ti-calendar-event" style="font-size:28px; opacity:0.35;" aria-hidden="true"></i>
+        <p class="bs-text-muted" style="margin:8px 0 0;">Select a completed class date from the calendar above to view or fill reports.</p>
       </div>
 
       <!-- Date selected -->
       <div ng-if="vm.reportSelectedDay">
 
-        <div class="report-day-header">
-          <span class="badge-subject">{{ vm.formatSessionDate(vm.reportSelectedDay) }}</span>
-          <span ng-if="vm.reportAllSubmittedOnSelectedDay" class="badge-green">
-            <i class="ti ti-circle-check" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span class="bs-tag bs-tag-accent">{{ vm.formatSessionDate(vm.reportSelectedDay) }}</span>
+          <span ng-if="vm.reportAllSubmittedOnSelectedDay" class="bs-tag bs-tag-accent">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
             All reports submitted
           </span>
-          <span ng-if="!vm.reportAllSubmittedOnSelectedDay && vm.reportSelectedDayStudents.length" class="badge-amber">
-            <i class="ti ti-alert-circle" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+          <span ng-if="!vm.reportAllSubmittedOnSelectedDay && vm.reportSelectedDayStudents.length" class="bs-tag bs-tag-accent-2">
+            <i class="ti ti-alert-circle" aria-hidden="true"></i>
             Reports pending
           </span>
         </div>
 
         <!-- No completed class on selected date -->
-        <div ng-if="!vm.reportSelectedDayStudents.length" class="empty-state">
-          <p>No reports yet — this class hasn't taken place.</p>
+        <div ng-if="!vm.reportSelectedDayStudents.length">
+          <p class="bs-text-muted">No reports yet — this class hasn't taken place.</p>
         </div>
 
         <!-- Student list for selected date -->
         <div ng-if="vm.reportSelectedDayStudents.length">
-          <p class="section-label" style="margin-bottom:8px;">
+          <p class="bs-text-muted" style="margin-bottom:8px; font-size:12px; text-transform:uppercase; letter-spacing:0.05em;">
             {{ vm.reportSelectedDayStudents.length }}
             student(s) in this session
           </p>
@@ -781,24 +777,24 @@
             </div>
 
             <!-- Submitted -->
-            <span ng-if="s.submitted" class="badge-green">
-              <i class="ti ti-check" style="font-size:11px; vertical-align:-1px;" aria-hidden="true"></i>
+            <span ng-if="s.submitted" class="bs-tag bs-tag-accent">
+              <i class="ti ti-check" aria-hidden="true"></i>
               Submitted
             </span>
 
             <!-- Pending — fill report button -->
-            <span ng-if="!s.submitted" class="badge-amber" style="margin-right:8px;">Pending</span>
+            <span ng-if="!s.submitted" class="bs-tag bs-tag-accent-2" style="margin-right:8px;">Pending</span>
             <button ng-if="!s.submitted && !vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]"
-              class="btn-outline sm"
+              class="bs-btn bs-btn-secondary"
               ng-click="vm.openReportForm(s.studentId, s.sessionDate, s.booking)">
-              <i class="ti ti-edit" style="font-size:12px; vertical-align:-1px;" aria-hidden="true"></i>
+              <i class="ti ti-edit" aria-hidden="true"></i>
               Fill report
             </button>
 
             <!-- Success flash -->
             <span ng-if="vm.reportSuccess[vm._reportKey(s.studentId, s.sessionDate)]"
-              class="text-success" style="font-size:12px;">
-              <i class="ti ti-circle-check" style="font-size:13px; vertical-align:-2px;" aria-hidden="true"></i>
+              style="color:var(--color-accent-700); font-size:12px;">
+              <i class="ti ti-circle-check" aria-hidden="true"></i>
               Report submitted!
             </span>
 
@@ -809,63 +805,62 @@
               <div class="report-form-header">
                 <div>
                   <strong style="font-size:13px;">{{ s.studentName }}</strong>
-                  <span style="font-size:12px; color:#94a3b8; margin-left:8px;">
+                  <span class="bs-text-muted" style="font-size:12px; margin-left:8px;">
                     {{ vm.formatSessionDate(s.sessionDate) }}
                   </span>
                 </div>
-                <button class="btn-link"
+                <button class="bs-btn bs-btn-ghost bs-btn-icon"
                   ng-click="vm.closeReportForm(s.studentId, s.sessionDate)">
-                  <i class="ti ti-x" style="font-size:15px;" aria-hidden="true"></i>
+                  <i class="ti ti-x" aria-hidden="true"></i>
                 </button>
               </div>
 
               <!-- Attendance -->
-              <div class="form-group">
+              <div class="bs-field">
                 <label>Attendance</label>
                 <div class="chip-row">
                   <button type="button" class="chip-btn"
                     ng-class="{'active-green': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'present'}"
                     ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'present'">
-                    <i class="ti ti-circle-check" style="font-size:12px;" aria-hidden="true"></i> Present
+                    <i class="ti ti-circle-check" aria-hidden="true"></i> Present
                   </button>
                   <button type="button" class="chip-btn"
                     ng-class="{'active-amber': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'late'}"
                     ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'late'">
-                    <i class="ti ti-clock" style="font-size:12px;" aria-hidden="true"></i> Late
+                    <i class="ti ti-clock" aria-hidden="true"></i> Late
                   </button>
                   <button type="button" class="chip-btn"
                     ng-class="{'active-red': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'}"
                     ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'absent'">
-                    <i class="ti ti-circle-x" style="font-size:12px;" aria-hidden="true"></i> Absent
+                    <i class="ti ti-circle-x" aria-hidden="true"></i> Absent
                   </button>
                 </div>
-                <p class="field-hint">Other fields will be disabled if absent.</p>
+                <p class="bs-text-muted" style="font-size:11px; margin-top:4px;">Other fields will be disabled if absent.</p>
               </div>
 
               <!-- Remaining fields — disabled when absent -->
               <div ng-class="{'report-fields-disabled': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'}">
 
                 <!-- Engagement -->
-                <div class="form-group">
+                <div class="bs-field">
                   <label>Engagement</label>
                   <div class="star-rating-row">
                     <button type="button" class="star-btn"
                       ng-repeat="n in [1,2,3,4,5]"
                       ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement = n"
                       ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'">
-                      <i class="ti"
-                        ng-class="n <= vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement ? 'ti-star' : 'ti-star'"
-                        ng-style="{'color': n <= vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement ? '#f59e0b' : '#e2e8f0', 'font-size': '22px'}"
+                      <i class="ti ti-star"
+                        ng-style="{'color': n <= vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '22px'}"
                         aria-hidden="true"></i>
                     </button>
-                    <span class="text-muted" style="font-size:12px; margin-left:6px;">
+                    <span class="bs-text-muted" style="font-size:12px; margin-left:6px;">
                       {{ vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement || 0 }} / 5
                     </span>
                   </div>
                 </div>
 
                 <!-- Understanding -->
-                <div class="form-group">
+                <div class="bs-field">
                   <label>Understanding</label>
                   <div class="chip-row">
                     <button type="button" class="chip-btn"
@@ -879,7 +874,7 @@
                 </div>
 
                 <!-- Homework -->
-                <div class="form-group">
+                <div class="bs-field">
                   <label>Homework completion</label>
                   <div class="chip-row">
                     <button type="button" class="chip-btn"
@@ -895,44 +890,44 @@
               </div>
 
               <!-- Remarks — always enabled -->
-              <div class="form-group">
-                <label>Tutor remarks <span class="text-muted" style="font-weight:400;">(optional)</span></label>
-                <textarea rows="2"
+              <div class="bs-field">
+                <label>Tutor remarks <span class="bs-text-muted" style="font-weight:400;">(optional)</span></label>
+                <textarea class="bs-input" rows="2"
                   ng-model="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].remarks"
                   placeholder="Personalised note for this student's parent..."></textarea>
               </div>
 
-              <p class="field-error" ng-if="vm.reportError[vm._reportKey(s.studentId, s.sessionDate)]">
+              <p ng-if="vm.reportError[vm._reportKey(s.studentId, s.sessionDate)]" style="color:var(--color-accent-2-700); font-size:13px;">
                 {{ vm.reportError[vm._reportKey(s.studentId, s.sessionDate)] }}
               </p>
 
-              <div class="btn-row" style="margin-top:8px;">
-                <button type="button" class="btn-outline"
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button type="button" class="bs-btn bs-btn-secondary"
                   ng-click="vm.closeReportForm(s.studentId, s.sessionDate)">Cancel</button>
-                <button type="button" class="btn-primary"
+                <button type="button" class="bs-btn bs-btn-primary"
                   ng-click="vm.confirmSubmitReport(s.studentId, s.sessionDate)"
                   ng-disabled="vm.reportSubmitting[vm._reportKey(s.studentId, s.sessionDate)]">
-                  <i class="ti ti-send" style="font-size:13px;" aria-hidden="true"></i>
+                  <i class="ti ti-send" aria-hidden="true"></i>
                   Submit report
                 </button>
               </div>
 
               <!-- Confirmation modal -->
-              <div class="report-confirm-modal"
+              <div class="bs-dialog-backdrop"
                 ng-if="vm.reportConfirm[vm._reportKey(s.studentId, s.sessionDate)]">
-                <div class="report-confirm-inner">
-                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <div class="bs-dialog" style="width:min(380px,100%);">
+                  <div style="display:flex; align-items:center; gap:8px;">
                     <i class="ti ti-alert-circle"
-                      style="font-size:20px; color:#f59e0b;" aria-hidden="true"></i>
+                      style="font-size:20px; color:var(--color-accent-2);" aria-hidden="true"></i>
                     <strong>Submit lesson report?</strong>
                   </div>
-                  <p style="font-size:13px; color:#64748b; margin:0 0 14px; line-height:1.6;">
+                  <p class="bs-text-muted" style="font-size:13px; margin:0;">
                     Once submitted, this report cannot be edited. The parent will be notified.
                   </p>
-                  <div class="btn-row">
-                    <button type="button" class="btn-outline"
+                  <div class="bs-dialog-actions">
+                    <button type="button" class="bs-btn bs-btn-secondary"
                       ng-click="vm.cancelConfirmReport(s.studentId, s.sessionDate)">Cancel</button>
-                    <button type="button" class="btn-primary"
+                    <button type="button" class="bs-btn bs-btn-primary"
                       ng-click="vm.submitReport(s.studentId, s.sessionDate)"
                       ng-disabled="vm.reportSubmitting[vm._reportKey(s.studentId, s.sessionDate)]">
                       Confirm and submit
@@ -950,7 +945,7 @@
 
         <!-- Submitted reports log — grouped by preset group -->
         <div ng-if="vm.reportGroups.length" style="margin-top:16px;">
-          <h5 class="section-label">Submitted reports</h5>
+          <h5 style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em;">Submitted reports</h5>
 
           <div class="report-log-group"
             ng-repeat="group in vm.reportGroups track by group.presetGroupId">
@@ -959,14 +954,14 @@
               ng-repeat="report in group.reports track by $index">
               <div class="report-log-row">
                 <i class="ti ti-file-check"
-                  style="font-size:14px; color:#16a34a; flex-shrink:0;" aria-hidden="true"></i>
+                  style="font-size:14px; color:var(--color-accent); flex-shrink:0;" aria-hidden="true"></i>
                 <div style="flex:1;">
                   <strong style="font-size:13px;">{{ report.studentName }}</strong>
-                  <span style="font-size:12px; color:#94a3b8; margin-left:6px;">
+                  <span class="bs-text-muted" style="font-size:12px; margin-left:6px;">
                     {{ vm.formatSessionDate(report.sessionDate) }}
                   </span>
                 </div>
-                <span class="badge-green">Submitted</span>
+                <span class="bs-tag bs-tag-accent">Submitted</span>
               </div>
             </div>
 
@@ -982,9 +977,9 @@
     </div><!-- end overview tab -->
 
     <!-- ===== EDIT PROFILE TAB ===== -->
-    <div ng-if="vm.activeTab === 'profile'" class="card max-w-lg">
-      <span class="label-tag indigo">TUTOR PROFILE MANAGEMENT</span>
-      <h3>Edit Profile Details</h3>
+    <div ng-if="vm.activeTab === 'profile'" class="bs-card bs-elev-sm" style="max-width:640px;">
+      <span class="bs-tag bs-tag-accent">TUTOR PROFILE MANAGEMENT</span>
+      <h3 style="margin:0;">Edit Profile Details</h3>
 
       <form ng-submit="vm.saveProfile()" class="profile-form">
 
@@ -1000,10 +995,10 @@
                 <i class="ti ti-shield-check" aria-hidden="true"></i>
                 Profile verification
               </p>
-              <p class="verif-subtitle">Complete all required documents to unlock subject offerings.</p>
+              <p class="verif-subtitle bs-text-muted">Complete all required documents to unlock subject offerings.</p>
             </div>
             <div class="verif-progress-wrap">
-              <span class="verif-progress-label">{{ vm.mandatoryUploadedCount() }} of {{ vm.mandatoryTotal }} required docs uploaded</span>
+              <span class="verif-progress-label bs-text-muted">{{ vm.mandatoryUploadedCount() }} of {{ vm.mandatoryTotal }} required docs uploaded</span>
               <div class="verif-progress-bar">
                 <div class="verif-progress-fill" ng-style="{'width': vm.verifProgress()}"></div>
               </div>
@@ -1029,11 +1024,11 @@
             </div>
           </div>
 
-          <div class="alert-success" ng-if="vm.verifSubmitSuccess">
+          <div style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.verifSubmitSuccess">
             <i class="ti ti-circle-check" aria-hidden="true"></i>
             Submitted for verification. We'll notify you within 1–3 business days.
           </div>
-          <div class="field-error" ng-if="vm.verifSubmitError">{{ vm.verifSubmitError }}</div>
+          <div ng-if="vm.verifSubmitError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.verifSubmitError }}</div>
 
           <!-- ── 1. Identity ── -->
           <div class="verif-card">
@@ -1438,26 +1433,26 @@
 
         <div ng-if="vm.tutor.verificationStatus !== 'not_submitted'">
 
-        <div class="form-group">
+        <div class="bs-field">
           <label>Bio</label>
-          <textarea ng-model="vm.profileForm.bio" rows="3" placeholder="Tell parents about your teaching style..."></textarea>
+          <textarea class="bs-input" ng-model="vm.profileForm.bio" rows="3" placeholder="Tell parents about your teaching style..."></textarea>
         </div>
 
         <!-- Teaching Offerings -->
-        <div class="form-group">
+        <div class="bs-field">
           <label>Teaching Offerings</label>
-          <p class="text-muted offering-hint">Select a country, subject and teaching mode(s), then qualification, then click Add Offering — it's added for every mode you select below.</p>
+          <p class="bs-text-muted" style="font-size:12px;">Select a country, subject and teaching mode(s), then qualification, then click Add Offering — it's added for every mode you select below.</p>
           <div class="offering-builder">
-            <div class="form-group">
+            <div class="bs-field">
               <label>Country</label>
               <div class="radio-row">
                 <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Singapore" ng-click="vm.newOffering.selectedOption = null" /> Singapore 🇸🇬</label>
                 <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Malaysia" ng-click="vm.newOffering.selectedOption = null" /> Malaysia 🇲🇾</label>
               </div>
             </div>
-            <div class="form-group">
+            <div class="bs-field">
               <label>Subject</label>
-              <select ng-model="vm.newOffering.selectedOption"
+              <select class="bs-input" ng-model="vm.newOffering.selectedOption"
                 ng-disabled="!vm.newOffering.country"
                 ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.newOffering.country]">
                 <option value="">{{ vm.newOffering.country ? '— Select subject —' : '— Select a country first —' }}</option>
@@ -1467,8 +1462,8 @@
             <!-- Teaching Modes (drag-and-drop dual pool) — the tutor's overall offered
                  modes. Whatever ends up in "Offered" is what Add Offering below fans
                  the combo out across, so this is the single source of truth for mode. -->
-            <div class="form-group">
-              <label>Teaching Modes Offered <span class="text-danger">*</span></label>
+            <div class="bs-field">
+              <label>Teaching Modes Offered <span style="color:var(--color-accent-2);">*</span></label>
               <div class="mode-pool-container">
                 <div class="mode-pool">
                   <div class="mode-pool-header">
@@ -1506,34 +1501,34 @@
                   </div>
                 </div>
               </div>
-              <p class="field-error" style="margin-top:8px" ng-if="vm.modesError">{{ vm.modesError }}</p>
+              <p ng-if="vm.modesError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:8px;">{{ vm.modesError }}</p>
             </div>
 
-            <button type="button" class="btn-outline-sm offering-add-btn" ng-click="vm.addOffering()">
-              <i class="ti ti-plus" style="font-size:13px;" aria-hidden="true"></i> Add offering
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.addOffering()">
+              <i class="ti ti-plus" aria-hidden="true"></i> Add offering
             </button>
-            <p class="field-error" ng-if="vm.offeringLockedError">{{ vm.offeringLockedError }}</p>
+            <p ng-if="vm.offeringLockedError" style="color:var(--color-accent-2-700); font-size:12px;">{{ vm.offeringLockedError }}</p>
           </div>
 
-          <div class="chip-list" ng-if="vm.profileForm.offerings.length">
-            <span class="chip offering-chip" ng-repeat="o in vm.profileForm.offerings">
-              <span class="offering-chip-text">{{ o.country }} · {{ o.subject }} · {{ o.level }} · {{ o.mode }}</span>
-              <button type="button" class="chip-remove" ng-click="vm.removeOffering($index)">×</button>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-2);" ng-if="vm.profileForm.offerings.length">
+            <span class="bs-tag bs-tag-accent" style="gap:6px;" ng-repeat="o in vm.profileForm.offerings">
+              {{ o.country }} · {{ o.subject }} · {{ o.level }} · {{ o.mode }}
+              <button type="button" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1; padding:0;" ng-click="vm.removeOffering($index)">×</button>
             </span>
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="bs-field">
           <label>Years of Experience</label>
-          <input type="number" ng-model="vm.profileForm.experienceYears" min="0" />
+          <input class="bs-input" type="number" ng-model="vm.profileForm.experienceYears" min="0" />
         </div>
 
-        <button type="submit" class="btn-indigo full-width">Save Profile</button>
+        <button type="submit" class="bs-btn bs-btn-primary bs-btn-block">Save Profile</button>
 
         </div><!-- end verificationStatus !== 'not_submitted' -->
 
-        <div class="alert-success" style="margin-top:12px" ng-if="vm.profileSuccess">✓ Profile updated successfully.</div>
-        <div class="alert-error" style="margin-top:12px" ng-if="vm.profileError">{{ vm.profileError }}</div>
+        <div ng-if="vm.profileSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">✓ Profile updated successfully.</div>
+        <div ng-if="vm.profileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">{{ vm.profileError }}</div>
       </form>
     </div><!-- end profile tab -->
 

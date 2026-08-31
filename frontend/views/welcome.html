@@ -1,77 +1,87 @@
-<div class="welcome-page">
+<div class="bs-scope" style="min-height:100vh; display:flex; flex-direction:column;">
 
-  <!-- ── Top bar ─────────────────────────────────── -->
-  <header class="main-header">
-    <div class="header-inner">
-      <div class="brand">
-        <div class="brand-icon">📚</div>
-        <div>
-          <h1 class="brand-name">LearnSphere</h1>
-          <p class="brand-tagline">Learn Continuously, Grow Confidently.</p>
-        </div>
-      </div>
-      <a href="#!/login" class="btn-primary">Sign In →</a>
-    </div>
-  </header>
-
-  <div class="welcome-content">
-
-  <!-- ── Hero ────────────────────────────────────── -->
-  <div class="search-hero">
-    <h2 class="search-hero-title">Find Your Perfect Tutor</h2>
-    <p class="search-hero-sub">Browse verified NIE-trained tutors across Singapore &amp; Malaysia</p>
-  </div>
-
-  <!-- ── Tutor Grid (2 per row, read-only preview) ── -->
-  <div class="welcome-tutor-grid">
-    <div class="tutor-card"
-      ng-repeat="t in vm.tutors"
-      ng-click="vm.goToLogin(t)"
-      ng-mouseenter="vm.pauseScroll()"
-      ng-mouseleave="vm.resumeScroll()"
-      style="cursor:pointer">
-
-      <!-- ── Top row: avatar + info ── -->
-      <div class="tutor-card-main">
-        <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
-        <div ng-if="!t.imageUrl" class="tutor-avatar avatar-fallback" style="font-size:56px">{{ t.name[0] }}</div>
-        <div class="tutor-card-body">
-          <div class="tutor-card-name-row">
-            <h4>{{ t.name }}</h4>
-            <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
-          </div>
-          <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
-          <div class="qual-tags">
-            <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
-          </div>
-          <div class="tutor-card-subjects-label">Teaches</div>
-          <div class="subject-list">
-            <button ng-repeat="s in t.subjects" class="subject-chip">{{ s }}</button>
-          </div>
-          <p class="tutor-bio">"{{ t.bio }}"</p>
-        </div>
-      </div>
-
-      <!-- ── Bottom bar: rating + modes + price ── -->
-      <div class="tutor-card-bar">
-        <div class="tutor-card-rating">
-          <span class="tutor-rating-star">⭐</span>
-          <span class="tutor-rating-value">{{ t.rating }}</span>
-          <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
-        </div>
-        <div class="tutor-card-modes">
-          <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
-        </div>
-        <div class="tutor-card-bar-spacer"></div>
-        <div class="tutor-card-price">
-          <small>Trial Rate</small>
-          <strong class="price">${{ t.pricePerSession }}/hr</strong>
-        </div>
-      </div>
-
+  <!-- ── Top nav ─────────────────────────────────── -->
+  <div class="bs-nav" style="border-bottom:1px solid var(--color-divider); position:sticky; top:0; background:var(--color-bg); z-index:20;">
+    <div class="bs-nav-brand">LearnSphere</div>
+    <div style="display:flex; gap:var(--space-3); align-items:center; margin-left:auto;">
+      <a href="#!/login" class="bs-btn bs-btn-ghost">Log in</a>
+      <a href="#!/login" class="bs-btn bs-btn-primary">Get started</a>
     </div>
   </div>
 
-  </div><!-- end welcome-content -->
+  <div style="flex:1;">
+    <div style="max-width:1180px; margin:0 auto; padding:var(--space-8) var(--space-6);">
+
+      <!-- ── Hero ────────────────────────────────── -->
+      <div style="display:flex; gap:var(--space-8); align-items:center; flex-wrap:wrap;">
+        <div style="flex:1 1 480px; min-width:320px;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700); margin-bottom:var(--space-2);">Tutor matching, made simple</div>
+          <h1 style="max-width:11ch;">Learning that fits your family's life</h1>
+          <p style="font-size:17px; max-width:46ch; opacity:0.85;">Browse verified NIE-trained tutors across Singapore &amp; Malaysia, book instantly, and keep every lesson, message and invoice in one place.</p>
+          <div style="display:flex; gap:var(--space-3); margin-top:var(--space-4); flex-wrap:wrap;">
+            <a href="#!/login" class="bs-btn bs-btn-primary">I'm a parent</a>
+            <a href="#!/login" class="bs-btn bs-btn-secondary">I'm a tutor</a>
+          </div>
+        </div>
+        <div style="flex:1 1 360px; min-width:280px;">
+          <img src="assets/bg-study1.jpg" class="bs-halftone" style="width:100%; height:340px; object-fit:cover; border-radius:var(--radius-lg);" alt="Parent and child at a laptop, tutoring session" />
+        </div>
+      </div>
+
+      <!-- ── How it works ────────────────────────── -->
+      <div style="margin-top:var(--space-8);">
+        <h2>How it works</h2>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--space-6); margin-top:var(--space-4);">
+          <div>
+            <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">01</div>
+            <h4 style="margin-top:var(--space-2);">Tell us what you need</h4>
+            <p class="bs-text-muted" style="font-size:14px;">Subject, level, preferred mode and schedule for each child.</p>
+          </div>
+          <div>
+            <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">02</div>
+            <h4 style="margin-top:var(--space-2);">Compare matched tutors</h4>
+            <p class="bs-text-muted" style="font-size:14px;">Ratings, reviews and classes you can book instantly.</p>
+          </div>
+          <div>
+            <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">03</div>
+            <h4 style="margin-top:var(--space-2);">Learn, track, pay</h4>
+            <p class="bs-text-muted" style="font-size:14px;">Lesson reports, a shared calendar, and invoices in one place.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tutor preview grid ──────────────────── -->
+      <div style="margin-top:var(--space-8);">
+        <h2>Meet a few of our tutors</h2>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-4); margin-top:var(--space-4);">
+          <div class="bs-card bs-elev-sm"
+            ng-repeat="t in vm.tutors"
+            ng-click="vm.goToLogin(t)"
+            ng-mouseenter="vm.pauseScroll()"
+            ng-mouseleave="vm.resumeScroll()"
+            style="cursor:pointer">
+            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius-lg);" alt="{{ t.name }}" />
+            <div ng-if="!t.imageUrl" class="bs-halftone" style="width:100%; height:120px; border-radius:var(--radius-lg); background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:40px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>
+            <div class="bs-card-title">{{ t.name }} <span ng-if="t.isVerified" title="Verified" style="color:var(--color-accent); font-size:13px;">✓</span></div>
+            <div class="bs-card-meta">{{ t.subjects.slice(0,2).join(', ') }} · ★ {{ t.rating }} ({{ t.reviewCount }})</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── For tutors callout ──────────────────── -->
+      <div style="margin-top:var(--space-8);">
+        <div style="font-family:var(--font-heading); font-weight:600; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-2-700); margin-bottom:var(--space-2);">For tutors</div>
+        <h2>Teach on your own schedule</h2>
+        <p style="opacity:0.85; max-width:46ch;">Set your own hours, publish classes parents can book instantly, and get paid securely after every confirmed session.</p>
+        <a href="#!/login" class="bs-btn bs-btn-secondary" style="margin-top:var(--space-2);">I'm a tutor</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Footer ───────────────────────────────────── -->
+  <div style="margin-top:var(--space-8); padding:var(--space-6); border-top:1px solid var(--color-divider);">
+    <div style="max-width:1180px; margin:0 auto; font-size:13px; opacity:0.6;">LearnSphere — tutor matching for families.</div>
+  </div>
 
 </div>

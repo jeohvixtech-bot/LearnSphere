@@ -1,165 +1,155 @@
-<div class="login-page" ng-click="auth.errorMsg = ''">
+<div class="bs-scope" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:var(--space-8) var(--space-6);" ng-click="auth.errorMsg = ''">
 
-  <!-- ── Left hero panel ──────────────────────────── -->
-  <div class="login-hero">
-    <div class="login-hero-body">
-      <div class="login-hero-icon">📚</div>
-      <h1 class="login-hero-title">LearnSphere</h1>
-      <p class="login-hero-tagline">Singapore &amp; Malaysia's Premier<br/>Tutor Matching Platform</p>
-      <ul class="login-hero-perks">
-        <li>✦ 500+ Verified Expert Tutors</li>
-        <li>✦ Flexible Online &amp; Home Sessions</li>
-        <li>✦ Secure Booking &amp; Safe Payments</li>
-        <li>✦ Real-time Progress Reports</li>
-      </ul>
+  <div class="bs-card bs-elev-md" style="width:min(460px,100%); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-4);">
+
+    <div>
+      <h3 style="margin-bottom:var(--space-1);">Welcome back</h3>
+      <p class="bs-text-muted" style="font-size:13px; margin:0;">Sign in to continue your learning journey.</p>
     </div>
-  </div>
 
-  <!-- ── Right form panel ─────────────────────────── -->
-  <div class="login-panel">
-    <div class="login-card">
+    <!-- Mode toggle -->
+    <div class="bs-seg" style="width:100%;">
+      <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+        <input type="radio" name="authMode" ng-model="auth.mode" value="login" /> Sign In
+      </label>
+      <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+        <input type="radio" name="authMode" ng-model="auth.mode" value="register" /> Register
+      </label>
+    </div>
 
-      <div class="login-card-header">
-        <h2>Welcome back 👋</h2>
-        <p>Sign in to continue your learning journey.</p>
+    <!-- Error -->
+    <div ng-if="auth.errorMsg" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">{{ auth.errorMsg }}</div>
+
+    <!-- Login Form -->
+    <form ng-if="auth.mode === 'login'" ng-submit="auth.login()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+      <div class="bs-field">
+        <label>Email Address</label>
+        <input class="bs-input" type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" />
       </div>
-
-      <!-- Mode Tabs -->
-      <div class="tab-group">
-        <button class="tab" ng-class="{active: auth.mode === 'login'}" ng-click="auth.mode = 'login'">Sign In</button>
-        <button class="tab" ng-class="{active: auth.mode === 'register'}" ng-click="auth.mode = 'register'">Register</button>
+      <div class="bs-field">
+        <label>Password</label>
+        <input class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" />
       </div>
+      <p style="text-align:right; margin:0;">
+        <a href="" class="bs-btn bs-btn-ghost" style="font-size:12px; padding:0;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>
+      </p>
+      <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="auth.loading">
+        <span ng-if="!auth.loading">Sign In</span>
+        <span ng-if="auth.loading">Authenticating…</span>
+      </button>
+    </form>
 
-      <!-- Error Message -->
-      <div class="alert-error" ng-if="auth.errorMsg">{{ auth.errorMsg }}</div>
-
-      <!-- Login Form -->
-      <form ng-if="auth.mode === 'login'" ng-submit="auth.login()">
-        <div class="form-group">
-          <label>Email Address</label>
-          <input type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" />
+    <!-- Forgot Password Modal -->
+    <div class="bs-dialog-backdrop" ng-if="auth.showForgotPassword" ng-click="auth.closeForgotPassword()">
+      <div class="bs-dialog" ng-click="$event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <div class="bs-dialog-title">Forgot Password</div>
+          <button class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="auth.closeForgotPassword()">&times;</button>
         </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" ng-model="auth.loginData.password" required placeholder="••••••••" />
-        </div>
-        <p style="text-align:right; margin: -8px 0 14px">
-          <span class="tnc-link" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</span>
-        </p>
-        <button type="submit" class="btn-primary full-width" ng-disabled="auth.loading">
-          <span ng-if="!auth.loading">Sign In →</span>
-          <span ng-if="auth.loading">Authenticating...</span>
-        </button>
-      </form>
-
-      <!-- Forgot Password Modal -->
-      <div class="tnc-modal-backdrop" ng-if="auth.showForgotPassword" ng-click="auth.closeForgotPassword()"></div>
-      <div class="tnc-modal" ng-if="auth.showForgotPassword" ng-click="$event.stopPropagation()">
-        <div class="tnc-modal-header">
-          <span class="tnc-modal-title">Forgot Password</span>
-          <button class="tnc-modal-close" ng-click="auth.closeForgotPassword()">&times;</button>
-        </div>
-        <div class="tnc-modal-body">
-          <p>Enter your account email and we'll send a temporary password to it.</p>
-          <div class="form-group">
+        <div class="bs-dialog-body">
+          <p style="margin:0 0 var(--space-3);">Enter your account email and we'll send a temporary password to it.</p>
+          <div class="bs-field">
             <label>Email Address</label>
-            <input type="email" ng-model="auth.forgotEmail" required placeholder="you@example.com" />
+            <input class="bs-input" type="email" ng-model="auth.forgotEmail" required placeholder="you@example.com" />
           </div>
-          <div class="alert-error" ng-if="auth.forgotErrorMsg">{{ auth.forgotErrorMsg }}</div>
-          <div class="alert-success" ng-if="auth.forgotMsg">{{ auth.forgotMsg }}</div>
-          <button type="button" class="btn-primary full-width" ng-disabled="auth.forgotLoading || !auth.forgotEmail" ng-click="auth.submitForgotPassword()">
+          <div ng-if="auth.forgotErrorMsg" style="margin-top:var(--space-2); background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">{{ auth.forgotErrorMsg }}</div>
+          <div ng-if="auth.forgotMsg" style="margin-top:var(--space-2); background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">{{ auth.forgotMsg }}</div>
+        </div>
+        <div class="bs-dialog-actions">
+          <button type="button" class="bs-btn bs-btn-primary" ng-disabled="auth.forgotLoading || !auth.forgotEmail" ng-click="auth.submitForgotPassword()">
             <span ng-if="!auth.forgotLoading">Send Temporary Password</span>
-            <span ng-if="auth.forgotLoading">Sending...</span>
+            <span ng-if="auth.forgotLoading">Sending…</span>
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- Register Form -->
-      <form ng-if="auth.mode === 'register'" ng-submit="auth.register()">
-        <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" ng-model="auth.registerData.name" ng-change="auth.validateName()" required placeholder="e.g. Sarah Tan" />
-          <div class="field-error" ng-if="auth.nameError">{{ auth.nameError }}</div>
+    <!-- Register Form -->
+    <form ng-if="auth.mode === 'register'" ng-submit="auth.register()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+      <div class="bs-field">
+        <label>Full Name</label>
+        <input class="bs-input" type="text" ng-model="auth.registerData.name" ng-change="auth.validateName()" required placeholder="e.g. Sarah Tan" />
+        <div ng-if="auth.nameError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ auth.nameError }}</div>
+      </div>
+      <div class="bs-field">
+        <label>Email Address</label>
+        <input class="bs-input" type="email" ng-model="auth.registerData.email" required placeholder="you@example.com" />
+      </div>
+      <div class="bs-field">
+        <label>Password</label>
+        <div style="position:relative;">
+          <input class="bs-input" ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" style="padding-right:38px;" />
+          <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; right:2px; top:1px;" ng-click="auth.showRegisterPassword = !auth.showRegisterPassword" tabindex="-1">
+            <i class="ti" ng-class="auth.showRegisterPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
+          </button>
         </div>
-        <div class="form-group">
-          <label>Email Address</label>
-          <input type="email" ng-model="auth.registerData.email" required placeholder="you@example.com" />
+      </div>
+      <div class="bs-field">
+        <label>Confirm Password</label>
+        <div style="position:relative;">
+          <input class="bs-input" ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" style="padding-right:38px;" />
+          <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; right:2px; top:1px;" ng-click="auth.showRegisterConfirmPassword = !auth.showRegisterConfirmPassword" tabindex="-1">
+            <i class="ti" ng-class="auth.showRegisterConfirmPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
+          </button>
         </div>
-        <div class="form-group">
-          <label>Password</label>
-          <div class="password-input-wrap">
-            <input ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" />
-            <button type="button" class="password-toggle-btn" ng-click="auth.showRegisterPassword = !auth.showRegisterPassword" tabindex="-1">
-              <i class="ti" ng-class="auth.showRegisterPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
-            </button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Confirm Password</label>
-          <div class="password-input-wrap">
-            <input ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" />
-            <button type="button" class="password-toggle-btn" ng-click="auth.showRegisterConfirmPassword = !auth.showRegisterConfirmPassword" tabindex="-1">
-              <i class="ti" ng-class="auth.showRegisterConfirmPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
-            </button>
-          </div>
-          <div class="field-error" ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword">Passwords do not match.</div>
-        </div>
-        <div class="form-group">
-          <label>Account Type</label>
-          <select ng-model="auth.registerData.role">
-            <option value="parent">Parent / Student</option>
-            <option value="tutor">Tutor / Teacher</option>
-          </select>
-        </div>
-        <div class="tnc-spacer"></div>
-
-        <div class="tnc-checkbox-row">
-          <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" />
-          <label for="tnc-agree" class="tnc-label">
-            I have read and agree to the
-            <span class="tnc-link" ng-click="auth.showTerms = !auth.showTerms">Terms and Conditions</span>
+        <div ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">Passwords do not match.</div>
+      </div>
+      <div class="bs-field">
+        <label>Account Type</label>
+        <div class="bs-seg" style="width:100%;">
+          <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+            <input type="radio" name="registerRole" ng-model="auth.registerData.role" value="parent" /> Parent / Student
+          </label>
+          <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+            <input type="radio" name="registerRole" ng-model="auth.registerData.role" value="tutor" /> Tutor / Teacher
           </label>
         </div>
+      </div>
 
-        <div class="tnc-modal-backdrop" ng-if="auth.showTerms" ng-click="auth.showTerms = false"></div>
-        <div class="tnc-modal" ng-if="auth.showTerms">
-          <div class="tnc-modal-header">
-            <span class="tnc-modal-title">Terms and Conditions</span>
-            <button class="tnc-modal-close" ng-click="auth.showTerms = false">&times;</button>
-          </div>
-          <div class="tnc-modal-body">
-            <p>Terms and Conditions content will be added here.</p>
-          </div>
-        </div>
+      <div style="display:flex; align-items:flex-start; gap:8px; font-size:13px;">
+        <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" style="margin-top:3px;" />
+        <label for="tnc-agree">
+          I have read and agree to the
+          <a href="" class="bs-btn bs-btn-ghost" style="padding:0; font-size:13px; display:inline;" ng-click="$event.preventDefault(); auth.showTerms = !auth.showTerms">Terms and Conditions</a>
+        </label>
+      </div>
 
-        <div class="tnc-spacer"></div>
-
-        <button type="submit" class="btn-primary full-width" ng-disabled="auth.loading || auth.registerData.password !== auth.registerData.confirmPassword || !auth.registerData.agreedToTerms || !!auth.nameError">
-          <span ng-if="!auth.loading">Create Account →</span>
-          <span ng-if="auth.loading">Creating...</span>
-        </button>
-      </form>
-
-      <!-- Demo Credentials -->
-      <div class="demo-creds">
-        <p class="demo-title">Demo Credentials</p>
-        <div class="demo-grid">
-          <div>
-            <strong>Parent</strong>
-            sarah.tan@example.com<br/>Parent@123
+      <div class="bs-dialog-backdrop" ng-if="auth.showTerms" ng-click="auth.showTerms = false">
+        <div class="bs-dialog" ng-click="$event.stopPropagation()">
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <div class="bs-dialog-title">Terms and Conditions</div>
+            <button class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="auth.showTerms = false">&times;</button>
           </div>
-          <div>
-            <strong>Tutor</strong>
-            lim.ws@example.com<br/>Tutor@123
-          </div>
-          <div>
-            <strong>Admin</strong>
-            admin@learnsphere.sg<br/>Admin@123
+          <div class="bs-dialog-body">
+            <p style="margin:0;">Terms and Conditions content will be added here.</p>
           </div>
         </div>
       </div>
 
-    </div>
-  </div>
+      <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="auth.loading || auth.registerData.password !== auth.registerData.confirmPassword || !auth.registerData.agreedToTerms || !!auth.nameError">
+        <span ng-if="!auth.loading">Create Account</span>
+        <span ng-if="auth.loading">Creating…</span>
+      </button>
+    </form>
 
+    <!-- Demo Credentials -->
+    <div class="bs-card" style="background:var(--color-bg); border:1px solid var(--color-divider);">
+      <div class="bs-card-kicker">Demo Credentials</div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:var(--space-3); font-size:12px;">
+        <div>
+          <strong>Parent</strong><br/>
+          <span class="bs-text-muted">sarah.tan@example.com<br/>Parent@123</span>
+        </div>
+        <div>
+          <strong>Tutor</strong><br/>
+          <span class="bs-text-muted">lim.ws@example.com<br/>Tutor@123</span>
+        </div>
+        <div>
+          <strong>Admin</strong><br/>
+          <span class="bs-text-muted">admin@learnsphere.sg<br/>Admin@123</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>

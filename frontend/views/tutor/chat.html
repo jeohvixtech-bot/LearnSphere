@@ -1,74 +1,78 @@
-<div class="dashboard-layout">
-  <aside class="sidebar sidebar-indigo">
-    <div class="sidebar-user">
-      <div class="avatar-circle indigo">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Tutor Dashboard</small></div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Tutor Dashboard</small></div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/tutor/overview" class="nav-item">📋 Overview & Schedules</a>
-      <a href="#!/tutor/chat" class="nav-item active">💬 Direct Messages</a>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/tutor/overview" class="bs-sidebar-link">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
+      </a>
+      <a href="#!/tutor/chat" class="bs-sidebar-link active">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct messages
+      </a>
     </nav>
-    <div class="status-live">Status: <span class="dot-green">● LIVE ON DUTY</span></div>
+    <div style="font-size:12px; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-divider);">
+      Status: <span style="color:var(--color-accent-700); font-weight:600;">● LIVE ON DUTY</span>
+    </div>
   </aside>
 
   <main class="dashboard-main">
-    <div class="chat-layout">
+    <div style="display:flex; gap:var(--space-4); height:calc(100vh - 140px); min-height:480px;">
 
-      <div class="card chat-tutor-list">
-        <h4>Your Parents</h4>
-        <div class="chat-tutor-item" ng-repeat="p in vm.contactableParents"
-          ng-class="{active: p.id === vm.activeParentUserId}"
-          ng-click="vm.loadChat(p.id)">
-          <div class="avatar-circle indigo" style="width:36px;height:36px;font-size:14px;flex-shrink:0">{{ p.name[0] }}</div>
-          <span>{{ p.name }}<br/><small class="text-muted">Parent of {{ p.studentName }}</small></span>
-          <span class="chat-unread-badge" ng-if="vm.unreadCounts[p.id]">{{ vm.unreadCounts[p.id] }}</span>
+      <!-- Thread list -->
+      <div class="bs-card bs-elev-sm" style="width:240px; flex-shrink:0; padding:var(--space-2); overflow-y:auto;">
+        <div class="bs-card-title" style="padding:var(--space-2);">Your Parents</div>
+        <div ng-repeat="p in vm.contactableParents"
+          ng-click="vm.loadChat(p.id)"
+          style="display:flex; align-items:center; gap:8px; padding:var(--space-2); border-radius:var(--radius-md); cursor:pointer;"
+          ng-style="p.id === vm.activeParentUserId ? {background:'var(--color-accent-100)'} : {}">
+          <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ p.name[0] }}</div>
+          <span style="flex:1; font-size:14px; min-width:0;">{{ p.name }}<br/><small class="bs-text-muted">Parent of {{ p.studentName }}</small></span>
+          <span class="bs-tag bs-tag-accent-2" ng-if="vm.unreadCounts[p.id]">{{ vm.unreadCounts[p.id] }}</span>
         </div>
-        <p ng-if="!vm.contactableParents.length" class="empty-state">
+        <p class="bs-text-muted" style="font-size:13px; padding:var(--space-2);" ng-if="!vm.contactableParents.length">
           No confirmed bookings yet. Once you confirm a booking, you'll be able to message that parent here.
         </p>
       </div>
 
-      <div class="card chat-container flex-1" ng-if="vm.activeParent">
-        <div class="chat-header">
+      <!-- Conversation -->
+      <div class="bs-card bs-elev-sm" style="flex:1; min-width:0; padding:0; overflow:hidden;" ng-if="vm.activeParent">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:var(--space-3); border-bottom:1px solid var(--color-divider);">
           <div>
             <strong>{{ vm.activeParent.name }}</strong>
-            <p class="online-status">● Parent of {{ vm.activeParent.studentName }} • Online</p>
+            <p class="bs-text-muted" style="margin:0; font-size:12px;">● Parent of {{ vm.activeParent.studentName }} · Online</p>
           </div>
-          <small>Direct Parent-Teacher Line</small>
+          <small class="bs-text-muted">Direct Parent-Teacher Line</small>
         </div>
 
-        <div class="chat-messages" id="chatMessages">
+        <div id="chatMessages" style="flex:1; overflow-y:auto; padding:var(--space-3); display:flex; flex-direction:column; gap:8px; height:calc(100% - 116px);">
           <div ng-repeat="msg in vm.chatMessages"
-            class="chat-message-wrap"
-            ng-class="{
-              'right': msg.sender === 'tutor',
-              'center': msg.sender === 'system',
-              'left': msg.sender === 'parent'
-            }">
-            <div ng-if="msg.sender === 'system'" class="system-msg">
+            style="display:flex;"
+            ng-style="{'justify-content': msg.sender === 'tutor' ? 'flex-end' : (msg.sender === 'system' ? 'center' : 'flex-start')}">
+            <div ng-if="msg.sender === 'system'" class="bs-text-muted" style="font-size:12px; text-align:center;">
               ⚠️ LearnSphere: {{ msg.text }}
             </div>
             <div ng-if="msg.sender !== 'system'"
-              class="chat-bubble"
-              ng-class="{'bubble-tutor': msg.sender === 'tutor', 'bubble-parent': msg.sender === 'parent'}">
-              <p>{{ msg.text }}</p>
-              <small>{{ msg.timestamp }}</small>
+              style="max-width:70%; padding:8px 12px; border-radius:var(--radius-lg);"
+              ng-style="msg.sender === 'tutor' ? {background:'var(--color-accent-100)', color:'var(--color-accent-900)'} : {background:'var(--color-bg)'}">
+              <p style="margin:0;">{{ msg.text }}</p>
+              <small class="bs-text-muted" style="font-size:11px;">{{ msg.timestamp }}</small>
             </div>
           </div>
-          <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet.</p>
+          <p class="bs-text-muted" ng-if="!vm.chatMessages.length">No messages yet.</p>
         </div>
 
-        <p class="field-error" style="margin:0 16px" ng-if="vm.chatError">{{ vm.chatError }}</p>
-        <form class="chat-input-row" ng-submit="vm.sendMessage()">
-          <input type="text" ng-model="vm.chatText"
-            placeholder="Draft a response to the parent..."
-            class="chat-input" />
-          <button type="submit" class="btn-indigo">Reply 📤</button>
+        <p style="color:var(--color-accent-2-700); font-size:13px; margin:0 var(--space-3);" ng-if="vm.chatError">{{ vm.chatError }}</p>
+        <form ng-submit="vm.sendMessage()" style="display:flex; gap:8px; padding:var(--space-3); border-top:1px solid var(--color-divider);">
+          <input type="text" class="bs-input" ng-model="vm.chatText"
+            placeholder="Draft a response to the parent..." />
+          <button type="submit" class="bs-btn bs-btn-primary">Reply</button>
         </form>
       </div>
 
-      <div class="card flex-1" ng-if="!vm.activeParent">
-        <p class="empty-state">
+      <div class="bs-card bs-elev-sm" style="flex:1; align-items:center; justify-content:center;" ng-if="!vm.activeParent">
+        <p class="bs-text-muted" style="text-align:center;">
           Select a parent on the left to start a conversation. You can message parents from bookings you've confirmed.
         </p>
       </div>
