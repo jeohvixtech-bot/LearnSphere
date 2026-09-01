@@ -372,44 +372,114 @@
            no tutor approval needed, unlike the request form below) ── -->
       <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3);" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && vm.selectedPresetGroup">
 
-        <div style="padding-bottom:var(--space-3); border-bottom:1px solid var(--color-divider);">
-          <h4 style="margin-bottom:3px">Booking Summary</h4>
-          <p class="bs-text-muted" style="margin:0;">This class is already published by {{ vm.selectedTutor.name }} — booking confirms immediately, no approval needed.</p>
+        <!-- Header -->
+        <div style="padding-bottom:var(--space-3); border-bottom:1px solid var(--color-divider); display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+          <div>
+            <h4 style="margin-bottom:3px;">Booking Summary</h4>
+            <p class="bs-text-muted" style="margin:0; font-size:12px;">Review your order before proceeding to payment</p>
+          </div>
+          <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:500; padding:2px 8px; border-radius:100px; background:var(--color-accent-50); color:var(--color-accent-700); border:0.5px solid var(--color-accent-200); white-space:nowrap; flex-shrink:0;">
+            <i class="ti ti-bolt" style="font-size:10px;" aria-hidden="true"></i>
+            Instant confirm
+          </span>
         </div>
 
-        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+        <!-- Class info -->
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:13px; margin-top:var(--space-3);">
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Tutor</span><strong>{{ vm.selectedTutor.name }}</strong></div>
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Subject</span><strong>{{ vm.selectedPresetGroup.subject }}<span ng-if="vm.selectedPresetGroup.level"> · {{ vm.selectedPresetGroup.level }}</span></strong></div>
-          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.selectedPresetGroup.mode }}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong><i class="ti ti-{{ vm.modeIcon(vm.selectedPresetGroup.mode) }}" style="font-size:12px; vertical-align:-1px; margin-right:3px;" aria-hidden="true"></i>{{ vm.selectedPresetGroup.mode }}</strong></div>
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Class size</span><strong>{{ vm.selectedPresetGroup.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</strong></div>
-          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Price per lesson</span><strong>${{ vm.selectedPresetGroup.pricePerLesson }}</strong></div>
-        </div>
-
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6; margin-top:var(--space-3);">Schedule ({{ vm.bookingForm.sessions.length }} class{{ vm.bookingForm.sessions.length === 1 ? '' : 'es' }})</div>
-        <div style="display:flex; flex-direction:column; gap:2px; margin-top:6px;">
-          <div style="display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--color-divider);" ng-repeat="session in vm.bookingForm.sessions">
-            <span>{{ session.date }}</span><span>{{ session.startTime }} – {{ session.endTime }}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="bs-text-muted">Child</span>
+            <select class="bs-input" style="font-size:12px; padding:3px 6px; width:auto; max-width:160px;" ng-model="vm.bookingForm.studentId">
+              <option ng-repeat="s in vm.activeStudents()" ng-value="s.id">{{ s.name }}</option>
+            </select>
           </div>
         </div>
 
-        <div class="bs-field" style="margin-top:var(--space-3);">
-          <label>Select Child</label>
-          <select class="bs-input" ng-model="vm.bookingForm.studentId">
-            <option ng-repeat="s in vm.activeStudents()" ng-value="s.id">{{ s.name }}</option>
-          </select>
+        <!-- Schedule -->
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); font-weight:600; margin-top:var(--space-3); margin-bottom:6px;">
+          Schedule — {{ vm.selectedPresetGroup.slots.length }} class{{ vm.selectedPresetGroup.slots.length === 1 ? '' : 'es' }}
+        </div>
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:8px 12px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; padding:5px 0; border-bottom:1px solid var(--color-divider); color:var(--color-text-secondary);"
+            ng-repeat="s in vm.selectedPresetGroup.slots">
+            <span>{{ s.dateFormatted }}</span>
+            <span>{{ s.startTime }} – {{ s.endTime }}</span>
+          </div>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-divider);">
-          <span>Total for {{ vm.bookingForm.sessions.length }} class(es)</span>
-          <strong style="font-family:var(--font-heading); font-size:18px;">${{ vm.selectedPresetGroup.pricePerLesson * vm.bookingForm.sessions.length }}.00</strong>
+        <!-- Price breakdown -->
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); font-weight:600; margin-top:var(--space-3); margin-bottom:6px;">
+          Price breakdown
+        </div>
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:10px 12px; display:flex; flex-direction:column; gap:3px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
+            <span>Price per lesson</span>
+            <span>{{ vm.currencySymbol() }}{{ vm.selectedPresetGroup.pricePerLesson | number:2 }}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
+            <span>× {{ vm.selectedPresetGroup.slots.length }} classes</span>
+            <span style="font-weight:500; color:var(--color-text);">{{ vm.currencySymbol() }}{{ vm.presetSubtotal() | number:2 }}</span>
+          </div>
+          <div style="border-top:1px dashed var(--color-divider); margin:6px 0;"></div>
+          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
+            <span>Subtotal</span>
+            <span>{{ vm.currencySymbol() }}{{ vm.presetSubtotal() | number:2 }}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
+            <span style="display:flex; align-items:center; gap:5px;">
+              {{ vm.taxLabel() }}
+              <span style="font-size:10px; background:var(--color-bg-alt,#f1f5f9); border:0.5px solid var(--color-divider); border-radius:4px; padding:1px 5px; color:var(--color-text-muted);">
+                {{ vm.selectedPresetGroup.country || 'SG' }}
+              </span>
+            </span>
+            <span>{{ vm.currencySymbol() }}{{ vm.presetTaxAmount() | number:2 }}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
+            <span style="display:flex; align-items:center; gap:5px;">
+              Payment portal fee (2%)
+              <span style="font-size:10px; background:var(--color-bg-alt,#f1f5f9); border:0.5px solid var(--color-divider); border-radius:4px; padding:1px 5px; color:var(--color-text-muted);">HiPay</span>
+            </span>
+            <span>{{ vm.currencySymbol() }}{{ vm.presetPortalFee() | number:2 }}</span>
+          </div>
+          <div style="border-top:1px solid var(--color-divider); margin:6px 0;"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:14px; font-weight:600; color:var(--color-text);">Total payable</span>
+            <strong style="font-family:var(--font-heading); font-size:20px; color:var(--color-accent-700);">{{ vm.currencySymbol() }}{{ vm.presetTotal() | number:2 }}</strong>
+          </div>
         </div>
 
-        <p ng-if="vm.presetBookingError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.presetBookingError }}</p>
+        <!-- Notice -->
+        <p style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:flex-start; gap:5px; line-height:1.5; margin-top:10px;">
+          <i class="ti ti-info-circle" style="font-size:13px; flex-shrink:0; margin-top:1px;" aria-hidden="true"></i>
+          Clicking "Proceed to payment" will open HiPay's secure payment portal in a new tab. Your booking will only be confirmed upon successful payment.
+        </p>
 
-        <button type="button" class="bs-btn bs-btn-primary bs-btn-block" ng-click="vm.confirmPresetGroupBooking()"
+        <p ng-if="vm.presetBookingError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:6px;">{{ vm.presetBookingError }}</p>
+
+        <!-- Buttons -->
+        <button type="button" class="bs-btn bs-btn-primary bs-btn-block"
+          style="margin-top:12px;"
+          ng-click="vm.confirmPresetGroupBooking()"
           ng-disabled="vm.presetBookingBusy || !vm.bookingForm.studentId">
-          {{ vm.presetBookingBusy ? 'Booking…' : 'Confirm Payment' }}
+          <i class="ti ti-lock" style="font-size:13px; vertical-align:-2px; margin-right:5px;" aria-hidden="true"></i>
+          {{ vm.presetBookingBusy ? 'Processing…' : 'Proceed to payment' }}
         </button>
+
+        <button type="button" class="bs-btn bs-btn-block"
+          style="margin-top:6px;"
+          ng-click="vm.cancelPresetBooking()"
+          ng-disabled="vm.presetBookingBusy">
+          Cancel
+        </button>
+
+        <!-- Security note -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:5px; margin-top:10px;">
+          <i class="ti ti-shield-check" style="font-size:13px; color:var(--color-text-muted);" aria-hidden="true"></i>
+          <span style="font-size:11px; color:var(--color-text-muted);">Secured by HiPay · SSL encrypted</span>
+        </div>
 
       </div><!-- end invoice summary -->
 

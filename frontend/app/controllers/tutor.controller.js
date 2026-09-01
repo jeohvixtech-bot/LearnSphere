@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', 'AuthService', 'TutorService',
+.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
   'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService',
-function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService) {
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -820,6 +820,212 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     });
   };
 
+  // Groups bookingsOnDay by presetGroupId — a group (one-to-many) preset class
+  // shows once with every enrolled student listed, instead of once per student.
+  // Flow A bookings (no presetGroupId) come back as a single-student "group" of
+  // their own, so the template can render both flows through one ng-repeat.
+  self.groupedBookingsOnDay = function (dayNum) {
+    var bookings = self.bookingsOnDay(dayNum);
+    var groups = {};
+    var ordered = [];
+
+    bookings.forEach(function (b) {
+      var gid = b.presetGroupId || null;
+      var classOnDay = self.classOnDay(b, dayNum);
+
+      if (gid) {
+        if (!groups[gid]) {
+          groups[gid] = {
+            isGroup: true,
+            presetGroupId: gid,
+            subject: b.subject,
+            mode: b.mode,
+            durationHours: b.durationHours,
+            time: classOnDay ? classOnDay.time : '',
+            totalPrice: b.totalPrice,
+            bookings: [],
+            students: [],
+            videoConferenceLink: b.videoConferenceLink || null,
+            isStartingSoon: classOnDay ? self.isStartingSoon(classOnDay.date) : false
+          };
+          ordered.push(groups[gid]);
+        }
+        groups[gid].bookings.push(b);
+        groups[gid].students.push({
+          studentId: b.studentId,
+          studentName: b.studentName,
+          bookingId: b.id,
+          bookingNumber: b.bookingNumber
+        });
+        // If any booking in the group has a video link, use it.
+        if (b.videoConferenceLink && !groups[gid].videoConferenceLink) {
+          groups[gid].videoConferenceLink = b.videoConferenceLink;
+        }
+      } else {
+        ordered.push({
+          isGroup: false,
+          presetGroupId: null,
+          subject: b.subject,
+          mode: b.mode,
+          durationHours: b.durationHours,
+          time: classOnDay ? classOnDay.time : '',
+          totalPrice: b.totalPrice,
+          bookings: [b],
+          students: [{
+            studentId: b.studentId,
+            studentName: b.studentName,
+            bookingId: b.id,
+            bookingNumber: b.bookingNumber
+          }],
+          videoConferenceLink: b.videoConferenceLink || null,
+          isStartingSoon: classOnDay ? self.isStartingSoon(classOnDay.date) : false
+        });
+      }
+    });
+
+    return ordered;
+  };
+
+  // ── Video conference link (Online confirmed bookings) ───────────────────
+  self.videoLink = {}; // { [bookingId]: { editing, inputValue, saving, error } }
+
+  self.isOnlineConfirmed = function (b) {
+    return !!b && b.mode === 'Online' && b.status === 'confirmed';
+  };
+
+  self.hasVideoLink = function (b) {
+    return !!(b && b.videoConferenceLink);
+  };
+
+  // Earliest class on the booking that hasn't ended yet (start + durationHours
+  // still ahead of now) — covers a session currently in progress, not just
+  // strictly-future ones, so Join/the link stay available through the class.
+  // Reuses combineDateTime (defined above), which already handles both a plain
+  // start time and a "start - end" range string (Flow B), same as the backend's
+  // GetNextSessionUtc in VideoLinkReminderService.
+  function _nextSessionDate(b) {
+    var durationMs = (b.durationHours || 1) * 3600000;
+    var now = Date.now();
+    var candidates = (b.classes || [])
+      .map(function (c) { return combineDateTime(c.date, c.time); })
+      .filter(function (d) { return d && !isNaN(d.getTime()) && (d.getTime() + durationMs) >= now; })
+      .sort(function (a, c) { return a - c; });
+    return candidates.length ? candidates[0] : null;
+  }
+
+  // Join enabled from 10 minutes before the session start through to its end.
+  self.isJoinEnabled = function (b) {
+    if (!self.hasVideoLink(b)) return false;
+    var next = _nextSessionDate(b);
+    if (!next) return false;
+    return (next.getTime() - Date.now()) / 60000 <= 10;
+  };
+
+  self.isLinkVisible = function (b) {
+    if (!self.hasVideoLink(b)) return false;
+    var next = _nextSessionDate(b);
+    if (!next) return false;
+    return (next.getTime() - Date.now()) / 60000 <= 60;
+  };
+
+  // 'link-missing' calendar dot — an Online confirmed booking with no link yet,
+  // on this day.
+  self.videoLinkDotForDay = function (dayNum) {
+    if (!self.tutor || !dayNum) return '';
+    var s = calDayStr(dayNum);
+    var missing = self.bookings.some(function (b) {
+      return b.tutorId === self.tutor.id && self.isOnlineConfirmed(b) && !self.hasVideoLink(b) &&
+        b.classes && b.classes.some(function (c) { return c.date === s; });
+    });
+    return missing ? 'link-missing' : '';
+  };
+
+  self.openVideoLinkInput = function (b) {
+    self.videoLink[b.id] = { editing: true, inputValue: b.videoConferenceLink || '', saving: false, error: '' };
+  };
+
+  self.cancelVideoLinkInput = function (b) {
+    if (self.videoLink[b.id]) self.videoLink[b.id].editing = false;
+  };
+
+  self.saveVideoLink = function (b) {
+    var state = self.videoLink[b.id];
+    if (!state || !state.inputValue) return;
+    state.saving = true;
+    state.error = '';
+    BookingService.setVideoLink(b.id, state.inputValue.trim()).then(function () {
+      b.videoConferenceLink = state.inputValue.trim();
+      state.editing = false;
+      state.saving = false;
+    }).catch(function (err) {
+      state.error = (err.data && err.data.message) || 'Failed to save video conference link.';
+      state.saving = false;
+    });
+  };
+
+  self.copyVideoLink = function (link) {
+    if (link && navigator.clipboard) navigator.clipboard.writeText(link);
+  };
+
+  self.onlineBookingsMissingLink = function () {
+    if (!self.tutor) return 0;
+    return self.bookings.filter(function (b) {
+      return b.tutorId === self.tutor.id && self.isOnlineConfirmed(b) && !self.hasVideoLink(b);
+    }).length;
+  };
+
+  // ── Video conference link for a grouped (preset) class — same self.videoLink
+  // state map as the single-booking helpers above, just keyed by presetGroupId
+  // instead of bookingId so one input covers every student in the class. ──
+  self.groupVideoLinkState = function (group) {
+    var key = group.presetGroupId || group.bookings[0].id;
+    return self.videoLink[key] || null;
+  };
+
+  self.openGroupVideoLinkInput = function (group) {
+    var key = group.presetGroupId || group.bookings[0].id;
+    self.videoLink[key] = { editing: true, inputValue: group.videoConferenceLink || '', saving: false, error: '' };
+  };
+
+  self.cancelGroupVideoLinkInput = function (group) {
+    var key = group.presetGroupId || group.bookings[0].id;
+    self.videoLink[key] = null;
+  };
+
+  // Saves the same link onto every booking in the group — the backend endpoint
+  // is still per-booking, so this fires one request per student and waits for
+  // all of them via $q.all (not the native Promise.all — that wouldn't run its
+  // .then() inside Angular's digest cycle, so the UI wouldn't update until
+  // something else happened to trigger one).
+  self.saveGroupVideoLink = function (group) {
+    var key = group.presetGroupId || group.bookings[0].id;
+    var state = self.videoLink[key];
+    if (!state || !state.inputValue.trim()) {
+      if (state) state.error = 'Please enter a valid URL.';
+      return;
+    }
+    state.saving = true;
+    state.error = '';
+    var link = state.inputValue.trim();
+
+    $q.all(group.bookings.map(function (b) {
+      return BookingService.setVideoLink(b.id, link);
+    })).then(function () {
+      group.videoConferenceLink = link;
+      group.bookings.forEach(function (b) { b.videoConferenceLink = link; });
+      self.videoLink[key] = null;
+    }).catch(function (err) {
+      state.saving = false;
+      state.error = (err && err.data && err.data.message) ? err.data.message : 'Failed to save link. Please try again.';
+    });
+  };
+
+  self.isGroupJoinEnabled = function (group) {
+    if (!group.videoConferenceLink) return false;
+    var b = group.bookings[0];
+    return b ? self.isJoinEnabled(b) : false;
+  };
+
   self.classOnDay = function (booking, dayNum) {
     if (!booking || !booking.classes || !dayNum) return null;
     var s = calDayStr(dayNum);
@@ -851,6 +1057,40 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     var s = calDayStr(dayNum);
     return self.tutor.timetable.filter(function (slot) {
       return slot.mode && slot.day === s;
+    });
+  };
+
+  // ── Video conference link on a published class (before/without enrollment) ──
+  self.slotVideoLink = {}; // { [slotId]: { editing, inputValue, saving, error } }
+
+  self.openSlotVideoLinkInput = function (slot) {
+    self.slotVideoLink[slot.id] = { editing: true, inputValue: slot.videoConferenceLink || '', saving: false, error: '' };
+  };
+
+  self.cancelSlotVideoLinkInput = function (slot) {
+    if (self.slotVideoLink[slot.id]) self.slotVideoLink[slot.id].editing = false;
+  };
+
+  self.saveSlotVideoLink = function (slot) {
+    var state = self.slotVideoLink[slot.id];
+    if (!state || !state.inputValue) return;
+    state.saving = true;
+    state.error = '';
+    var link = state.inputValue.trim();
+    TutorService.setSlotVideoLink(self.tutor.id, slot.id, link).then(function () {
+      // The backend applies this to every slot in the same recurring series (and
+      // any already-enrolled students' bookings) — mirror that locally too so a
+      // sibling occurrence's card reflects it without a full reload.
+      self.tutor.timetable.forEach(function (s) {
+        if (s.id === slot.id || (slot.presetGroupId && s.presetGroupId === slot.presetGroupId)) {
+          s.videoConferenceLink = link;
+        }
+      });
+      state.editing = false;
+      state.saving = false;
+    }).catch(function (err) {
+      state.error = (err.data && err.data.message) || 'Failed to save video conference link.';
+      state.saving = false;
     });
   };
 

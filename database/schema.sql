@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS TutorTimeSlots (
     IsFull           TINYINT(1)      NOT NULL DEFAULT 0,
     PricePerLesson   DECIMAL(10,2)   NOT NULL DEFAULT 0,
     PresetGroupId    VARCHAR(20)     NULL, -- shared across every slot from one Setup Class submission (e.g. all occurrences of a weekly recurring class), "PRESET" + zero-padded id of the batch's first slot
+    VideoConferenceLink LONGTEXT     NULL, -- one shared link per recurring series, settable before any student enrolls — see TutorsController.SetSlotVideoLink
     CONSTRAINT FK_TutorTimeSlots_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
 
@@ -271,6 +272,8 @@ CREATE TABLE IF NOT EXISTS Bookings (
     BookingNumber  LONGTEXT        NOT NULL,
     BookingType    VARCHAR(20)     NOT NULL DEFAULT 'parent-offer', -- parent-offer | tutor-preset
     PresetSlotId   INT             NULL,                     -- FK to TutorTimeSlots.Id when BookingType = 'tutor-preset'
+    VideoConferenceLink     LONGTEXT     NULL,
+    VideoLinkReminderStatus VARCHAR(20)  NOT NULL DEFAULT 'none', -- none | 24h_sent | 6h_sent
     CONSTRAINT FK_Bookings_Tutors   FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)   ON DELETE RESTRICT,
     CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT,
     CONSTRAINT FK_Bookings_PresetSlot FOREIGN KEY (PresetSlotId) REFERENCES TutorTimeSlots(Id) ON DELETE RESTRICT

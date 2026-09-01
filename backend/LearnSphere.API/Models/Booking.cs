@@ -23,6 +23,12 @@ public class Booking
     public int? PresetSlotId { get; set; }
     public TutorTimeSlot? PresetSlot { get; set; }
 
+    // Set by the tutor once, via PATCH /api/bookings/{id}/video-link, for Online
+    // confirmed bookings only. VideoLinkReminderService polls for confirmed Online
+    // bookings still missing this and nudges the tutor before the class starts.
+    public string? VideoConferenceLink { get; set; }
+    public string VideoLinkReminderStatus { get; set; } = "none"; // none | 24h_sent | 6h_sent
+
     public ICollection<BookingClass> Classes { get; set; } = new List<BookingClass>();
     public ICollection<BookingPresetSlot> PresetSlots { get; set; } = new List<BookingPresetSlot>();
     public ICollection<CounterProposal> CounterProposals { get; set; } = new List<CounterProposal>();

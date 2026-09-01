@@ -74,26 +74,6 @@ public class AdminController : ControllerBase
         }));
     }
 
-    [HttpPatch("tutors/{id}/verify")]
-    public async Task<IActionResult> VerifyTutor(int id)
-    {
-        var tutor = await _context.Tutors
-            .Include(t => t.Qualifications)
-            .FirstOrDefaultAsync(t => t.Id == id);
-
-        if (tutor == null) return NotFound();
-
-        tutor.IsVerified = true;
-        tutor.Qualifications.Insert(0, new TutorQualification
-        {
-            TutorId = tutor.Id,
-            Qualification = "Verified by operations team"
-        });
-
-        await _context.SaveChangesAsync();
-        return Ok();
-    }
-
     [HttpGet("disputes")]
     public async Task<IActionResult> GetDisputes()
     {

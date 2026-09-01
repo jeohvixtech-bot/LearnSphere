@@ -92,6 +92,18 @@
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span class="bs-card-title">{{ t.name }}</span>
                 <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:10px;">✓ Verified</span>
+                <!-- Tier derived from the same score matchScore already carries —
+                     see parent.controller.js#scoreToTier, kept in sync with the
+                     backend bands in TutorsController.ScoreToTier. -->
+                <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Gold'" class="bs-tag" style="font-size:10px; background:#fffbeb; color:#b45309; border:1px solid #fde68a;">
+                  <i class="ti ti-trophy" aria-hidden="true"></i> Gold Teacher
+                </span>
+                <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Silver'" class="bs-tag" style="font-size:10px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
+                  <i class="ti ti-medal" aria-hidden="true"></i> Silver Teacher
+                </span>
+                <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Bronze'" class="bs-tag" style="font-size:10px; background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
+                  <i class="ti ti-award" aria-hidden="true"></i> Bronze Teacher
+                </span>
                 <span ng-if="$index === 0 && t.matchScore" class="bs-tag bs-tag-accent-2" style="font-size:10px;">🏆 Top Match</span>
                 <span ng-if="t.matchScore" class="bs-tag bs-tag-outline" style="font-size:10px;"
                   title="Rating {{ t.matchScore.ratingPoints }} pts · Activeness {{ t.matchScore.activenessPoints }} pts · Disputes {{ t.matchScore.disputePoints }} pts · Experience {{ t.matchScore.experiencePoints }} pts">

@@ -111,6 +111,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
+            .Include(b => b.PresetSlots).ThenInclude(ps => ps.TutorTimeSlot)
             .AsQueryable();
 
         if (role == "parent")
@@ -296,7 +297,11 @@ public class BookingsController : ControllerBase
             TotalPrice = slots.Sum(s => s.PricePerLesson),
             Status = "confirmed",
             BookingType = "tutor-preset",
-            PresetSlotId = first.Id
+            PresetSlotId = first.Id,
+            // A late enrollee into a class the tutor already set a shared link for
+            // (see TutorsController.SetSlotVideoLink) inherits it immediately,
+            // rather than the tutor needing to re-set it per student.
+            VideoConferenceLink = first.VideoConferenceLink
         };
         _context.Bookings.Add(booking);
         await _context.SaveChangesAsync();
@@ -356,6 +361,75 @@ public class BookingsController : ControllerBase
             .FirstOrDefaultAsync(b => b.Id == booking.Id);
 
         return Ok(MapToDto(created!));
+    }
+
+    // Tutor sets/updates the video conference link for their own confirmed Online
+    // booking — see VideoLinkReminderService for the reminder nudges that lead up
+    // to this. Deliberately no reminder-status reset here: setting the link stops
+    // the reminders outright (VideoLinkReminderService's own query only looks at
+    // bookings with no link), so VideoLinkReminderStatus is left as a pure history
+    // of what's already been sent, not something this endpoint needs to touch.
+    //
+    // For a tutor-preset (Flow B) booking, this is one occurrence of a class other
+    // students may share — same propagation as TutorsController.SetSlotVideoLink
+    // (every slot in the recurring series + every enrolled student's booking gets
+    // the same link), so editing from an already-booked class's card here stays
+    // consistent with setting it from the "published slots" list before anyone
+    // enrolled at all.
+    [HttpPatch("{id}/video-link")]
+    public async Task<IActionResult> SetVideoLink(int id, [FromBody] SetVideoLinkDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var booking = await _context.Bookings
+            .Include(b => b.Tutor)
+            .Include(b => b.PresetSlots)
+            .FirstOrDefaultAsync(b => b.Id == id);
+        if (booking == null) return NotFound();
+        if (booking.Tutor.UserId != userId) return Forbid();
+        if (booking.Status != "confirmed")
+            return BadRequest(new { message = "Video links can only be set on confirmed bookings." });
+        if (booking.Mode != "Online")
+            return BadRequest(new { message = "Video conference links are only applicable to online bookings." });
+        if (string.IsNullOrWhiteSpace(dto.VideoConferenceLink))
+            return BadRequest(new { message = "Please provide a valid video conference link." });
+        if (!Uri.TryCreate(dto.VideoConferenceLink.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != "https" && uri.Scheme != "http"))
+            return BadRequest(new { message = "Please enter a valid URL starting with http:// or https://" });
+
+        var link = dto.VideoConferenceLink.Trim();
+        booking.VideoConferenceLink = link;
+
+        if (booking.BookingType == "tutor-preset")
+        {
+            var slotIds = booking.PresetSlots.Select(ps => ps.TutorTimeSlotId).ToList();
+            if (booking.PresetSlotId.HasValue) slotIds.Add(booking.PresetSlotId.Value);
+            var slots = await _context.TutorTimeSlots.Where(s => slotIds.Contains(s.Id)).ToListAsync();
+            var groupIds = slots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!).Distinct().ToList();
+
+            var groupSlotIds = new List<int>(slotIds);
+            if (groupIds.Count > 0)
+            {
+                var groupSlots = await _context.TutorTimeSlots.Where(s => s.PresetGroupId != null && groupIds.Contains(s.PresetGroupId!)).ToListAsync();
+                foreach (var s in groupSlots) { s.VideoConferenceLink = link; groupSlotIds.Add(s.Id); }
+            }
+            else
+            {
+                foreach (var s in slots) s.VideoConferenceLink = link;
+            }
+
+            var siblingBookingIds = await _context.BookingPresetSlots
+                .Where(bps => groupSlotIds.Contains(bps.TutorTimeSlotId))
+                .Select(bps => bps.BookingId)
+                .ToListAsync();
+            var siblingBookings = await _context.Bookings
+                .Where(b => b.Id != id && b.Status == "confirmed"
+                    && (siblingBookingIds.Contains(b.Id) || (b.PresetSlotId != null && groupSlotIds.Contains(b.PresetSlotId.Value))))
+                .ToListAsync();
+            foreach (var b in siblingBookings) b.VideoConferenceLink = link;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Video conference link saved." });
     }
 
     [HttpPatch("{id}/status")]
@@ -817,7 +891,12 @@ public class BookingsController : ControllerBase
         Status = b.Status,
         BookingNumber = b.BookingNumber,
         BookingType = b.BookingType,
+        PresetGroupId = b.PresetSlots
+            .Select(ps => ps.TutorTimeSlot?.PresetGroupId)
+            .FirstOrDefault(g => g != null),
         IsFirstClass = false, // populated by GET /bookings — see GetAll
+        VideoConferenceLink = b.VideoConferenceLink,
+        VideoLinkReminderStatus = b.VideoLinkReminderStatus,
         Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
         CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {

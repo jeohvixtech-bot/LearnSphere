@@ -263,6 +263,29 @@
           </span>
         </div>
 
+        <!-- Video conference join — Online confirmed bookings only -->
+        <div ng-if="b.mode === 'Online' && b.status === 'confirmed'" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3);">
+          <p ng-if="!b.videoConferenceLink" class="bs-text-muted" style="margin:0; font-size:13px;">
+            <i class="ti ti-video-off" aria-hidden="true"></i> Your tutor has not set the video conference link yet.
+          </p>
+          <div ng-if="b.videoConferenceLink" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span ng-if="vm.isParentLinkVisible(b)" style="font-size:12px; word-break:break-all; flex:1; min-width:120px;">{{ b.videoConferenceLink }}</span>
+            <span ng-if="!vm.isParentLinkVisible(b)" class="bs-text-muted" style="font-size:13px; flex:1;">Video link ready — visible 1 hour before class.</span>
+            <a ng-if="vm.isParentJoinEnabled(b)" class="bs-btn" style="background:#16a34a; color:#fff;"
+              ng-href="{{ b.videoConferenceLink }}" target="_blank" rel="noopener"
+              title="Join class">
+              <i class="ti ti-video" aria-hidden="true"></i> Join class
+            </a>
+            <button ng-if="!vm.isParentJoinEnabled(b)" type="button" class="bs-btn bs-btn-secondary" disabled
+              title="Available 10 min before class">
+              <i class="ti ti-video" aria-hidden="true"></i> Available 10 min before class
+            </button>
+            <button type="button" ng-if="vm.isParentJoinEnabled(b)" class="bs-btn bs-btn-secondary" ng-click="vm.copyVideoLink(b.videoConferenceLink)">
+              <i class="ti ti-copy" aria-hidden="true"></i> Copy
+            </button>
+          </div>
+        </div>
+
         <!-- Footer: price + actions -->
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
           <div>

@@ -140,6 +140,59 @@ public class TutorsController : ControllerBase
         return Ok(results);
     }
 
+    // Single-tutor version of the GetMatchScores formula above — same weightages/
+    // point scales, just scoped to one tutor's own activeness/dispute counts
+    // instead of the bulk GroupBy-all-tutors query, so it's cheap to call from a
+    // single-tutor endpoint (GetByUser) without an N+1 query per tutor in a list.
+    private async Task<(double Score, string Tier)> ComputeTutorTierAsync(Tutor t)
+    {
+        var weightages = await _context.ScoringWeightages.ToListAsync();
+        int PctOf(string key) => weightages.FirstOrDefault(w => w.Key == key)?.Percent ?? 0;
+        var ratingPct = PctOf("rating");
+        var activenessPct = PctOf("activeness");
+        var disputesPct = PctOf("disputes");
+        var experiencePct = PctOf("experience");
+
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var monthStartStr = monthStart.ToString("yyyy-MM-dd");
+        var nextMonthStartStr = monthStart.AddMonths(1).ToString("yyyy-MM-dd");
+
+        var classesThisMonth = await _context.Bookings
+            .Where(b => b.TutorId == t.Id && b.Status == "completed")
+            .SelectMany(b => b.Classes)
+            .CountAsync(c => string.Compare(c.Date, monthStartStr) >= 0 && string.Compare(c.Date, nextMonthStartStr) < 0);
+
+        var disputesThisMonth = await _context.IssueReports
+            .Where(ir => ir.Booking.TutorId == t.Id && ir.CreatedAt >= monthStart && ir.CreatedAt < monthStart.AddMonths(1))
+            .CountAsync()
+            + await _context.PresetCancellationDecisions
+            .Where(d => d.Booking.TutorId == t.Id && d.Status == "resolved" && d.ResolvedAt >= monthStart && d.ResolvedAt < monthStart.AddMonths(1))
+            .CountAsync();
+
+        var ratingPoints = RatingToPoints(t.Rating);
+        var activenessPoints = ActivenessToPoints(classesThisMonth);
+        var disputePoints = DisputesToPoints(disputesThisMonth);
+        var experiencePoints = ExperienceToPoints(t.ExperienceYears);
+
+        var score = (ratingPoints * ratingPct + activenessPoints * activenessPct +
+                     disputePoints * disputesPct + experiencePoints * experiencePct) / 100.0;
+
+        return (Math.Round(score, 2), ScoreToTier(score));
+    }
+
+    // Thresholds are calibrated against the formula's real achievable range given
+    // typical weightages (roughly -1.6 to 5.65, NOT 0-100 — points cap at 10/5/2/5
+    // for rating/activeness/disputes/experience, weighted by admin-set percentages
+    // that don't have to sum to 100). Re-tune here if admins change the weightages
+    // enough to shift the practical range.
+    private static string ScoreToTier(double score)
+    {
+        if (score >= 4.5) return "Gold";
+        if (score >= 3.0) return "Silver";
+        if (score >= 1.5) return "Bronze";
+        return "Normal";
+    }
+
     // Scale bands mirror the read-only reference tables on the admin Scoring Config
     // page (admin.controller.js ratingScale/activenessScale/disputesScale/
     // experienceScale) — only the weightage %, not these bands, is admin-editable.
@@ -336,7 +389,9 @@ public class TutorsController : ControllerBase
         if (tutor == null) return NotFound();
         var syllabusMap = await LoadSyllabusMapAsync(
             tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(MapToDto(tutor, syllabusMap));
+        var dto = MapToDto(tutor, syllabusMap);
+        (dto.Score, dto.Tier) = await ComputeTutorTierAsync(tutor);
+        return Ok(dto);
     }
 
     [HttpPut("{id}")]
@@ -1060,6 +1115,66 @@ public class TutorsController : ControllerBase
         return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = isReschedule });
     }
 
+    // Sets one shared video conference link for a published preset class — works
+    // whether or not any student has enrolled yet, unlike the booking-level
+    // PATCH /bookings/{id}/video-link (which needs a Booking row to exist).
+    // Applies to every occurrence in the same recurring series (same PresetGroupId)
+    // and propagates onto any Booking already riding on those slots, so
+    // Booking.VideoConferenceLink — what VideoLinkReminderService and every other
+    // video-link UI actually reads — stays correct without those call sites needing
+    // to know slots exist at all.
+    [HttpPatch("{id}/slots/{slotId}/video-link")]
+    [Authorize]
+    public async Task<IActionResult> SetSlotVideoLink(int id, int slotId, [FromBody] SetVideoLinkDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        var slot = await _context.TutorTimeSlots.FirstOrDefaultAsync(s => s.Id == slotId && s.TutorId == id);
+        if (slot == null) return NotFound();
+        if (string.IsNullOrWhiteSpace(slot.Mode))
+            return BadRequest(new { message = "This slot is not a published class." });
+        if (slot.Mode != "Online")
+            return BadRequest(new { message = "Video conference links are only applicable to online classes." });
+        if (string.IsNullOrWhiteSpace(dto.VideoConferenceLink))
+            return BadRequest(new { message = "Please provide a valid video conference link." });
+        if (!Uri.TryCreate(dto.VideoConferenceLink.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != "https" && uri.Scheme != "http"))
+            return BadRequest(new { message = "Please enter a valid URL starting with http:// or https://" });
+
+        var link = dto.VideoConferenceLink.Trim();
+
+        var groupSlotIds = new List<int> { slot.Id };
+        if (!string.IsNullOrEmpty(slot.PresetGroupId))
+        {
+            var siblingSlots = await _context.TutorTimeSlots
+                .Where(s => s.PresetGroupId == slot.PresetGroupId && s.TutorId == id)
+                .ToListAsync();
+            foreach (var s in siblingSlots) { s.VideoConferenceLink = link; groupSlotIds.Add(s.Id); }
+        }
+        else
+        {
+            slot.VideoConferenceLink = link;
+        }
+
+        // Propagate onto every already-enrolled student's booking for this class —
+        // both the current multi-slot linking table and the legacy single-slot field.
+        var bookingIdsViaPresetSlots = await _context.BookingPresetSlots
+            .Where(bps => groupSlotIds.Contains(bps.TutorTimeSlotId))
+            .Select(bps => bps.BookingId)
+            .ToListAsync();
+        var affectedBookings = await _context.Bookings
+            .Where(b => bookingIdsViaPresetSlots.Contains(b.Id) || (b.PresetSlotId != null && groupSlotIds.Contains(b.PresetSlotId.Value)))
+            .Where(b => b.Status == "confirmed")
+            .ToListAsync();
+        foreach (var b in affectedBookings) b.VideoConferenceLink = link;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Video conference link saved.", updatedBookings = affectedBookings.Count });
+    }
+
     [HttpPost("{id}/reviews")]
     [Authorize(Roles = "parent")]
     public async Task<IActionResult> AddReview(int id, [FromBody] CreateReviewDto dto)
@@ -1648,6 +1763,7 @@ public class TutorsController : ControllerBase
             EndTime = s.EndTime, Mode = s.Mode, Subject = s.Subject, Level = s.Level, Country = s.Country,
             ClassSize = s.ClassSize, MaxStudents = s.MaxStudents, ConfirmedCount = s.ConfirmedCount,
             IsFull = s.IsFull, PricePerLesson = s.PricePerLesson, PresetGroupId = s.PresetGroupId,
+            VideoConferenceLink = s.VideoConferenceLink,
             SyllabusTopics = s.PresetGroupId != null && sm.TryGetValue(s.PresetGroupId, out var topics)
                 ? topics : new List<string>()
         }).ToList(),

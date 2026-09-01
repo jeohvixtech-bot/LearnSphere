@@ -18,7 +18,10 @@ public class BookingDto
     public string Status { get; set; } = string.Empty;
     public string BookingNumber { get; set; } = string.Empty;
     public string BookingType { get; set; } = string.Empty; // parent-offer | tutor-preset
+    public string? PresetGroupId { get; set; }
     public bool IsFirstClass { get; set; } = false;
+    public string? VideoConferenceLink { get; set; }
+    public string VideoLinkReminderStatus { get; set; } = "none";
     public List<BookingClassDto> Classes { get; set; } = new();
     public CounterProposalDto? CounterProposal { get; set; }
     public List<LessonReportSummaryDto> LessonReports { get; set; } = new();
@@ -56,6 +59,11 @@ public class UpdateBookingStatusDto
 {
     public string Status { get; set; } = string.Empty;
     public CounterProposalDto? CounterProposal { get; set; }
+}
+
+public class SetVideoLinkDto
+{
+    public string VideoConferenceLink { get; set; } = string.Empty;
 }
 
 public class CounterProposalDto

@@ -13,10 +13,6 @@ angular.module('learnSphereApp')
     return $http.get(API_URL + '/admin/tutors/unverified', h());
   };
 
-  self.verifyTutor = function (id) {
-    return $http.patch(API_URL + '/admin/tutors/' + id + '/verify', {}, h());
-  };
-
   self.getDisputes = function () {
     return $http.get(API_URL + '/admin/disputes', h());
   };

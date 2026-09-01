@@ -38,6 +38,12 @@ public class TutorDto
     public List<string> Qualifications { get; set; } = new();
     public bool IsVerified { get; set; }
     public bool IsOnline { get; set; }
+    // Tier badge (Gold/Silver/Bronze/Normal) shown on the tutor's own profile —
+    // only populated by GetByUser, which is the only endpoint that computes it
+    // (see TutorsController.ComputeTutorTierAsync). Defaults reflect "not computed"
+    // for every other endpoint that maps a Tutor to this DTO.
+    public double Score { get; set; }
+    public string Tier { get; set; } = "Normal";
     public string VerificationStatus { get; set; } = string.Empty;
     public bool OfferingsUnlocked { get; set; }
     public DateTime? LastSubmittedAt { get; set; }
@@ -118,6 +124,7 @@ public class TimeSlotDto
     public decimal PricePerLesson { get; set; }
     public string? PresetGroupId { get; set; }
     public List<string> SyllabusTopics { get; set; } = new();
+    public string? VideoConferenceLink { get; set; }
 }
 
 public class VerifyTutorDto

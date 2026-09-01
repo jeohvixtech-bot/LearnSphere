@@ -165,6 +165,53 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // class per occurrence — same as how a parent-offer booking already covers
   // multiple sessions) so it shows up as one entry in Sessions & Activity, not
   // one per occurrence.
+  // ── Payment summary helpers ───────────────────────────────────────────
+  // Tax rate based on tutor's country: SG = 9% GST, MY = 8% SST, default 0
+  self.taxRate = function () {
+    var country = (self.selectedPresetGroup && self.selectedPresetGroup.country) || '';
+    if (country === 'SG' || country === 'Singapore') return 0.09;
+    if (country === 'MY' || country === 'Malaysia')  return 0.08;
+    return 0;
+  };
+
+  self.taxLabel = function () {
+    var country = (self.selectedPresetGroup && self.selectedPresetGroup.country) || '';
+    if (country === 'SG' || country === 'Singapore') return 'GST (9%)';
+    if (country === 'MY' || country === 'Malaysia')  return 'SST (8%)';
+    return 'Tax';
+  };
+
+  var PORTAL_FEE_RATE = 0.02; // 2% HiPay payment portal fee
+
+  self.presetSubtotal = function () {
+    if (!self.selectedPresetGroup) return 0;
+    return self.selectedPresetGroup.pricePerLesson * (self.selectedPresetGroup.slots || []).length;
+  };
+
+  self.presetTaxAmount = function () {
+    return +(self.presetSubtotal() * self.taxRate()).toFixed(2);
+  };
+
+  self.presetPortalFee = function () {
+    return +(self.presetSubtotal() * PORTAL_FEE_RATE).toFixed(2);
+  };
+
+  self.presetTotal = function () {
+    return +(self.presetSubtotal() + self.presetTaxAmount() + self.presetPortalFee()).toFixed(2);
+  };
+
+  self.currencySymbol = function () {
+    var country = (self.selectedPresetGroup && self.selectedPresetGroup.country) || '';
+    if (country === 'MY' || country === 'Malaysia') return 'RM';
+    return '$';
+  };
+
+  self.cancelPresetBooking = function () {
+    self.selectedPresetGroup = null;
+    self.presetBookingError  = '';
+  };
+  // ─────────────────────────────────────────────────────────────────────
+
   self.confirmPresetGroupBooking = function () {
     var group = self.selectedPresetGroup;
     if (!group || !self.bookingForm.studentId || self.presetBookingBusy) return;
@@ -865,7 +912,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         confirmedCount: s.confirmedCount,
         maxStudents: s.maxStudents,
         presetGroupId: s.presetGroupId,
-        syllabusTopics: s.syllabusTopics || []
+        syllabusTopics: s.syllabusTopics || [],
+        country: s.country || ''
       };
     });
 
@@ -892,6 +940,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
           endTime: s.endTime,
           recurrenceLabel: '',
           syllabusTopics: s.syllabusTopics || [],
+          country: s.country || '',
           slots: []
         };
       }
@@ -1168,6 +1217,40 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     if (!dt || isNaN(dt.getTime())) return false;
     var minAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
     return dt < minAllowed;
+  };
+
+  // ── Video conference link — parent-facing join button ───────────────────
+  // Earliest class on the booking that hasn't ended yet — same approach as
+  // tutor.controller.js's private _nextSessionDate, kept in sync with it and
+  // with the backend's GetNextSessionUtc (VideoLinkReminderService): all three
+  // pull the first "H:MM AM/PM" out of BookingClass.Time via the same regex
+  // shape, so a single-time or "start - end" range string both work.
+  function _nextSessionDate(b) {
+    var durationMs = (b.durationHours || 1) * 3600000;
+    var now = Date.now();
+    var candidates = (b.classes || [])
+      .map(function (c) { return combineDateTime(c.date, c.time); })
+      .filter(function (d) { return d && !isNaN(d.getTime()) && (d.getTime() + durationMs) >= now; })
+      .sort(function (a, c) { return a - c; });
+    return candidates.length ? candidates[0] : null;
+  }
+
+  self.isParentLinkVisible = function (b) {
+    if (!b || !b.videoConferenceLink) return false;
+    var next = _nextSessionDate(b);
+    if (!next) return false;
+    return (next.getTime() - Date.now()) / 60000 <= 60;
+  };
+
+  self.isParentJoinEnabled = function (b) {
+    if (!b || !b.videoConferenceLink) return false;
+    var next = _nextSessionDate(b);
+    if (!next) return false;
+    return (next.getTime() - Date.now()) / 60000 <= 10;
+  };
+
+  self.copyVideoLink = function (link) {
+    if (link && navigator.clipboard) navigator.clipboard.writeText(link);
   };
 
   self.hasTooSoonSession = function () {

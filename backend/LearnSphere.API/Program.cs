@@ -48,6 +48,8 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Host"]) &&
 else
     builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 
+builder.Services.AddHostedService<VideoLinkReminderService>();
+
 // CORS — origins configurable via appsettings.json "AllowedOrigins"
 // Set to ["*"] to allow all, or list specific origins e.g. ["http://localhost:4200","http://myserver:1002"]
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
@@ -257,6 +259,8 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PricePerLesson` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PresetGroupId` VARCHAR(20) NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `VideoConferenceLink` LONGTEXT NULL"); } catch { }
     // Backfill preset slots published before PresetGroupId existed. We can't recover
     // which original Setup Class submission each row came from, so approximate the
     // catalog's old merge-by-subject behavior — group legacy rows sharing the same
@@ -283,6 +287,11 @@ using (var scope = app.Services.CreateScope())
     // Safe/lossless widen; existing whole-hour values are unaffected.
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Bookings` MODIFY COLUMN `DurationHours` DOUBLE NOT NULL DEFAULT 1"); } catch { }
+    // Video conference link for Online confirmed bookings — see VideoLinkReminderService.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` ADD COLUMN `VideoConferenceLink` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` ADD COLUMN `VideoLinkReminderStatus` VARCHAR(20) NOT NULL DEFAULT 'none'"); } catch { }
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(

@@ -39,4 +39,9 @@ angular.module('learnSphereApp')
   self.cancel = function (id) {
     return $http.post(API_URL + '/bookings/' + id + '/cancel', {}, h());
   };
+
+  self.setVideoLink = function (bookingId, link) {
+    return $http.patch(API_URL + '/bookings/' + bookingId + '/video-link',
+      { videoConferenceLink: link }, h());
+  };
 }]);

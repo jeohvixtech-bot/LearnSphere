@@ -134,18 +134,6 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   }
   init();
 
-  // Kept for compatibility — no longer called from vetting.html (superseded by
-  // the staged per-document review + confirmAndVerify flow below), but left
-  // in place in case anything else still calls it.
-  self.verifyTutor = function (tutor) {
-    AdminService.verifyTutor(tutor.id).then(function () {
-      tutor.isVerified = true;
-      self.unverifiedTutors = self.unverifiedTutors.filter(function (t) { return t.id !== tutor.id; });
-      self.systemLogs.unshift('Approved tutor: ' + tutor.name + ' (Just now)');
-      AdminService.getStats().then(function (res) { self.stats = res.data; });
-    });
-  };
-
   // ── Tutor Vetting: per-document review ──────────────────────────────
   // Decisions are staged client-side only — nothing hits the backend per document
   // anymore. "Confirm & Verify" is the single action that applies every staged

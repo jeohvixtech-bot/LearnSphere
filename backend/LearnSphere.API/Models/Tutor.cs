@@ -162,6 +162,15 @@ public class TutorTimeSlot
     // happen to share the same subject. Format: "PRESET" + 6-digit zero-padded
     // id of the first slot in the batch (same convention as Booking/InvoiceNumber).
     public string? PresetGroupId { get; set; }
+
+    // One shared link per recurring series, settable before any student has
+    // enrolled (see TutorsController.SetSlotVideoLink) — propagated onto every
+    // Booking tied to this slot/series at set-time, and copied onto any new
+    // Booking created afterward (see BookPreset), so Booking.VideoConferenceLink
+    // stays the single source of truth other code (VideoLinkReminderService,
+    // the booking-level PATCH endpoint) already reads without needing to know
+    // about slots at all.
+    public string? VideoConferenceLink { get; set; }
 }
 
 // Platform-defined syllabus topics per country + subject + level.
