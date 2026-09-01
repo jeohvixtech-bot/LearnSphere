@@ -11,8 +11,15 @@ namespace LearnSphere.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IWebHostEnvironment _env;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService) => _authService = authService;
+    public AuthController(IAuthService authService, IWebHostEnvironment env, ILogger<AuthController> logger)
+    {
+        _authService = authService;
+        _env = env;
+        _logger = logger;
+    }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
@@ -25,6 +32,9 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
+        var nameError = NameValidator.Validate(dto.Name);
+        if (nameError != null) return BadRequest(new { message = nameError });
+
         var result = await _authService.RegisterAsync(dto);
         if (result == null) return BadRequest(new { message = "Email already in use." });
         return Ok(result);
@@ -36,12 +46,16 @@ public class AuthController : ControllerBase
         var tempPassword = await _authService.ForgotPasswordAsync(dto.Email);
 
         // Always respond 200 regardless of whether the email was found, to avoid leaking
-        // which addresses are registered. devTempPassword is only present because SMTP
-        // isn't configured yet (see ConsoleEmailService) — remove it once real email is wired up.
+        // which addresses are registered. The temp password itself is delivered by email
+        // (see IEmailService) — never returned to the client. In non-Production, it's
+        // logged server-side only, so local/staging testing doesn't require a working
+        // mailbox.
+        if (tempPassword != null && !_env.IsProduction())
+            _logger.LogInformation("Dev-only temp password for {Email}: {TempPassword}", dto.Email, tempPassword);
+
         return Ok(new
         {
-            message = "If an account exists for that email, a temporary password has been generated.",
-            devTempPassword = tempPassword
+            message = "If an account exists for that email, a temporary password has been generated."
         });
     }
 

@@ -13,6 +13,10 @@ angular.module('learnSphereApp')
     return $http.post(API_URL + '/bookings', data, h());
   };
 
+  self.bookPreset = function (data) {
+    return $http.post(API_URL + '/bookings/preset', data, h());
+  };
+
   self.updateStatus = function (id, status, counterProposal) {
     return $http.patch(API_URL + '/bookings/' + id + '/status', {
       status: status,
@@ -20,12 +24,12 @@ angular.module('learnSphereApp')
     }, h());
   };
 
-  self.submitLessonReport = function (id, data) {
-    return $http.post(API_URL + '/bookings/' + id + '/lesson-report', data, h());
+  self.submitLessonReport = function (bookingId, data) {
+    return $http.post(API_URL + '/bookings/' + bookingId + '/lesson-reports', data, h());
   };
 
-  self.editLessonReport = function (id, data) {
-    return $http.patch(API_URL + '/bookings/' + id + '/lesson-report', data, h());
+  self.getLessonReports = function (bookingId) {
+    return $http.get(API_URL + '/bookings/' + bookingId + '/lesson-reports', h());
   };
 
   self.reportIssue = function (id, data) {

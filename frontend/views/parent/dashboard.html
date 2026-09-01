@@ -1,135 +1,186 @@
-<div class="dashboard-layout">
-  <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+
+  <!-- ── Forced: tutor cancelled a confirmed class ───────────────────── -->
+  <div class="bs-dialog-backdrop" ng-if="vm.currentCancellation()">
+    <div class="bs-dialog" style="width:min(460px,100%);">
       <div>
-        <strong>{{ vm.user.name }}</strong>
-        <small>Primary parent account</small>
+        <h3 ng-if="vm.currentCancellation().proposedDate" style="margin-bottom:2px;">Your class was rescheduled</h3>
+        <h3 ng-if="!vm.currentCancellation().proposedDate" style="margin-bottom:2px;">Your class was cancelled</h3>
+        <p class="bs-text-muted" style="font-size:13px; margin:0;">{{ vm.currentCancellation().tutorName }} · {{ vm.currentCancellation().subject }}</p>
+      </div>
+
+      <div class="bs-dialog-body">
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <span class="bs-text-muted">Original class</span>
+            <strong>{{ vm.currentCancellation().originalDate | dmy }}, {{ vm.currentCancellation().originalTime | hhmma }}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px;" ng-if="vm.currentCancellation().proposedDate">
+            <span class="bs-text-muted">Proposed new date</span>
+            <strong>{{ vm.currentCancellation().proposedDate | dmy }}, {{ vm.currentCancellation().proposedTime | hhmma }}</strong>
+          </div>
+        </div>
+
+        <p style="margin-top:var(--space-3);" ng-if="vm.currentCancellation().proposedDate">
+          {{ vm.currentCancellation().tutorName }} needs to move this class. Accept the new date, or decline for a refund credit (reviewed by our team).
+        </p>
+        <p style="margin-top:var(--space-3);" ng-if="!vm.currentCancellation().proposedDate">
+          {{ vm.currentCancellation().tutorName }} cancelled this class with no replacement offered. You'll receive a refund credit for it.
+        </p>
+
+        <p ng-if="vm.cancellationActionError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.cancellationActionError }}</p>
+      </div>
+
+      <div class="bs-dialog-actions" ng-if="vm.currentCancellation().proposedDate" style="justify-content:flex-start;">
+        <button type="button" class="bs-btn bs-btn-secondary" ng-disabled="vm.cancellationActionBusy" ng-click="vm.rejectCancellation(vm.currentCancellation())">
+          Reject — Request Refund
+        </button>
+        <button type="button" class="bs-btn bs-btn-primary" ng-disabled="vm.cancellationActionBusy" ng-click="vm.acceptCancellation(vm.currentCancellation())">
+          Accept {{ vm.currentCancellation().proposedDate | dmy }}, {{ vm.currentCancellation().proposedTime | hhmma }}
+        </button>
+      </div>
+      <div class="bs-dialog-actions" ng-if="!vm.currentCancellation().proposedDate">
+        <button type="button" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="vm.cancellationActionBusy" ng-click="vm.acknowledgeCancellation(vm.currentCancellation())">
+          OK, Got It
+        </button>
       </div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item active">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
-      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
-      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+  </div>
+
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+    </div>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/parent/dashboard" class="bs-sidebar-link active">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="bs-sidebar-link">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="bs-sidebar-link">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="bs-sidebar-link">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="bs-sidebar-link">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="bs-sidebar-link">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="bs-sidebar-link">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="bs-sidebar-link">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
 
     <!-- ── Pay Success ───────────────────────────── -->
-    <div class="alert-success" ng-if="vm.paySuccess">
+    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
     <!-- ── Welcome Hero ───────────────────────────── -->
-    <div class="dash-hero">
-      <div class="dash-hero-left">
-        <p class="dash-hero-greeting">Parent Dashboard</p>
-        <h2 class="dash-hero-name">Welcome back, {{ vm.user.name.split(' ')[0] }}! 👋</h2>
-        <p class="dash-hero-sub">Here's an overview of your children's tutoring activity</p>
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:var(--space-4);">
+      <div>
+        <div style="font-family:var(--font-heading); font-weight:600; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700);">Parent Dashboard</div>
+        <h1 style="margin-top:4px;">Welcome back, {{ vm.user.name.split(' ')[0] }}</h1>
+        <p class="bs-text-muted" style="margin:0;">Here's an overview of your children's tutoring activity</p>
       </div>
-      <div class="dash-hero-stats">
-        <div class="dash-hero-stat">
-          <strong>{{ vm.students.length }}</strong>
-          <small>Children</small>
+      <div style="display:flex; gap:var(--space-6);">
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.students.length }}</div>
+          <div class="bs-text-muted" style="font-size:12px;">Children</div>
         </div>
-        <div class="dash-hero-stat">
-          <strong>{{ vm.confirmedAndCounteredBookings().length }}</strong>
-          <small>Upcoming</small>
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.confirmedAndCounteredBookings().length }}</div>
+          <div class="bs-text-muted" style="font-size:12px;">Upcoming</div>
         </div>
-        <div class="dash-hero-stat">
-          <strong>{{ vm.pendingPayments().length }}</strong>
-          <small>Payments Due</small>
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.pendingPayments().length }}</div>
+          <div class="bs-text-muted" style="font-size:12px;">Payments Due</div>
         </div>
       </div>
     </div>
 
     <!-- ── Payment Alert ─────────────────────────── -->
-    <div class="alert-banner" ng-if="vm.pendingPayments().length > 0">
-      <div class="alert-banner-left">
-        <span class="alert-badge">★ Action Required</span>
-        <h3>Session Confirmed — Payment Pending</h3>
-        <p>Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
-        <div class="invoice-tags">
-          <span class="invoice-tag" ng-repeat="inv in vm.pendingPayments()">
-            {{ inv.subject }} &bull; <strong>${{ inv.amount }}.00</strong>
+    <div class="bs-card" style="background:var(--color-accent-2-100); flex-direction:row; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3);" ng-if="vm.pendingPayments().length > 0">
+      <div>
+        <span class="bs-tag bs-tag-accent-2">★ Action Required</span>
+        <h4 style="margin-top:var(--space-2);">Session Confirmed — Payment Pending</h4>
+        <p style="margin:0; font-size:13px;">Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-2);">
+          <span class="bs-tag bs-tag-neutral" ng-repeat="inv in vm.pendingPayments()">
+            {{ inv.subject }} · <strong>${{ inv.amount }}.00</strong>
           </span>
         </div>
       </div>
-      <button class="btn-white" ng-click="vm.payInvoice(vm.pendingPayments()[0].id)">
-        💳 Pay Now (${{ vm.pendingPayments()[0].amount }}.00)
+      <button class="bs-btn bs-btn-primary" ng-click="vm.payInvoice(vm.pendingPayments()[0].id)">
+        Pay Now (${{ vm.pendingPayments()[0].amount }}.00)
       </button>
     </div>
 
-    <!-- ── Two-column: Sessions + Progress ────────── -->
-    <div class="grid-2">
-
-      <!-- Upcoming Tutorials -->
-      <div class="card">
-        <div class="dash-section-header">
-          <div style="display:flex;align-items:center">
-            <span class="dash-section-icon green">📅</span>
-            <span class="dash-section-title">Upcoming Tutorials</span>
-          </div>
-          <a href="#!/parent/sessions" class="link-sm">View All →</a>
-        </div>
-
-        <div class="empty-state-box" ng-if="!vm.confirmedAndCounteredBookings().length">
-          <p>No upcoming tutorial sessions scheduled.</p>
-          <a href="#!/parent/search" class="btn-primary sm">Find a Tutor</a>
-        </div>
-
-        <div class="session-list" ng-if="vm.confirmedAndCounteredBookings().length">
-          <div class="session-item" ng-repeat="b in vm.confirmedAndCounteredBookings()">
-            <img ng-src="{{ b.tutorImageUrl }}" class="avatar" alt="{{ b.tutorName }}" />
-            <div class="session-info">
-              <span class="badge-subject">{{ b.subject }}</span>
-              <strong>{{ b.tutorName }}</strong>
-              <small>🕐 {{ b.classes[0].date | dmy }} &bull; {{ b.classes[0].time }} ({{ b.durationHours }}h)
-                <span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span>
-              </small>
-            </div>
-            <span class="status-badge" ng-class="b.status">{{ b.status | uppercase }}</span>
-          </div>
-        </div>
+    <!-- ── Upcoming Tutorials ──────────────────────── -->
+    <div class="bs-card bs-elev-sm">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <div class="bs-card-title">Upcoming Tutorials</div>
+        <a href="#!/parent/sessions" class="bs-btn bs-btn-ghost" style="font-size:12px;">View All →</a>
       </div>
 
+      <div ng-if="!vm.confirmedAndCounteredBookings().length" style="text-align:center; padding:var(--space-4) 0;">
+        <p class="bs-text-muted">No upcoming tutorial sessions scheduled.</p>
+        <a href="#!/parent/search" class="bs-btn bs-btn-primary">Find a Tutor</a>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:var(--space-2);" ng-if="vm.confirmedAndCounteredBookings().length">
+        <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);" ng-repeat="b in vm.confirmedAndCounteredBookings()">
+          <img ng-src="{{ b.tutorImageUrl }}" class="bs-halftone" style="width:44px; height:44px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ b.tutorName }}" />
+          <div style="flex:1; min-width:0;">
+            <span class="bs-tag bs-tag-accent" style="margin-bottom:4px;">{{ b.subject }}</span>
+            <div style="font-family:var(--font-heading); font-weight:600;">{{ b.tutorName }}</div>
+            <small class="bs-text-muted">{{ b.classes[0].date | dmy }} · {{ b.classes[0].time | hhmma }} ({{ b.durationHours }}h)
+              <span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span>
+            </small>
+          </div>
+          <span class="bs-tag" ng-class="b.status === 'confirmed' ? 'bs-tag-accent' : 'bs-tag-neutral'">{{ b.status | uppercase }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- ── Children Overview ──────────────────────── -->
-    <div class="card">
-      <div class="dash-section-header">
-        <div style="display:flex;align-items:center">
-          <span class="dash-section-icon green">👨‍👩‍👧</span>
-          <span class="dash-section-title">Active Children Profiles</span>
-        </div>
-        <a href="#!/parent/students" class="link-sm">+ Add Child</a>
+    <div class="bs-card bs-elev-sm">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <div class="bs-card-title">Active Children Profiles</div>
+        <a href="#!/parent/students" class="bs-btn bs-btn-ghost" style="font-size:12px;">+ Add Child</a>
       </div>
 
-      <div class="student-grid">
-        <div class="student-mini-card" ng-repeat="s in vm.students">
-          <div class="student-avatar-circle">{{ s.name[0] }}</div>
-          <div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-3);">
+        <div class="bs-card" style="background:var(--color-bg); flex-direction:row; gap:var(--space-3);" ng-repeat="s in vm.activeStudents()">
+          <div style="width:40px; height:40px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
+          <div style="min-width:0;">
             <strong>{{ s.name }}</strong>
-            <p>{{ s.educationLevel }}</p>
-            <p>🏫 {{ s.school }}</p>
-            <small ng-if="s.learningGoal">🎯 "{{ s.learningGoal }}"</small>
+            <p class="bs-text-muted" style="font-size:12px; margin:2px 0 0;">{{ s.educationLevel }} · {{ s.school }}</p>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+              <span class="bs-tag bs-tag-neutral" ng-repeat="c in s.subjectCombos | limitTo:3">{{ c.subject }}</span>
+            </div>
           </div>
         </div>
-        <div class="student-mini-empty" ng-if="!vm.students.length">
+        <div class="bs-text-muted" style="grid-column:1/-1;" ng-if="!vm.activeStudents().length">
           No child profiles yet. <a href="#!/parent/students">Add one now →</a>
         </div>
       </div>
     </div>
 
     <!-- ── Notice Banner ─────────────────────────── -->
-    <div class="notice-banner">
-      ⚠️ <strong>Scheduled Maintenance:</strong>&nbsp; The dashboard will be offline on June 15th, 2:00 AM – 4:00 AM SGT.
+    <div style="background:var(--color-neutral-100); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+      <strong>Scheduled Maintenance:</strong>&nbsp; The dashboard will be offline on June 15th, 2:00 AM – 4:00 AM SGT.
     </div>
 
   </main>

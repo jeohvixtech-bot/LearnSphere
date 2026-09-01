@@ -1,6 +1,7 @@
 -- LearnSphere MySQL Schema
 -- Generated from EF Core models (AppDbContext + AppDbContextModelSnapshot)
--- Last updated: reflects all migrations including AddReviewBookingId
+-- Last updated: reflects all migrations including FavoriteTutors, StudentPreferredModes,
+-- ChatMessages.ParentUserId, and tutor-preset class slots (Flow B)
 -- Run this against a fresh MySQL instance to create the full schema manually.
 -- (The .NET backend uses EF Core migrations at runtime — this file is for manual/reference use.)
 
@@ -34,6 +35,8 @@ CREATE TABLE IF NOT EXISTS Tutors (
     Bio              LONGTEXT        NOT NULL,
     IsVerified       TINYINT(1)      NOT NULL DEFAULT 0,
     IsOnline         TINYINT(1)      NOT NULL DEFAULT 1,  -- offline hides the profile from parent search/booking entirely
+    VerificationStatus VARCHAR(20)   NOT NULL DEFAULT 'not_submitted', -- not_submitted | pending | approved (no separate terminal "rejected" — see TutorDocuments)
+    OfferingsUnlocked  TINYINT(1)    NOT NULL DEFAULT 0,  -- gates the offering builder until mandatory documents are approved
     CONSTRAINT FK_Tutors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
@@ -83,6 +86,35 @@ CREATE TABLE IF NOT EXISTS TutorOfferings (
 );
 
 -- ============================================================
+-- TutorDocuments  (tutor verification uploads — identity, academic, teaching
+-- credentials, intro video link, specialist certs. identity_photo and intro_video
+-- are single-slot; o_level/a_level/degree/postgrad/nie_cert/specialist_cert allow
+-- up to 3 rows each, ordered by SortOrder. Re-upload after rejection creates a new
+-- row (ReplacesDocumentId points at the old rejected row) instead of overwriting —
+-- see TutorsController.SaveDocument/ApplyVerificationDecisions.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorDocuments (
+    Id                  INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId             INT             NOT NULL,
+    DocumentType        VARCHAR(30)     NOT NULL DEFAULT '', -- identity_photo | o_level | a_level | degree | postgrad | nie_cert | intro_video | specialist_cert
+    FileUrl             LONGTEXT        NULL,
+    ExternalUrl         LONGTEXT        NULL,                -- intro_video is link-only (no file upload)
+    FileName            LONGTEXT        NULL,
+    FileSizeBytes       BIGINT          NULL,
+    IdType              VARCHAR(20)     NULL,                -- identity_photo only: NRIC | WorkPassSG | MyKad | Passport
+    IdNumber            LONGTEXT        NULL,                -- identity_photo only
+    SortOrder           INT             NOT NULL DEFAULT 0,
+    Status              VARCHAR(20)     NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+    AdminNote           LONGTEXT        NULL,
+    UploadedAt          DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ReviewedAt          DATETIME(6)     NULL,
+    ReplacesDocumentId  INT             NULL,                -- self-referencing: the rejected row this re-upload supersedes
+    IsArchived          TINYINT(1)      NOT NULL DEFAULT 0,   -- superseded-and-approved rows are archived, not deleted (audit trail)
+    KEY IX_TutorDocuments_TutorId (TutorId),
+    CONSTRAINT FK_TutorDocuments_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- TutorReviews
 -- Added: BookingId (nullable) + filtered unique index (task 2 / AddReviewBookingId migration)
 -- ============================================================
@@ -104,15 +136,61 @@ CREATE UNIQUE INDEX UQ_TutorReviews_TutorBooking
 -- ============================================================
 -- TutorTimeSlots
 -- ============================================================
+-- Day/Time hold a preset slot's date ("YYYY-MM-DD") and start time when the slot
+-- represents a tutor-preset class (BookingType = 'tutor-preset' on Bookings); the
+-- extra columns below are only populated for those rows.
 CREATE TABLE IF NOT EXISTS TutorTimeSlots (
-    Id         INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId    INT         NOT NULL,
-    Day        LONGTEXT    NOT NULL,
-    Time       LONGTEXT    NOT NULL,
-    Status     LONGTEXT    NOT NULL DEFAULT 'Available', -- Available | Booked
-    BookingId  INT         NULL,
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId          INT             NOT NULL,
+    Day              LONGTEXT        NOT NULL,
+    Time             LONGTEXT        NOT NULL,
+    Status           LONGTEXT        NOT NULL DEFAULT 'Available', -- Available | Booked
+    BookingId        INT             NULL,
+    EndTime          LONGTEXT        NULL,
+    DurationMinutes  INT             NOT NULL DEFAULT 60,
+    Mode             LONGTEXT        NULL,
+    Subject          LONGTEXT        NULL,
+    Level            LONGTEXT        NULL,
+    Country          LONGTEXT        NULL,
+    ClassSize        VARCHAR(20)     NOT NULL DEFAULT 'one-to-one', -- one-to-one | one-to-many
+    MaxStudents      INT             NOT NULL DEFAULT 1,
+    ConfirmedCount   INT             NOT NULL DEFAULT 0,
+    IsFull           TINYINT(1)      NOT NULL DEFAULT 0,
+    PricePerLesson   DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    PresetGroupId    VARCHAR(20)     NULL, -- shared across every slot from one Setup Class submission (e.g. all occurrences of a weekly recurring class), "PRESET" + zero-padded id of the batch's first slot
     CONSTRAINT FK_TutorTimeSlots_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
 );
+
+-- ============================================================
+-- SyllabusTopics — platform-defined topics per country+subject+level.
+-- Seeded once by admin. Max 6 topics per subject+level combination.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS SyllabusTopics (
+    Id          INT          NOT NULL AUTO_INCREMENT,
+    Country     VARCHAR(10)  NOT NULL DEFAULT '',
+    Subject     VARCHAR(100) NOT NULL DEFAULT '',
+    Level       VARCHAR(100) NOT NULL DEFAULT '',
+    Topic       VARCHAR(200) NOT NULL DEFAULT '',
+    SortOrder   INT          NOT NULL DEFAULT 0,
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_SyllabusTopic (Country, Subject, Level, Topic),
+    KEY IX_SyllabusTopics_Country_Subject_Level (Country, Subject, Level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- PresetGroupSyllabuses — topics a tutor selected for a preset group (max 6).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PresetGroupSyllabuses (
+    Id              INT          NOT NULL AUTO_INCREMENT,
+    PresetGroupId   VARCHAR(20)  NOT NULL DEFAULT '',
+    SyllabusTopicId INT          NOT NULL,
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_PresetGroupSyllabus (PresetGroupId, SyllabusTopicId),
+    KEY IX_PresetGroupSyllabuses_PresetGroupId (PresetGroupId),
+    CONSTRAINT FK_PresetGroupSyllabuses_SyllabusTopics
+        FOREIGN KEY (SyllabusTopicId) REFERENCES SyllabusTopics(Id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
 -- Students
@@ -127,8 +205,47 @@ CREATE TABLE IF NOT EXISTS Students (
     SubjectSelect   LONGTEXT    NOT NULL,
     LearningGoal    LONGTEXT    NULL,
     PhotoUrl        LONGTEXT    NULL,
-    IsArchived      TINYINT(1)  NOT NULL DEFAULT 0,
+    IsArchived      TINYINT(1)  NOT NULL DEFAULT 0,   -- archived profiles are hidden from active lists/booking, not deleted
     CONSTRAINT FK_Students_Users FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- StudentTutorFirstClasses  (tracks the first confirmed lesson between a
+-- student and a tutor for a given country+subject+level combination —
+-- inserted on booking confirmed (Flow A) and auto-confirmed (Flow B).
+-- Fee logic is a TODO, wired in once pricing rules are finalised.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS StudentTutorFirstClasses (
+    Id        INT          NOT NULL AUTO_INCREMENT,
+    Country   VARCHAR(50)  NOT NULL DEFAULT '',
+    Subject   VARCHAR(100) NOT NULL DEFAULT '',
+    Level     VARCHAR(100) NOT NULL DEFAULT '',
+    TutorId   INT          NOT NULL,
+    StudentId INT          NOT NULL,
+    BookingId INT          NULL,
+    CreatedAt DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_StudentTutorFirstClass (Country, Subject, Level, TutorId, StudentId),
+    KEY IX_STFC_TutorId   (TutorId),
+    KEY IX_STFC_StudentId (StudentId),
+    CONSTRAINT FK_STFC_Tutors
+        FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)    ON DELETE CASCADE,
+    CONSTRAINT FK_STFC_Students
+        FOREIGN KEY (StudentId) REFERENCES Students(Id)  ON DELETE CASCADE,
+    CONSTRAINT FK_STFC_Bookings
+        FOREIGN KEY (BookingId) REFERENCES Bookings(Id)  ON DELETE SET NULL
+);
+
+-- ============================================================
+-- StudentPreferredModes  (ranked teaching-mode preference per child)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS StudentPreferredModes (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    StudentId  INT          NOT NULL,
+    Mode       VARCHAR(50)  NOT NULL, -- Online | Tutor Place | Tuition Center
+    Sequence   INT          NOT NULL DEFAULT 0, -- preference order, ascending
+    KEY IX_StudentPreferredModes_StudentId (StudentId),
+    CONSTRAINT FK_StudentPreferredModes_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -146,14 +263,17 @@ CREATE TABLE IF NOT EXISTS Bookings (
     Mode           LONGTEXT        NOT NULL,
     Date           LONGTEXT        NULL,                     -- legacy; superseded by BookingClasses.Date
     Time           LONGTEXT        NULL,                     -- legacy; superseded by BookingClasses.Time
-    DurationHours  INT             NOT NULL DEFAULT 1,
+    DurationHours  DOUBLE          NOT NULL DEFAULT 1, -- widened from INT: 15-min-interval preset classes (e.g. 90 min) aren't whole hours
     Message        LONGTEXT        NULL,
     TotalPrice     DECIMAL(10,2)   NOT NULL,
     Status         LONGTEXT        NOT NULL DEFAULT 'pending', -- pending | countered | confirmed | completed | cancelled
     SlotId         INT             NULL,                     -- legacy; unused
     BookingNumber  LONGTEXT        NOT NULL,
+    BookingType    VARCHAR(20)     NOT NULL DEFAULT 'parent-offer', -- parent-offer | tutor-preset
+    PresetSlotId   INT             NULL,                     -- FK to TutorTimeSlots.Id when BookingType = 'tutor-preset'
     CONSTRAINT FK_Bookings_Tutors   FOREIGN KEY (TutorId)   REFERENCES Tutors(Id)   ON DELETE RESTRICT,
-    CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT
+    CONSTRAINT FK_Bookings_Students FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT,
+    CONSTRAINT FK_Bookings_PresetSlot FOREIGN KEY (PresetSlotId) REFERENCES TutorTimeSlots(Id) ON DELETE RESTRICT
 );
 
 -- ============================================================
@@ -165,6 +285,24 @@ CREATE TABLE IF NOT EXISTS BookingClasses (
     Date       LONGTEXT    NOT NULL,
     Time       LONGTEXT    NOT NULL,
     CONSTRAINT FK_BookingClasses_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- BookingPresetSlots  (one row per TutorTimeSlot a preset-class booking
+-- covers — lets a single Booking span an entire recurring series, e.g. all
+-- 5 occurrences of a weekly class, while still tracking exactly which slots
+-- need their seat freed if the booking is cancelled. Bookings.PresetSlotId
+-- is kept for backward compatibility with bookings created before this
+-- table existed — always just the first slot of the group when there's
+-- more than one.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS BookingPresetSlots (
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId        INT         NOT NULL,
+    TutorTimeSlotId  INT         NOT NULL,
+    KEY IX_BookingPresetSlots_BookingId (BookingId),
+    CONSTRAINT FK_BookingPresetSlots_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_BookingPresetSlots_TutorTimeSlots FOREIGN KEY (TutorTimeSlotId) REFERENCES TutorTimeSlots(Id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -208,29 +346,32 @@ CREATE TABLE IF NOT EXISTS CounterProposalClasses (
 );
 
 -- ============================================================
--- LessonReports  (1-to-1 with Booking)
+-- LessonReports — one report per student per session date.
+-- For group classes each student gets their own personalised report.
+-- Reports cannot be edited after submission.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS LessonReports (
-    Id          INT AUTO_INCREMENT PRIMARY KEY,
-    BookingId   INT         NOT NULL UNIQUE,
-    Covered     LONGTEXT    NOT NULL,
-    Performance LONGTEXT    NOT NULL,
-    Homework    LONGTEXT    NOT NULL,
-    SubmitDate  LONGTEXT    NOT NULL,
-    CONSTRAINT FK_LessonReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+    Id                  INT          NOT NULL AUTO_INCREMENT,
+    BookingId           INT          NOT NULL,
+    StudentId           INT          NOT NULL,
+    SessionDate         VARCHAR(20)  NOT NULL DEFAULT '',
+    Attendance          VARCHAR(20)  NOT NULL DEFAULT '',
+    Engagement          INT          NULL,
+    Understanding       VARCHAR(30)  NULL,
+    HomeworkCompletion  VARCHAR(30)  NULL,
+    Remarks             LONGTEXT     NULL,
+    SubmittedAt         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (Id),
+    UNIQUE KEY UQ_LessonReport_BookingStudentDate
+        (BookingId, StudentId, SessionDate),
+    KEY IX_LessonReports_BookingId (BookingId),
+    KEY IX_LessonReports_StudentId (StudentId),
+    CONSTRAINT FK_LessonReports_Bookings
+        FOREIGN KEY (BookingId)  REFERENCES Bookings(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_LessonReports_Students
+        FOREIGN KEY (StudentId) REFERENCES Students(Id) ON DELETE RESTRICT
 );
-
--- ============================================================
--- LessonReportEdits  (edit history for a lesson report)
--- ============================================================
-CREATE TABLE IF NOT EXISTS LessonReportEdits (
-    Id               INT AUTO_INCREMENT PRIMARY KEY,
-    LessonReportId   INT         NOT NULL,
-    Date             LONGTEXT    NOT NULL,
-    Changes          LONGTEXT    NOT NULL,
-    CONSTRAINT FK_LessonReportEdits_LessonReports
-        FOREIGN KEY (LessonReportId) REFERENCES LessonReports(Id) ON DELETE CASCADE
-);
+-- LessonReportEdits removed — reports are immutable after submission
 
 -- ============================================================
 -- IssueReports  (1-to-1 with Booking)
@@ -240,7 +381,8 @@ CREATE TABLE IF NOT EXISTS IssueReports (
     BookingId   INT         NOT NULL UNIQUE,
     IssueType   LONGTEXT    NOT NULL,
     Details     LONGTEXT    NOT NULL,
-    Timestamp   LONGTEXT    NOT NULL,
+    Timestamp   LONGTEXT    NOT NULL,        -- display-only, time-of-day (no date) — see CreatedAt
+    CreatedAt   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), -- real date/time, used by the AI Speed Match "Tutor Dispute (Refresh Monthly)" scoring criterion
     CONSTRAINT FK_IssueReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
@@ -272,14 +414,84 @@ CREATE TABLE IF NOT EXISTS Payouts (
 );
 
 -- ============================================================
+-- PresetCancellationDecisions  (per-booking outcome when a tutor cancels a
+-- published preset-class slot — see TutorsController.DeleteSlot,
+-- PresetCancellationsController, AdminController). One row per affected
+-- BOOKING, not per cancellation event — a group class can have several
+-- independent families on the same slot, each deciding separately.
+-- Original*/PricePerLesson are snapshotted from the TutorTimeSlot at cancel
+-- time since that row is deleted immediately after.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PresetCancellationDecisions (
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    BookingId        INT             NOT NULL,
+    OriginalDate     LONGTEXT        NOT NULL,
+    OriginalTime     LONGTEXT        NOT NULL,
+    OriginalEndTime  LONGTEXT        NOT NULL,
+    PricePerLesson   DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    ProposedDate     LONGTEXT        NULL, -- NULL = straight cancel, no reschedule offered
+    ProposedTime     LONGTEXT        NULL,
+    ProposedEndTime  LONGTEXT        NULL,
+    Status           VARCHAR(20)     NOT NULL DEFAULT 'pending', -- pending | accepted | auto-accepted | pending-admin | resolved
+    AcknowledgedAt   DATETIME(6)     NULL, -- straight-cancel popup dismissal only; Path A decisions don't use this
+    CreatedAt        DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    DecidedAt        DATETIME(6)     NULL, -- when the parent (or the auto-accept sweep) made the call
+    ResolvedAt       DATETIME(6)     NULL, -- when the refund/penalty/dispute-score side effects actually ran
+    AdminNote        LONGTEXT        NULL,
+    KEY IX_PresetCancellationDecisions_BookingId (BookingId),
+    KEY IX_PresetCancellationDecisions_Status (Status),
+    CONSTRAINT FK_PresetCancellationDecisions_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- TutorPenalties  (deduction ledger against a tutor's future payout — e.g.
+-- the 20% penalty charged when a preset-class cancellation resolves toward a
+-- parent credit. Kept append-only rather than editing Payouts rows directly;
+-- PayoutsController's available-balance calc subtracts SUM(Amount) here.
+-- BookingId is a soft reference, not a hard FK — a penalty is a permanent
+-- ledger entry that should outlive the booking record it originated from.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorPenalties (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId    INT             NOT NULL,
+    BookingId  INT             NULL,
+    Amount     DECIMAL(10,2)   NOT NULL DEFAULT 0,
+    Reason     LONGTEXT        NOT NULL,
+    CreatedAt  DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY IX_TutorPenalties_TutorId (TutorId),
+    CONSTRAINT FK_TutorPenalties_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- FavoriteTutors  (parent's liked/bookmarked tutors)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS FavoriteTutors (
+    Id            INT AUTO_INCREMENT PRIMARY KEY,
+    ParentUserId  INT          NOT NULL,
+    TutorId       INT          NOT NULL,
+    CreatedAt     DATETIME(6)  NOT NULL,
+    UNIQUE KEY UQ_FavoriteTutors_Parent_Tutor (ParentUserId, TutorId),
+    CONSTRAINT FK_FavoriteTutors_Users  FOREIGN KEY (ParentUserId) REFERENCES Users(Id)  ON DELETE CASCADE,
+    CONSTRAINT FK_FavoriteTutors_Tutors FOREIGN KEY (TutorId)      REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- ChatMessages
+-- Added: ParentUserId — threads were keyed by TutorId alone, mixing every
+-- parent who messaged a given tutor into one conversation. The key is now
+-- (TutorId, ParentUserId).
+-- Added: IsRead — a thread is strictly 1:1, so one flag per message is enough
+-- to answer "has the recipient seen this" (no per-participant read table).
+-- Marked true as a side effect of the recipient calling GET /api/chat/{tutorId}/{parentUserId}.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ChatMessages (
-    Id         INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId    INT         NOT NULL,
-    Sender     LONGTEXT    NOT NULL, -- parent | tutor | system
-    Text       LONGTEXT    NOT NULL,
-    Timestamp  LONGTEXT    NOT NULL
+    Id            INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId       INT         NOT NULL,
+    ParentUserId  INT         NOT NULL DEFAULT 0,
+    Sender        LONGTEXT    NOT NULL, -- parent | tutor | system
+    Text          LONGTEXT    NOT NULL,
+    Timestamp     LONGTEXT    NOT NULL,
+    IsRead        TINYINT(1)  NOT NULL DEFAULT 0
 );
 
 -- ============================================================
@@ -304,4 +516,20 @@ CREATE TABLE IF NOT EXISTS Institutions (
     Name     LONGTEXT    NOT NULL,
     Country  LONGTEXT    NOT NULL, -- Singapore | Malaysia
     Type     LONGTEXT    NOT NULL  -- Primary | Secondary | Junior College | Polytechnic/Vocational | University/Tertiary
+);
+
+-- ============================================================
+-- ScoringWeightages  (AI Speed Match scoring config, admin Scoring Config
+-- page — Key is the stable identifier the match-score calculator switches
+-- on; Label is display text only. Seeded once with 6 fixed rows
+-- (rating/activeness/disputes/experience + 2 reserved "na" slots); only
+-- Percent is admin-editable thereafter.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ScoringWeightages (
+    Id         INT AUTO_INCREMENT PRIMARY KEY,
+    `Key`      VARCHAR(20)   NOT NULL, -- rating | activeness | disputes | experience | na1 | na2
+    Label      VARCHAR(100)  NOT NULL,
+    Percent    INT           NOT NULL DEFAULT 0,
+    SortOrder  INT           NOT NULL DEFAULT 0,
+    UNIQUE KEY UQ_ScoringWeightages_Key (`Key`)
 );

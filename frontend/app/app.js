@@ -110,6 +110,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
     })
+    .when('/admin/reschedule-queue', {
+      templateUrl: 'views/admin/reschedule-queue.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
     .otherwise({ redirectTo: '/welcome' });
 
   function authGuard(requiredRole) {
@@ -124,7 +130,7 @@ angular.module('learnSphereApp', ['ngRoute'])
           deferred.resolve(user);
         }
       } else {
-        $location.path('/login');
+        $location.path('/welcome');
         deferred.reject('Unauthorized');
       }
       return deferred.promise;
@@ -138,7 +144,7 @@ angular.module('learnSphereApp', ['ngRoute'])
       if (user) {
         deferred.resolve(user);
       } else {
-        $location.path('/login');
+        $location.path('/welcome');
         deferred.reject('Unauthorized');
       }
       return deferred.promise;
@@ -148,6 +154,6 @@ angular.module('learnSphereApp', ['ngRoute'])
 
 .run(['$rootScope', '$location', 'AuthService', function ($rootScope, $location, AuthService) {
   $rootScope.$on('$routeChangeError', function () {
-    $location.path('/login');
+    $location.path('/welcome');
   });
 }]);

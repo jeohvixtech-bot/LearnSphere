@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AuthCtrl', ['$location', 'AuthService', function ($location, AuthService) {
+.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', function ($location, AuthService, PendingMatchService, NameValidationService) {
   var self = this;
 
   // Redirect if already logged in
@@ -16,7 +16,10 @@ angular.module('learnSphereApp')
   self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
   self.showTerms = false;
   self.errorMsg = '';
+  self.nameError = '';
   self.loading = false;
+  self.showRegisterPassword = false;
+  self.showRegisterConfirmPassword = false;
 
   // Forgot password
   self.showForgotPassword = false;
@@ -80,8 +83,18 @@ angular.module('learnSphereApp')
       });
   };
 
+  // Full-name validation for registration — see NameValidationService for the
+  // actual rule (shared with child-profile name validation in parent.controller.js).
+  // Mirrored server-side in NameValidator.cs so this can't be bypassed by calling
+  // the API directly.
+  self.validateName = function () {
+    self.nameError = NameValidationService.validate(self.registerData.name);
+  };
+
   self.register = function () {
     self.errorMsg = '';
+    self.validateName();
+    if (self.nameError) { self.errorMsg = self.nameError; return; }
     if (self.registerData.password !== self.registerData.confirmPassword) {
       self.errorMsg = 'Passwords do not match.';
       return;
@@ -110,7 +123,13 @@ angular.module('learnSphereApp')
   };
 
   function redirectByRole(role) {
-    if (role === 'parent' || role === 'student') $location.path('/parent/dashboard');
+    // A tutor clicked from the (signed-out) welcome page takes priority over the
+    // usual dashboard landing — send the parent straight to that tutor's booking
+    // page. ParentCtrl.init() consumes it once the tutor catalog has loaded.
+    if ((role === 'parent' || role === 'student') && PendingMatchService.hasPendingTutor()) {
+      $location.path('/parent/search');
+    }
+    else if (role === 'parent' || role === 'student') $location.path('/parent/dashboard');
     else if (role === 'tutor')                   $location.path('/tutor/overview');
     else if (role === 'admin')                   $location.path('/admin/overview');
     else                                         $location.path('/login');

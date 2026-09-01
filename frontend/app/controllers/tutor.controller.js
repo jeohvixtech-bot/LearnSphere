@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('TutorCtrl', ['$location', '$timeout', '$interval', '$rootScope', 'AuthService', 'TutorService',
-  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog',
-function ($location, $timeout, $interval, $rootScope, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog) {
+.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', 'AuthService', 'TutorService',
+  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService',
+function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -13,6 +13,37 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.chatMessages = [];
   self.subjectCatalog = SubjectCatalog;
 
+  // Teaching-mode dual-pool selector (drag-and-drop between "available" and "offered").
+  // Rebuilt into plain arrays only on load/change — never computed inline in the
+  // template — to avoid the infinite-digest trap ng-repeat-over-a-function hits here.
+  self.modesLeft = [];
+  self.modesRight = [];
+  self.modesError = '';
+  self.offeringLockedError = '';
+
+  function rebuildModePools(offeredModes) {
+    var offered = offeredModes || [];
+    self.modesLeft = TeachingModesCatalog.filter(function (m) { return offered.indexOf(m.mode) === -1; });
+    self.modesRight = TeachingModesCatalog.filter(function (m) { return offered.indexOf(m.mode) !== -1; });
+  }
+
+  self.onModeDropToRight = function (item) {
+    if (self.modesRight.some(function (m) { return m.mode === item.mode; })) return;
+    self.modesLeft = self.modesLeft.filter(function (m) { return m.mode !== item.mode; });
+    self.modesRight.push(item);
+  };
+
+  self.onModeDropToLeft = function (item) {
+    if (self.modesLeft.some(function (m) { return m.mode === item.mode; })) return;
+    self.modesRight = self.modesRight.filter(function (m) { return m.mode !== item.mode; });
+    self.modesLeft.push(item);
+    if (self.newOffering.mode === item.mode) self.newOffering.mode = '';
+  };
+
+  self.removeMode = function (mode) {
+    self.onModeDropToLeft(mode);
+  };
+
   // Tab state
   self.activeTab = 'overview';
 
@@ -20,17 +51,113 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.profileForm = {};
   self.profileSuccess = false;
   self.profileError = '';
-  self.uploading = false;
-  self.newOffering = { country: '', selectedOption: null, mode: '', qualification: '', price: null };
+  self.newOffering = { country: '', selectedOption: null };
 
-  // Report forms
-  self.reportBooking = null;
-  self.reportForm = { covered: '', performance: '', homework: '' };
-  self.reportSuccess = false;
+  // ── Lesson report state ──────────────────────────────────────────
+  self.reportSelectedDay = null;  // the calendar day currently selected for reports
+  self.reportForm        = {};    // { [studentId_sessionDate]: { attendance, engagement, understanding, homeworkCompletion, remarks } }
+  self.reportOpen        = {};    // { [studentId_sessionDate]: true/false } — is form open for this student+date
+  self.reportConfirm     = {};    // { [studentId_sessionDate]: true/false } — is confirm modal shown
+  self.reportSubmitting  = {};    // { [studentId_sessionDate]: true/false }
+  self.reportError       = {};    // { [studentId_sessionDate]: 'error message' }
+  self.reportSuccess     = {};    // { [studentId_sessionDate]: true/false }
 
-  self.editBooking = null;
-  self.editForm = { covered: '', performance: '', homework: '', changesMade: '' };
-  self.editSuccess = false;
+  // Key helper
+  self._reportKey = function (studentId, sessionDate) {
+    return studentId + '_' + sessionDate;
+  };
+
+  // Precomputed report-view state — NEVER call a function that allocates fresh
+  // arrays/objects directly from a template binding (ng-repeat/ng-class/{{}}).
+  // Same trap this file already avoids elsewhere (see rebuildSetupClassModesList/
+  // computeContactableParents): a function invoked fresh every digest never
+  // stabilizes and trips Angular's $rootScope:infdig. These are recomputed only
+  // at well-defined points (bookings reload, report day change) via
+  // _recomputeReportView(), and the template just reads the plain result.
+  self.reportDotsByDay = {};              // { dayNum: 'amber'|'green' } — for the month currently on screen
+  self.reportSelectedDayStudents = [];    // student rows for vm.reportSelectedDay
+  self.reportAllSubmittedOnSelectedDay = false;
+  self.reportGroups = [];                 // submitted reports log
+
+  function sessionDatesForBooking(b) {
+    return (b.classes || []).map(function (c) { return c.date; });
+  }
+
+  function recomputeReportDots() {
+    var dots = {};
+    self.bookings.forEach(function (b) {
+      if (b.status !== 'completed') return;
+      sessionDatesForBooking(b).forEach(function (dateStr) {
+        var d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime()) || d.getFullYear() !== self.calYear || d.getMonth() !== self.calMonth) return;
+        var dayNum = d.getDate();
+        var hasReport = (b.lessonReports || []).some(function (r) {
+          return r.studentId === b.studentId && r.sessionDate === dateStr;
+        });
+        dots[dayNum] = dots[dayNum] === undefined ? hasReport : (dots[dayNum] && hasReport);
+      });
+    });
+    var result = {};
+    Object.keys(dots).forEach(function (dayNum) { result[dayNum] = dots[dayNum] ? 'green' : 'amber'; });
+    self.reportDotsByDay = result;
+  }
+
+  function recomputeReportSelectedDayStudents() {
+    if (!self.reportSelectedDay) {
+      self.reportSelectedDayStudents = [];
+      self.reportAllSubmittedOnSelectedDay = false;
+      return;
+    }
+    var dateStr = self.reportSelectedDay;
+    var rows = self.bookings
+      .filter(function (b) { return b.status === 'completed' && sessionDatesForBooking(b).indexOf(dateStr) >= 0; })
+      .map(function (b) {
+        var report = (b.lessonReports || []).find(function (r) {
+          return r.studentId === b.studentId && r.sessionDate === dateStr;
+        });
+        return {
+          booking: b, studentId: b.studentId, studentName: b.studentName,
+          sessionDate: dateStr, submitted: !!report, report: report || null
+        };
+      });
+    self.reportSelectedDayStudents = rows;
+    self.reportAllSubmittedOnSelectedDay = rows.length > 0 && rows.every(function (s) { return s.submitted; });
+  }
+
+  function recomputeReportGroups() {
+    var groups = {};
+    self.bookings.forEach(function (b) {
+      if (b.status !== 'completed') return;
+      var reports = b.lessonReports || [];
+      if (!reports.length) return;
+      var groupKey = 'booking_' + b.id;
+      if (!groups[groupKey]) groups[groupKey] = { presetGroupId: groupKey, reports: [] };
+      reports.forEach(function (r) {
+        groups[groupKey].reports.push({
+          studentName: b.studentName, sessionDate: r.sessionDate, attendance: r.attendance,
+          engagement: r.engagement, understanding: r.understanding, homeworkCompletion: r.homeworkCompletion,
+          remarks: r.remarks, submittedAt: r.submittedAt
+        });
+      });
+    });
+    self.reportGroups = Object.keys(groups).map(function (k) {
+      groups[k].reports.sort(function (a, b) { return a.sessionDate.localeCompare(b.sessionDate); });
+      return groups[k];
+    });
+  }
+
+  self._recomputeReportView = function () {
+    recomputeReportDots();
+    recomputeReportSelectedDayStudents();
+    recomputeReportGroups();
+  };
+
+  // Every BookingService.getAll() call site in this controller routes through
+  // here so the report-view state above always stays in sync with self.bookings.
+  self._setBookings = function (data) {
+    self.bookings = data;
+    self._recomputeReportView();
+  };
 
   self.counterBooking = null;
   self.counterForm = { message: '', classes: [] };
@@ -41,7 +168,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.rescheduleSuccess = false;
 
   self.chatText = '';
-  self.selectedCalDay = new Date().getDate();
+  self.selectedCalDays = [];
   var _now = new Date();
   self.calYear = _now.getFullYear();
   self.calMonth = _now.getMonth(); // 0-indexed
@@ -49,37 +176,81 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   function init() {
     TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
+      // Pre-fill identity fields from any already-saved ID number doc, so a page
+      // reload doesn't blank the form back to the 'NRIC'/'' defaults.
+      var existingIdDoc = (self.tutor.documents || [])
+        .find(function (d) { return d.documentType === 'identity_id'; });
+      if (existingIdDoc && existingIdDoc.idType) {
+        self.verif.idType = existingIdDoc.idType;
+        self.verif.idNumber = existingIdDoc.idNumber || '';
+      }
       self.blockedRanges = ScheduleService.getBlocked(res.data.id);
       self.profileForm = {
-        imageUrl: res.data.imageUrl,
         bio: res.data.bio,
         experienceYears: res.data.experienceYears,
         offerings: res.data.offerings && res.data.offerings.length
           ? res.data.offerings.map(function(o) {
-              return { country: o.country, subject: o.subject, level: o.level, mode: o.mode, qualification: o.qualification, price: o.price || 0 };
+              return { country: o.country, subject: o.subject, level: o.level, mode: o.mode };
             })
           : []
       };
+      rebuildModePools(res.data.modes);
+      rebuildSetupClassModesList();
+      maybeInitChat();
     });
-    BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    BookingService.getAll().then(function (res) {
+      self._setBookings(res.data);
+      maybeInitChat();
+    });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
-    if ($location.path() === '/tutor/chat') {
-      loadChat();
-    }
   }
   init();
 
-  function loadChat() {
-    if (!self.tutor) {
-      $timeout(function () { if (self.tutor) loadChatById(self.tutor.id); }, 1000);
-    } else {
-      loadChatById(self.tutor.id);
+  // Chat — a tutor can only see one conversation per parent, not one shared thread
+  // mixing every parent who's ever messaged them. Requires both the tutor profile
+  // (for tutor.id) and bookings (to know which parents to list) to be loaded; whichever
+  // of the two async calls above finishes last is what actually triggers this.
+  self.contactableParents = [];
+  self.activeParent = null;
+  self.unreadCounts = {}; // { parentUserId: count } — sidebar badges, see ChatController.GetUnreadCounts
+
+  self.loadUnreadCounts = function () {
+    ChatService.getUnreadCounts().then(function (res) { self.unreadCounts = res.data; });
+  };
+
+  function computeContactableParents() {
+    var seen = {};
+    var list = [];
+    (self.bookings || []).forEach(function (b) {
+      if (!self.tutor || b.tutorId !== self.tutor.id) return;
+      if ((b.status !== 'confirmed' && b.status !== 'completed') || seen[b.parentUserId]) return;
+      seen[b.parentUserId] = true;
+      list.push({ id: b.parentUserId, name: b.parentName, studentName: b.studentName });
+    });
+    self.contactableParents = list;
+  }
+
+  function maybeInitChat() {
+    if ($location.path() !== '/tutor/chat' || !self.tutor) return;
+    computeContactableParents();
+    self.loadUnreadCounts();
+    if (!self.activeParentUserId && self.contactableParents.length) {
+      self.loadChat(self.contactableParents[0].id);
     }
   }
 
-  function loadChatById(tutorId) {
-    ChatService.getMessages(tutorId).then(function (res) { self.chatMessages = res.data; });
-  }
+  self.loadChat = function (parentUserId) {
+    self.activeParentUserId = parentUserId;
+    self.activeParent = self.contactableParents.find(function (p) { return p.id === parentUserId; }) || null;
+    ChatService.getMessages(self.tutor.id, parentUserId).then(function (res) {
+      self.chatMessages = res.data;
+      // Opening the thread just marked its unread messages read server-side
+      // (see ChatController.GetMessages) — clear the badge immediately rather
+      // than waiting for the next poll tick.
+      self.unreadCounts[parentUserId] = 0;
+      scrollChatToBottom();
+    });
+  };
 
   // Computed props
   self.pendingRequests = function () {
@@ -113,12 +284,110 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     });
   };
 
-  self.needsReport = function () {
-    return self.completedClasses().filter(function (b) { return !b.lessonReport; });
+  // ── Open assessment form for a student + date ─────────────────────
+  self.openReportForm = function (studentId, sessionDate, booking) {
+    var key = self._reportKey(studentId, sessionDate);
+    self.reportOpen[key] = true;
+    self.reportForm[key] = {
+      attendance:         '',
+      engagement:         0,
+      understanding:      '',
+      homeworkCompletion: '',
+      remarks:            '',
+      bookingId:          booking.id
+    };
+    self.reportError[key]   = null;
+    self.reportSuccess[key] = false;
+    self.reportConfirm[key] = false;
   };
 
-  self.hasReport = function () {
-    return self.completedClasses().filter(function (b) { return !!b.lessonReport; });
+  self.closeReportForm = function (studentId, sessionDate) {
+    var key = self._reportKey(studentId, sessionDate);
+    self.reportOpen[key]    = false;
+    self.reportConfirm[key] = false;
+    self.reportError[key]   = null;
+  };
+
+  // ── Show confirmation modal ───────────────────────────────────────
+  self.confirmSubmitReport = function (studentId, sessionDate) {
+    var key = self._reportKey(studentId, sessionDate);
+    var form = self.reportForm[key];
+    if (!form) return;
+
+    // Frontend validation
+    if (!form.attendance) {
+      self.reportError[key] = 'Please select attendance.';
+      return;
+    }
+    if (form.attendance !== 'absent') {
+      if (!form.engagement || form.engagement < 1) {
+        self.reportError[key] = 'Please rate engagement.';
+        return;
+      }
+      if (!form.understanding) {
+        self.reportError[key] = 'Please select understanding level.';
+        return;
+      }
+      if (!form.homeworkCompletion) {
+        self.reportError[key] = 'Please select homework completion.';
+        return;
+      }
+    }
+
+    self.reportError[key]   = null;
+    self.reportConfirm[key] = true;
+  };
+
+  self.cancelConfirmReport = function (studentId, sessionDate) {
+    var key = self._reportKey(studentId, sessionDate);
+    self.reportConfirm[key] = false;
+  };
+
+  // ── Final submit ──────────────────────────────────────────────────
+  self.submitReport = function (studentId, sessionDate) {
+    var key  = self._reportKey(studentId, sessionDate);
+    var form = self.reportForm[key];
+    if (!form) return;
+
+    self.reportSubmitting[key] = true;
+    self.reportError[key]      = null;
+    self.reportConfirm[key]    = false;
+
+    var payload = {
+      studentId:          studentId,
+      sessionDate:        sessionDate,
+      attendance:         form.attendance,
+      engagement:         form.attendance === 'absent' ? null : form.engagement,
+      understanding:      form.attendance === 'absent' ? null : form.understanding,
+      homeworkCompletion: form.attendance === 'absent' ? null : form.homeworkCompletion,
+      remarks:            form.remarks || null
+    };
+
+    BookingService.submitLessonReport(form.bookingId, payload)
+      .then(function () {
+        self.reportSuccess[key]    = true;
+        self.reportOpen[key]       = false;
+        self.reportSubmitting[key] = false;
+        // Refresh bookings so report status updates immediately
+        return BookingService.getAll();
+      })
+      .then(function (res) {
+        self._setBookings(res.data);
+      })
+      .catch(function (err) {
+        self.reportError[key] = (err.data && err.data.message)
+          ? err.data.message : 'Failed to submit report. Please try again.';
+        self.reportSubmitting[key] = false;
+      });
+  };
+
+  // ── Format session date for display ──────────────────────────────
+  self.formatSessionDate = function (dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr + 'T00:00:00');
+    var days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
   };
 
   // ── Malaysia + Singapore public holidays ────────────────────────────
@@ -196,6 +465,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.blockedRanges = [];
   self.blockConflicts = [];
   self.blockOverlapError = '';
+  self.blockPresetWarning = '';
 
   function parseLocalDate(val) {
     if (!val) return new Date(NaN);
@@ -243,6 +513,44 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.hasTooSoonTutorReschedule = function () {
     return (self.rescheduleForm.classes || []).some(function (c) {
       return c.proposedDate && self.isTooSoon(c.proposedDate, c.proposedTime);
+    });
+  };
+
+  // A proposed date/time must be a valid, fully-formed value — a malformed or partial
+  // entry (e.g. "05:00 A"), or an out-of-range hour with an AM/PM suffix tacked on
+  // (e.g. "19:00 PM" — self-contradictory, can't be safely auto-fixed) is rejected
+  // outright, not silently skipped.
+  function isValidClockTime(timeStr) {
+    var m = String(timeStr || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return false;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    return h >= 1 && h <= 12 && min >= 0 && min <= 59;
+  }
+
+  // Converts a bare 24-hour "HH:MM" time (no AM/PM suffix) into 12-hour "H:MM AM/PM"
+  // format. Leaves anything else (already-AM/PM, or unparseable) unchanged.
+  function normalizeTimeToAmPm(raw) {
+    var s = String(raw || '').trim();
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return s;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    if (h < 0 || h > 23 || min < 0 || min > 59) return s;
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (min < 10 ? '0' + min : min) + ' ' + ampm;
+  }
+
+  self.hasInvalidCounter = function () {
+    return (self.counterForm.classes || []).some(function (c) {
+      if (c.proposedDate && isNaN(parseLocalDate(c.proposedDate).getTime())) return true;
+      return !isValidClockTime(c.proposedStartTime);
+    });
+  };
+
+  self.hasInvalidTutorReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      if (c.proposedDate && isNaN(parseLocalDate(c.proposedDate).getTime())) return true;
+      return !isValidClockTime(c.proposedStartTime);
     });
   };
 
@@ -358,13 +666,28 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       return;
     }
 
+    // Preset (Flow B) slots in the newly-blocked range: one with active bookings just
+    // gets a heads-up (existing students are unaffected, it just won't take new ones);
+    // one nobody has booked yet is quietly removed since it'll never be filled now.
+    self.blockPresetWarning = '';
+    (self.tutor.timetable || []).forEach(function (slot) {
+      if (!slot.mode) return; // not a preset slot
+      var d = parseLocalDate(slot.day);
+      if (d < start || d > end) return;
+      if (slot.confirmedCount > 0 && !slot.isFull) {
+        self.blockPresetWarning = 'This date has active class bookings. Blocking it will not affect existing students but no new bookings will be accepted.';
+      } else if (slot.confirmedCount === 0 && !slot.isFull) {
+        TutorService.deleteSlot(self.tutor.id, slot.id);
+      }
+    });
+
     self.blockConflicts = [];
     ScheduleService.addBlock(self.tutor.id, s, e); // normalises to YYYY-MM-DD strings
     self.blockForm.startDate = '';
     self.blockForm.endDate = '';
   };
 
-  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; };
+  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; self.blockPresetWarning = ''; };
 
   self.removeBlock = function (idx) {
     self.blockedRanges.splice(idx, 1);
@@ -390,6 +713,16 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     return d < today;
   };
 
+  // New classes (Setup Class + reschedule proposals) can only land next month
+  // or later — never the current month, no matter how many days are left in it.
+  function isBeforeNextMonth(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return true;
+    var now = new Date();
+    var nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return d < nextMonthStart;
+  }
+
   // ── Monthly calendar ────────────────────────────────────────────────
   var _monthNames = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December'];
@@ -399,13 +732,17 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.prevMonth = function () {
     if (self.calMonth === 0) { self.calMonth = 11; self.calYear--; }
     else { self.calMonth--; }
-    self.selectedCalDay = 0;
+    self.selectedCalDays = [];
+    self.reportSelectedDay = null;
+    self._recomputeReportView();
   };
 
   self.nextMonth = function () {
     if (self.calMonth === 11) { self.calMonth = 0; self.calYear++; }
     else { self.calMonth++; }
-    self.selectedCalDay = 0;
+    self.selectedCalDays = [];
+    self.reportSelectedDay = null;
+    self._recomputeReportView();
   };
 
   self.calDaysArray = function () {
@@ -429,11 +766,56 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     return self.calYear + '-' + m + '-' + d;
   }
 
+  // Multi-date selection for "Setup class" (up to 5 dates at once). Blocked/past days
+  // can't be selected — same rule the single-day calendar already enforced.
+  self.toggleCalDay = function (d) {
+    if (!d || self.isPastDay(d) || self.isBlocked(d)) return;
+    var idx = self.selectedCalDays.indexOf(d);
+    if (idx > -1) { self.selectedCalDays.splice(idx, 1); return; }
+    if (self.selectedCalDays.length >= 5) return;
+    self.selectedCalDays.push(d);
+    // After setting selectedCalDays, also update reportSelectedDay
+    self.reportSelectedDay = calDayStr(d);
+    self._recomputeReportView();
+  };
+
+  // Calendar days are split into two click paths: toggleCalDay's multi-select
+  // (used by "Setup class") is deliberately future-only — you can't schedule a
+  // class in the past. But a completed class, by definition, is ALWAYS in the
+  // past (see BookingsController.GetAll's auto-complete rule), so the Class
+  // Reports Portal below needs past days to stay clickable even though Setup
+  // Class must keep rejecting them. A past-day click here only ever updates
+  // reportSelectedDay — it never touches selectedCalDays/Setup Class state.
+  self.onCalDayClick = function (d) {
+    if (!d) return;
+    if (self.isPastDay(d)) {
+      self.reportSelectedDay = calDayStr(d);
+      self._recomputeReportView();
+      return;
+    }
+    self.toggleCalDay(d);
+  };
+
+  self.isReportSelectedDay = function (d) {
+    return !!d && self.reportSelectedDay === calDayStr(d);
+  };
+
+  self.isCalDaySelected = function (d) { return self.selectedCalDays.indexOf(d) > -1; };
+
+  // Selected days in date order for the day-detail panel below the calendar —
+  // returns a fresh array each call, but ng-repeat uses "track by day" on the
+  // primitive value itself, so identity stays stable across digests regardless.
+  self.sortedSelectedCalDays = function () {
+    return self.selectedCalDays.slice().sort(function (a, b) { return a - b; });
+  };
+
+  self.resetCalDaySelection = function () { self.selectedCalDays = []; };
+
   self.bookingsOnDay = function (dayNum) {
     if (!self.tutor || !dayNum) return [];
     var s = calDayStr(dayNum);
     return self.bookings.filter(function (b) {
-      return b.tutorId === self.tutor.id &&
+      return b.tutorId === self.tutor.id && b.status !== 'cancelled' &&
         b.classes && b.classes.some(function (c) { return c.date === s; });
     });
   };
@@ -448,6 +830,526 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     return self.bookingsOnDay(dayNum).filter(function (b) { return b.status === 'confirmed'; });
   };
 
+  // A day's dot reflects ALL bookings that day, not just the first one found —
+  // any unpaid booking takes priority (signals action needed) over an all-paid day.
+  self.dayHasUnpaidBooking = function (dayNum) {
+    return self.bookingsOnDay(dayNum).some(function (b) { return !self.isPaid(b.id); });
+  };
+
+  self.dayAllBookingsPaid = function (dayNum) {
+    var list = self.bookingsOnDay(dayNum);
+    return list.length > 0 && list.every(function (b) { return self.isPaid(b.id); });
+  };
+
+  // Preset (tutor-published) class slots on a given day — these are separate from
+  // actual bookings: a slot only becomes a booking once a parent books it. Sourced
+  // from self.tutor.timetable, which includes every TutorTimeSlot for this tutor;
+  // slot.mode set is what distinguishes a preset-class slot from a plain
+  // availability block (see the same check in confirmBlock() above).
+  self.publishedSlotsOnDay = function (dayNum) {
+    if (!self.tutor || !self.tutor.timetable || !dayNum) return [];
+    var s = calDayStr(dayNum);
+    return self.tutor.timetable.filter(function (slot) {
+      return slot.mode && slot.day === s;
+    });
+  };
+
+  // Cancelling a published slot that already has confirmed/pending student
+  // bookings needs the tutor to choose up front: propose a replacement
+  // date/time (each affected family then Accepts/Rejects individually, no
+  // penalty either way — see PresetCancellationsController), or cancel outright
+  // with nothing offered (every affected family is credited immediately, and a
+  // penalty + dispute-score hit applies — see IPresetCancellationService).
+  self.cancelSlotBusy = false;
+  self.cancelSlotModal = null; // the slot being cancelled, or null when closed
+  self.cancelSlotForm = { mode: 'reschedule', proposedDate: '', proposedTime: '04:00 PM', proposedEndTime: '05:00 PM' };
+  self.cancelSlotError = '';
+
+  self.openCancelSlotModal = function (slot) {
+    self.cancelSlotModal = slot;
+    self.cancelSlotForm = { mode: 'reschedule', proposedDate: '', proposedTime: '04:00 PM', proposedEndTime: '05:00 PM' };
+    self.cancelSlotError = '';
+  };
+
+  self.closeCancelSlotModal = function () {
+    self.cancelSlotModal = null;
+  };
+
+  self.submitCancelSlot = function () {
+    var slot = self.cancelSlotModal;
+    if (!slot) return;
+    self.cancelSlotError = '';
+
+    var body = null;
+    if (self.cancelSlotForm.mode === 'reschedule') {
+      if (!self.cancelSlotForm.proposedDate || !self.cancelSlotForm.proposedTime || !self.cancelSlotForm.proposedEndTime) {
+        self.cancelSlotError = 'Please fill in the proposed date, start time, and end time.';
+        return;
+      }
+      // fp-date binds "DD-MM-YYYY" — convert to "YYYY-MM-DD" to match slot.Day's
+      // format (same conversion used for reschedule proposals, see submitCounter).
+      var d = parseLocalDate(self.cancelSlotForm.proposedDate);
+      if (isNaN(d.getTime())) {
+        self.cancelSlotError = 'Please enter a valid proposed date.';
+        return;
+      }
+      var mm = (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+      var dd = (d.getDate() < 10 ? '0' : '') + d.getDate();
+      var proposedDateStr = d.getFullYear() + '-' + mm + '-' + dd;
+
+      if (isBeforeNextMonth(proposedDateStr)) {
+        self.cancelSlotError = 'The proposed date is not available — reschedules can only be set for next month onward.';
+        return;
+      }
+
+      var clockMin = function (timeStr) {
+        var m = String(timeStr || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!m) return null;
+        var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+        if (ampm === 'PM' && h !== 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        return h * 60 + min;
+      };
+      var startMin = clockMin(self.cancelSlotForm.proposedTime);
+      var endMin = clockMin(self.cancelSlotForm.proposedEndTime);
+      if (startMin == null || endMin == null) {
+        self.cancelSlotError = 'Please enter times in the format 04:00 PM.';
+        return;
+      }
+      if (endMin <= startMin) {
+        self.cancelSlotError = 'The end time must be after the start time.';
+        return;
+      }
+
+      body = {
+        proposedDate: proposedDateStr,
+        proposedTime: self.cancelSlotForm.proposedTime,
+        proposedEndTime: self.cancelSlotForm.proposedEndTime
+      };
+    }
+
+    self.cancelSlotBusy = true;
+    TutorService.deleteSlot(self.tutor.id, slot.id, body).then(function () {
+      self.cancelSlotBusy = false;
+      self.cancelSlotModal = null;
+      TutorService.getByUser(user.userId).then(function (res) {
+        self.tutor = res.data;
+        rebuildSetupClassModesList();
+      });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    }).catch(function (err) {
+      self.cancelSlotBusy = false;
+      self.cancelSlotError = (err.data && err.data.message) ? err.data.message : 'Failed to cancel. Please try again.';
+    });
+  };
+
+  // ── Setup Class (tutor-preset slots, Flow B) ──────────────────────────
+  self.setupClassOpen = false;
+  self.setupClassSaving = false;
+  self.setupClassError = '';
+  self.setupClassForm = {
+    mode: '', subject: '', level: '', country: '',
+    classSize: 'one-to-one', maxStudents: 1,
+    pricePerLesson: 0,
+    syllabusTopicIds: []   // selected topic IDs (max 6)
+  };
+
+  self.syllabusTopics       = [];   // available topics loaded from API
+  self.syllabusSearch       = '';   // autocomplete filter text
+  self.syllabusDropdownOpen = false;
+  self.setupClassSlots = {}; // { "YYYY-MM-DD": ["09:00 AM", ...], ... }
+
+  // Grid rows are 30-minute slots (8:00 AM – 9:30 PM) — each row IS an exact,
+  // directly-selectable start time, expressed as total minutes since midnight.
+  self.setupClassGridSlots = [];
+  for (var _gm = 8 * 60; _gm <= 21 * 60 + 30; _gm += 30) self.setupClassGridSlots.push(_gm);
+
+  self.setupClassGridSlotLabel = function (totalMin) {
+    return clockFromMinutes(totalMin);
+  };
+
+  function clockFromMinutes(totalMin) {
+    var t = ((totalMin % (24 * 60)) + 24 * 60) % (24 * 60);
+    var h = Math.floor(t / 60);
+    var m = t % 60;
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
+  }
+
+  self.setupClassSelectedDates = function () {
+    return self.selectedCalDays.slice().sort(function (a, b) { return a - b; }).map(calDayStr);
+  };
+
+  self.setupClassSelectedDatesLabel = function () {
+    var days = self.selectedCalDays.slice().sort(function (a, b) { return a - b; });
+    if (!days.length) return '';
+    return days.join(', ') + ' · ' + self.calYear;
+  };
+
+  // Setup Class needs at least one registered offering + teaching mode to
+  // publish against — without either, the Mode/Subject dropdowns would just be
+  // empty. Whether that's blocking (and what message explains it) also depends
+  // on verification status — see the Setup Class modal template.
+  self.tutorHasOfferings = function () {
+    return !!(self.tutor && self.tutor.offerings && self.tutor.offerings.length &&
+      self.tutor.modes && self.tutor.modes.length);
+  };
+
+  self.openSetupClass = function () {
+    if (!self.selectedCalDays.length || !self.tutor) return;
+    self.setupClassSlots = {};
+    self.setupClassSelectedDates().forEach(function (key) { self.setupClassSlots[key] = []; });
+    // Mode must be picked first — Subject stays blank/hidden until then (see
+    // onModeChange), so nothing is pre-selected here.
+    rebuildSetupClassModesList();
+    self.setupClassForm.mode = '';
+    self.setupClassForm.subject = '';
+    self.setupClassForm.level = '';
+    self.setupClassForm.country = '';
+    self.setupClassUniqueSubjectsList = [];
+    self.setupClassForm.classSize = 'one-to-one';
+    self.setupClassForm.maxStudents = 1;
+    self.setupClassForm.syllabusTopicIds = [];
+    self.syllabusTopics = [];
+    self.syllabusSearch = '';
+    self.syllabusDropdownOpen = false;
+    self.setupClassError = '';
+    self._slotDrag = null;
+    self.setupClassOpen = true;
+  };
+
+  self.closeSetupClass = function () { self.setupClassOpen = false; self._slotDrag = null; };
+
+  // Grid rows carry their own exact time (30-min resolution) — a direct conversion,
+  // no separate start-time spinner needed (removed along with the now-unused
+  // Duration dropdown and time-summary pill; each class's time now comes entirely
+  // from which grid cell(s) were clicked/dragged, see makeSlotRange below).
+  self.setupClassTimeAt = function (totalMin) {
+    return clockFromMinutes(totalMin);
+  };
+
+  // setupClassSlots[dateStr] holds an array of *ranges* — { startMin, endMin, start, end } —
+  // not individual 30-min entries. Each range is ONE class: dragging across several grid
+  // cells combines them into a single range spanning the first cell's start time to the
+  // last cell's end time, rather than creating one class per cell.
+  function makeSlotRange(startMin, endMin) {
+    return { startMin: startMin, endMin: endMin, start: clockFromMinutes(startMin), end: clockFromMinutes(endMin) };
+  }
+
+  self.isSetupSlotSelected = function (dateStr, totalMin) {
+    return (self.setupClassSlots[dateStr] || []).some(function (r) {
+      return totalMin >= r.startMin && totalMin < r.endMin;
+    });
+  };
+
+  // The combined "start – end" label is only shown on the first cell of a range,
+  // since the cells after it belong to the same class, not separate ones.
+  self.setupSlotRangeLabel = function (dateStr, totalMin) {
+    var r = (self.setupClassSlots[dateStr] || []).find(function (r) { return r.startMin === totalMin; });
+    return r ? (r.start + ' – ' + r.end) : '';
+  };
+
+  function parseTimeRangeMinutesForBooked(timeStr) {
+    var matches = String(timeStr || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi);
+    if (!matches || matches.length < 2) return null;
+    function toMin(t) {
+      var mm = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      var hh = parseInt(mm[1], 10) % 12, min = parseInt(mm[2], 10);
+      if (mm[3].toUpperCase() === 'PM') hh += 12;
+      return hh * 60 + min;
+    }
+    var start = toMin(matches[0]), end = toMin(matches[1]);
+    if (end <= start) end += 24 * 60;
+    return { start: start, end: end };
+  }
+
+  // Marks a grid cell as unavailable if it overlaps EITHER an existing confirmed/
+  // countered booking OR a preset slot this tutor has already published (whether
+  // booked or not) — both count as "an existing class", so neither can be
+  // double-booked over from this grid.
+  self.isSetupSlotBooked = function (dateStr, totalMin) {
+    if (!self.tutor) return false;
+    var slotStart = totalMin, slotEnd = totalMin + 30;
+
+    var overlapsBooking = self.bookings.some(function (b) {
+      if (b.tutorId !== self.tutor.id || (b.status !== 'confirmed' && b.status !== 'countered')) return false;
+      return (b.classes || []).some(function (c) {
+        if (c.date !== dateStr) return false;
+        var range = parseTimeRangeMinutesForBooked(c.time);
+        return range && slotStart < range.end && range.start < slotEnd;
+      });
+    });
+    if (overlapsBooking) return true;
+
+    return (self.tutor.timetable || []).some(function (slot) {
+      if (!slot.mode || slot.day !== dateStr) return false;
+      var range = parseTimeRangeMinutesForBooked(slot.time + ' - ' + (slot.endTime || slot.time));
+      return range && slotStart < range.end && range.start < slotEnd;
+    });
+  };
+
+  self.toggleSetupSlot = function (dateStr, totalMin) {
+    if (self.isSetupSlotBooked(dateStr, totalMin)) return;
+    var ranges = self.setupClassSlots[dateStr] || [];
+    var idx = ranges.findIndex(function (r) { return totalMin >= r.startMin && totalMin < r.endMin; });
+    if (idx > -1) ranges.splice(idx, 1);
+    else ranges.push(makeSlotRange(totalMin, totalMin + 30));
+    self.setupClassSlots[dateStr] = ranges;
+  };
+
+  // ── Drag-to-select a time range on the Setup Class grid ──────────────
+  // A plain click (mousedown+mouseup on the same cell, no drag) still toggles
+  // just that one cell. Dragging across multiple cells in the same date column
+  // combines the whole span into ONE class — first cell's start time to last
+  // cell's end time — rather than one class per cell. The drag can't extend
+  // through an already-occupied cell (existing booking or published slot), so a
+  // combined range never silently overlaps something that's already there. Drag
+  // is confined to a single date column; moving into a different column is ignored.
+  self._slotDrag = null;
+
+  function slotRangeHasOccupiedCell(dateStr, loMin, hiMinExclusive) {
+    for (var m = loMin; m < hiMinExclusive; m += 30) {
+      if (self.isSetupSlotBooked(dateStr, m)) return true;
+    }
+    return false;
+  }
+
+  self.startSlotDrag = function (dateStr, totalMin, $event) {
+    if ($event) $event.preventDefault();
+    self._slotDrag = { dateStr: dateStr, startSlot: totalMin, endSlot: totalMin };
+  };
+
+  self.dragOverSlot = function (dateStr, totalMin) {
+    if (!self._slotDrag || dateStr !== self._slotDrag.dateStr) return;
+    var lo = Math.min(self._slotDrag.startSlot, totalMin);
+    var hi = Math.max(self._slotDrag.startSlot, totalMin);
+    if (slotRangeHasOccupiedCell(dateStr, lo, hi + 30)) return; // don't drag through an occupied cell
+    self._slotDrag.endSlot = totalMin;
+  };
+
+  self.isSetupSlotDragPreview = function (dateStr, totalMin) {
+    if (!self._slotDrag || dateStr !== self._slotDrag.dateStr) return false;
+    var lo = Math.min(self._slotDrag.startSlot, self._slotDrag.endSlot);
+    var hi = Math.max(self._slotDrag.startSlot, self._slotDrag.endSlot);
+    return totalMin >= lo && totalMin <= hi;
+  };
+
+  self.endSlotDrag = function () {
+    if (!self._slotDrag) return;
+    var d = self._slotDrag;
+    self._slotDrag = null;
+    var lo = Math.min(d.startSlot, d.endSlot);
+    var hi = Math.max(d.startSlot, d.endSlot) + 30; // exclusive upper bound, covers the last cell's full 30 min
+
+    if (lo === hi - 30) {
+      // Plain click, no real drag — toggle behaviour (existing single-cell semantics)
+      self.toggleSetupSlot(d.dateStr, lo);
+      return;
+    }
+    // Combine into one range spanning the whole drag. Any existing ranges the new
+    // span touches are replaced by it (redefining that stretch of time), rather
+    // than kept alongside it — avoids overlapping classes on the same date.
+    var ranges = (self.setupClassSlots[d.dateStr] || []).filter(function (r) {
+      return r.endMin <= lo || r.startMin >= hi;
+    });
+    ranges.push(makeSlotRange(lo, hi));
+    self.setupClassSlots[d.dateStr] = ranges;
+  };
+
+  self.setupClassTotalSlots = function () {
+    return Object.keys(self.setupClassSlots).reduce(function (sum, k) {
+      return sum + (self.setupClassSlots[k] || []).length;
+    }, 0);
+  };
+
+  self.onClassSizeChange = function () {
+    if (self.setupClassForm.classSize === 'one-to-one') self.setupClassForm.maxStudents = 1;
+    else if (!self.setupClassForm.maxStudents || self.setupClassForm.maxStudents < 2) self.setupClassForm.maxStudents = 2;
+  };
+
+  // Rebuilt once (not called from ng-repeat directly) — a function called from the
+  // view that allocates new objects every digest never stabilizes: ng-repeat tracks
+  // items by identity by default, so a fresh array/objects every digest tears down
+  // and rebuilds every <option>, which was resetting the Subject <select> back to
+  // blank on every digest (same trap computeContactableParents() above avoids).
+  self.setupClassUniqueSubjectsList = [];
+
+  // Mode is picked FIRST — Subject only becomes visible/selectable once a mode is
+  // chosen, and only shows subject+level combos actually offered under that mode
+  // (sourced from the tutor's real offerings, not the separate "Teaching Modes
+  // Offered" drag-pool, which can drift out of sync — see the Home Visit gap).
+  function rebuildSetupClassSubjectsForMode() {
+    if (!self.tutor || !self.tutor.offerings || !self.setupClassForm.mode) {
+      self.setupClassUniqueSubjectsList = [];
+      return;
+    }
+    var seen = {}, out = [];
+    self.tutor.offerings.forEach(function (o) {
+      if (o.mode !== self.setupClassForm.mode) return;
+      var key = o.subject + ' (' + o.level + ')';
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({ key: key, subject: o.subject, level: o.level, country: o.country });
+    });
+    self.setupClassUniqueSubjectsList = out;
+  }
+
+  // All distinct modes across every offering — unfiltered, shown first.
+  self.setupClassModesList = [];
+
+  function rebuildSetupClassModesList() {
+    if (!self.tutor || !self.tutor.offerings) { self.setupClassModesList = []; return; }
+    var seen = {}, out = [];
+    self.tutor.offerings.forEach(function (o) {
+      if (seen[o.mode]) return;
+      seen[o.mode] = true;
+      out.push(o.mode);
+    });
+    self.setupClassModesList = out;
+  }
+
+  self.onModeChange = function () {
+    self.setupClassForm.subject = '';
+    self.setupClassForm.level = '';
+    self.setupClassForm.country = '';
+    self.setupClassForm.syllabusTopicIds = [];
+    self.syllabusTopics = [];
+    self.syllabusSearch = '';
+    rebuildSetupClassSubjectsForMode();
+  };
+
+  self.onSubjectChange = function () {
+    var match = self.setupClassUniqueSubjectsList.find(function (o) { return o.subject === self.setupClassForm.subject; });
+    if (match) { self.setupClassForm.level = match.level; self.setupClassForm.country = match.country; }
+
+    // Reset and load syllabus topics for the now-resolved country+subject+level
+    self.setupClassForm.syllabusTopicIds = [];
+    self.syllabusTopics = [];
+    self.syllabusSearch = '';
+
+    if (match) {
+      TutorService.getSyllabusTopics(match.country, self.setupClassForm.subject, match.level).then(function (res) {
+        self.syllabusTopics = res.data || [];
+      });
+    }
+  };
+
+  // ── Syllabus topic dropdown helpers ───────────────────────────────
+  // Filtered topics based on autocomplete search
+  self.filteredSyllabusTopics = function () {
+    var q = (self.syllabusSearch || '').toLowerCase();
+    return self.syllabusTopics.filter(function (t) {
+      return !q || t.topic.toLowerCase().indexOf(q) >= 0;
+    });
+  };
+
+  // Toggle a topic selection
+  self.toggleSyllabusTopic = function (topicId) {
+    var idx = self.setupClassForm.syllabusTopicIds.indexOf(topicId);
+    if (idx > -1) {
+      self.setupClassForm.syllabusTopicIds.splice(idx, 1);
+    } else {
+      if (self.setupClassForm.syllabusTopicIds.length >= 6) return;
+      self.setupClassForm.syllabusTopicIds.push(topicId);
+    }
+  };
+
+  self.isSyllabusTopicSelected = function (topicId) {
+    return self.setupClassForm.syllabusTopicIds.indexOf(topicId) > -1;
+  };
+
+  self.syllabusSelectedCount = function () {
+    return self.setupClassForm.syllabusTopicIds.length;
+  };
+
+  // Topic name by ID
+  self.syllabusTopicName = function (topicId) {
+    var t = self.syllabusTopics.find(function (t) { return t.id === topicId; });
+    return t ? t.topic : '';
+  };
+
+  // Remove a selected topic chip
+  self.removeSyllabusTopic = function (topicId) {
+    var idx = self.setupClassForm.syllabusTopicIds.indexOf(topicId);
+    if (idx > -1) self.setupClassForm.syllabusTopicIds.splice(idx, 1);
+  };
+
+  self.toggleSyllabusDropdown = function () {
+    self.syllabusDropdownOpen = !self.syllabusDropdownOpen;
+    if (self.syllabusDropdownOpen) self.syllabusSearch = '';
+  };
+
+  self.closeSyllabusDropdown = function () {
+    self.syllabusDropdownOpen = false;
+  };
+
+  // Mirrors the validation checks in submitSetupClass below — used to drive the
+  // Setup Class modal's submit button disabled state.
+  self.setupClassFormValid = function () {
+    var f = self.setupClassForm;
+    var hasSlots = self.setupClassTotalSlots() > 0;
+    return hasSlots
+      && f.mode
+      && f.subject
+      && f.classSize
+      && f.maxStudents > 0
+      && f.pricePerLesson > 0;
+  };
+
+  self.submitSetupClass = function () {
+    self.setupClassError = '';
+    if (self.setupClassTotalSlots() === 0) { self.setupClassError = 'Please select at least one time slot.'; return; }
+    if (!self.setupClassForm.mode) { self.setupClassError = 'Please select a teaching mode.'; return; }
+    if (!self.setupClassForm.subject) { self.setupClassError = 'Please select a subject.'; return; }
+    if (!self.setupClassForm.pricePerLesson || self.setupClassForm.pricePerLesson <= 0) {
+      self.setupClassError = 'Please enter a price per lesson.';
+      return;
+    }
+
+    // Each range already carries its own accurate start/end (first cell's start
+    // through last cell's end for a dragged/combined class), so its own span is
+    // sent as-is rather than derived from the form's single duration dropdown —
+    // that duration only applies to a plain single-cell click/selection.
+    var slots = [];
+    var earlyDate = null;
+    Object.keys(self.setupClassSlots).forEach(function (dateStr) {
+      if (!earlyDate && isBeforeNextMonth(dateStr)) earlyDate = dateStr;
+      (self.setupClassSlots[dateStr] || []).forEach(function (r) {
+        slots.push({ date: dateStr, startTime: r.start, endTime: r.end, durationMinutes: r.endMin - r.startMin });
+      });
+    });
+    if (earlyDate) {
+      self.setupClassError = earlyDate + ' is not available — classes can only be set up for next month onward.';
+      return;
+    }
+
+    self.setupClassSaving = true;
+    TutorService.setupClass(self.tutor.id, {
+      slots: slots,
+      mode: self.setupClassForm.mode,
+      subject: self.setupClassForm.subject,
+      level: self.setupClassForm.level,
+      country: self.setupClassForm.country,
+      classSize: self.setupClassForm.classSize,
+      maxStudents: self.setupClassForm.maxStudents,
+      pricePerLesson: self.setupClassForm.pricePerLesson,
+      syllabusTopicIds: self.setupClassForm.syllabusTopicIds
+    }).then(function () {
+      self.setupClassSaving = false;
+      self.setupClassOpen = false;
+      self.selectedCalDays = [];
+      TutorService.getByUser(user.userId).then(function (res) {
+        self.tutor = res.data;
+        rebuildSetupClassModesList();
+      });
+    }).catch(function (err) {
+      self.setupClassSaving = false;
+      self.setupClassError = (err.data && err.data.message) ? err.data.message : 'Failed to save. Please try again.';
+    });
+  };
+
   self.getInvoice = function (bookingId) {
     return self.invoices.find(function (i) { return i.bookingId === bookingId; });
   };
@@ -460,7 +1362,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   // Actions
   self.confirmBooking = function (booking) {
     BookingService.updateStatus(booking.id, 'confirmed', null).then(function () {
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     });
   };
@@ -495,6 +1397,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   };
 
   self.onCounterStartTimeChange = function (c) {
+    c.proposedStartTime = normalizeTimeToAmPm(c.proposedStartTime);
     var end = self.counterEndTime(c);
     c.proposedTime = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
   };
@@ -504,6 +1407,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   };
 
   self.onTutorRescheduleStartTimeChange = function (c) {
+    c.proposedStartTime = normalizeTimeToAmPm(c.proposedStartTime);
     var end = self.rescheduleEndTime(c);
     c.proposedTime = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
   };
@@ -519,10 +1423,16 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     self.counterSuccess = false;
   };
 
+  self.hasProfaneCounterMessage = function () {
+    return ProfanityFilterService.containsProfanity(self.counterForm.message);
+  };
+
   self.submitCounter = function () {
     if (!self.counterBooking) return;
+    if (self.hasInvalidCounter()) return;
     if (self.hasTooSoonCounter()) return;
     if (self.hasDuplicateCounter()) return;
+    if (self.hasProfaneCounterMessage()) return;
     BookingService.updateStatus(self.counterBooking.id, 'countered', {
       message: self.counterForm.message,
       classes: self.counterForm.classes.map(function (c) {
@@ -535,7 +1445,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     }).then(function () {
       self.counterSuccess = true;
       self.counterBooking = null;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       $timeout(function () {
         self.counterSuccess = false;
       }, 2000);
@@ -612,6 +1522,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
 
   self.submitTutorReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasInvalidTutorReschedule()) return;
     if (self.hasTooSoonTutorReschedule()) return;
     if (self.hasDurationMismatchTutorReschedule()) return;
     if (self.hasDuplicateTutorReschedule()) return;
@@ -628,7 +1539,7 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
       self.rescheduleSuccess = true;
       self.blockConflicts = [];
       self.cancelTutorReschedule();
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       $timeout(function () {
         self.rescheduleSuccess = false;
       }, 2500);
@@ -639,89 +1550,53 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
   self.acceptCounterProposal = function (booking) {
     BookingService.updateStatus(booking.id, 'confirmed', null).then(function () {
       self.counterAcceptSuccess = true;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       $timeout(function () {
         self.counterAcceptSuccess = false;
       }, 2500);
     });
   };
 
-  self.startReport = function (booking) {
-    self.reportBooking = booking;
-    self.reportForm = { covered: '', performance: '', homework: '' };
-    self.reportSuccess = false;
-  };
-
-  self.submitReport = function () {
-    if (!self.reportBooking) return;
-    BookingService.submitLessonReport(self.reportBooking.id, self.reportForm).then(function () {
-      self.reportSuccess = true;
-      self.reportBooking = null;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
-      $timeout(function () {
-        self.reportSuccess = false;
-      }, 2000);
-    });
-  };
-
-  self.cancelReport = function () { self.reportBooking = null; };
-
-  self.startEdit = function (booking) {
-    self.editBooking = booking;
-    self.editForm = {
-      covered: booking.lessonReport.covered,
-      performance: booking.lessonReport.performance,
-      homework: booking.lessonReport.homework,
-      changesMade: ''
-    };
-    self.editSuccess = false;
-  };
-
-  self.submitEdit = function () {
-    if (!self.editBooking) return;
-    BookingService.editLessonReport(self.editBooking.id, self.editForm).then(function () {
-      self.editSuccess = true;
-      self.editBooking = null;
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
-      $timeout(function () {
-        self.editSuccess = false;
-      }, 2000);
-    });
-  };
-
-  self.cancelEdit = function () { self.editBooking = null; };
-
   // Edit profile offerings
   self.addOffering = function () {
+    self.offeringLockedError = '';
+    // Offerings can be added once verification has been submitted (pending
+    // review) or fully approved — only blocked pre-submission.
+    if (self.tutor.verificationStatus === 'not_submitted') {
+      self.offeringLockedError = 'Submit your profile verification before adding subject offerings.';
+      return;
+    }
     var opt = self.newOffering.selectedOption;
-    if (!self.newOffering.country || !opt || !self.newOffering.mode || !self.newOffering.qualification) return;
-    self.profileForm.offerings.push({
-      country: self.newOffering.country,
-      subject: opt.subject,
-      level: opt.level,
-      mode: self.newOffering.mode,
-      qualification: self.newOffering.qualification,
-      price: parseFloat(self.newOffering.price) || 0
+    if (!self.newOffering.country) { self.offeringLockedError = 'Please select a country.'; return; }
+    if (!opt) { self.offeringLockedError = 'Please select a subject.'; return; }
+    if (!self.modesRight.length) { self.offeringLockedError = 'Please drag at least one teaching mode into "Offered".'; return; }
+    // One offering combo per mode currently in "Offered" — the offering builder no
+    // longer asks for mode separately, it always matches whatever's selected above.
+    // Offerings are country+subject+level+mode only — duplicates (same combo
+    // already offered) are rejected with an explicit error instead of silently
+    // skipped, so the tutor knows why nothing new appeared.
+    var duplicateModes = [];
+    self.modesRight.forEach(function (m) {
+      var exists = self.profileForm.offerings.some(function (o) {
+        return o.country === self.newOffering.country && o.subject === opt.subject &&
+          o.level === opt.level && o.mode === m.mode;
+      });
+      if (exists) { duplicateModes.push(m.mode); return; }
+      self.profileForm.offerings.push({
+        country: self.newOffering.country,
+        subject: opt.subject,
+        level: opt.level,
+        mode: m.mode
+      });
     });
-    self.newOffering = { country: self.newOffering.country, selectedOption: null, mode: '', qualification: '', price: null };
+    if (duplicateModes.length) {
+      self.offeringLockedError = 'You already offer ' + opt.subject + ' (' + opt.level + ') for: ' + duplicateModes.join(', ') + '.';
+    }
+    self.newOffering = { country: self.newOffering.country, selectedOption: null };
   };
 
   self.removeOffering = function (index) {
     self.profileForm.offerings.splice(index, 1);
-  };
-
-  self.onFileSelect = function (element) {
-    var file = element.files[0];
-    if (!file) return;
-    self.uploading = true;
-    self.profileError = '';
-    TutorService.uploadImage(file).then(function (res) {
-      self.profileForm.imageUrl = res.data.url;
-      self.uploading = false;
-    }, function () {
-      self.profileError = 'Image upload failed. Please try again.';
-      self.uploading = false;
-    });
   };
 
   self.toggleOnlineStatus = function () {
@@ -735,18 +1610,30 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     if (!self.tutor) return;
     self.profileSuccess = false;
     self.profileError = '';
-    if (!self.profileForm.imageUrl) {
-      self.profileError = 'Please upload a profile photo before saving.';
+    self.modesError = '';
+    if (!self.modesRight.length) {
+      self.modesError = 'Please select at least one teaching mode.';
       return;
     }
+    var bioProfanityError = ProfanityFilterService.validate(self.profileForm.bio);
+    if (bioProfanityError) {
+      self.profileError = bioProfanityError;
+      return;
+    }
+    if (!confirm('Save changes to your profile?')) return;
+    // imageUrl is deliberately not sent — the public photo is only set once a
+    // "profile_photo" verification document is approved by admin (see Part 1).
     var payload = {
-      imageUrl: self.profileForm.imageUrl,
       bio: self.profileForm.bio,
       experienceYears: self.profileForm.experienceYears,
       offerings: self.profileForm.offerings
     };
-    TutorService.update(self.tutor.id, payload).then(function (res) {
+    var modes = self.modesRight.map(function (m) { return m.mode; });
+    TutorService.update(self.tutor.id, payload).then(function () {
+      return TutorService.updateModes(self.tutor.id, modes);
+    }).then(function (res) {
       self.tutor = res.data;
+      rebuildSetupClassModesList();
       self.profileSuccess = true;
       $timeout(function () { self.profileSuccess = false; }, 3000);
     }, function () {
@@ -754,21 +1641,379 @@ function ($location, $timeout, $interval, $rootScope, AuthService, TutorService,
     });
   };
 
+  // ── Verification helpers ──────────────────────────────────────────
+  self.verif = {
+    idType: 'NRIC',
+    idNumber: '',
+    introVideoLink: '',
+    uploadingMap: {},   // { documentType: true/false }
+    errorMap: {}        // { documentType: 'error message' }
+  };
+
+  // Shape-only validation (no checksum) — mirrors TutorsController.SaveDocument's
+  // server-side patterns. Passport intentionally has no pattern: admin relies on
+  // the identity photo vs. typed value during review instead.
+  var ID_NUMBER_PATTERNS = {
+    NRIC: { regex: /^[ST]\d{7}[A-Z]$/, example: 'S1234567A' },
+    WorkPassSG: { regex: /^[FGM]\d{7}[A-Z]$/, example: 'F1234567N' },
+    MyKad: { regex: /^\d{12}$/, example: '990101011234' }
+  };
+
+  // Returns an error message if vm.verif.idNumber doesn't match the shape expected
+  // for vm.verif.idType, or '' if it's fine (including Passport, which has no format).
+  self.idNumberFormatError = function () {
+    var spec = ID_NUMBER_PATTERNS[self.verif.idType];
+    if (!spec) return '';
+    var value = (self.verif.idNumber || '').trim().toUpperCase().replace(/-/g, '');
+    if (!value) return '';
+    return spec.regex.test(value) ? '' : ('Doesn\'t match the expected ' + self.verif.idType + ' format, e.g. ' + spec.example);
+  };
+
+  // A rejected doc that's been re-uploaded gets a NEW row (see SaveDocument's
+  // dual-row handling) rather than being overwritten — the old rejected row stays
+  // in the API response (admin still needs to see it) but is "superseded" from
+  // the tutor's own point of view, so it's filtered out of what they see here.
+  function isSuperseded(doc) {
+    return (self.tutor.documents || []).some(function (d) { return d.replacesDocumentId === doc.id; });
+  }
+
+  // Part 1 (documents) locks once verification is submitted — only a rejected
+  // field (with no replacement uploaded yet) stays editable, for the fix-and-
+  // resubmit loop. See TutorsController.SaveDocument for the matching backend gate.
+  self.isVerifLocked = function () {
+    return !!self.tutor && self.tutor.verificationStatus === 'pending';
+  };
+
+  // Whether a brand-new (non-replacement) upload can start for a slot — false
+  // while locked, since new/blank slots can't be touched mid-review either.
+  self.canUploadNew = function () {
+    return !self.isVerifLocked();
+  };
+
+  // Single-upload types (identity_photo, intro_video) — one doc at most.
+  self.getDocSingle = function (type) {
+    return (self.tutor.documents || []).find(function (d) { return d.documentType === type && !isSuperseded(d); });
+  };
+
+  // Multi-upload types (o_level, a_level, degree, postgrad, nie_cert,
+  // specialist_cert) — up to 3, sorted for stable display order.
+  self.getDocs = function (type) {
+    return (self.tutor.documents || [])
+      .filter(function (d) { return d.documentType === type && !isSuperseded(d); })
+      .sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+  };
+
+  self.getDocCount = function (type) {
+    return self.getDocs(type).length;
+  };
+
+  self.isDocTypeFull = function (type) {
+    return self.getDocCount(type) >= 3;
+  };
+
+  self.getSpecialistCerts = function () {
+    return self.getDocs('specialist_cert');
+  };
+
+  // Alias — kept for any template reference still using the old name.
+  self.getDoc = self.getDocSingle;
+
+  self.formatFileSize = function (bytes) {
+    if (!bytes) return '';
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return Math.round(bytes / 1024) + ' KB';
+  };
+
+  // Returns true if the tutor has at least one rejected document
+  // Excludes superseded docs — once the tutor re-uploads a fix, the old rejected
+  // row is superseded (see isSuperseded) and shouldn't keep showing a "please
+  // re-upload" banner for something already fixed and awaiting admin.
+  self.hasRejectedDoc = function () {
+    return (self.tutor.documents || []).some(function (d) { return d.status === 'rejected' && !isSuperseded(d); });
+  };
+
+  // Returns the first still-unfixed rejected doc's adminNote (for the banner)
+  self.rejectedDocNote = function () {
+    var d = (self.tutor.documents || []).find(function (d) { return d.status === 'rejected' && !isSuperseded(d); });
+    return d ? { type: d.documentType, note: d.adminNote } : null;
+  };
+
+  var ACADEMIC_LEVEL_TYPES = ['o_level', 'a_level', 'degree', 'postgrad'];
+
+  // Static, not rebuilt per digest — ng-repeat over a fresh array literal in the
+  // template tears down and rebuilds every row each cycle (same trap documented
+  // on rebuildSetupClassSubjectsForMode/computeContactableParents above).
+  self.academicLevels = [
+    { type: 'o_level', label: 'O-Level / SPM' },
+    { type: 'a_level', label: 'A-Level / STPM / Diploma' },
+    { type: 'degree', label: "Bachelor's degree" },
+    { type: 'postgrad', label: "Master's / PhD" }
+  ];
+
+  // Count of mandatory slots filled: identity photo, ID number, profile photo,
+  // and at least one academic level — each reviewed independently by admin.
+  self.mandatoryUploadedCount = function () {
+    var docs = self.tutor.documents || [];
+    var count = 0;
+    if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; })) count++;
+    // ID number has no separate save step anymore — a typed, not-yet-saved value
+    // counts too, since "Submit for verification" saves it as part of submitting.
+    if ((self.verif.idNumber || '').trim() || docs.some(function (d) { return d.documentType === 'identity_id' && d.idNumber; })) count++;
+    if (docs.some(function (d) { return d.documentType === 'profile_photo' && d.fileUrl; })) count++;
+    if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })) count++;
+    return count;
+  };
+
+  self.mandatoryTotal = 4;
+
+  self.verifProgress = function () {
+    return Math.round((self.mandatoryUploadedCount() / self.mandatoryTotal) * 100) + '%';
+  };
+
+  self.canSubmitVerification = function () {
+    if (self.mandatoryUploadedCount() < self.mandatoryTotal) return false;
+    if (self.idNumberFormatError()) return false;
+    // Disabled while under review, unless every rejected document already has a
+    // fresh replacement ready — i.e. first-time setup, or a genuine fix-and-
+    // resubmit round, not "just sitting under review with nothing changed yet."
+    if (self.tutor.verificationStatus === 'pending' && !self.canResubmitAfterRejection()) return false;
+    return true;
+  };
+
+  // Refreshes vm.tutor after any verification mutation. Deliberately uses
+  // getByUser (not getById/TutorService.getById) — GetById only returns tutors
+  // that are IsVerified && IsOnline, so it 404s for exactly the tutors this
+  // feature targets (mid-verification, not yet approved).
+  self._refreshTutor = function () {
+    return TutorService.getByUser(user.userId).then(function (res) {
+      self.tutor = res.data;
+      // Re-sync idType/idNumber from the saved identity_id doc (reviewed
+      // independently from the photo — see SaveDocument), so the form still
+      // reflects what's actually on file after a reload/refresh rather than
+      // resetting to the hardcoded 'NRIC'/'' defaults.
+      var idDoc = self.getDocSingle('identity_id');
+      if (idDoc && idDoc.idType) {
+        self.verif.idType = idDoc.idType;
+        self.verif.idNumber = idDoc.idNumber || '';
+      }
+    });
+  };
+
+  // ID type/number is reviewed independently from the identity photo — its own
+  // document row, own status, own reject/re-fix loop. No separate save button —
+  // the typed value is saved as part of clicking "Submit for verification" (see
+  // submitVerification), same as saveIntroVideoLink's link-only pattern otherwise.
+  self.canEditIdNumber = function () {
+    if (!self.isVerifLocked()) return true;
+    var d = self.getDocSingle('identity_id');
+    return !!d && d.status === 'rejected';
+  };
+
+  // Same lock/unlock rule as canEditIdNumber — intro_video is link-only too, so
+  // a rejected link needs the same "type a new value, no separate file input"
+  // fix path rather than a re-upload button.
+  self.canEditIntroVideo = function () {
+    if (!self.isVerifLocked()) return true;
+    var d = self.getDocSingle('intro_video');
+    return !!d && d.status === 'rejected';
+  };
+
+  self.uploadVerifDoc = function (file, docType) {
+    if (!file) return;
+    self.verif.uploadingMap[docType] = true;
+    self.verif.errorMap[docType] = null;
+
+    TutorService.uploadDocument(file, docType).then(function (res) {
+      return TutorService.saveDocument(self.tutor.id, {
+        documentType: docType,
+        fileUrl: res.data.url,
+        fileName: res.data.fileName,
+        fileSizeBytes: res.data.fileSizeBytes
+      });
+    }).then(function () {
+      return self._refreshTutor();
+    }).catch(function (err) {
+      self.verif.errorMap[docType] = err.data && err.data.message
+        ? err.data.message : 'Upload failed. Please try again.';
+    }).finally(function () {
+      self.verif.uploadingMap[docType] = false;
+    });
+  };
+
+  // Replaces a rejected document — does NOT touch the old row (it stays exactly
+  // as rejected, still visible to admin as "current" until this is resolved).
+  // The new upload is a separate row, linked via replacesDocumentId. See
+  // TutorsController.SaveDocument's dual-row re-upload handling.
+  self.reuploadVerifDoc = function (file, docType, docId) {
+    if (!file || !docId) return;
+    self.verif.uploadingMap[docType] = true;
+    self.verif.errorMap[docType] = null;
+
+    TutorService.uploadDocument(file, docType)
+      .then(function (res) {
+        return TutorService.saveDocument(self.tutor.id, {
+          documentType: docType,
+          fileUrl: res.data.url,
+          fileName: res.data.fileName,
+          fileSizeBytes: res.data.fileSizeBytes,
+          replacesDocumentId: parseInt(docId)
+        });
+      })
+      .then(function () {
+        return self._refreshTutor();
+      })
+      .catch(function (err) {
+        self.verif.errorMap[docType] = err.data && err.data.message
+          ? err.data.message : 'Re-upload failed. Please try again.';
+      })
+      .finally(function () {
+        self.verif.uploadingMap[docType] = false;
+      });
+  };
+
+  // Saves an intro video link (no file upload)
+  self.saveIntroVideoLink = function () {
+    if (!self.verif.introVideoLink) return;
+    TutorService.saveDocument(self.tutor.id, {
+      documentType: 'intro_video',
+      externalUrl: self.verif.introVideoLink
+    }).then(function () {
+      self.verif.introVideoLink = '';
+      return self._refreshTutor();
+    }).catch(function () {
+      self.verif.errorMap['intro_video'] = 'Failed to save link.';
+    });
+  };
+
+  self.removeVerifDoc = function (docId) {
+    if (self.isVerifLocked()) return;
+    TutorService.removeDocument(self.tutor.id, docId)
+      .then(function () { return self._refreshTutor(); })
+      .catch(function () { /* Non-fatal */ });
+  };
+
+  self.verifSubmitSuccess = false;
+  self.verifSubmitError = '';
+
+  // True once every currently-rejected document has a fresh replacement uploaded
+  // (a new pending row pointing back at it) — i.e. genuinely ready to go back to
+  // admin, not just sitting under review with nothing changed yet.
+  self.canResubmitAfterRejection = function () {
+    var docs = self.tutor.documents || [];
+    var lastSubmittedAt = self.tutor.lastSubmittedAt ? new Date(self.tutor.lastSubmittedAt) : null;
+    var rejected = docs.filter(function (d) { return d.status === 'rejected'; });
+    if (!rejected.length) return false;
+    return rejected.every(function (d) {
+      var replacement = docs.find(function (r) { return r.replacesDocumentId === d.id; });
+      if (replacement) {
+        // A replacement that's already been submitted (uploaded before the last
+        // submit) isn't a NEW fix — it's already with admin, so it doesn't count
+        // toward re-enabling the button again.
+        if (!lastSubmittedAt) return true;
+        return new Date(replacement.uploadedAt) > lastSubmittedAt;
+      }
+      // ID number has no separate save step — a freshly typed value (about to be
+      // saved by submitVerification itself) counts as "fixed and ready" too.
+      if (d.documentType === 'identity_id' && self.canEditIdNumber() && (self.verif.idNumber || '').trim()) return true;
+      return false;
+    });
+  };
+
+  self.submitVerification = function () {
+    // Button is disabled in every case this would otherwise block (see
+    // canSubmitVerification) — nothing more to check here.
+    if (!self.canSubmitVerification()) return;
+    if (!confirm('You won\'t be able to change these documents until admin reviews them — submit for verification?')) return;
+    self.verifSubmitError = '';
+
+    var finishSubmit = function () {
+      TutorService.submitVerification(self.tutor.id).then(function () {
+        return self._refreshTutor();
+      }).then(function () {
+        self.verifSubmitSuccess = true;
+        $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
+      }).catch(function (err) {
+        self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Submission failed.';
+      });
+    };
+
+    // ID number has no separate save button — save it here as part of submitting,
+    // same as every other document was already saved individually beforehand.
+    if (self.canEditIdNumber() && (self.verif.idNumber || '').trim()) {
+      TutorService.saveDocument(self.tutor.id, {
+        documentType: 'identity_id',
+        idType: self.verif.idType,
+        idNumber: self.verif.idNumber
+      }).then(finishSubmit).catch(function (err) {
+        self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Failed to save ID number.';
+      });
+    } else {
+      finishSubmit();
+    }
+  };
+
+  // Triggers a hidden file input from a custom "Browse" button
+  self.triggerVerifUpload = function (inputId) {
+    document.getElementById(inputId).click();
+  };
+
   // Poll for booking updates (e.g. parent accepts counter proposal)
   var _pollInterval = $interval(function () {
-    if (!self.rescheduleBooking && !self.counterBooking && !self.reportBooking && !self.editBooking) {
-      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    if (!self.rescheduleBooking && !self.counterBooking) {
+      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
     }
   }, 15000);
-  $rootScope.$on('$destroy', function () { $interval.cancel(_pollInterval); });
+  // $scope (not $rootScope) — $rootScope never actually fires '$destroy' on a
+  // route change in a normal SPA lifecycle, only on full app teardown, so an
+  // interval cancelled that way would never really stop; it'd just keep
+  // multiplying (uncancelled) every time this controller is re-instantiated by
+  // navigating between tutor pages. $scope IS destroyed on route change.
+  $scope.$on('$destroy', function () { $interval.cancel(_pollInterval); });
 
-  // Chat
+  self.chatError = '';
+
   self.sendMessage = function () {
-    if (!self.chatText.trim() || !self.tutor) return;
-    ChatService.send({ tutorId: self.tutor.id, sender: 'tutor', text: self.chatText })
+    if (!self.chatText.trim() || !self.tutor || !self.activeParentUserId) return;
+    self.chatError = ProfanityFilterService.validate(self.chatText);
+    if (self.chatError) return;
+    ChatService.send({ tutorId: self.tutor.id, parentUserId: self.activeParentUserId, text: self.chatText })
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';
+        scrollChatToBottom();
+      }, function (err) {
+        self.chatError = (err.data && err.data.message) ? err.data.message : 'Failed to send. Please try again.';
       });
   };
+
+  // Auto-refresh the open conversation so a parent's reply shows up without the
+  // tutor needing to reload the page — see the matching comment in
+  // parent.controller.js. Only appends messages not already present (by id).
+  function mergeNewChatMessages(fetched) {
+    var seenIds = {};
+    self.chatMessages.forEach(function (m) { seenIds[m.id] = true; });
+    var added = false;
+    fetched.forEach(function (m) {
+      if (!seenIds[m.id]) { self.chatMessages.push(m); added = true; }
+    });
+    if (added) scrollChatToBottom();
+  }
+
+  function scrollChatToBottom() {
+    $timeout(function () {
+      var el = document.getElementById('chatMessages');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  var _chatPollInterval = $interval(function () {
+    if (!self.tutor) return;
+    self.loadUnreadCounts();
+    if (!self.activeParentUserId) return;
+    ChatService.getMessages(self.tutor.id, self.activeParentUserId).then(function (res) {
+      mergeNewChatMessages(res.data);
+      self.unreadCounts[self.activeParentUserId] = 0;
+    });
+  }, 4000);
+  $scope.$on('$destroy', function () { $interval.cancel(_chatPollInterval); });
 }]);

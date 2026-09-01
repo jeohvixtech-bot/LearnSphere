@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -52,16 +53,49 @@ public class BookingsController : ControllerBase
         for (int i = 0; i < list.Count; i++)
         {
             var r1 = ParseTimeRangeMinutes(list[i].Time);
-            if (r1 == null) continue;
+            // Can't verify this class's own time range — fail closed (treat as an
+            // overlap) rather than silently letting malformed data through unchecked.
+            if (r1 == null) return true;
             for (int j = i + 1; j < list.Count; j++)
             {
                 if (list[i].Date != list[j].Date) continue;
                 var r2 = ParseTimeRangeMinutes(list[j].Time);
-                if (r2 == null) continue;
+                if (r2 == null) return true;
                 if (r1.Value.Start < r2.Value.End && r2.Value.Start < r1.Value.End) return true;
             }
         }
         return false;
+    }
+
+    // Records the first confirmed lesson between a student and a tutor for a given
+    // country + subject + level combination — see StudentTutorFirstClass. Does NOT
+    // call SaveChangesAsync — the caller's existing SaveChangesAsync covers the
+    // insert (the unique DB constraint catches any concurrent race condition).
+    private async Task<bool> RecordFirstClassAsync(
+        int tutorId, int studentId,
+        string country, string subject, string level,
+        int bookingId)
+    {
+        var exists = await _context.StudentTutorFirstClasses.AnyAsync(f =>
+            f.TutorId   == tutorId   &&
+            f.StudentId == studentId &&
+            f.Country   == country   &&
+            f.Subject   == subject   &&
+            f.Level     == level);
+
+        if (exists) return false;
+
+        _context.StudentTutorFirstClasses.Add(new StudentTutorFirstClass
+        {
+            TutorId   = tutorId,
+            StudentId = studentId,
+            Country   = country,
+            Subject   = subject,
+            Level     = level,
+            BookingId = bookingId,
+            CreatedAt = DateTime.UtcNow
+        });
+        return true;
     }
 
     [HttpGet]
@@ -72,10 +106,10 @@ public class BookingsController : ControllerBase
 
         var query = _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
+            .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
             .AsQueryable();
 
@@ -104,7 +138,17 @@ public class BookingsController : ControllerBase
         }
         if (anyAutoCompleted) await _context.SaveChangesAsync();
 
-        return Ok(bookings.Select(MapToDto));
+        var firstClassBookingIds = await _context.StudentTutorFirstClasses
+            .Where(f => f.BookingId != null &&
+                        bookings.Select(b => b.Id).Contains(f.BookingId!.Value))
+            .Select(f => f.BookingId!.Value)
+            .ToHashSetAsync();
+
+        return Ok(bookings.Select(b => {
+            var dto = MapToDto(b);
+            dto.IsFirstClass = firstClassBookingIds.Contains(b.Id);
+            return dto;
+        }));
     }
 
     [HttpPost]
@@ -122,6 +166,9 @@ public class BookingsController : ControllerBase
 
         if (HasOverlappingClasses(dto.Classes.Select(c => (c.Date, c.Time))))
             return BadRequest(new { message = "Two or more classes in this booking overlap on the same date and time." });
+
+        var messageProfanityError = ProfanityFilter.Validate(dto.Message);
+        if (messageProfanityError != null) return BadRequest(new { message = messageProfanityError });
 
         if (dto.SlotId.HasValue)
         {
@@ -178,7 +225,133 @@ public class BookingsController : ControllerBase
 
         var created = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
+            .Include(b => b.Classes)
+            .FirstOrDefaultAsync(b => b.Id == booking.Id);
+
+        return Ok(MapToDto(created!));
+    }
+
+    // Books one or more tutor-preset class slots (Flow B) as a SINGLE booking —
+    // e.g. every occurrence of a recurring series, same as how a parent-offer
+    // booking already covers multiple sessions in one Booking. Auto-confirmed, no
+    // per-request tutor approval, since the tutor already published these slots
+    // ahead of time.
+    [HttpPost("preset")]
+    public async Task<IActionResult> BookPreset([FromBody] PresetBookingDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var slotIds = (dto.PresetSlotIds ?? new List<int>()).Distinct().ToList();
+        if (slotIds.Count == 0) return BadRequest(new { message = "No class slots specified." });
+
+        var slots = await _context.TutorTimeSlots.Where(s => slotIds.Contains(s.Id)).ToListAsync();
+        if (slots.Count != slotIds.Count)
+            return NotFound(new { message = "One or more of these classes no longer exist." });
+        if (slots.Any(s => s.Status != "Available" || s.IsFull))
+            return BadRequest(new { message = "One or more of these classes are no longer available." });
+        if (slots.Select(s => s.TutorId).Distinct().Count() > 1)
+            return BadRequest(new { message = "These classes belong to different tutors." });
+
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == dto.StudentId);
+        if (student == null || student.ParentUserId != userId) return NotFound(new { message = "Student not found." });
+        if (student.IsArchived)
+            return BadRequest(new { message = "This profile is archived and can't be booked for. Restore it first." });
+
+        var studentConfirmedClasses = await _context.Bookings
+            .Where(b => b.StudentId == dto.StudentId && b.Status == "confirmed")
+            .SelectMany(b => b.Classes)
+            .ToListAsync();
+        foreach (var slot in slots)
+        {
+            var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
+            // Can't determine this slot's own time range (e.g. a null/malformed EndTime)
+            // — fail closed instead of silently treating it as "no conflict, must be fine."
+            if (slotRange == null)
+                return BadRequest(new { message = $"This class has an invalid time range and can't be booked — contact support." });
+
+            var alreadyBooked = studentConfirmedClasses.Where(c => c.Date == slot.Day).Any(c =>
+            {
+                var r = ParseTimeRangeMinutes(c.Time);
+                // Can't verify this existing confirmed class's time range — fail closed.
+                if (r == null) return true;
+                return slotRange.Value.Start < r.Value.End && r.Value.Start < slotRange.Value.End;
+            });
+            if (alreadyBooked)
+                return BadRequest(new { message = $"This child already has a confirmed class on {slot.Day} that overlaps this time." });
+        }
+
+        var first = slots.OrderBy(s => s.Day).First();
+        var booking = new Booking
+        {
+            TutorId = first.TutorId,
+            StudentId = dto.StudentId,
+            // Matches the parent-offer flow's "Subject - Level" convention (composed
+            // client-side in parent.controller.js's submitBooking) so the level shows
+            // up wherever the booking's Subject string is displayed, not just on the
+            // original slot.
+            Subject = (first.Subject ?? string.Empty) + (string.IsNullOrWhiteSpace(first.Level) ? "" : " - " + first.Level),
+            Mode = first.Mode ?? string.Empty,
+            DurationHours = first.DurationMinutes / 60.0,
+            TotalPrice = slots.Sum(s => s.PricePerLesson),
+            Status = "confirmed",
+            BookingType = "tutor-preset",
+            PresetSlotId = first.Id
+        };
+        _context.Bookings.Add(booking);
+        await _context.SaveChangesAsync();
+        booking.BookingNumber = "BOK" + booking.Id.ToString("D5");
+
+        var isFirstClassPreset = await RecordFirstClassAsync(
+            first.TutorId,
+            dto.StudentId,
+            first.Country  ?? string.Empty,
+            first.Subject  ?? string.Empty,
+            first.Level    ?? string.Empty,
+            booking.Id);
+
+        // TODO: apply first-class fee logic when pricing rules are finalised.
+        // isFirstClassPreset == true  → first lesson, charge first-class rate
+        // isFirstClassPreset == false → recurring, charge recurring rate
+
+        foreach (var slot in slots)
+        {
+            _context.BookingClasses.Add(new BookingClass { BookingId = booking.Id, Date = slot.Day, Time = slot.Time + " - " + slot.EndTime });
+            _context.BookingPresetSlots.Add(new BookingPresetSlot { BookingId = booking.Id, TutorTimeSlotId = slot.Id });
+            slot.ConfirmedCount += 1;
+            if (slot.ConfirmedCount >= slot.MaxStudents) slot.IsFull = true;
+        }
+
+        var newInvoice = new Invoice
+        {
+            BookingId = booking.Id,
+            Date = first.Day,
+            Amount = booking.TotalPrice,
+            Status = "Unpaid",
+            Subject = booking.Subject
+        };
+        _context.Invoices.Add(newInvoice);
+
+        var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == first.TutorId);
+        _context.Notifications.Add(new Notification
+        {
+            UserId = userId,
+            Title = "Class Booked",
+            Message = slots.Count == 1
+                ? $"You booked {first.Subject} with {tutor?.User?.Name ?? "your tutor"} on {first.Day}."
+                : $"You booked {slots.Count} {first.Subject} classes with {tutor?.User?.Name ?? "your tutor"}, starting {first.Day}.",
+            Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+            Type = "booking",
+            IsRead = false
+        });
+
+        await _context.SaveChangesAsync();
+        newInvoice.InvoiceNumber = "INV" + newInvoice.Id.ToString("D5");
+        await _context.SaveChangesAsync();
+
+        var created = await _context.Bookings
+            .Include(b => b.Tutor).ThenInclude(t => t.User)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == booking.Id);
 
@@ -193,7 +366,7 @@ public class BookingsController : ControllerBase
 
         var booking = await _context.Bookings
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Tutor)
             .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -205,6 +378,12 @@ public class BookingsController : ControllerBase
         if (!isOwningParent && !isOwningTutor) return Forbid();
 
         var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
+
+        if (dto.Status == "countered" && dto.CounterProposal != null)
+        {
+            var counterProfanityError = ProfanityFilter.Validate(dto.CounterProposal.Message);
+            if (counterProfanityError != null) return BadRequest(new { message = counterProfanityError });
+        }
 
         if (dto.Status == "countered" && dto.CounterProposal != null
             && HasOverlappingClasses(dto.CounterProposal.Classes.Select(c =>
@@ -299,6 +478,57 @@ public class BookingsController : ControllerBase
                     IsRead = false
                 });
             }
+
+            // A Flow-A (parent-offer) booking just got confirmed — if it lands on the same
+            // date/time as one of this tutor's still-open preset slots (Flow B), that slot
+            // is no longer really available (the tutor is now busy then), so hide it from
+            // preset search rather than let a second family double-book the same time.
+            // Already-full slots need no action — they're already hidden from search.
+            if (booking.BookingType != "tutor-preset")
+            {
+                var overlappingPresetSlots = await _context.TutorTimeSlots
+                    .Where(s => s.TutorId == booking.TutorId && s.Status == "Available" && !s.IsFull)
+                    .ToListAsync();
+                foreach (var c in booking.Classes)
+                {
+                    var classRange = ParseTimeRangeMinutes(c.Time);
+                    foreach (var slot in overlappingPresetSlots)
+                    {
+                        if (slot.Day != c.Date) continue;
+                        var slotRange = ParseTimeRangeMinutes(slot.Time + " - " + slot.EndTime);
+                        // Can't verify one side's time range — fail closed and hide the
+                        // preset slot rather than silently risk a double-booking.
+                        if (classRange == null || slotRange == null)
+                        {
+                            slot.Status = "Booked";
+                            continue;
+                        }
+                        if (classRange.Value.Start < slotRange.Value.End && slotRange.Value.Start < classRange.Value.End)
+                            slot.Status = "Booked";
+                    }
+                }
+            }
+
+            var subjectParts = (booking.Subject ?? string.Empty)
+                .Split(new[] { " - " }, 2, StringSplitOptions.None);
+            var trackedSubject = subjectParts[0].Trim();
+            var trackedLevel   = subjectParts.Length > 1 ? subjectParts[1].Trim() : string.Empty;
+
+            var tutorOffering = await _context.TutorOfferings
+                .Where(o => o.TutorId == booking.TutorId
+                         && o.Subject  == trackedSubject
+                         && o.Level    == trackedLevel)
+                .FirstOrDefaultAsync();
+            var trackedCountry = tutorOffering?.Country ?? string.Empty;
+
+            var isFirstClass = await RecordFirstClassAsync(
+                booking.TutorId, booking.StudentId,
+                trackedCountry, trackedSubject, trackedLevel,
+                booking.Id);
+
+            // TODO: apply first-class fee logic when pricing rules are finalised.
+            // isFirstClass == true  → first lesson, charge first-class rate
+            // isFirstClass == false → recurring, charge recurring rate
         }
 
         await _context.SaveChangesAsync();
@@ -311,10 +541,10 @@ public class BookingsController : ControllerBase
 
         var updated = await _context.Bookings.AsNoTracking()
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
+            .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
             .FirstOrDefaultAsync(b => b.Id == id);
 
@@ -328,10 +558,10 @@ public class BookingsController : ControllerBase
 
         var booking = await _context.Bookings
             .Include(b => b.Tutor).ThenInclude(t => t.User)
-            .Include(b => b.Student)
+            .Include(b => b.Student).ThenInclude(s => s.ParentUser)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
+            .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
             .Include(b => b.Invoice)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -350,6 +580,26 @@ public class BookingsController : ControllerBase
 
         var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
         if (pendingProposal != null) pendingProposal.Status = "cancelled";
+
+        // Cancelling a preset (Flow B) booking frees up the seat it held on every
+        // slot it covers — BookingPresetSlots for bookings made after that table
+        // existed, falling back to the single legacy PresetSlotId otherwise.
+        if (booking.BookingType == "tutor-preset")
+        {
+            var presetSlotIds = await _context.BookingPresetSlots
+                .Where(bps => bps.BookingId == booking.Id)
+                .Select(bps => bps.TutorTimeSlotId)
+                .ToListAsync();
+            if (presetSlotIds.Count == 0 && booking.PresetSlotId.HasValue)
+                presetSlotIds.Add(booking.PresetSlotId.Value);
+
+            var presetSlots = await _context.TutorTimeSlots.Where(s => presetSlotIds.Contains(s.Id)).ToListAsync();
+            foreach (var presetSlot in presetSlots)
+            {
+                presetSlot.ConfirmedCount = Math.Max(0, presetSlot.ConfirmedCount - 1);
+                if (presetSlot.ConfirmedCount < presetSlot.MaxStudents) presetSlot.IsFull = false;
+            }
+        }
 
         // Void any outstanding invoice so Billing & Invoices stops offering to pay for a cancelled class.
         if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
@@ -376,44 +626,96 @@ public class BookingsController : ControllerBase
         return Ok(MapToDto(booking));
     }
 
-    [HttpPost("{id}/lesson-report")]
-    public async Task<IActionResult> SubmitLessonReport(int id, [FromBody] CreateLessonReportDto dto)
+    [HttpPost("{id}/lesson-reports")]
+    public async Task<IActionResult> SubmitLessonReport(int id, [FromBody] SubmitLessonReportDto dto)
     {
+        // Validate remarks profanity if provided
+        if (!string.IsNullOrWhiteSpace(dto.Remarks))
+        {
+            var profanityError = ProfanityFilter.Validate(dto.Remarks);
+            if (profanityError != null)
+                return BadRequest(new { message = profanityError });
+        }
+
         var booking = await _context.Bookings
-            .Include(b => b.LessonReport)
+            .Include(b => b.LessonReports)
             .Include(b => b.Student)
+            .Include(b => b.PresetSlots)
+                .ThenInclude(ps => ps.TutorTimeSlot)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
+        if (booking.Status != "completed")
+            return BadRequest(new { message = "Reports can only be submitted for completed bookings." });
 
-        var submitDate = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
-        if (booking.LessonReport == null)
+        // Verify this session date belongs to this booking
+        bool validDate = false;
+        if (booking.BookingType == "tutor-preset")
         {
-            booking.LessonReport = new LessonReport
-            {
-                BookingId = id,
-                Covered = dto.Covered,
-                Performance = dto.Performance,
-                Homework = dto.Homework,
-                SubmitDate = submitDate
-            };
+            validDate = booking.PresetSlots
+                .Any(ps => ps.TutorTimeSlot?.Day == dto.SessionDate);
         }
         else
         {
-            booking.LessonReport.Covered = dto.Covered;
-            booking.LessonReport.Performance = dto.Performance;
-            booking.LessonReport.Homework = dto.Homework;
-            booking.LessonReport.SubmitDate = submitDate;
+            var classes = await _context.BookingClasses
+                .Where(c => c.BookingId == id)
+                .ToListAsync();
+            validDate = classes.Any(c => c.Date == dto.SessionDate);
         }
 
+        if (!validDate)
+            return BadRequest(new { message = "Invalid session date for this booking." });
+
+        // Check report not already submitted
+        var existing = booking.LessonReports
+            .FirstOrDefault(r =>
+                r.StudentId  == dto.StudentId &&
+                r.SessionDate == dto.SessionDate);
+
+        if (existing != null)
+            return BadRequest(new { message = "A report for this student and session has already been submitted." });
+
+        // Validate fields — absent students skip engagement/understanding/homework
+        if (string.IsNullOrWhiteSpace(dto.Attendance))
+            return BadRequest(new { message = "Attendance is required." });
+
+        if (dto.Attendance != "absent")
+        {
+            if (dto.Engagement == null || dto.Engagement < 1 || dto.Engagement > 5)
+                return BadRequest(new { message = "Engagement rating (1–5) is required." });
+            if (string.IsNullOrWhiteSpace(dto.Understanding))
+                return BadRequest(new { message = "Understanding is required." });
+            if (string.IsNullOrWhiteSpace(dto.HomeworkCompletion))
+                return BadRequest(new { message = "Homework completion is required." });
+        }
+
+        var report = new LessonReport
+        {
+            BookingId          = id,
+            StudentId          = dto.StudentId,
+            SessionDate        = dto.SessionDate,
+            Attendance         = dto.Attendance,
+            Engagement         = dto.Attendance == "absent" ? null : dto.Engagement,
+            Understanding      = dto.Attendance == "absent" ? null : dto.Understanding,
+            HomeworkCompletion = dto.Attendance == "absent" ? null : dto.HomeworkCompletion,
+            Remarks            = dto.Remarks,
+            SubmittedAt        = DateTime.UtcNow
+        };
+
+        _context.LessonReports.Add(report);
+
         // Notify parent
-        if (booking.Student != null)
+        var student = await _context.Students
+            .Include(s => s.ParentUser)
+            .FirstOrDefaultAsync(s => s.Id == dto.StudentId);
+
+        if (student != null)
         {
             _context.Notifications.Add(new Notification
             {
-                UserId = booking.Student.ParentUserId,
-                Title = "Edu Progress Report Received",
-                Message = "The tutor published a lesson evaluation report for your child.",
+                UserId  = student.ParentUserId,
+                Title   = "Lesson Report Received",
+                Message = $"A lesson report for {student.Name} has been submitted for {dto.SessionDate}.",
                 Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                 Type = "system",
                 IsRead = false
@@ -421,34 +723,57 @@ public class BookingsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
-        return Ok();
+        return Ok(new { message = "Lesson report submitted." });
     }
 
-    [HttpPatch("{id}/lesson-report")]
-    public async Task<IActionResult> EditLessonReport(int id, [FromBody] EditLessonReportDto dto)
+    [HttpGet("{id}/lesson-reports")]
+    public async Task<IActionResult> GetLessonReports(int id)
     {
-        var report = await _context.LessonReports
-            .Include(r => r.EditHistory)
-            .FirstOrDefaultAsync(r => r.BookingId == id);
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role   = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
-        if (report == null) return NotFound();
+        var booking = await _context.Bookings
+            .Include(b => b.LessonReports)
+                .ThenInclude(r => r.Student)
+            .FirstOrDefaultAsync(b => b.Id == id);
 
-        report.Covered = dto.Covered;
-        report.Performance = dto.Performance;
-        report.Homework = dto.Homework;
-        report.EditHistory.Add(new LessonReportEdit
+        if (booking == null) return NotFound();
+
+        // Parents only see reports for their own children
+        if (role == "parent")
         {
-            Date = DateTime.Now.ToString("MMM d, yyyy h:mm tt"),
-            Changes = dto.ChangesMade
-        });
+            var student = await _context.Students
+                .FirstOrDefaultAsync(s =>
+                    s.Id == booking.StudentId &&
+                    s.ParentUserId == userId);
+            if (student == null) return Forbid();
+        }
 
-        await _context.SaveChangesAsync();
-        return Ok();
+        var reports = booking.LessonReports
+            .OrderBy(r => r.SessionDate)
+            .Select(r => new
+            {
+                r.Id,
+                r.StudentId,
+                StudentName   = r.Student.Name,
+                r.SessionDate,
+                r.Attendance,
+                r.Engagement,
+                r.Understanding,
+                r.HomeworkCompletion,
+                r.Remarks,
+                r.SubmittedAt
+            });
+
+        return Ok(reports);
     }
 
     [HttpPost("{id}/issue")]
     public async Task<IActionResult> ReportIssue(int id, [FromBody] CreateIssueReportDto dto)
     {
+        var issueProfanityError = ProfanityFilter.Validate(dto.Details);
+        if (issueProfanityError != null) return BadRequest(new { message = issueProfanityError });
+
         var booking = await _context.Bookings
             .Include(b => b.IssueReport)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -462,7 +787,8 @@ public class BookingsController : ControllerBase
                 BookingId = id,
                 IssueType = dto.IssueType,
                 Details = dto.Details,
-                Timestamp = DateTime.Now.ToString("h:mm:ss tt")
+                Timestamp = DateTime.Now.ToString("h:mm:ss tt"),
+                CreatedAt = DateTime.UtcNow
             };
         }
 
@@ -481,6 +807,8 @@ public class BookingsController : ControllerBase
         TutorImageUrl = b.Tutor?.ImageUrl ?? string.Empty,
         StudentId = b.StudentId,
         StudentName = b.Student?.Name ?? string.Empty,
+        ParentUserId = b.Student?.ParentUserId ?? 0,
+        ParentName = b.Student?.ParentUser?.Name ?? string.Empty,
         Subject = b.Subject,
         Mode = b.Mode,
         DurationHours = b.DurationHours,
@@ -488,6 +816,8 @@ public class BookingsController : ControllerBase
         TotalPrice = b.TotalPrice,
         Status = b.Status,
         BookingNumber = b.BookingNumber,
+        BookingType = b.BookingType,
+        IsFirstClass = false, // populated by GET /bookings — see GetAll
         Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
         CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {
@@ -499,15 +829,18 @@ public class BookingsController : ControllerBase
                 ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
             }).ToList() ?? new()
         },
-        LessonReport = b.LessonReport == null ? null : new LessonReportDto
+        LessonReports = b.LessonReports?.OrderBy(r => r.SessionDate).Select(r => new LessonReportSummaryDto
         {
-            Id = b.LessonReport.Id,
-            Covered = b.LessonReport.Covered,
-            Performance = b.LessonReport.Performance,
-            Homework = b.LessonReport.Homework,
-            SubmitDate = b.LessonReport.SubmitDate,
-            EditHistory = b.LessonReport.EditHistory?.Select(e => new LessonReportEditDto { Date = e.Date, Changes = e.Changes }).ToList() ?? new()
-        },
+            Id = r.Id,
+            StudentId = r.StudentId,
+            SessionDate = r.SessionDate,
+            Attendance = r.Attendance,
+            Engagement = r.Engagement,
+            Understanding = r.Understanding,
+            HomeworkCompletion = r.HomeworkCompletion,
+            Remarks = r.Remarks,
+            SubmittedAt = r.SubmittedAt.ToString("MMM d, yyyy")
+        }).ToList() ?? new(),
         IssueReport = b.IssueReport == null ? null : new IssueReportDto
         {
             IssueType = b.IssueReport.IssueType,

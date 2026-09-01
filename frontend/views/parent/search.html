@@ -1,18 +1,34 @@
-<div class="dashboard-layout">
-  <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
-      <a href="#!/parent/search" class="nav-item active">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
-      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/parent/dashboard" class="bs-sidebar-link">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="bs-sidebar-link">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="bs-sidebar-link active">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="bs-sidebar-link">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="bs-sidebar-link">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="bs-sidebar-link">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="bs-sidebar-link">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="bs-sidebar-link">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
@@ -24,128 +40,205 @@
     <div ng-if="!vm.selectedTutor">
 
       <!-- ── Search Hero ─────────────────────────── -->
-      <div class="search-hero">
-        <h2 class="search-hero-title">Find Your Perfect Tutor</h2>
-        <p class="search-hero-sub">Browse verified NIE-trained tutors across Singapore &amp; Malaysia</p>
-        <div class="search-hero-bar">
-          <span class="search-icon">🔍</span>
-          <input type="text" ng-model="vm.searchQuery" placeholder="Search tutor name" />
+      <div>
+        <h2>Find Your Perfect Tutor</h2>
+        <p class="bs-text-muted">Browse verified tutors across Singapore &amp; Malaysia</p>
+        <div style="position:relative; max-width:420px; margin-top:var(--space-2);">
+          <i class="ti ti-search" aria-hidden="true" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:0.5; font-size:16px;"></i>
+          <input type="text" class="bs-input" style="padding-left:32px;" ng-model="vm.searchQuery" placeholder="Search tutor name" />
         </div>
       </div>
 
-      <!-- ── Filter Bar ──────────────────────────── -->
-      <div class="filter-bar">
+      <!-- ── Filter Bar (always visible) ─────────── -->
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-4); margin-top:var(--space-4); padding:var(--space-3) 0; border-top:1px solid var(--color-divider); border-bottom:1px solid var(--color-divider);">
 
-        <div class="filter-bar-header" ng-click="vm.filtersExpanded = !vm.filtersExpanded">
-          <span class="filter-bar-label">🔧 Filter</span>
-          <span class="filter-toggle-icon" ng-class="{open: vm.filtersExpanded}">▾</span>
-          <span class="result-count">{{ vm.filteredTutors().length }} Tutors Found</span>
+        <div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text); opacity:0.6; margin-bottom:4px;">Country</div>
+          <div class="bs-seg">
+            <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
+              ng-click="vm.selectSearchCountry(c)" class="bs-seg-opt"
+              ng-style="{background: vm.selectedCountry === c ? 'var(--color-accent)' : 'transparent', color: vm.selectedCountry === c ? 'var(--color-bg)' : 'inherit'}">
+              {{ c === 'Singapore' ? 'SG' : 'MY' }}
+            </button>
+          </div>
         </div>
 
-        <div class="filter-bar-panel" ng-show="vm.filtersExpanded">
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Country</span>
-            <div class="filter-country-switch">
-              <button type="button" ng-repeat="c in ['Singapore','Malaysia']"
-                ng-click="vm.selectSearchCountry(c)"
-                ng-class="{active: vm.selectedCountry === c}" class="filter-chip">
-                {{ c === 'Singapore' ? 'SG 🇸🇬' : 'MY 🇲🇾' }}
-              </button>
-            </div>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Subject</span>
-            <select class="filter-select-sm" ng-model="vm.selectedSubject"
-              ng-options="opt.subject as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
-              <option value="All">All Subjects</option>
-            </select>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Mode</span>
-            <select class="filter-select-sm" ng-model="vm.selectedMode">
-              <option value="All">All Modes</option>
-              <option value="Online">Online</option>
-              <option value="Home Visit">Home Visit</option>
-              <option value="Tutor Place">Tutor Place</option>
-            </select>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Experience</span>
-            <select class="filter-select-sm" ng-model="vm.minExperience"
-              ng-options="e.value as e.label for e in [{value:0,label:'All Experience'},{value:15,label:'> 15 years'},{value:10,label:'> 10 years'},{value:5,label:'> 5 years'},{value:3,label:'> 3 years'},{value:1,label:'> 1 year'}]">
-            </select>
-          </div>
-
-          <div class="filter-bar-divider"></div>
-
-          <div class="filter-bar-group">
-            <span class="filter-bar-label">Rating</span>
-            <select class="filter-select-sm" ng-model="vm.minRating"
-              ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
-            </select>
-          </div>
-
+        <div class="bs-field" style="margin:0;">
+          <label>Subject</label>
+          <select class="bs-input" ng-model="vm.selectedSubject"
+            ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
+            <option value="">All Subjects</option>
+          </select>
         </div>
+
+        <div class="bs-field" style="margin:0;">
+          <label>Mode</label>
+          <select class="bs-input" ng-model="vm.selectedMode">
+            <option value="All">All Modes</option>
+            <option value="Online">Online</option>
+            <option value="Tutor Place">Tutor Place</option>
+            <option value="Tuition Center">Tuition Center</option>
+          </select>
+        </div>
+
+        <div class="bs-field" style="margin:0;">
+          <label>Experience</label>
+          <select class="bs-input" ng-model="vm.minExperience"
+            ng-options="e.value as e.label for e in [{value:0,label:'All Experience'},{value:15,label:'> 15 years'},{value:10,label:'> 10 years'},{value:5,label:'> 5 years'},{value:3,label:'> 3 years'},{value:1,label:'> 1 year'}]">
+          </select>
+        </div>
+
+        <div class="bs-field" style="margin:0;">
+          <label>Rating</label>
+          <select class="bs-input" ng-model="vm.minRating"
+            ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
+          </select>
+        </div>
+
+        <span class="bs-text-muted" style="font-size:13px; margin-left:auto;">{{ vm.filteredTutors().length }} tutors found</span>
       </div>
 
       <!-- ── Tutor Grid ───────────────────────────── -->
-      <div class="tutor-grid">
-        <div class="tutor-card" ng-repeat="t in vm.filteredTutors()" ng-class="{'tutor-card--favorited': vm.isFavorited(t.id)}">
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:var(--space-4); margin-top:var(--space-4);">
+        <div class="bs-card bs-elev-sm" ng-repeat="t in vm.filteredTutors()"
+          ng-style="vm.isPinnedTutor(t) ? {outline: '2px solid var(--color-accent)', outlineOffset: '-1px'} : {}"
+          style="position:relative;">
 
-          <button type="button" class="favorite-btn" ng-class="{active: vm.isFavorited(t.id)}"
+          <!-- Favourite button -->
+          <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; top:var(--space-2); right:var(--space-2);"
+            ng-style="{color: vm.isFavorited(t.id) ? 'var(--color-accent-2)' : 'inherit'}"
             ng-click="vm.toggleFavorite(t, $event)" title="Like this tutor">
-            {{ vm.isFavorited(t.id) ? '♥' : '♡' }}
+            <i class="ti ti-heart" aria-hidden="true"></i>
           </button>
 
-          <!-- ── Top row: avatar + info ── -->
-          <div class="tutor-card-main">
-            <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
-            <div class="tutor-card-body">
-              <div class="tutor-card-name-row">
-                <h4>{{ t.name }}</h4>
-                <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
-              </div>
-              <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
-              <div class="qual-tags">
-                <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
-              </div>
-              <div class="tutor-card-subjects-label">Teaches</div>
-              <div class="subject-list">
-                <button ng-repeat="o in t.offerings" class="subject-chip"
-                  ng-click="vm.selectedCountry = o.country; vm.selectedSubject = o.subject">
-                  {{ o.country }} · {{ o.level }} · {{ o.subject }}
-                </button>
-              </div>
-              <p class="tutor-bio">"{{ t.bio }}"</p>
+          <!-- Top: avatar + info -->
+          <div>
+            <div class="bs-tag bs-tag-accent" ng-if="vm.isPinnedTutor(t)" style="margin-bottom:var(--space-2);">
+              <i class="ti ti-eye" aria-hidden="true"></i>&nbsp;You were looking at this tutor
             </div>
+            <div style="display:flex; gap:var(--space-3);">
+              <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ t.name }}" />
+              <div ng-if="!t.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:24px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ t.name[0] }}</div>
+              <div style="min-width:0; flex:1;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="bs-card-title">{{ t.name }}</span>
+                  <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:10px;">✓ Verified</span>
+                </div>
+                <p class="bs-card-meta" style="margin-top:2px;">{{ t.experienceYears }} yrs experience</p>
+                <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                  <span class="bs-tag bs-tag-neutral" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6; margin-top:var(--space-2);">Teaches</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+              <button ng-repeat="o in t.offerings" class="bs-tag bs-tag-outline" style="cursor:pointer; border-width:1px; background:none;"
+                ng-click="vm.selectedCountry = o.country; vm.selectedSubject = vm.findSubjectCatalogEntry(o.country, o.subject, o.level)">
+                {{ vm.abbreviateOffering(o) }}
+              </button>
+            </div>
+            <p class="bs-card-body" style="font-style:italic; margin-top:var(--space-2);">"{{ t.bio }}"</p>
           </div>
 
-          <!-- ── Bottom bar: rating + modes + price + CTA ── -->
-          <div class="tutor-card-bar">
-            <div class="tutor-card-rating">
-              <span class="tutor-rating-star">⭐</span>
-              <span class="tutor-rating-value">{{ t.rating }}</span>
-              <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
+          <!-- Middle bar: rating + modes -->
+          <div style="display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap;">
+            <span style="font-size:13px;">★ {{ t.rating }} <span class="bs-text-muted">({{ t.reviewCount }} reviews)</span></span>
+            <span class="bs-tag bs-tag-neutral" ng-repeat="m in t.modes">{{ m }}</span>
+          </div>
+
+          <!-- Bottom: preset class list — every card here is guaranteed at least
+               one (see filteredTutors), so no "no slots" empty state is needed. -->
+          <div class="tutor-slot-strip">
+            <p class="tutor-slot-strip-label">
+              <i class="ti ti-calendar-event" aria-hidden="true"></i>
+              Available classes through {{ vm.nextMonthLabel() }}
+            </p>
+            <!-- Max ~4 rows visible, scrolls internally beyond that -->
+            <div class="tutor-slot-list">
+
+              <!-- One row per unique preset-class group -->
+              <div class="slot-list-row" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.presetGroupId"
+                ng-mouseenter="vm.showRowTooltip(sg, $event)" ng-mouseleave="vm.hideRowTooltip(sg)">
+                <div class="slot-list-row-info">
+                  <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                  <span>{{ vm.abbreviateSubject(sg.subject) }} · {{ sg.slots[0].dateShort }}, {{ sg.slots[0].startTime }}</span>
+
+                  <!-- Tooltip: full month details, on hover — position:fixed,
+                       computed in JS (see showRowTooltip), so it isn't clipped by
+                       the scrollable .tutor-slot-list box it lives inside. Its own
+                       mouseenter/mouseleave (rather than relying on the row's alone)
+                       is what lets the cursor actually cross the gap between row and
+                       tooltip without the delayed hide in hideRowTooltip firing first. -->
+                  <div class="slot-tooltip slot-tooltip-fixed" ng-if="sg._tooltipStyle" ng-style="sg._tooltipStyle"
+                    ng-mouseenter="vm.keepTooltipOpen(sg)" ng-mouseleave="vm.hideRowTooltip(sg)">
+                    <p class="slot-tooltip-title">{{ sg.subject }} · {{ sg.level }}</p>
+                    <div class="slot-tooltip-meta">
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-calendar" aria-hidden="true"></i>
+                        <span>{{ sg.recurrenceLabel }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-clock" aria-hidden="true"></i>
+                        <span>{{ sg.startTime }} – {{ sg.endTime }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                        <span>{{ sg.mode }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-{{ sg.classSize === 'one-to-one' ? 'user' : 'users' }}" aria-hidden="true"></i>
+                        <span>{{ sg.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-currency-dollar" aria-hidden="true"></i>
+                        <span class="slot-price">
+                          ${{ sg.pricePerLesson }} / lesson
+                          <span class="slot-price-est">· est. ${{ sg.pricePerLesson * sg.slots.length }} / month</span>
+                        </span>
+                      </div>
+                      <div class="slot-tooltip-meta-row" ng-if="sg.syllabusTopics && sg.syllabusTopics.length">
+                        <i class="ti ti-book" aria-hidden="true"></i>
+                        <span>
+                          Syllabus covered:
+                          <span ng-repeat="topic in sg.syllabusTopics">
+                            – {{ topic }}<span ng-if="!$last"> </span>
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                    <div class="slot-tooltip-schedule">
+                      <div class="slot-tooltip-row" ng-repeat="s in sg.slots">
+                        <div>
+                          <p class="slot-tooltip-date">{{ s.dateFormatted }}</p>
+                          <p class="slot-tooltip-time">{{ s.startTime }} – {{ s.endTime }}</p>
+                        </div>
+                        <span class="slot-status-badge"
+                          ng-class="{
+                            'badge-open': !s.isFull && s.classSize === 'one-to-one',
+                            'badge-fill': !s.isFull && s.classSize === 'one-to-many',
+                            'badge-full': s.isFull
+                          }">
+                          <span ng-if="s.isFull">Full</span>
+                          <span ng-if="!s.isFull && s.classSize === 'one-to-one'">Open</span>
+                          <span ng-if="!s.isFull && s.classSize === 'one-to-many'">{{ s.confirmedCount }} / {{ s.maxStudents }} filled</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" class="btn-outline sm" ng-click="vm.viewAndBookPreset(t, sg)">View &amp; Book</button>
+              </div>
+
+              <!-- Informational only — subjects tutor teaches but has no preset slot -->
+              <div class="slot-list-row slot-list-row-empty" ng-repeat="o in vm.tutorSubjectsWithoutSlots(t) track by o.subject">
+                <div class="slot-list-row-info">
+                  <i class="ti ti-calendar-x" aria-hidden="true"></i>
+                  <span>No preset for {{ o.subject }}</span>
+                </div>
+              </div>
+
             </div>
-            <div class="tutor-card-modes">
-              <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
-            </div>
-            <div class="tutor-card-bar-spacer"></div>
-            <div class="tutor-card-price">
-              <small>Trial Rate</small>
-              <strong class="price">${{ t.pricePerSession }}/hr</strong>
-            </div>
-            <button class="btn-primary" ng-click="vm.selectTutor(t)">View &amp; Book →</button>
           </div>
 
         </div>
@@ -153,84 +246,96 @@
 
     </div><!-- end listing view -->
 
-
     <!-- ══════════════════════════════════════════════
          BOOKING DETAIL VIEW
          ══════════════════════════════════════════════ -->
-    <div ng-if="vm.selectedTutor">
+<div class="bs-scope" ng-if="vm.selectedTutor">
 
       <!-- Back button -->
-      <div class="booking-back">
-        <button class="btn-link" ng-click="vm.clearSelectedTutor()">← Back to Tutor Catalog</button>
-      </div>
+      <button class="bs-btn bs-btn-ghost" ng-click="vm.clearSelectedTutor()">← Back to Tutor Catalog</button>
 
-      <!-- Booking Success -->
-      <div class="alert-success large" ng-if="vm.bookingSuccess">
+      <!-- Booking Success (Flow A — request dispatched, awaiting tutor approval) -->
+      <div ng-if="vm.bookingSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-4); border-radius:var(--radius-md); margin-top:var(--space-3);">
         ✓ Booking Request Dispatched!<br/>
         <small style="font-weight:400">Connecting you with {{ vm.selectedTutor.name }}. Redirecting to your sessions...</small>
       </div>
 
-      <!-- ── Full-width tutor profile header ────── -->
-      <div class="tutor-detail-card" ng-if="!vm.bookingSuccess">
+      <!-- Preset Booking Success (Flow B — already confirmed, invoice receipt) -->
+      <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3); text-align:center; align-items:center;" ng-if="vm.presetBookingSuccess">
+        <i class="ti ti-circle-check" aria-hidden="true" style="font-size:40px; color:var(--color-accent);"></i>
+        <h3 style="margin:0;">Class Booked &amp; Paid!</h3>
+        <p class="bs-text-muted" style="margin:0;">No approval needed — {{ vm.presetBookingReceipt.tutorName }} already published this class.</p>
+        <div style="width:100%; max-width:360px; text-align:left; background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Student</span><strong>{{ vm.presetBookingReceipt.studentName }}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Subject</span><strong>{{ vm.presetBookingReceipt.subject }}<span ng-if="vm.presetBookingReceipt.level"> · {{ vm.presetBookingReceipt.level }}</span></strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.presetBookingReceipt.mode }}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Booking</span><strong>#{{ vm.presetBookingReceipt.booking.bookingNumber }} · {{ vm.presetBookingReceipt.booking.classes.length }} class(es)</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Payment</span><strong style="color:var(--color-accent-700);">✓ Paid</strong></div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--color-divider); padding-top:6px;"><span class="bs-text-muted">Total</span><strong>${{ vm.presetBookingReceipt.total }}.00</strong></div>
+        </div>
+        <p class="bs-text-muted" style="margin:0;">Redirecting to your sessions...</p>
+      </div>
 
-        <div class="tutor-detail-top">
-          <img ng-src="{{ vm.selectedTutor.imageUrl }}" class="tutor-detail-avatar" alt="{{ vm.selectedTutor.name }}" />
-          <div class="tutor-detail-info">
-            <div class="tutor-detail-name">
-              {{ vm.selectedTutor.name }}
-              <span ng-if="vm.selectedTutor.isVerified" class="badge-verified">✓ Verified</span>
-              <button type="button" class="favorite-btn inline" ng-class="{active: vm.isFavorited(vm.selectedTutor.id)}"
+      <!-- ── Full-width tutor profile header ────── -->
+      <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3);" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess">
+
+        <div style="display:flex; gap:var(--space-4); align-items:flex-start;">
+          <img ng-if="vm.selectedTutor.imageUrl" ng-src="{{ vm.selectedTutor.imageUrl }}" class="bs-halftone" style="width:88px; height:88px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ vm.selectedTutor.name }}" />
+          <div ng-if="!vm.selectedTutor.imageUrl" class="bs-halftone" style="width:88px; height:88px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:32px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ vm.selectedTutor.name[0] }}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h3 style="margin:0;">{{ vm.selectedTutor.name }}</h3>
+              <span ng-if="vm.selectedTutor.isVerified" class="bs-tag bs-tag-accent">✓ Verified</span>
+              <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-style="{color: vm.isFavorited(vm.selectedTutor.id) ? 'var(--color-accent-2)' : 'inherit'}"
                 ng-click="vm.toggleFavorite(vm.selectedTutor, $event)" title="Like this tutor">
                 {{ vm.isFavorited(vm.selectedTutor.id) ? '♥' : '♡' }}
               </button>
             </div>
-            <p class="tutor-detail-meta">
-              {{ vm.selectedTutor.experienceYears }} yrs experience &bull; {{ vm.selectedTutor.modes.join(' / ') }}
-              &bull; ⭐ {{ vm.selectedTutor.rating }} ({{ vm.selectedTutor.reviewCount }} reviews)
+            <p class="bs-text-muted" style="margin:4px 0 0;">
+              {{ vm.selectedTutor.experienceYears }} yrs experience · {{ vm.selectedTutor.modes.join(' / ') }}
+              · ★ {{ vm.selectedTutor.rating }} ({{ vm.selectedTutor.reviewCount }} reviews)
             </p>
           </div>
-          <div class="tutor-detail-rate">
-            <small>Session Rate</small>
-            <div class="price">${{ vm.selectedTutor.pricePerSession }}/hr</div>
-            <span class="rating-badge" style="margin-top:8px;display:inline-flex">⭐ {{ vm.selectedTutor.rating }}</span>
-          </div>
         </div>
 
-        <div class="tutor-detail-bio-row">
-          <p class="tutor-detail-bio">"{{ vm.selectedTutor.bio }}"</p>
-        </div>
+        <p style="font-style:italic; margin-top:var(--space-3);">"{{ vm.selectedTutor.bio }}"</p>
 
-        <div class="tutor-detail-footer">
-          <div class="tutor-detail-footer-section">
-            <span class="tutor-detail-footer-label">Subjects Offered</span>
-            <div class="subject-list">
-              <button ng-repeat="o in vm.selectedTutor.offerings" class="subject-chip"
-                ng-click="vm.selectedCountry = o.country; vm.selectedSubject = o.subject">
+        <div style="display:flex; gap:var(--space-6); flex-wrap:wrap; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-divider);">
+          <div>
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Subjects Offered</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+              <button ng-repeat="o in vm.selectedTutor.offerings" class="bs-tag bs-tag-outline" style="cursor:pointer; background:none;"
+                ng-click="vm.selectedCountry = o.country; vm.selectedSubject = vm.findSubjectCatalogEntry(o.country, o.subject, o.level)">
                 {{ o.country }} · {{ o.level }} · {{ o.subject }}
               </button>
             </div>
           </div>
-          <div class="tutor-detail-footer-section">
-            <span class="tutor-detail-footer-label">Credentials &amp; Qualifications</span>
-            <div class="qual-tags">
-              <span class="qual-tag" ng-repeat="q in vm.selectedTutor.qualifications">✓ {{ q }}</span>
+          <div>
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Credentials &amp; Qualifications</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+              <span class="bs-tag bs-tag-neutral" ng-repeat="q in vm.selectedTutor.qualifications">✓ {{ q }}</span>
             </div>
           </div>
         </div>
 
-      </div><!-- end tutor-detail-card -->
+      </div><!-- end tutor profile header -->
 
-      <!-- ── Tutor availability calendar (dates/times only, no booking details) ── -->
-      <div class="card" ng-if="!vm.bookingSuccess">
+      <!-- ── Tutor availability calendar (dates/times only, no booking details) ──
+           Hidden once a published class is selected — its schedule is already fixed.
+           Calendar grid markup/classes kept as-is (see .cal-* in main.css) rather
+           than reskinned — it's shared with several other screens' calendars and
+           carries a lot of state-variant styling (holidays, blocked days, report
+           dots) that's riskier to touch than to leave alone. -->
+      <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3);" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && !vm.selectedPresetGroup">
         <div class="cal-nav-row" style="justify-content:space-between;margin-bottom:12px">
           <div>
-            <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">📅 {{ vm.selectedTutor.name }}'s Availability</h3>
-            <p class="text-muted" style="margin:0">Grayed-out times are already booked — pick a different time to avoid overlap</p>
+            <h4 style="margin-bottom:3px">{{ vm.selectedTutor.name }}'s Availability</h4>
+            <p class="bs-text-muted" style="margin:0">Grayed-out times are already booked — pick a different time to avoid overlap</p>
           </div>
           <div class="cal-nav-row">
-            <button class="btn-outline sm" ng-click="vm.tutorCalPrevMonth()">‹ Prev</button>
+            <button class="bs-btn bs-btn-secondary" ng-click="vm.tutorCalPrevMonth()">‹ Prev</button>
             <span class="cal-month-label">{{ vm.tutorCalMonthName() }} {{ vm.tutorCal.year }}</span>
-            <button class="btn-outline sm" ng-click="vm.tutorCalNextMonth()">Next ›</button>
+            <button class="bs-btn bs-btn-secondary" ng-click="vm.tutorCalNextMonth()">Next ›</button>
           </div>
         </div>
 
@@ -257,34 +362,79 @@
           <p ng-if="!vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length" class="empty-state">✓ Fully available this day.</p>
           <div class="chip-list" ng-if="vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length">
             <span class="chip" ng-repeat="b in vm.getBusyTimesForDay(vm.tutorCal.selectedDay)" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">
-              🚫 {{ b.time }}
+              🚫 {{ b.time | hhmma }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- ── Booking form (full width below profile) -->
-      <div class="booking-form-single card" ng-if="!vm.bookingSuccess">
+      <!-- ── Invoice summary (a published class was selected — confirms immediately,
+           no tutor approval needed, unlike the request form below) ── -->
+      <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3);" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && vm.selectedPresetGroup">
 
-        <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #e2e8f0">
-          <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">Request Tutorial Session</h3>
-          <p class="text-muted">Complete the form below to send your booking request to {{ vm.selectedTutor.name }}</p>
+        <div style="padding-bottom:var(--space-3); border-bottom:1px solid var(--color-divider);">
+          <h4 style="margin-bottom:3px">Booking Summary</h4>
+          <p class="bs-text-muted" style="margin:0;">This class is already published by {{ vm.selectedTutor.name }} — booking confirms immediately, no approval needed.</p>
         </div>
 
-        <form ng-submit="vm.submitBooking()" class="form-stack">
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Tutor</span><strong>{{ vm.selectedTutor.name }}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Subject</span><strong>{{ vm.selectedPresetGroup.subject }}<span ng-if="vm.selectedPresetGroup.level"> · {{ vm.selectedPresetGroup.level }}</span></strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.selectedPresetGroup.mode }}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Class size</span><strong>{{ vm.selectedPresetGroup.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Price per lesson</span><strong>${{ vm.selectedPresetGroup.pricePerLesson }}</strong></div>
+        </div>
 
-          <div class="booking-form-section">Child &amp; Subject</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6; margin-top:var(--space-3);">Schedule ({{ vm.bookingForm.sessions.length }} class{{ vm.bookingForm.sessions.length === 1 ? '' : 'es' }})</div>
+        <div style="display:flex; flex-direction:column; gap:2px; margin-top:6px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--color-divider);" ng-repeat="session in vm.bookingForm.sessions">
+            <span>{{ session.date }}</span><span>{{ session.startTime }} – {{ session.endTime }}</span>
+          </div>
+        </div>
 
-          <div class="form-row">
-            <div class="form-group">
+        <div class="bs-field" style="margin-top:var(--space-3);">
+          <label>Select Child</label>
+          <select class="bs-input" ng-model="vm.bookingForm.studentId">
+            <option ng-repeat="s in vm.activeStudents()" ng-value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-divider);">
+          <span>Total for {{ vm.bookingForm.sessions.length }} class(es)</span>
+          <strong style="font-family:var(--font-heading); font-size:18px;">${{ vm.selectedPresetGroup.pricePerLesson * vm.bookingForm.sessions.length }}.00</strong>
+        </div>
+
+        <p ng-if="vm.presetBookingError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.presetBookingError }}</p>
+
+        <button type="button" class="bs-btn bs-btn-primary bs-btn-block" ng-click="vm.confirmPresetGroupBooking()"
+          ng-disabled="vm.presetBookingBusy || !vm.bookingForm.studentId">
+          {{ vm.presetBookingBusy ? 'Booking…' : 'Confirm Payment' }}
+        </button>
+
+      </div><!-- end invoice summary -->
+
+      <!-- ── Booking form (full width below profile) — request needing tutor approval -->
+      <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3);" ng-if="!vm.bookingSuccess && !vm.presetBookingSuccess && !vm.selectedPresetGroup">
+
+        <div style="padding-bottom:var(--space-3); border-bottom:1px solid var(--color-divider);">
+          <h4 style="margin-bottom:3px">Request Tutorial Session</h4>
+          <p class="bs-text-muted" style="margin:0;">Complete the form below to send your booking request to {{ vm.selectedTutor.name }}</p>
+        </div>
+
+        <form ng-submit="vm.submitBooking()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Child &amp; Subject</div>
+
+          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+            <div class="bs-field" style="flex:1; min-width:180px; margin:0;">
               <label>Select Child</label>
-              <select ng-model="vm.bookingForm.studentId">
+              <select class="bs-input" ng-model="vm.bookingForm.studentId">
                 <option ng-repeat="s in vm.activeStudents()" ng-value="s.id">{{ s.name }}</option>
               </select>
             </div>
-            <div class="form-group">
+            <div class="bs-field" style="flex:1; min-width:180px; margin:0;">
               <label>Classes per Month</label>
-              <select ng-model="vm.bookingForm.classesPerMonth" ng-change="vm.updateSessions()">
+              <select class="bs-input" ng-model="vm.bookingForm.classesPerMonth" ng-change="vm.updateSessions()">
                 <option ng-value="1">1 class per month</option>
                 <option ng-value="2">2 classes per month</option>
                 <option ng-value="3">3 classes per month</option>
@@ -295,80 +445,89 @@
             </div>
           </div>
 
-          <div class="form-group">
+          <div class="bs-field" style="margin:0;">
             <label>Subject Module</label>
-            <div class="subject-chips">
+            <div style="display:flex; flex-wrap:wrap; gap:4px;">
               <button type="button" ng-repeat="s in vm.selectedTutor.subjects"
                 ng-click="vm.bookingForm.subject = s"
-                ng-class="{selected: vm.bookingForm.subject === s}"
-                class="subject-chip-select">{{ s }}</button>
+                class="bs-tag"
+                ng-class="vm.bookingForm.subject === s ? 'bs-tag-accent' : 'bs-tag-outline'"
+                style="cursor:pointer; background:none; border:1px solid var(--color-divider);">{{ s }}</button>
             </div>
           </div>
 
-          <div class="booking-form-section">Schedule</div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Schedule</div>
 
-          <div ng-repeat="session in vm.bookingForm.sessions" class="session-slot">
-            <div class="session-slot-label" ng-if="vm.bookingForm.sessions.length > 1">
+          <div ng-repeat="session in vm.bookingForm.sessions" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);">
+            <div style="font-size:12px; font-weight:600; margin-bottom:6px;" ng-if="vm.bookingForm.sessions.length > 1">
               Class {{ $index + 1 }}
             </div>
-            <div class="form-row-3">
-              <div class="form-group">
-                <label>Date</label>
-                <input type="text" ng-model="session.date" required ng-change="vm.onDateChange($index)"
+            <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+              <div class="bs-field" style="flex:1; min-width:140px; margin:0;">
+                <label>Date <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="session.date" required ng-change="vm.onDateChange($index)"
                   placeholder="DD-MM-YYYY" fp-date
-                  ng-class="{'input-blocked': session.date && vm.isSessionDateBlocked(session.date)}" />
-                <span class="blocked-date-hint" ng-if="session.date && vm.isSessionDateBlocked(session.date)">
+                  ng-style="session.date && vm.isSessionDateBlocked(session.date) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+                <span ng-if="session.date && vm.isSessionDateBlocked(session.date)" style="color:var(--color-accent-2-700); font-size:12px;">
                   ⚠️ Tutor unavailable on this date — blocked period
                 </span>
               </div>
-              <div class="form-group">
-                <label>Start Time</label>
-                <input type="text" ng-model="session.startTime" placeholder="04:00 PM" ng-change="vm.calcEndTime(session)" />
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>Start Time <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="session.startTime" placeholder="04:00 PM" ng-change="vm.calcEndTime(session)" />
               </div>
-              <div class="form-group">
-                <label>End Time</label>
-                <input type="text" ng-model="session.endTime" placeholder="05:00 PM" />
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>End Time <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="session.endTime" placeholder="05:00 PM" ng-change="vm.onEndTimeChange(session)" />
               </div>
             </div>
-            <span class="blocked-date-hint" ng-if="session.date && vm.isTooSoon(session.date, session.startTime)">
+            <span ng-if="session.date && vm.isTooSoon(session.date, session.startTime)" style="color:var(--color-accent-2-700); font-size:12px;">
               ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
             </span>
-            <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" class="recurring-label">
+            <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" style="display:flex; align-items:center; gap:6px; font-size:13px; margin-top:6px;">
               <input type="checkbox" ng-model="session.recurring" ng-change="vm.applyRecurring()" />
               Recurring class every week
             </label>
           </div>
 
-          <div class="booking-form-section">Notes</div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Notes</div>
 
-          <div class="form-group">
-            <label>Message / Guidelines <span style="font-weight:400;color:#94a3b8">(optional)</span></label>
-            <textarea ng-model="vm.bookingForm.message" rows="2"
+          <div class="bs-field" style="margin:0;">
+            <label>Message / Guidelines <span class="bs-text-muted">(optional)</span></label>
+            <textarea class="bs-input" ng-model="vm.bookingForm.message" rows="2"
               placeholder="e.g. Please focus on quadratic equation formulas."></textarea>
+            <div ng-if="vm.hasProfaneBookingMessage()" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">Please remove inappropriate language before submitting.</div>
           </div>
 
-          <div class="price-summary">
-            <span>💳 Estimated Monthly Total</span>
-            <strong>${{ vm.selectedTutor.pricePerSession * vm.bookingForm.classesPerMonth }}.00 / month</strong>
+          <p class="bs-text-muted" style="font-size:12px; margin:0;">Price will be confirmed by the tutor once they review this request.</p>
+
+          <div ng-if="vm.hasBlockedSessionDate()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+            <strong>⚠️ Tutor unavailable on selected dates</strong>
+            <p style="margin:2px 0 0;">One or more class dates fall within the tutor's blocked period. Please change the highlighted dates.</p>
           </div>
 
-          <div class="block-conflict-alert" ng-if="vm.hasBlockedSessionDate()">
-            <div class="block-conflict-header">⚠️ Tutor unavailable on selected dates</div>
-            <p class="block-conflict-sub">One or more class dates fall within the tutor's blocked period. Please change the highlighted dates.</p>
+          <div ng-if="vm.hasTooSoonSession()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+            <strong>⚠️ Session too soon</strong>
+            <p style="margin:2px 0 0;">One or more class times are less than 6 hours from now. Please choose a later time to avoid urgent changes.</p>
           </div>
 
-          <div class="block-conflict-alert" ng-if="vm.hasTooSoonSession()">
-            <div class="block-conflict-header">⚠️ Session too soon</div>
-            <p class="block-conflict-sub">One or more class times are less than 6 hours from now. Please choose a later time to avoid urgent changes.</p>
+          <div ng-if="vm.hasDuplicateSessions()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+            <strong>⚠️ Overlapping class times</strong>
+            <p style="margin:2px 0 0;">Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.</p>
           </div>
 
-          <div class="block-conflict-alert" ng-if="vm.hasDuplicateSessions()">
-            <div class="block-conflict-header">⚠️ Overlapping class times</div>
-            <p class="block-conflict-sub">Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.</p>
+          <div ng-if="vm.hasInvalidTimeRangeSession()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+            <strong>⚠️ Invalid date or time</strong>
+            <p style="margin:2px 0 0;">Every class needs a valid date and time (e.g. "04:00 PM"), and end time must be later than start time.</p>
           </div>
 
-          <button type="submit" class="btn-primary full-width"
-            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions()">
+          <div ng-if="vm.hasDurationMismatchSession()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+            <strong>⚠️ Inconsistent class length</strong>
+            <p style="margin:2px 0 0;">All classes in one booking must be the same length. Please make each class's start/end time span match the others.</p>
+          </div>
+
+          <button type="submit" class="bs-btn bs-btn-primary bs-btn-block"
+            ng-disabled="vm.hasBlockedSessionDate() || vm.hasTooSoonSession() || vm.hasDuplicateSessions() || vm.hasInvalidTimeRangeSession() || vm.hasDurationMismatchSession() || vm.hasProfaneBookingMessage()">
             Dispatch Booking Request →
           </button>
 

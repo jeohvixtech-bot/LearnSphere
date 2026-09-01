@@ -1,0 +1,59 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item active">🔄 Reschedule Rejections</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="card">
+      <span class="label-tag red">Preset-Class Reschedule Rejections</span>
+      <h3>Reschedule Rejection Queue</h3>
+      <p class="text-muted">A tutor proposed a new date for a published class and the parent declined it, asking for a refund instead. Nothing happens automatically — resolving one here issues the credit and charges the tutor's 20% penalty.</p>
+
+      <div class="alert-success" ng-if="vm.rescheduleResolveSuccess" style="margin-bottom:12px">
+        ✓ Resolved — credit issued and penalty applied.
+      </div>
+
+      <div class="empty-state-box large" ng-if="!vm.rescheduleQueue.length">
+        ✔️ No pending reschedule rejections to review.
+      </div>
+
+      <div class="dispute-card" ng-repeat="d in vm.rescheduleQueue">
+        <div class="dispute-card-header">
+          <div>
+            <strong class="text-danger">REJECTED RESCHEDULE #{{ d.id }}</strong>
+            <p>Booking {{ d.bookingNumber }} · {{ d.subject }}</p>
+          </div>
+          <span class="status-badge pending">PENDING_REVIEW</span>
+        </div>
+        <div class="dispute-details">
+          <p><strong>Tutor:</strong> {{ d.tutorName }}</p>
+          <p><strong>Parent:</strong> {{ d.parentName }} ({{ d.studentName }})</p>
+          <p><strong>Original class:</strong> {{ d.originalDate | dmy }}, {{ d.originalTime | hhmma }}</p>
+          <p><strong>Proposed new date:</strong> {{ d.proposedDate | dmy }}, {{ d.proposedTime | hhmma }} — declined by parent</p>
+          <p><strong>Class fee:</strong> ${{ d.pricePerLesson }} · <strong>Tutor penalty on resolve:</strong> ${{ (d.pricePerLesson * 0.2).toFixed(2) }}</p>
+          <small class="mono">Reported: {{ d.createdAt }}</small>
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <label>Admin note (optional)</label>
+          <input type="text" ng-model="d._adminNote" placeholder="e.g. Confirmed with parent, processing refund." />
+        </div>
+        <div class="dispute-actions">
+          <button class="btn-danger" ng-disabled="vm.rescheduleActionBusy" ng-click="vm.resolveRescheduleRejection(d)">
+            ✓ Issue Credit &amp; Apply Penalty
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

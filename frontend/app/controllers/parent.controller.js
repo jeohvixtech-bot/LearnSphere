@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('ParentCtrl', ['$location', '$timeout', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService',
-function ($location, $timeout, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService) {
+.controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -24,6 +24,16 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.invoices = [];
   self.chatMessages = [];
   self.selectedTutor = null;
+  self.pinnedTutorId = null;
+  // AngularJS template expressions run in a sandboxed evaluator that doesn't
+  // expose global functions like String() — calling it there silently returns
+  // undefined instead of throwing, so String(t.id) === String(vm.pinnedTutorId)
+  // used directly in ng-if/ng-class always reduces to undefined === undefined
+  // (always true). Do the comparison here in real JS instead and call this
+  // from the template.
+  self.isPinnedTutor = function (t) {
+    return String(t.id) === String(self.pinnedTutorId);
+  };
 
   // AI Speed Match
   self.aiMatchSelectedStudentId = null;
@@ -34,6 +44,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.aiMatchAppliedStudentId = null;
   self.aiMatchAppliedSubject = '';
   self.aiMatchResults = [];
+  self.aiMatchScoresLoading = false;
   self.applyAiMatch = function (s) {
     self.aiMatchSelectedStudentId = s.id;
     self.aiMatchAppliedStudentId = s.id;
@@ -42,11 +53,51 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     var combo = (s.subjectCombos || []).find(function (c) {
       return (c.country + ' · ' + c.level + ' · ' + c.subject) === self.aiMatchAppliedSubject;
     });
-    var subjectName = combo ? combo.subject : '';
-    self.aiMatchResults = self.tutors.filter(function (t) {
-      return (t.offerings || []).some(function (o) { return o.subject === subjectName; }) ||
-             (t.subjects || []).indexOf(subjectName) >= 0;
-    });
+    // Filters, all of which must pass:
+    //  - Subject + level + country together (same fix as filteredTutors()'s
+    //    matchSub) — a bare subject-name check would pass a tutor teaching the
+    //    same subject at a completely different level than the child needs.
+    //  - Teaching mode — the child's saved preferredModes must overlap with the
+    //    tutor's offered modes; a strict online-only/home-visit-only mismatch
+    //    isn't something ranking can fix, so it's excluded outright rather than
+    //    just ranked lower. No preferredModes saved = no mode filter applied.
+    //  - Availability (tutor currently accepting bookings) is already covered
+    //    upstream — self.tutors only ever contains IsVerified && IsOnline
+    //    tutors (see TutorsController.GetAll), so nothing further is needed here.
+    var preferredModes = s.preferredModes || [];
+    var matched = combo ? self.tutors.filter(function (t) {
+      var subjectMatch = (t.offerings || []).some(function (o) {
+        return o.subject === combo.subject && o.level === combo.level && o.country === combo.country;
+      });
+      var modeMatch = !preferredModes.length || (t.modes || []).some(function (m) {
+        return preferredModes.indexOf(m) >= 0;
+      });
+      // Same rule as the catalog's filteredTutors() — booking now only happens
+      // from a tutor's published preset classes, so a tutor with none isn't a
+      // useful match result right now.
+      var hasPresetClasses = self.tutorHasAnySlots(t);
+      return subjectMatch && modeMatch && hasPresetClasses;
+    }) : [];
+    self.aiMatchResults = matched;
+    if (!matched.length) return;
+
+    // Rank by AI Speed Match score (admin-configured weightage × tutor's live
+    // rating/experience/this-month activeness/disputes — see TutorsController.
+    // GetMatchScores), highest first; price breaks ties among equal scores
+    // (cheaper tutor ranks higher), never overriding a better score outright.
+    self.aiMatchScoresLoading = true;
+    TutorService.getMatchScores().then(function (res) {
+      var scoreByTutor = {};
+      res.data.forEach(function (m) { scoreByTutor[m.tutorId] = m; });
+      matched.forEach(function (t) { t.matchScore = scoreByTutor[t.id] || null; });
+      self.aiMatchResults = matched.slice().sort(function (a, b) {
+        var sa = a.matchScore ? a.matchScore.score : -Infinity;
+        var sb = b.matchScore ? b.matchScore.score : -Infinity;
+        if (sb !== sa) return sb - sa;
+        return a.pricePerSession - b.pricePerSession;
+      });
+      self.aiMatchScoresLoading = false;
+    }).catch(function () { self.aiMatchScoresLoading = false; });
   };
 
   // Personalize My Class
@@ -93,15 +144,150 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   // Search / filter state
   self.searchQuery = '';
   self.selectedCountry = 'Singapore';
-  self.selectedSubject = 'All';
+  // null = "All Subjects"; otherwise the whole {examType, subject, level, label} catalog
+  // entry — filtering needs the level too, not just the subject name (see filteredTutors).
+  self.selectedSubject = null;
   self.selectedMode = 'All';
   self.minRating = 0;
+
+  // Flow B — booking a tutor's already-published class (picked via a catalog
+  // card's "View & Book" row button, see viewAndBookPreset/selectTutor below)
+  // confirms immediately, no per-request tutor approval. State for that flow's
+  // invoice summary + receipt (see confirmPresetGroupBooking below).
+  self.selectedPresetGroup = null;
+  self.presetBookingBusy = false;
+  self.presetBookingError = '';
+  self.presetBookingSuccess = false;
+  self.presetBookingReceipt = null;
+
+  // Books every occurrence in the selected preset class group as ONE booking
+  // (BookPreset takes an array of slot ids and creates a single Booking with one
+  // class per occurrence — same as how a parent-offer booking already covers
+  // multiple sessions) so it shows up as one entry in Sessions & Activity, not
+  // one per occurrence.
+  self.confirmPresetGroupBooking = function () {
+    var group = self.selectedPresetGroup;
+    if (!group || !self.bookingForm.studentId || self.presetBookingBusy) return;
+
+    self.presetBookingBusy = true;
+    self.presetBookingError = '';
+
+    BookingService.bookPreset({
+      presetSlotIds: group.slots.map(function (s) { return s.id; }),
+      studentId: self.bookingForm.studentId
+    }).then(function (res) {
+      var createdBooking = res.data;
+      // The button says "Confirm Payment" — actually pay the invoice immediately
+      // here rather than just creating it Unpaid, unlike the tutor-approval
+      // request flow (submitBooking) which genuinely can't charge until the
+      // tutor accepts. Otherwise "Pay Invoice" would still show as outstanding
+      // in Sessions & Activity right after a parent thinks they've just paid.
+      return InvoiceService.getAll().then(function (r) {
+        self.invoices = r.data;
+        var inv = self.invoices.find(function (i) { return i.bookingId === createdBooking.id; });
+        return inv ? InvoiceService.pay(inv.id) : $q.when();
+      }).then(function () {
+        return InvoiceService.getAll();
+      }).then(function (r2) {
+        self.invoices = r2.data;
+        return createdBooking;
+      });
+    }).then(function (createdBooking) {
+      self.presetBookingBusy = false;
+      self.presetBookingSuccess = true;
+      var student = self.students.find(function (x) { return x.id === self.bookingForm.studentId; });
+      self.presetBookingReceipt = {
+        tutorName: self.selectedTutor.name,
+        studentName: student ? student.name : '',
+        subject: group.subject,
+        level: group.level,
+        mode: group.mode,
+        pricePerLesson: group.pricePerLesson,
+        total: createdBooking.totalPrice,
+        booking: createdBooking
+      };
+      BookingService.getAll().then(function (r) { self.bookings = r.data; });
+      // Refresh the catalog so the booked occurrences drop out of / update in
+      // everyone's "Available classes" chips (fill count, isFull, etc).
+      TutorService.getAll({ includePresetSlots: true }).then(function (res2) {
+        self.tutors = res2.data;
+        self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
+      });
+      $timeout(function () {
+        self.presetBookingSuccess = false;
+        self.presetBookingReceipt = null;
+        self.selectedTutor = null;
+        self.selectedPresetGroup = null;
+        $location.path('/parent/sessions');
+      }, 3500);
+    }).catch(function (err) {
+      self.presetBookingBusy = false;
+      self.presetBookingError = (err.data && err.data.message) || 'Booking failed. Please try again.';
+    });
+  };
   self.minExperience = 0;
-  self.filtersExpanded = true;
 
   self.selectSearchCountry = function (c) {
     self.selectedCountry = c;
-    self.selectedSubject = 'All';
+    self.selectedSubject = null;
+  };
+
+  // Finds the catalog entry matching a given subject+level (used when a tutor card's
+  // subject chip is clicked, so the filter dropdown highlights the same entry it just
+  // applied — ng-options matches by object identity, so a freshly-built object with the
+  // same fields wouldn't show as selected even though it'd filter correctly either way).
+  self.findSubjectCatalogEntry = function (country, subject, level) {
+    return (self.subjectCatalog[country] || []).find(function (opt) {
+      return opt.subject === subject && opt.level === level;
+    }) || { examType: '', subject: subject, level: level, label: subject + ' (' + level + ')' };
+  };
+
+  var COUNTRY_ABBREV = { Singapore: 'SG', Malaysia: 'MY' };
+  var SUBJECT_ABBREV = {
+    'Mathematics': 'Maths',
+    'Additional Mathematics': 'A. Maths',
+    'English Language': 'English',
+    'Mother Tongue (Chinese)': 'Chinese',
+    'Mother Tongue (Malay)': 'Malay',
+    'Mother Tongue (Tamil)': 'Tamil',
+    'Combined Science': 'Comb. Science',
+    'Literature in English': 'Literature',
+    'Principles of Accounts': 'POA',
+    'Social Studies': 'Soc. Studies',
+    'Design & Technology': 'D&T',
+    'Food & Nutrition': 'F&N',
+    'General Paper': 'GP',
+    'Bahasa Malaysia': 'BM',
+    'Business Studies': 'Biz Studies',
+    'Information Technology': 'IT'
+  };
+
+  // Card-tag abbreviation for the compact "SG · P6 · Maths" chip format — the
+  // detailed tooltip/booking view keeps full text (e.g. "Mathematics · Primary 6"),
+  // this is only for the dense catalog-card tags where space is tight.
+  function abbreviateLevel(level) {
+    if (!level) return '';
+    var m = level.match(/^Primary\s+(\d+)$/i);
+    if (m) return 'P' + m[1];
+    m = level.match(/^Secondary\s+(\d+)$/i);
+    if (m) return 'Sec' + m[1];
+    if (/PSLE/i.test(level)) return 'PSLE';
+    if (/SPM/i.test(level)) return 'SPM';
+    if (/UPSR/i.test(level)) return 'UPSR';
+    if (/PT3/i.test(level)) return 'PT3';
+    if (/STPM/i.test(level)) return 'STPM';
+    return level;
+  }
+
+  self.abbreviateSubject = function (subject) {
+    return SUBJECT_ABBREV[subject] || subject;
+  };
+
+  self.abbreviateOffering = function (o) {
+    if (!o) return '';
+    var country = COUNTRY_ABBREV[o.country] || o.country;
+    var level = abbreviateLevel(o.level);
+    return country + ' · ' + level + ' · ' + self.abbreviateSubject(o.subject);
   };
 
   // Booking form
@@ -128,10 +314,22 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   self.studentSuccess = false;
   self.newlyAddedStudentId = null;
 
+  // Preferred teaching-modes dual-pool for the "Add New Child" form — the student
+  // doesn't exist yet, so this is saved via a follow-up PATCH right after creation.
+  self.newStudentPreferredLeft = TeachingModesCatalog.slice();
+  self.newStudentPreferredRight = [];
+  self.newStudentPreferredModesError = '';
+
   // Edit student state
   self.editingStudent = null;
   self.editStudentForm = {};
   self.editStudentSubjects = []; // [{country, level, subject}]
+
+  // Preferred teaching-modes dual-pool selector (drag-and-drop, right pool is ordered).
+  // Rebuilt into plain arrays only on edit-open/change, never inline in the template.
+  self.preferredLeft = [];
+  self.preferredRight = [];
+  self.preferredModesError = '';
   self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
 
   // Parent profile panel
@@ -169,7 +367,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     if (!confirm('This will permanently close your account and cannot be undone. Continue?')) return;
     ParentProfileService.close(self.parentProfile.id).then(function () {
       AuthService.logout();
-      $location.path('/login');
+      $location.path('/welcome');
     });
   };
 
@@ -336,6 +534,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   self.onRescheduleStartTimeChange = function (c) {
+    c.proposedStartTime = normalizeTimeToAmPm(c.proposedStartTime);
     var end = self.rescheduleEndTime(c);
     c.time = end ? (c.proposedStartTime + ' - ' + end) : c.proposedStartTime;
   };
@@ -355,6 +554,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.submitReschedule = function () {
     if (!self.rescheduleBooking) return;
+    if (self.hasInvalidReschedule()) return;
     if (self.hasTooSoonReschedule()) return;
     if (self.hasDurationMismatchReschedule()) return;
     if (self.hasDuplicateReschedule()) return;
@@ -399,28 +599,147 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Load data
   function init() {
-    TutorService.getAll().then(function (res) {
+    // Consumed synchronously up front (PendingMatchService is a plain in-memory
+    // store, no async needed) so both loads below — which run in parallel with no
+    // guaranteed order — can agree on the same values regardless of which
+    // resolves first, rather than racing to set self.bookingForm.studentId.
+    var pendingTutorId = PendingMatchService.consumeTutor();
+    var pendingPresetGroupId = PendingMatchService.consumePresetGroupId();
+    var pendingStudentId = PendingMatchService.consumeStudentId();
+
+    TutorService.getAll({ includePresetSlots: true }).then(function (res) {
       self.tutors = res.data;
-      var pendingTutorId = PendingMatchService.consumeTutor();
-      if (pendingTutorId) {
+      // Preset slot strip on each tutor card (search page) reads straight off
+      // each tutor's own t.timetable (see computeTutorPresetSummary below) —
+      // that's already included in this response, no per-tutor round trip needed.
+      // Computed once here (not from the template) to avoid $rootScope:infdig.
+      self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
+
+      // A pending tutor WITH a preset group is the AI Speed Match "View & Book"
+      // hand-off — jump straight to that class's booking summary, same as
+      // clicking the chip directly would. Without a group (e.g. a signed-out
+      // visitor clicking a tutor card on the welcome page — see
+      // WelcomeCtrl.goToLogin), there's no specific class to jump to yet, so
+      // don't guess: just pin the card below instead of auto-opening anything.
+      if (pendingTutorId && pendingPresetGroupId) {
         var t = self.tutors.find(function (x) { return x.id === pendingTutorId; });
-        if (t) self.selectTutor(t);
+        if (t) {
+          // Carry the chip selection from AI Speed Match over onto this
+          // freshly-loaded tutor object — selectTutor() below reads it straight
+          // off the tutor, same as a chip clicked directly on this page would.
+          t._selectedPresetGroupId = pendingPresetGroupId;
+          self.selectTutor(t, pendingStudentId);
+        }
+      }
+
+      // Pin — deliberately separate from the one-shot consume above.
+      // PendingMatchService.getTutor() doesn't clear its value on read, so this
+      // re-derives correctly every time ParentCtrl is re-instantiated (every
+      // /parent/* route change creates a fresh one), letting the pin survive
+      // navigating away and back until the user actually logs out.
+      var pinnedId = PendingMatchService.getTutor ? PendingMatchService.getTutor() : null;
+      if (pinnedId) {
+        var pinnedTutor = self.tutors.find(function (x) { return String(x.id) === String(pinnedId); });
+        if (pinnedTutor) {
+          // Auto-switch country filter to match the tutor's country so their
+          // pinned card is actually visible under the current filters.
+          if (pinnedTutor.country) {
+            self.selectedCountry = pinnedTutor.country;
+          } else if (pinnedTutor.offerings && pinnedTutor.offerings.length) {
+            self.selectedCountry = pinnedTutor.offerings[0].country || self.selectedCountry;
+          }
+          self.pinnedTutorId = pinnedId;
+        } else {
+          self.pinnedTutorId = null;
+        }
       }
     });
     StudentService.getMyStudents().then(function (res) {
       self.students = res.data;
       self.students.forEach(function (s) { s.subjectCombos = self.parseSubjectCombos(s.subjectSelect, s.educationLevel); });
-      var firstActive = self.students.find(function (s) { return !s.isArchived; });
-      if (firstActive) {
-        self.bookingForm.studentId = firstActive.id;
+      // Computes the exact same target selectTutor() above would, so it doesn't
+      // matter which of these two parallel loads resolves first — a pending
+      // student (from an AI Speed Match hand-off) wins if still valid/active,
+      // otherwise the first active child, same as before.
+      var activeStudents = self.activeStudents();
+      var preferredValid = pendingStudentId && activeStudents.some(function (s) { return s.id === pendingStudentId; });
+      if (preferredValid) self.bookingForm.studentId = pendingStudentId;
+      else if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
+    });
+    BookingService.getAll().then(function (res) {
+      self.bookings = res.data;
+      // A parent can only message a tutor they actually have a relationship with —
+      // pick the first contactable tutor once bookings are known, not an arbitrary
+      // one from the full public catalog.
+      computeContactableTutors();
+      if ($location.path() === '/parent/chat') {
+        self.loadUnreadCounts();
+        if (self.contactableTutors.length) self.loadChat(self.contactableTutors[0].id);
       }
     });
-    BookingService.getAll().then(function (res) { self.bookings = res.data; });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
     TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
+
+    // Forced "tutor cancelled your class" popup — only checked/shown on the
+    // dashboard page (explicit requirement), but reappears every time the
+    // parent lands back there until every pending item is resolved. The GET
+    // itself also sweeps auto-accept server-side (see
+    // PresetCancellationsController.GetMine), so a proposal nobody responded
+    // to before its date/time passed shows up already resolved, not pending.
+    if ($location.path() === '/parent/dashboard') {
+      PresetCancellationService.getMine().then(function (res) {
+        self.pendingCancellations = res.data;
+      });
+    }
   }
   init();
+
+  self.pendingCancellations = [];
+  self.cancellationActionBusy = false;
+  self.cancellationActionError = '';
+
+  self.currentCancellation = function () {
+    return self.pendingCancellations.length ? self.pendingCancellations[0] : null;
+  };
+
+  self.acceptCancellation = function (decision) {
+    self.cancellationActionBusy = true;
+    self.cancellationActionError = '';
+    PresetCancellationService.accept(decision.id).then(function () {
+      self.pendingCancellations = self.pendingCancellations.filter(function (d) { return d.id !== decision.id; });
+      self.cancellationActionBusy = false;
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    }).catch(function (err) {
+      self.cancellationActionBusy = false;
+      self.cancellationActionError = (err.data && err.data.message) || 'Could not process this. Please try again.';
+    });
+  };
+
+  self.rejectCancellation = function (decision) {
+    self.cancellationActionBusy = true;
+    self.cancellationActionError = '';
+    PresetCancellationService.reject(decision.id).then(function () {
+      self.pendingCancellations = self.pendingCancellations.filter(function (d) { return d.id !== decision.id; });
+      self.cancellationActionBusy = false;
+    }).catch(function (err) {
+      self.cancellationActionBusy = false;
+      self.cancellationActionError = (err.data && err.data.message) || 'Could not process this. Please try again.';
+    });
+  };
+
+  self.acknowledgeCancellation = function (decision) {
+    self.cancellationActionBusy = true;
+    self.cancellationActionError = '';
+    PresetCancellationService.acknowledge(decision.id).then(function () {
+      self.pendingCancellations = self.pendingCancellations.filter(function (d) { return d.id !== decision.id; });
+      self.cancellationActionBusy = false;
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    }).catch(function (err) {
+      self.cancellationActionBusy = false;
+      self.cancellationActionError = (err.data && err.data.message) || 'Could not process this. Please try again.';
+    });
+  };
 
   // Favorite tutors
   self.isFavorited = function (tutorId) {
@@ -442,30 +761,335 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Filtered tutors
   self.filteredTutors = function () {
-    return self.tutors.filter(function (t) {
+    // Pinned tutor (see init()) always leads and is pulled out of the SOURCE list
+    // before any filter runs — including hasPresetClasses — so it stays visible
+    // after a welcome-page hand-off even with zero live preset slots. It's re-
+    // prepended after filtering/sorting the rest.
+    var pinned = null;
+    var source = self.tutors.filter(function (t) {
+      if (String(t.id) === String(self.pinnedTutorId)) { pinned = t; return false; }
+      return true;
+    });
+
+    var all = source.filter(function (t) {
       var q = self.searchQuery.toLowerCase();
       var matchQuery = !q || t.name.toLowerCase().indexOf(q) >= 0 ||
         t.subjects.some(function (s) { return s.toLowerCase().indexOf(q) >= 0; }) ||
         (t.qualifications || []).some(function (ql) { return ql.toLowerCase().indexOf(q) >= 0; });
       var matchCountry = (t.offerings || []).some(function (o) { return o.country === self.selectedCountry; });
-      var matchSub = self.selectedSubject === 'All' || t.subjects.indexOf(self.selectedSubject) >= 0;
+      // Matches on subject AND level together (via the tutor's actual offerings) — a
+      // bare subject-name check would pass for a tutor teaching the subject at a
+      // completely different level than the one selected.
+      var matchSub = !self.selectedSubject || (t.offerings || []).some(function (o) {
+        return o.subject === self.selectedSubject.subject && o.level === self.selectedSubject.level;
+      });
       var matchMode = self.selectedMode === 'All' || t.modes.indexOf(self.selectedMode) >= 0;
       var matchRating = !self.minRating || t.rating >= self.minRating;
       var matchExperience = !self.minExperience || t.experienceYears >= self.minExperience;
-      return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience;
-    }).sort(function (a, b) {
-      return (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
+      // The catalog only ever books from a tutor's published preset classes now
+      // (see viewAndBookPreset) — a tutor with none isn't bookable from this page,
+      // so hide them entirely rather than showing a card with no action on it.
+      var hasPresetClasses = self.tutorHasAnySlots(t);
+      return matchQuery && matchCountry && matchSub && matchMode && matchRating && matchExperience && hasPresetClasses;
     });
+
+    // Favorited-first, then rating descending as a tiebreaker within each group —
+    // without this, order within a group was whatever it happened to be beforehand.
+    all.sort(function (a, b) {
+      var favDiff = (self.isFavorited(b.id) ? 1 : 0) - (self.isFavorited(a.id) ? 1 : 0);
+      if (favDiff !== 0) return favDiff;
+      return (b.rating || 0) - (a.rating || 0);
+    });
+
+    // The pin bypasses subject/mode/rating/experience/preset-slot filters (see
+    // comment above) but not Country — a tutor with zero offerings in the
+    // selected country has nothing to show here regardless of the pin.
+    var pinnedMatchesCountry = pinned && (pinned.offerings || []).some(function (o) {
+      return o.country === self.selectedCountry;
+    });
+
+    return pinnedMatchesCountry ? [pinned].concat(all) : all;
   };
 
-  // Select a tutor to book
-  self.selectTutor = function (tutor) {
+  // ── Next month label e.g. "Aug 2026" ──────────────────────────────
+  self.nextMonthLabel = function () {
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return months[d.getMonth()] + ' ' + d.getFullYear();
+  };
+
+  // ── Returns the "upcoming" date range as YYYY-MM-DD strings: today
+  // through the end of next month. Deliberately NOT just next calendar
+  // month alone — a slot dated later this month (e.g. published 9 days out)
+  // is exactly the kind of imminent, bookable class this strip exists to
+  // surface, and excluding it just because it isn't technically "next
+  // month" would hide real, useful data for no good reason.
+  self._nextMonthRange = function () {
+    var now = new Date();
+    var y = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+    var m = (now.getMonth() + 1) % 12;
+    var end = new Date(y, m + 1, 0);
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    var fmt = function (d) { return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); };
+    var start = now;
+    return { start: fmt(start), end: fmt(end) };
+  };
+
+  // Preset-slot summary for one tutor — computed ONCE per tutor (see init(),
+  // where this is called right after self.tutors loads) and cached on
+  // t._presetSummary, NOT recomputed from the template. tutorNextMonthSlots/
+  // tutorHasAnySlots/tutorSlotsBySubject/tutorSubjectsWithoutSlots below are
+  // called directly from ng-if/ng-repeat in the template; a function called
+  // from there that builds fresh arrays/objects every call never stabilizes
+  // and trips Angular's infinite-digest guard ($rootScope:infdig) — the
+  // original version of this code did exactly that (same trap fixed
+  // elsewhere for setupClassUniqueSubjects/computeContactableTutors, just
+  // missed here when this feature was first built).
+  function computeTutorPresetSummary(t) {
+    var range = self._nextMonthRange();
+    var slots = (t.timetable || []).filter(function (s) {
+      return s.mode && s.day >= range.start && s.day <= range.end;
+    }).map(function (s) {
+      return {
+        id: s.id,
+        date: s.day,
+        startTime: s.time,
+        endTime: s.endTime,
+        isFull: s.isFull,
+        subject: s.subject,
+        level: s.level,
+        mode: s.mode,
+        classSize: s.classSize,
+        pricePerLesson: s.pricePerLesson,
+        confirmedCount: s.confirmedCount,
+        maxStudents: s.maxStudents,
+        presetGroupId: s.presetGroupId,
+        syllabusTopics: s.syllabusTopics || []
+      };
+    });
+
+    var groups = {};
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Grouped by preset-id (one id per Setup Class submission, assigned server-side —
+    // see SetupClass in TutorsController) rather than subject+mode, so a class only
+    // merges with the OTHER occurrences it was actually published together with, not
+    // every unrelated slot that happens to share the same subject. Falls back to
+    // subject|mode for any pre-migration row that somehow still lacks a group id.
+    slots.forEach(function (s) {
+      var key = s.presetGroupId || (s.subject + '|' + s.mode);
+      if (!groups[key]) {
+        groups[key] = {
+          presetGroupId: key,
+          subject: s.subject,
+          level: s.level,
+          mode: s.mode,
+          classSize: s.classSize,
+          pricePerLesson: s.pricePerLesson,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          recurrenceLabel: '',
+          syllabusTopics: s.syllabusTopics || [],
+          slots: []
+        };
+      }
+      var d = new Date(s.date + 'T00:00:00');
+      groups[key].slots.push({
+        id: s.id,
+        date: s.date,
+        dateFormatted: days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()],
+        dateShort: d.getDate() + ' ' + months[d.getMonth()],
+        startTime: s.startTime,
+        endTime: s.endTime,
+        isFull: s.isFull,
+        classSize: s.classSize,
+        confirmedCount: s.confirmedCount || 0,
+        maxStudents: s.maxStudents || 1
+      });
+    });
+
+    var nm = self.nextMonthLabel().split(' ');
+    var groupList = Object.keys(groups).map(function (k) { return groups[k]; });
+    groupList.forEach(function (g) {
+      g.slots.sort(function (a, b) { return a.date.localeCompare(b.date); });
+      if (g.slots.length > 0) {
+        var d = new Date(g.slots[0].date + 'T00:00:00');
+        g.recurrenceLabel = 'Every ' + ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()] + ', ' + nm[0] + ' ' + nm[1];
+      }
+    });
+
+    var subjectsWithSlots = groupList.map(function (g) { return g.subject; });
+    var subjectsWithoutSlots = (t.offerings || []).filter(function (o) {
+      return subjectsWithSlots.indexOf(o.subject) < 0;
+    }).reduce(function (acc, o) {
+      if (!acc.some(function (x) { return x.subject === o.subject; })) acc.push(o);
+      return acc;
+    }, []);
+
+    return {
+      openSlots: slots.filter(function (s) { return !s.isFull; }),
+      hasAny: slots.length > 0,
+      groups: groupList,
+      subjectsWithoutSlots: subjectsWithoutSlots
+    };
+  }
+
+  // ── All preset slots for a tutor in next month ────────────────────
+  self.tutorNextMonthSlots = function (t) {
+    return (t._presetSummary && t._presetSummary.openSlots) || [];
+  };
+
+  // ── Does the tutor have ANY preset slots (full or not) next month ─
+  self.tutorHasAnySlots = function (t) {
+    return !!(t._presetSummary && t._presetSummary.hasAny);
+  };
+
+  // ── Group tutor's next month slots by subject ─────────────────────
+  self.tutorSlotsBySubject = function (t) {
+    return (t._presetSummary && t._presetSummary.groups) || [];
+  };
+
+  // ── Subjects tutor teaches but has NO preset slot next month ───────
+  self.tutorSubjectsWithoutSlots = function (t) {
+    return (t._presetSummary && t._presetSummary.subjectsWithoutSlots) || [];
+  };
+
+  // ── Mode icon helper (Tabler icon suffix) ─────────────────────────
+  self.modeIcon = function (mode) {
+    var map = {
+      'Online': 'video',
+      'Tutor Place': 'building',
+      'Tuition Center': 'building'
+    };
+    return map[mode] || 'calendar';
+  };
+
+  // Each row in the catalog/AI-Match "Available classes" list has its own View &
+  // Book button — jumps straight to the booking summary for THAT class (via
+  // selectTutor()'s existing t._selectedPresetGroupId pre-fill logic), no
+  // separate select-then-click-a-shared-button step needed.
+  self.viewAndBookPreset = function (t, sg) {
+    t._selectedPresetGroupId = sg.presetGroupId;
+    self.selectTutor(t);
+  };
+
+  // AI Speed Match equivalent of viewAndBookPreset — this page has no in-page
+  // booking-detail section of its own, so it reuses goToBookTutor's existing
+  // PendingMatchService hand-off to land on that section over on /parent/search.
+  self.viewAndBookPresetMatch = function (t, sg) {
+    t._selectedPresetGroupId = sg.presetGroupId;
+    self.goToBookTutor(t);
+  };
+
+  // The preset-class list (.tutor-slot-list) scrolls internally (max ~4 rows
+  // visible) — a plain CSS :hover + position:absolute tooltip would get
+  // clipped by that scroll box the moment its content is taller than the box
+  // itself, even with nothing currently scrolled (overflow:auto clips
+  // absolutely-positioned descendants unconditionally, not just while
+  // scrolled). Computing position:fixed coordinates here escapes that
+  // clipping entirely, since fixed positioning is relative to the viewport,
+  // not any scrolling ancestor.
+  self.showRowTooltip = function (sg, $event) {
+    // Cancel any pending hide from a moment ago (e.g. the cursor briefly left
+    // the row and came straight back) so it doesn't fire after this call.
+    if (sg._tooltipHideTimer) { $timeout.cancel(sg._tooltipHideTimer); sg._tooltipHideTimer = null; }
+
+    var rowRect = $event.currentTarget.getBoundingClientRect();
+
+    // Clamp so a row hovered near the right edge doesn't push the tooltip
+    // off-screen — keep tooltipWidth in sync with .slot-tooltip's width in main.css.
+    var tooltipWidth = 435;
+    var left = Math.min(rowRect.left, window.innerWidth - tooltipWidth - 12);
+
+    // Anchored directly below the hovered row by default — may overlap
+    // whichever sibling row sits right beneath it, an accepted tradeoff so
+    // the tooltip appears next to the subject you're hovering rather than at
+    // one shared position regardless of which row triggered it. Flips ABOVE
+    // the row only when there isn't enough room left below it in the
+    // viewport, so a row near the bottom of the screen doesn't get its
+    // tooltip clipped by the browser window instead. Anchoring with `bottom`
+    // (grows upward) rather than computing `top` from an estimated height
+    // works regardless of the tooltip's actual rendered height, which varies
+    // with how many dates are in the schedule.
+    var spaceBelow = window.innerHeight - rowRect.bottom;
+    var flipUp = spaceBelow < 260;
+
+    sg._tooltipStyle = flipUp ? {
+      display: 'block',
+      top: 'auto',
+      bottom: (window.innerHeight - rowRect.top + 6) + 'px',
+      left: left + 'px'
+    } : {
+      display: 'block',
+      top: (rowRect.bottom + 6) + 'px',
+      bottom: 'auto',
+      left: left + 'px'
+    };
+  };
+
+  // Hides after a short delay rather than immediately — ng-if destroys the
+  // tooltip element the instant _tooltipStyle goes null, so an immediate hide
+  // on the row's mouseleave removes it before the cursor can ever cross the
+  // gap and land on the tooltip itself (which has the matching mouseenter
+  // below to cancel this timer). Re-entering either the row or the tooltip
+  // within the delay window cancels it; only truly leaving both hides it.
+  self.hideRowTooltip = function (sg) {
+    if (sg._tooltipHideTimer) $timeout.cancel(sg._tooltipHideTimer);
+    sg._tooltipHideTimer = $timeout(function () {
+      sg._tooltipStyle = null;
+      sg._tooltipHideTimer = null;
+    }, 200);
+  };
+
+  // Bound to the tooltip's own mouseenter — the cursor has successfully
+  // crossed the gap, so cancel the pending hide without recomputing position
+  // (unlike showRowTooltip, which needs the ROW's rect, not the tooltip's).
+  self.keepTooltipOpen = function (sg) {
+    if (sg._tooltipHideTimer) { $timeout.cancel(sg._tooltipHideTimer); sg._tooltipHideTimer = null; }
+  };
+
+  // 'YYYY-MM-DD' (as stored/returned by the API) -> 'DD-MM-YYYY' (what the
+  // booking form's fp-date-bound session.date fields expect — see filters.js).
+  function toDdMmYyyy(ymd) {
+    var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+  }
+
+  // Select a tutor to book. preferredStudentId (optional) is the child a match
+  // was actually run for (e.g. AI Speed Match, via PendingMatchService) — when
+  // given and valid, it wins over the plain "first active child" default, so a
+  // booking made off an AI Speed Match result doesn't silently land on whichever
+  // child happens to be first in the parent's list instead of the one matched.
+  self.selectTutor = function (tutor, preferredStudentId) {
     self.selectedTutor = tutor;
+    self.selectedPresetGroup = null;
+    self.presetBookingError = '';
     self.bookingForm.subject = tutor.subjects[0] || '';
     self.bookingForm.classesPerMonth = 1;
     self.bookingForm.sessions = [{ date: '', startTime: '04:00 PM', endTime: '05:00 PM', recurring: false }];
     var activeStudents = self.activeStudents();
-    if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
+    var preferredValid = preferredStudentId && activeStudents.some(function (s) { return s.id === preferredStudentId; });
+    if (preferredValid) self.bookingForm.studentId = preferredStudentId;
+    else if (activeStudents.length) self.bookingForm.studentId = activeStudents[0].id;
+
+    // A published class chip was selected first — carry its subject and exact
+    // schedule (one session row per still-bookable occurrence) into the booking
+    // form/invoice summary. The parent only needs to pick a child from here.
+    // Already-full occurrences are dropped — nothing left to book there.
+    var groupId = tutor._selectedPresetGroupId;
+    var group = groupId && tutor._presetSummary &&
+      (tutor._presetSummary.groups || []).find(function (g) { return g.presetGroupId === groupId; });
+    var openSlots = group ? group.slots.filter(function (s) { return !s.isFull; }) : [];
+    if (group && openSlots.length > 0) {
+      self.selectedPresetGroup = angular.extend({}, group, { slots: openSlots });
+      self.bookingForm.subject = group.subject;
+      self.bookingForm.classesPerMonth = openSlots.length;
+      self.bookingForm.sessions = openSlots.map(function (s) {
+        return { date: toDdMmYyyy(s.date), startTime: s.startTime, endTime: s.endTime, recurring: false };
+      });
+    }
 
     self.tutorCal.year = _scNow.getFullYear();
     self.tutorCal.month = _scNow.getMonth();
@@ -475,10 +1099,13 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
   };
 
   // Jump from AI Speed Match results straight into the booking flow on the search page.
-  // Route changes re-instantiate ParentCtrl, so the tutor id is handed off via PendingMatchService
-  // and picked back up once the search page's tutor list has loaded (see init()).
+  // Route changes re-instantiate ParentCtrl, so the tutor id (and, if a preset class
+  // chip was selected on the AI Match card, its group id too) is handed off via
+  // PendingMatchService and picked back up once the search page's tutor list has
+  // loaded (see init()) — landing straight on the booking summary instead of the
+  // plain request form, same as picking a chip directly on the search page does.
   self.goToBookTutor = function (tutor) {
-    PendingMatchService.setTutor(tutor.id);
+    PendingMatchService.setTutor(tutor.id, tutor._selectedPresetGroupId, self.aiMatchAppliedStudentId);
     $location.path('/parent/search');
   };
 
@@ -549,6 +1176,13 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  self.hasInvalidReschedule = function () {
+    return (self.rescheduleForm.classes || []).some(function (c) {
+      if (c.date && !toDateObj(c.date)) return true;
+      return parseClockTimeMinutes(c.proposedStartTime) === null;
+    });
+  };
+
   self.hasTooSoonReschedule = function () {
     return (self.rescheduleForm.classes || []).some(function (c) {
       return c.date && self.isTooSoon(c.date, c.time);
@@ -595,6 +1229,47 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     }), 'date', 'time');
   };
 
+  // Parses "H:MM AM/PM" into minutes since midnight, or null if unrecognizable OR the
+  // hour is out of the valid 1-12 range for 12-hour format (e.g. "19:00 PM" — a
+  // self-contradictory 24-hour hour with an AM/PM suffix tacked on; can't be auto-fixed
+  // since it's ambiguous what was actually meant, so it's rejected rather than converted).
+  function parseClockTimeMinutes(timeStr) {
+    var m = String(timeStr || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10), ampm = m[3].toUpperCase();
+    if (h < 1 || h > 12 || min < 0 || min > 59) return null;
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  }
+
+  // Converts a bare 24-hour "HH:MM" time (no AM/PM suffix) into 12-hour "H:MM AM/PM"
+  // format. Leaves anything else (already-AM/PM, or unparseable) unchanged, so this is
+  // safe to run on every time input's change event without fighting the user's typing.
+  function normalizeTimeToAmPm(raw) {
+    var s = String(raw || '').trim();
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return s;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    if (h < 0 || h > 23 || min < 0 || min > 59) return s;
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (min < 10 ? '0' + min : min) + ' ' + ampm;
+  }
+
+  // Every session's date and time must be a valid, fully-formed value — a malformed or
+  // partial entry (e.g. "05:00 A") is rejected outright, not silently skipped — and end
+  // time must be strictly after start time, same day (no overnight spans).
+  self.hasInvalidTimeRangeSession = function () {
+    return (self.bookingForm.sessions || []).some(function (s) {
+      if (s.date && !toDateObj(s.date)) return true;
+      var start = parseClockTimeMinutes(s.startTime);
+      var end = parseClockTimeMinutes(s.endTime);
+      if (start === null || end === null) return true;
+      return end <= start;
+    });
+  };
+
   self.hasDuplicateReschedule = function () {
     return hasOverlappingDateTimes(self.rescheduleForm.classes || [], 'date', 'time');
   };
@@ -628,6 +1303,20 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     });
   };
 
+  // A booking's classes must all be the same length — durationHours is a single value
+  // for the whole booking, so every session's actual (end - start) time span must match
+  // the first session's. There's no separate "duration" input for the user to get out of
+  // sync with the times themselves; it's always derived from what was actually entered.
+  self.hasDurationMismatchSession = function () {
+    var sessions = self.bookingForm.sessions || [];
+    if (sessions.length < 2) return false;
+    var first = parseTimeRangeHours(sessions[0].startTime + ' - ' + sessions[0].endTime);
+    if (first === null) return false;
+    return sessions.some(function (s) {
+      return self.isDurationMismatch(s.startTime + ' - ' + s.endTime, first);
+    });
+  };
+
   self.applyRecurring = function () {
     var sessions = self.bookingForm.sessions;
     if (!sessions || sessions.length < 2 || !sessions[0].recurring || !sessions[0].date) return;
@@ -647,6 +1336,7 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.calcEndTime = function (session) {
     if (!session.startTime) return;
+    session.startTime = normalizeTimeToAmPm(session.startTime);
     var match = session.startTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (!match) return;
     var h = parseInt(match[1]);
@@ -662,24 +1352,43 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     session.endTime = h + ':' + (m < 10 ? '0' + m : m) + ' ' + endAmpm;
   };
 
-  self.clearSelectedTutor = function () { self.selectedTutor = null; };
+  self.onEndTimeChange = function (session) {
+    session.endTime = normalizeTimeToAmPm(session.endTime);
+  };
+
+  self.clearSelectedTutor = function () {
+    self.selectedTutor = null;
+    self.selectedPresetGroup = null;
+    self.presetBookingError = '';
+  };
 
   // Book a tutor
+  self.hasProfaneBookingMessage = function () {
+    return ProfanityFilterService.containsProfanity(self.bookingForm.message);
+  };
+
   self.submitBooking = function () {
     if (!self.selectedTutor) return;
     if (self.hasTooSoonSession()) return;
+    if (self.hasInvalidTimeRangeSession()) return;
+    if (self.hasDurationMismatchSession()) return;
     if (self.hasDuplicateSessions()) return;
+    if (self.hasProfaneBookingMessage()) return;
     var student = self.students.find(function (s) { return s.id === self.bookingForm.studentId; });
     var classes = self.bookingForm.sessions.map(function (session) {
       return { date: toDateStr(session.date), time: session.startTime + ' - ' + session.endTime };
     });
+    // durationHours is derived from what was actually entered, not a separate field the
+    // user never sees or edits — that disconnect is exactly how a booking could end up
+    // with a 2-hour time range stored against a 1-hour duration.
+    var derivedDuration = parseTimeRangeHours(classes[0].time);
     BookingService.create({
       tutorId: self.selectedTutor.id,
       studentId: self.bookingForm.studentId,
       subject: self.bookingForm.subject + ' - ' + (student ? student.educationLevel : ''),
       mode: self.selectedTutor.modes[0],
       classes: classes,
-      durationHours: self.bookingForm.duration,
+      durationHours: derivedDuration !== null ? derivedDuration : 1,
       message: self.bookingForm.message,
       totalPrice: self.selectedTutor.pricePerSession * parseInt(self.bookingForm.classesPerMonth)
     }).then(function (res) {
@@ -717,6 +1426,9 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.editStudentForm = { name: s.name, school: s.school, learningGoal: s.learningGoal || '' };
     self.editStudentSubjects = self.parseSubjectCombos(s.subjectSelect, s.educationLevel);
     self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
+    self.editStudentNameError = '';
+    self.editStudentGoalError = '';
+    rebuildPreferredPools(s.preferredModes);
   };
 
   self.cancelEditStudent = function () {
@@ -724,7 +1436,65 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.editStudentForm = {};
     self.editStudentSubjects = [];
     self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
+    self.preferredLeft = [];
+    self.preferredRight = [];
   };
+
+  function rebuildPreferredPools(preferredModes) {
+    var preferred = preferredModes || [];
+    self.preferredRight = preferred
+      .map(function (mode) { return TeachingModesCatalog.filter(function (m) { return m.mode === mode; })[0]; })
+      .filter(function (m) { return !!m; });
+    self.preferredLeft = TeachingModesCatalog.filter(function (m) { return preferred.indexOf(m.mode) === -1; });
+  }
+
+  self.onPreferredDropToRight = function (item) {
+    if (self.preferredRight.some(function (m) { return m.mode === item.mode; })) return;
+    self.preferredLeft = self.preferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    self.preferredRight.push(item);
+  };
+
+  self.onPreferredDropToLeft = function (item) {
+    if (self.preferredLeft.some(function (m) { return m.mode === item.mode; })) return;
+    self.preferredRight = self.preferredRight.filter(function (m) { return m.mode !== item.mode; });
+    self.preferredLeft.push(item);
+  };
+
+  self.removePreferredMode = function (mode) {
+    self.onPreferredDropToLeft(mode);
+  };
+
+  // Drop directly on a row within the ordered pool — inserts at that row's position,
+  // whether the dragged item came from the left pool or is being reordered in-place.
+  self.onPreferredDropOnItem = function (item, targetIndex) {
+    var fromIndex = self.preferredRight.findIndex(function (m) { return m.mode === item.mode; });
+    if (fromIndex !== -1) {
+      self.preferredRight.splice(fromIndex, 1);
+      if (fromIndex < targetIndex) targetIndex -= 1;
+    } else {
+      self.preferredLeft = self.preferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    }
+    if (targetIndex > self.preferredRight.length) targetIndex = self.preferredRight.length;
+    if (targetIndex < 0) targetIndex = 0;
+    self.preferredRight.splice(targetIndex, 0, item);
+  };
+
+  self.movePreferredModeUp = function (index) {
+    if (index <= 0) return;
+    var arr = self.preferredRight;
+    var tmp = arr[index - 1];
+    arr[index - 1] = arr[index];
+    arr[index] = tmp;
+  };
+
+  self.movePreferredModeDown = function (index) {
+    if (index >= self.preferredRight.length - 1) return;
+    var arr = self.preferredRight;
+    var tmp = arr[index + 1];
+    arr[index + 1] = arr[index];
+    arr[index] = tmp;
+  };
+
 
   self.addEditStudentSubject = function () {
     var c = self.newEditStudentSubjectCombo;
@@ -737,8 +1507,31 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.removeEditStudentSubject = function (i) { self.editStudentSubjects.splice(i, 1); };
 
+  // Child-name validation — same rule as registration (see NameValidationService).
+  self.editStudentNameError = '';
+  self.validateEditStudentName = function () {
+    self.editStudentNameError = NameValidationService.validate(self.editStudentForm.name);
+    if (self.editStudentNameError) return;
+    var trimmed = (self.editStudentForm.name || '').trim().toLowerCase();
+    var isDuplicate = self.activeStudents().some(function (s) {
+      return s.id !== self.editingStudent.id && s.name.trim().toLowerCase() === trimmed;
+    });
+    if (isDuplicate) self.editStudentNameError = 'You already have a child profile with this name.';
+  };
+
+  self.editStudentGoalError = '';
+
   self.saveEditStudent = function () {
     if (!self.editingStudent || !self.editStudentForm.name.trim()) return;
+    self.validateEditStudentName();
+    if (self.editStudentNameError) return;
+    self.editStudentGoalError = ProfanityFilterService.validate(self.editStudentForm.learningGoal);
+    if (self.editStudentGoalError) return;
+    self.preferredModesError = '';
+    if (!self.preferredRight.length) {
+      self.preferredModesError = 'Please select at least one preferred teaching mode.';
+      return;
+    }
     var payload = {
       name: self.editStudentForm.name,
       school: self.editStudentForm.school || '',
@@ -746,11 +1539,17 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       subjectSelect: self.formatSubjectCombos(self.editStudentSubjects),
       learningGoal: self.editStudentForm.learningGoal || null
     };
-    StudentService.update(self.editingStudent.id, payload).then(function (res) {
+    var preferredModes = self.preferredRight.map(function (m) { return m.mode; });
+    var editingId = self.editingStudent.id;
+    StudentService.update(editingId, payload).then(function () {
+      return StudentService.updatePreferredModes(editingId, preferredModes);
+    }).then(function (res) {
       res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
-      var idx = self.students.findIndex(function (s) { return s.id === self.editingStudent.id; });
+      var idx = self.students.findIndex(function (s) { return s.id === editingId; });
       if (idx >= 0) self.students[idx] = res.data;
       self.cancelEditStudent();
+    }, function () {
+      self.preferredModesError = 'Failed to save changes. Please try again.';
     });
   };
 
@@ -820,9 +1619,81 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   self.removeStudentSubject = function (i) { self.studentSubjects.splice(i, 1); };
 
+  self.onNewStudentPreferredDropToRight = function (item) {
+    if (self.newStudentPreferredRight.some(function (m) { return m.mode === item.mode; })) return;
+    self.newStudentPreferredLeft = self.newStudentPreferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    self.newStudentPreferredRight.push(item);
+  };
+
+  self.onNewStudentPreferredDropToLeft = function (item) {
+    if (self.newStudentPreferredLeft.some(function (m) { return m.mode === item.mode; })) return;
+    self.newStudentPreferredRight = self.newStudentPreferredRight.filter(function (m) { return m.mode !== item.mode; });
+    self.newStudentPreferredLeft.push(item);
+  };
+
+  self.removeNewStudentPreferredMode = function (mode) {
+    self.onNewStudentPreferredDropToLeft(mode);
+  };
+
+  self.onNewStudentPreferredDropOnItem = function (item, targetIndex) {
+    var fromIndex = self.newStudentPreferredRight.findIndex(function (m) { return m.mode === item.mode; });
+    if (fromIndex !== -1) {
+      self.newStudentPreferredRight.splice(fromIndex, 1);
+      if (fromIndex < targetIndex) targetIndex -= 1;
+    } else {
+      self.newStudentPreferredLeft = self.newStudentPreferredLeft.filter(function (m) { return m.mode !== item.mode; });
+    }
+    if (targetIndex > self.newStudentPreferredRight.length) targetIndex = self.newStudentPreferredRight.length;
+    if (targetIndex < 0) targetIndex = 0;
+    self.newStudentPreferredRight.splice(targetIndex, 0, item);
+  };
+
+  self.moveNewStudentPreferredModeUp = function (index) {
+    if (index <= 0) return;
+    var arr = self.newStudentPreferredRight;
+    var tmp = arr[index - 1];
+    arr[index - 1] = arr[index];
+    arr[index] = tmp;
+  };
+
+  self.moveNewStudentPreferredModeDown = function (index) {
+    if (index >= self.newStudentPreferredRight.length - 1) return;
+    var arr = self.newStudentPreferredRight;
+    var tmp = arr[index + 1];
+    arr[index + 1] = arr[index];
+    arr[index] = tmp;
+  };
+
   // Add student
+  self.studentSubjectsError = '';
+  self.studentNameError = '';
+  self.studentGoalError = '';
+  self.validateStudentName = function () {
+    self.studentNameError = NameValidationService.validate(self.studentForm.name);
+    if (self.studentNameError) return;
+    var trimmed = (self.studentForm.name || '').trim().toLowerCase();
+    var isDuplicate = self.activeStudents().some(function (s) {
+      return s.name.trim().toLowerCase() === trimmed;
+    });
+    if (isDuplicate) self.studentNameError = 'You already have a child profile with this name.';
+  };
+
   self.createStudent = function () {
+    self.studentSubjectsError = '';
+    self.newStudentPreferredModesError = '';
     if (!self.studentForm.name.trim()) return;
+    self.validateStudentName();
+    if (self.studentNameError) return;
+    self.studentGoalError = ProfanityFilterService.validate(self.studentForm.learningGoal);
+    if (self.studentGoalError) return;
+    if (!self.studentSubjects.length) {
+      self.studentSubjectsError = 'Please add at least one subject before creating the profile.';
+      return;
+    }
+    if (!self.newStudentPreferredRight.length) {
+      self.newStudentPreferredModesError = 'Please select at least one preferred teaching mode.';
+      return;
+    }
 
     var save = function (schoolName) {
       var payload = {
@@ -834,20 +1705,31 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
         learningGoal: self.studentForm.learningGoal,
         photoUrl: self.studentForm.photoUrl || null
       };
+      var preferredModes = self.newStudentPreferredRight.map(function (m) { return m.mode; });
       StudentService.create(payload).then(function (res) {
-        res.data.subjectCombos = self.parseSubjectCombos(res.data.subjectSelect, res.data.educationLevel);
-        self.students.push(res.data);
-        self.newlyAddedStudentId = res.data.id;
+        return StudentService.updatePreferredModes(res.data.id, preferredModes).then(function (modesRes) {
+          return modesRes.data;
+        });
+      }).then(function (student) {
+        student.subjectCombos = self.parseSubjectCombos(student.subjectSelect, student.educationLevel);
+        self.students.push(student);
+        self.newlyAddedStudentId = student.id;
         self.studentSuccess = true;
         self.studentForm = { name: '', birthDate: '', school: '', learningGoal: '', photoUrl: '' };
+        self.studentNameError = '';
+        self.studentGoalError = '';
         self.studentSubjects = [];
         self.newStudentSubjectCombo = { country: '', selectedOption: null };
+        self.newStudentPreferredLeft = TeachingModesCatalog.slice();
+        self.newStudentPreferredRight = [];
         self.schoolSearch = '';
         self.institutions = [];
         self.schoolDropdownOpen = false;
         self.schoolIsOther = false;
         self.schoolError = null;
         $timeout(function () { self.studentSuccess = false; }, 5000);
+      }).catch(function (err) {
+        self.studentNameError = (err.data && err.data.message) || 'Failed to create profile. Please try again.';
       });
     };
 
@@ -883,6 +1765,19 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
 
   // Pay an invoice
   self.paySuccess = false;
+  self.payingBooking = null;
+
+  // Sessions & Activity's "Pay Invoice" button opens this review panel first
+  // (same invoice-summary layout as the preset-class booking summary on the Find
+  // Tutors page) rather than charging immediately on click.
+  self.openPaySummary = function (b) { self.payingBooking = b; };
+
+  self.confirmPayInvoice = function () {
+    if (!self.payingBooking) return;
+    var inv = self.getInvoiceForBooking(self.payingBooking.id);
+    self.payingBooking = null;
+    if (inv) self.payInvoice(inv.id);
+  };
 
   self.invoicesTab = 'active';
 
@@ -916,9 +1811,12 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
     self.issueForm.bookingId = bookingId;
     self.issueForm.details = '';
     self.issueSuccess = false;
+    self.issueError = '';
   };
 
   self.submitIssue = function () {
+    self.issueError = ProfanityFilterService.validate(self.issueForm.details);
+    if (self.issueError) return;
     BookingService.reportIssue(self.issueForm.bookingId, {
       issueType: self.issueForm.issueType,
       details: self.issueForm.details
@@ -929,23 +1827,96 @@ function ($location, $timeout, $q, AuthService, TutorService, StudentService, Bo
       $timeout(function () {
         self.issueSuccess = false;
       }, 3000);
+    }, function (err) {
+      self.issueError = (err.data && err.data.message) ? err.data.message : 'Failed to submit. Please try again.';
     });
   };
 
-  // Chat
+  // Chat — a parent can only contact tutors they have an accepted (confirmed or
+  // completed) booking with, not the entire public catalog. Computed once when
+  // bookings load (not a template-called function) — a function called from the
+  // view that allocates a new array/objects every digest never stabilizes and
+  // trips Angular's infinite-digest guard.
+  self.contactableTutors = [];
+  self.activeTutor = null;
+  self.unreadCounts = {}; // { tutorId: count } — sidebar badges, see ChatController.GetUnreadCounts
+
+  self.loadUnreadCounts = function () {
+    ChatService.getUnreadCounts().then(function (res) { self.unreadCounts = res.data; });
+  };
+
+  function computeContactableTutors() {
+    var seen = {};
+    var list = [];
+    (self.bookings || []).forEach(function (b) {
+      if ((b.status !== 'confirmed' && b.status !== 'completed') || seen[b.tutorId]) return;
+      seen[b.tutorId] = true;
+      list.push({ id: b.tutorId, name: b.tutorName, imageUrl: b.tutorImageUrl });
+    });
+    self.contactableTutors = list;
+  }
+
   self.loadChat = function (tutorId) {
     self.activeTutorId = tutorId;
-    ChatService.getMessages(tutorId).then(function (res) { self.chatMessages = res.data; });
+    self.activeTutor = self.contactableTutors.find(function (t) { return t.id === tutorId; }) || null;
+    ChatService.getMessages(tutorId, self.user.userId).then(function (res) {
+      self.chatMessages = res.data;
+      // Opening the thread just marked its unread messages read server-side
+      // (see ChatController.GetMessages) — clear the badge immediately rather
+      // than waiting for the next poll tick.
+      self.unreadCounts[tutorId] = 0;
+      scrollChatToBottom();
+    });
   };
+
+  self.chatError = '';
 
   self.sendMessage = function () {
     if (!self.chatText.trim() || !self.activeTutorId) return;
-    ChatService.send({ tutorId: self.activeTutorId, sender: 'parent', text: self.chatText })
+    self.chatError = ProfanityFilterService.validate(self.chatText);
+    if (self.chatError) return;
+    ChatService.send({ tutorId: self.activeTutorId, parentUserId: self.user.userId, text: self.chatText })
       .then(function (res) {
         self.chatMessages.push(res.data);
         self.chatText = '';
+        scrollChatToBottom();
+      }, function (err) {
+        self.chatError = (err.data && err.data.message) ? err.data.message : 'Failed to send. Please try again.';
       });
   };
+
+  // Auto-refresh the open conversation so a reply shows up without the parent
+  // needing to reload the page. Polls rather than pushing over a live socket —
+  // simplest option for this app's scale, mirrors the existing booking poll in
+  // tutor.controller.js. Only appends messages the client hasn't already seen
+  // (by id) so an in-progress read/scroll position isn't disrupted by replacing
+  // the whole array every tick.
+  function mergeNewChatMessages(fetched) {
+    var seenIds = {};
+    self.chatMessages.forEach(function (m) { seenIds[m.id] = true; });
+    var added = false;
+    fetched.forEach(function (m) {
+      if (!seenIds[m.id]) { self.chatMessages.push(m); added = true; }
+    });
+    if (added) scrollChatToBottom();
+  }
+
+  function scrollChatToBottom() {
+    $timeout(function () {
+      var el = document.getElementById('chatMessages');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  var _chatPollInterval = $interval(function () {
+    self.loadUnreadCounts();
+    if (!self.activeTutorId) return;
+    ChatService.getMessages(self.activeTutorId, self.user.userId).then(function (res) {
+      mergeNewChatMessages(res.data);
+      self.unreadCounts[self.activeTutorId] = 0;
+    });
+  }, 4000);
+  $scope.$on('$destroy', function () { $interval.cancel(_chatPollInterval); });
 
   // School dropdown
   self.openSchoolDropdown = function () {

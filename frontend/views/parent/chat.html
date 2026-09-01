@@ -1,58 +1,98 @@
-<div class="dashboard-layout">
-  <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Setup Child Profile</a>
-      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions & Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing & Invoices</a>
-      <a href="#!/parent/chat" class="nav-item active">💬 Direct Messages</a>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/parent/dashboard" class="bs-sidebar-link">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="bs-sidebar-link">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="bs-sidebar-link">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="bs-sidebar-link">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="bs-sidebar-link">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="bs-sidebar-link">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="bs-sidebar-link">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="bs-sidebar-link active">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
-    <div class="card chat-container">
-      <div class="chat-header">
-        <div>
-          <strong>Mr. Lim Wei Sheng</strong>
-          <p class="online-status">● Tutor • Online</p>
+    <div style="display:flex; gap:var(--space-4); height:calc(100vh - 140px); min-height:480px;">
+
+      <!-- Thread list -->
+      <div class="bs-card bs-elev-sm" style="width:240px; flex-shrink:0; padding:var(--space-2); overflow-y:auto;">
+        <div class="bs-card-title" style="padding:var(--space-2);">Your Tutors</div>
+        <div ng-repeat="t in vm.contactableTutors"
+          ng-click="vm.loadChat(t.id)"
+          style="display:flex; align-items:center; gap:8px; padding:var(--space-2); border-radius:var(--radius-md); cursor:pointer;"
+          ng-style="t.id === vm.activeTutorId ? {background:'var(--color-accent-100)'} : {}">
+          <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ t.name }}" />
+          <div ng-if="!t.imageUrl" style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ t.name[0] }}</div>
+          <span style="flex:1; font-size:14px; min-width:0;">{{ t.name }}</span>
+          <span class="bs-tag bs-tag-accent-2" ng-if="vm.unreadCounts[t.id]">{{ vm.unreadCounts[t.id] }}</span>
         </div>
-        <small>Direct Parent-Teacher Line</small>
+        <p class="bs-text-muted" style="font-size:13px; padding:var(--space-2);" ng-if="!vm.contactableTutors.length">
+          No confirmed bookings yet. Once a tutor confirms a session, you'll be able to message them here.
+        </p>
       </div>
 
-      <div class="chat-messages" id="chatMessages">
-        <div ng-repeat="msg in vm.chatMessages"
-          class="chat-message-wrap"
-          ng-class="{
-            'right': msg.sender === 'parent',
-            'center': msg.sender === 'system',
-            'left': msg.sender === 'tutor'
-          }">
-          <div ng-if="msg.sender === 'system'" class="system-msg">
-            ⚠️ LearnSphere: {{ msg.text }}
+      <!-- Conversation -->
+      <div class="bs-card bs-elev-sm" style="flex:1; min-width:0; padding:0; overflow:hidden;" ng-if="vm.activeTutor">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:var(--space-3); border-bottom:1px solid var(--color-divider);">
+          <div>
+            <strong>{{ vm.activeTutor.name }}</strong>
+            <p class="bs-text-muted" style="margin:0; font-size:12px;">● Tutor · Online</p>
           </div>
-          <div ng-if="msg.sender !== 'system'"
-            class="chat-bubble"
-            ng-class="{'bubble-parent': msg.sender === 'parent', 'bubble-tutor': msg.sender === 'tutor'}">
-            <p>{{ msg.text }}</p>
-            <small>{{ msg.timestamp }}</small>
-          </div>
+          <small class="bs-text-muted">Direct Parent-Teacher Line</small>
         </div>
-        <p ng-if="!vm.chatMessages.length" class="empty-state">No messages yet. Start the conversation!</p>
+
+        <div id="chatMessages" style="flex:1; overflow-y:auto; padding:var(--space-3); display:flex; flex-direction:column; gap:8px; height:calc(100% - 116px);">
+          <div ng-repeat="msg in vm.chatMessages"
+            style="display:flex;"
+            ng-style="{'justify-content': msg.sender === 'parent' ? 'flex-end' : (msg.sender === 'system' ? 'center' : 'flex-start')}">
+            <div ng-if="msg.sender === 'system'" class="bs-text-muted" style="font-size:12px; text-align:center;">
+              ⚠️ LearnSphere: {{ msg.text }}
+            </div>
+            <div ng-if="msg.sender !== 'system'"
+              style="max-width:70%; padding:8px 12px; border-radius:var(--radius-lg);"
+              ng-style="msg.sender === 'parent' ? {background:'var(--color-accent-100)', color:'var(--color-accent-900)'} : {background:'var(--color-bg)'}">
+              <p style="margin:0;">{{ msg.text }}</p>
+              <small class="bs-text-muted" style="font-size:11px;">{{ msg.timestamp }}</small>
+            </div>
+          </div>
+          <p class="bs-text-muted" ng-if="!vm.chatMessages.length">No messages yet. Start the conversation!</p>
+        </div>
+
+        <p style="color:var(--color-accent-2-700); font-size:13px; margin:0 var(--space-3);" ng-if="vm.chatError">{{ vm.chatError }}</p>
+        <form ng-submit="vm.sendMessage()" style="display:flex; gap:8px; padding:var(--space-3); border-top:1px solid var(--color-divider);">
+          <input type="text" class="bs-input" ng-model="vm.chatText"
+            placeholder="Type a message to the tutor..." />
+          <button type="submit" class="bs-btn bs-btn-primary">Send</button>
+        </form>
       </div>
 
-      <form class="chat-input-row" ng-submit="vm.sendMessage()">
-        <input type="text" ng-model="vm.chatText"
-          placeholder="Type a message to the tutor..."
-          class="chat-input" />
-        <button type="submit" class="btn-primary">Send 📤</button>
-      </form>
+      <div class="bs-card bs-elev-sm" style="flex:1; align-items:center; justify-content:center;" ng-if="!vm.activeTutor">
+        <p class="bs-text-muted" style="text-align:center;">
+          Select a tutor on the left to start a conversation. You can message tutors from bookings that have been confirmed.
+        </p>
+      </div>
+
     </div>
   </main>
 </div>

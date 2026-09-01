@@ -1,65 +1,78 @@
-<div class="dashboard-layout">
-  <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
-      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item active">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
-      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/parent/dashboard" class="bs-sidebar-link">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="bs-sidebar-link">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="bs-sidebar-link">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="bs-sidebar-link">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="bs-sidebar-link active">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="bs-sidebar-link">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="bs-sidebar-link">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="bs-sidebar-link">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
 
     <!-- ── Page Hero ──────────────────────────────── -->
-    <div class="profile-hero">
-      <div class="profile-hero-left">
-        <div class="profile-hero-icon">🎯</div>
-        <div>
-          <h2 class="profile-hero-title">Personalize My Class</h2>
-          <p class="profile-hero-sub">Can't find exactly what you're looking for in the market? Tell us what you're looking for, and we'll search our tutor database to match you with the most suitable teacher for your child.</p>
-        </div>
-      </div>
+    <div>
+      <h1>Personalize My Class</h1>
+      <p class="bs-text-muted" style="max-width:60ch;">Can't find exactly what you're looking for in the market? Tell us what you're looking for, and we'll search our tutor database to match you with the most suitable teacher for your child.</p>
     </div>
 
     <!-- Tab Bar -->
-    <div class="tab-bar">
-      <button class="tab-btn" ng-class="{'active': vm.personalizeTab === 'form'}" ng-click="vm.personalizeTab = 'form'">🎯 Preferences</button>
-      <button class="tab-btn" ng-class="{'active': vm.personalizeTab === 'saved'}" ng-click="vm.personalizeTab = 'saved'">📋 Saved Applications</button>
+    <div class="bs-seg">
+      <button type="button" class="bs-seg-opt" ng-click="vm.personalizeTab = 'form'"
+        ng-style="{background: vm.personalizeTab === 'form' ? 'var(--color-accent)' : 'transparent', color: vm.personalizeTab === 'form' ? 'var(--color-bg)' : 'inherit'}">Preferences</button>
+      <button type="button" class="bs-seg-opt" ng-click="vm.personalizeTab = 'saved'"
+        ng-style="{background: vm.personalizeTab === 'saved' ? 'var(--color-accent)' : 'transparent', color: vm.personalizeTab === 'saved' ? 'var(--color-bg)' : 'inherit'}">Saved Applications</button>
     </div>
 
     <!-- ===== PREFERENCES TAB ===== -->
-    <div class="card" ng-if="vm.personalizeTab === 'form'">
-      <div class="alert-success" ng-if="vm.personalizeSaveSuccess" style="margin-bottom:16px">
+    <div class="bs-card bs-elev-sm" ng-if="vm.personalizeTab === 'form'">
+      <div ng-if="vm.personalizeSaveSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);">
         ✓ Application saved successfully!
       </div>
 
-      <h3>Preferences</h3>
+      <div class="bs-card-title">Preferences</div>
 
-      <div class="grid-2">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:var(--space-4);">
 
         <!-- 1. Teaching Mode -->
-        <div class="form-group">
+        <div class="bs-field">
           <label>Teaching Mode</label>
-          <select ng-model="vm.personalize.mode">
+          <select class="bs-input" ng-model="vm.personalize.mode">
             <option value="">— Mode —</option>
             <option>Online</option>
-            <option>Home Visit</option>
             <option>Tutor Place</option>
+            <option>Tuition Center</option>
           </select>
         </div>
 
         <!-- 2. Tutor Qualification -->
-        <div class="form-group">
+        <div class="bs-field">
           <label>Tutor Qualification</label>
-          <select ng-model="vm.personalize.qualification">
+          <select class="bs-input" ng-model="vm.personalize.qualification">
             <option value="">— Qualification —</option>
             <option>Bachelor's Degree</option>
             <option>Master's Degree</option>
@@ -75,66 +88,66 @@
         </div>
 
         <!-- 3. Country + Subject -->
-        <div class="form-group">
+        <div class="bs-field">
           <label>Country</label>
           <div class="radio-row">
             <label class="radio-option"><input type="radio" ng-model="vm.personalize.country" value="Singapore" ng-click="vm.onPersonalizeCountryChange()" /> Singapore 🇸🇬</label>
             <label class="radio-option"><input type="radio" ng-model="vm.personalize.country" value="Malaysia" ng-click="vm.onPersonalizeCountryChange()" /> Malaysia 🇲🇾</label>
           </div>
           <label style="display:block;margin-top:10px">Subject</label>
-          <select ng-model="vm.personalize.selectedSubjectOption"
+          <select class="bs-input" ng-model="vm.personalize.selectedSubjectOption"
             ng-disabled="!vm.personalize.country"
             ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalogWithOther[vm.personalize.country]">
             <option value="">{{ vm.personalize.country ? '— Select subject —' : '— Select a country first —' }}</option>
           </select>
-          <input type="text" style="margin-top:8px" ng-if="vm.personalize.selectedSubjectOption.subject === 'Other'"
+          <input class="bs-input" type="text" style="margin-top:8px" ng-if="vm.personalize.selectedSubjectOption.subject === 'Other'"
             ng-model="vm.personalize.subjectOther" placeholder="Enter subject" />
         </div>
 
         <!-- 4. Offer Price -->
-        <div class="form-group">
+        <div class="bs-field">
           <label>Offer Price ($/session)</label>
-          <input type="number" ng-model="vm.personalize.price" min="0" step="0.01" placeholder="e.g. 50" />
-          <p class="text-muted" style="margin-top:6px;font-size:12px">Platform may apply an additional 5% charge.</p>
+          <input class="bs-input" type="number" ng-model="vm.personalize.price" min="0" step="0.01" placeholder="e.g. 50" />
+          <p class="bs-text-muted" style="margin-top:6px;font-size:12px">Platform may apply an additional 5% charge.</p>
         </div>
 
       </div>
 
-      <div class="form-group" style="margin-top:6px">
+      <div class="bs-field" style="margin-top:6px">
         <label>Tell us more about your child's needs</label>
-        <textarea rows="8" ng-model="vm.personalize.description"
+        <textarea class="bs-input" rows="8" ng-model="vm.personalize.description"
           placeholder="Describe your child's learning goals, strengths, areas to improve, preferred teaching style, exam targets, or anything else the tutor should know..."></textarea>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;margin-top:16px">
-        <button type="button" class="btn-primary" ng-click="vm.savePersonalizeApplication()">💾 Save</button>
+      <div style="display:flex;justify-content:flex-end;">
+        <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.savePersonalizeApplication()">Save</button>
       </div>
     </div>
 
     <!-- ===== SAVED APPLICATIONS TAB ===== -->
-    <div class="card" ng-if="vm.personalizeTab === 'saved'">
-      <h3>Saved Applications</h3>
+    <div class="bs-card bs-elev-sm" ng-if="vm.personalizeTab === 'saved'">
+      <div class="bs-card-title">Saved Applications</div>
 
-      <p class="empty-state" ng-if="!vm.personalizeApplications.length">
+      <p class="bs-text-muted" ng-if="!vm.personalizeApplications.length">
         No saved applications yet. Fill in your preferences and click Save.
       </p>
 
-      <div class="chip-list" ng-if="vm.personalizeApplications.length" style="flex-direction:column;align-items:stretch;gap:10px">
-        <div class="card" ng-repeat="a in vm.personalizeApplications" style="padding:14px 16px">
+      <div style="display:flex; flex-direction:column; gap:var(--space-3);" ng-if="vm.personalizeApplications.length">
+        <div class="bs-card" style="background:var(--color-bg);" ng-repeat="a in vm.personalizeApplications">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
             <div>
               <strong>{{ a.subject || 'No subject specified' }}</strong>
-              <p class="text-muted" style="margin:2px 0 0;font-size:12px">Saved {{ a.savedAt }}</p>
+              <p class="bs-text-muted" style="margin:2px 0 0;font-size:12px">Saved {{ a.savedAt }}</p>
             </div>
-            <button type="button" class="chip-remove" ng-click="vm.removePersonalizeApplication(a.id)" title="Remove">×</button>
+            <button type="button" style="background:none; border:none; color:var(--color-accent-2); cursor:pointer; font-size:16px; line-height:1; padding:0;" ng-click="vm.removePersonalizeApplication(a.id)" title="Remove">×</button>
           </div>
-          <div class="chip-list" style="margin-top:10px">
-            <span class="chip" ng-if="a.mode">{{ a.mode }}</span>
-            <span class="chip" ng-if="a.qualification">{{ a.qualification }}</span>
-            <span class="chip" ng-if="a.country">{{ a.country }}</span>
-            <span class="chip" ng-if="a.price">${{ a.price }}/session</span>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
+            <span class="bs-tag bs-tag-neutral" ng-if="a.mode">{{ a.mode }}</span>
+            <span class="bs-tag bs-tag-neutral" ng-if="a.qualification">{{ a.qualification }}</span>
+            <span class="bs-tag bs-tag-neutral" ng-if="a.country">{{ a.country }}</span>
+            <span class="bs-tag bs-tag-accent" ng-if="a.price">${{ a.price }}/session</span>
           </div>
-          <p ng-if="a.description" style="margin-top:10px;font-size:13px;color:#475569">{{ a.description }}</p>
+          <p class="bs-text-muted" ng-if="a.description" style="margin-top:10px;font-size:13px;">{{ a.description }}</p>
         </div>
       </div>
     </div>

@@ -15,4 +15,14 @@ public class Student
     public bool IsArchived { get; set; } = false;
 
     public List<Booking> Bookings { get; set; } = new();
+    public List<StudentPreferredMode> PreferredModes { get; set; } = new();
+}
+
+public class StudentPreferredMode
+{
+    public int Id { get; set; }
+    public int StudentId { get; set; }
+    public Student Student { get; set; } = null!;
+    public string Mode { get; set; } = string.Empty;
+    public int Sequence { get; set; } // 0 = most preferred
 }

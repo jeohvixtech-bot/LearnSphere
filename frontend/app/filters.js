@@ -66,4 +66,46 @@ angular.module('learnSphereApp')
     }
     return s;
   };
+})
+// Normalizes any stored clock time (or "H:MM AM/PM - H:MM AM/PM" range) into a
+// consistent zero-padded "hh:mm AM/PM" display, regardless of how it was originally
+// entered/stored (e.g. "4:00 PM" or "4:00PM" both render as "04:00 PM").
+.filter('hhmma', function () {
+  function normalizeOne(raw) {
+    var m = String(raw || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return raw;
+    var h = parseInt(m[1], 10), min = parseInt(m[2], 10);
+    if (h < 1 || h > 12 || min < 0 || min > 59) return raw;
+    var hh = (h < 10 ? '0' : '') + h;
+    var mm = (min < 10 ? '0' : '') + min;
+    return hh + ':' + mm + ' ' + m[3].toUpperCase();
+  }
+  return function (val) {
+    if (!val) return '';
+    return String(val).split(/\s*-\s*/).map(normalizeOne).join(' - ');
+  };
+})
+// Display label for a TutorDocument.documentType value (verification section).
+.filter('verifDocLabel', function () {
+  var labels = {
+    identity_photo: 'Identity photo',
+    identity_id: 'ID number',
+    profile_photo: 'Profile photo',
+    o_level: 'O-Level / SPM',
+    a_level: 'A-Level / STPM / Diploma',
+    degree: "Bachelor's degree",
+    postgrad: "Master's / PhD",
+    nie_cert: 'NIE / DPLI / MOE certificate',
+    intro_video: 'Introduction video',
+    specialist_cert: 'Specialist certificate'
+  };
+  return function (type) {
+    return labels[type] || type || '';
+  };
+})
+.filter('capitalize', function () {
+  return function (s) {
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
+  };
 });

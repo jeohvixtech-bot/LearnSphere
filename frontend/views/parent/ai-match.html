@@ -1,112 +1,205 @@
-<div class="dashboard-layout">
-  <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
-      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item active">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item">📅 Sessions &amp; Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
-      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/parent/dashboard" class="bs-sidebar-link">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="bs-sidebar-link">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="bs-sidebar-link">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="bs-sidebar-link active">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="bs-sidebar-link">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="bs-sidebar-link">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="bs-sidebar-link">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="bs-sidebar-link">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
 
     <!-- ── Page Hero ──────────────────────────────── -->
-    <div class="profile-hero">
-      <div class="profile-hero-left">
-        <div class="profile-hero-icon">🤖</div>
-        <div>
-          <h2 class="profile-hero-title">AI Speed Match</h2>
-          <p class="profile-hero-sub">Select a child profile to find their best-matched tutors</p>
-        </div>
-      </div>
+    <div>
+      <h1>AI Speed Match</h1>
+      <p class="bs-text-muted">Select a child profile to find their best-matched tutors</p>
     </div>
 
-    <!-- ── Student profile picker ─────────────────── -->
-    <div class="profile-empty-state" ng-if="!vm.students.length">
-      <div class="profile-empty-icon">👤</div>
+    <!-- ── Student profile picker (active profiles only) ─────────────────── -->
+    <div style="text-align:center; padding:var(--space-6); background:var(--color-surface); border-radius:var(--radius-md);" ng-if="!vm.activeStudents().length">
       <h4>No Profiles Yet</h4>
-      <p>Add a child's profile under Children Profiles to start matching.</p>
+      <p class="bs-text-muted">Add a child's profile under Children Profiles to start matching.</p>
     </div>
 
-    <div class="ai-match-grid-3" ng-if="vm.students.length">
-      <div class="profile-card" ng-repeat="s in vm.students"
-        ng-class="{'profile-card--selected': vm.aiMatchSelectedStudentId === s.id}"
-        ng-click="vm.selectAiMatchStudent(s.id)" style="cursor:pointer">
-        <span class="profile-selected-badge" ng-if="vm.aiMatchSelectedStudentId === s.id">✓ SELECTED</span>
-        <div class="profile-card-top">
-          <div class="profile-avatar">{{ s.name[0] }}</div>
-          <div class="profile-card-body">
-            <div class="profile-card-name">{{ s.name }}</div>
-            <span class="profile-card-level">{{ s.educationLevel }}</span>
-            <div class="profile-card-school" ng-if="s.school">🏫 {{ s.school }}</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:var(--space-4);" ng-if="vm.activeStudents().length">
+      <div class="bs-card bs-elev-sm" ng-repeat="s in vm.activeStudents()"
+        ng-style="vm.aiMatchSelectedStudentId === s.id ? {outline:'2px solid var(--color-accent)'} : {}"
+        ng-click="vm.selectAiMatchStudent(s.id)" style="cursor:pointer; position:relative;">
+        <span class="bs-tag bs-tag-accent" ng-if="vm.aiMatchSelectedStudentId === s.id" style="position:absolute; top:var(--space-2); right:var(--space-2);">✓ SELECTED</span>
+        <div style="display:flex; gap:var(--space-3);">
+          <div style="width:48px; height:48px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
+          <div>
+            <div class="bs-card-title">{{ s.name }}</div>
+            <span class="bs-text-muted" style="font-size:12px;">{{ s.educationLevel }}</span>
+            <div class="bs-text-muted" style="font-size:12px;" ng-if="s.school">{{ s.school }}</div>
           </div>
         </div>
-        <div class="form-group" style="margin-top:14px" ng-if="s.subjectSelect" ng-click="$event.stopPropagation()">
-          <label>Subject</label>
-          <select ng-model="vm.aiMatchSubjectChoice[s.id]">
+        <div class="bs-field" style="margin-top:var(--space-2);" ng-if="s.subjectSelect" ng-click="$event.stopPropagation()">
+          <label>Subject <span style="color:var(--color-accent-2);">*</span></label>
+          <select class="bs-input" ng-model="vm.aiMatchSubjectChoice[s.id]">
             <option value="">— Select subject —</option>
             <option ng-repeat="c in s.subjectCombos"
               value="{{ c.country }} · {{ c.level }} · {{ c.subject }}">{{ c.country }} · {{ c.level }} · {{ c.subject }}</option>
           </select>
         </div>
 
-        <button type="button" class="btn-primary full-width" style="margin-top:10px"
+        <button type="button" class="bs-btn bs-btn-primary bs-btn-block"
           ng-click="$event.stopPropagation(); vm.applyAiMatch(s)"
           ng-disabled="!vm.aiMatchSubjectChoice[s.id]">Apply</button>
       </div>
     </div>
 
     <!-- ── Match results ──────────────────────────── -->
-    <div class="card" style="margin-top:20px" ng-if="vm.aiMatchAppliedStudentId">
+    <div ng-if="vm.aiMatchAppliedStudentId">
       <h3>Tutors offering {{ vm.aiMatchAppliedSubject }}</h3>
+      <p class="bs-text-muted" ng-if="vm.aiMatchScoresLoading">Calculating match scores…</p>
 
-      <p class="empty-state" ng-if="!vm.aiMatchResults.length">
-        No tutors currently offer this subject. Try another subject or check back later.
+      <p class="bs-text-muted" ng-if="!vm.aiMatchResults.length">
+        No tutors currently offer this subject in a mode this child prefers. Try another subject, update the child's preferred modes, or check back later.
       </p>
 
-      <div class="tutor-card" ng-repeat="t in vm.aiMatchResults">
-        <div class="tutor-card-main">
-          <img ng-src="{{ t.imageUrl }}" class="tutor-avatar" alt="{{ t.name }}" />
-          <div class="tutor-card-body">
-            <div class="tutor-card-name-row">
-              <h4>{{ t.name }}</h4>
-              <span ng-if="t.isVerified" class="badge-verified">✓ Verified</span>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:var(--space-4);">
+        <div class="bs-card bs-elev-sm" ng-repeat="t in vm.aiMatchResults">
+          <div style="display:flex; gap:var(--space-3);">
+            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ t.name }}" />
+            <div ng-if="!t.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:24px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ t.name[0] }}</div>
+            <div style="min-width:0; flex:1;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="bs-card-title">{{ t.name }}</span>
+                <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:10px;">✓ Verified</span>
+                <span ng-if="$index === 0 && t.matchScore" class="bs-tag bs-tag-accent-2" style="font-size:10px;">🏆 Top Match</span>
+                <span ng-if="t.matchScore" class="bs-tag bs-tag-outline" style="font-size:10px;"
+                  title="Rating {{ t.matchScore.ratingPoints }} pts · Activeness {{ t.matchScore.activenessPoints }} pts · Disputes {{ t.matchScore.disputePoints }} pts · Experience {{ t.matchScore.experiencePoints }} pts">
+                  ⚡ Match Score: {{ t.matchScore.score }}
+                </span>
+              </div>
+              <p class="bs-card-meta" style="margin-top:2px;">{{ t.experienceYears }} yrs experience</p>
+              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                <span class="bs-tag bs-tag-neutral" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
+              </div>
             </div>
-            <p class="tutor-card-meta">{{ t.experienceYears }} yrs experience</p>
-            <div class="qual-tags">
-              <span class="qual-tag" ng-repeat="q in t.qualifications | limitTo:3">✓ {{ q }}</span>
-            </div>
-            <div class="tutor-card-subjects-label">Teaches</div>
-            <div class="subject-list">
-              <button ng-repeat="sub in t.subjects" class="subject-chip">{{ sub }}</button>
-            </div>
-            <p class="tutor-bio">"{{ t.bio }}"</p>
           </div>
-        </div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6; margin-top:var(--space-2);">Teaches</div>
+          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+            <span class="bs-tag bs-tag-outline" ng-repeat="sub in t.subjects">{{ sub }}</span>
+          </div>
+          <p class="bs-card-body" style="font-style:italic; margin-top:var(--space-2);">"{{ t.bio }}"</p>
 
-        <div class="tutor-card-bar">
-          <div class="tutor-card-rating">
-            <span class="tutor-rating-star">⭐</span>
-            <span class="tutor-rating-value">{{ t.rating }}</span>
-            <span class="tutor-rating-count">({{ t.reviewCount }} reviews)</span>
+          <div style="display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap;">
+            <span style="font-size:13px;">★ {{ t.rating }} <span class="bs-text-muted">({{ t.reviewCount }} reviews)</span></span>
+            <span class="bs-tag bs-tag-neutral" ng-repeat="m in t.modes">{{ m }}</span>
           </div>
-          <div class="tutor-card-modes">
-            <span class="tutor-mode-chip" ng-repeat="m in t.modes">{{ m }}</span>
+
+          <!-- Available preset classes — tooltip system kept exactly as-is
+               (see frontend/views/parent/search.html for the same pattern) -->
+          <div class="tutor-slot-strip">
+            <p class="tutor-slot-strip-label">
+              <i class="ti ti-calendar-event" aria-hidden="true"></i>
+              Available classes through {{ vm.nextMonthLabel() }}
+            </p>
+            <div class="tutor-slot-list">
+
+              <div class="slot-list-row" ng-repeat="sg in vm.tutorSlotsBySubject(t) track by sg.presetGroupId"
+                ng-mouseenter="vm.showRowTooltip(sg, $event)" ng-mouseleave="vm.hideRowTooltip(sg)">
+                <div class="slot-list-row-info">
+                  <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                  <span>{{ vm.abbreviateSubject(sg.subject) }} · {{ sg.slots[0].dateShort }}, {{ sg.slots[0].startTime }}</span>
+
+                  <div class="slot-tooltip slot-tooltip-fixed" ng-if="sg._tooltipStyle" ng-style="sg._tooltipStyle"
+                    ng-mouseenter="vm.keepTooltipOpen(sg)" ng-mouseleave="vm.hideRowTooltip(sg)">
+                    <p class="slot-tooltip-title">{{ sg.subject }} · {{ sg.level }}</p>
+                    <div class="slot-tooltip-meta">
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-calendar" aria-hidden="true"></i>
+                        <span>{{ sg.recurrenceLabel }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-clock" aria-hidden="true"></i>
+                        <span>{{ sg.startTime }} – {{ sg.endTime }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-{{ vm.modeIcon(sg.mode) }}" aria-hidden="true"></i>
+                        <span>{{ sg.mode }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-{{ sg.classSize === 'one-to-one' ? 'user' : 'users' }}" aria-hidden="true"></i>
+                        <span>{{ sg.classSize === 'one-to-one' ? '1-to-1' : '1-to-many' }}</span>
+                      </div>
+                      <div class="slot-tooltip-meta-row">
+                        <i class="ti ti-currency-dollar" aria-hidden="true"></i>
+                        <span class="slot-price">
+                          ${{ sg.pricePerLesson }} / lesson
+                          <span class="slot-price-est">· est. ${{ sg.pricePerLesson * sg.slots.length }} / month</span>
+                        </span>
+                      </div>
+                      <div class="slot-tooltip-meta-row" ng-if="sg.syllabusTopics && sg.syllabusTopics.length">
+                        <i class="ti ti-book" aria-hidden="true"></i>
+                        <span>
+                          Syllabus covered:
+                          <span ng-repeat="topic in sg.syllabusTopics">
+                            – {{ topic }}<span ng-if="!$last"> </span>
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                    <div class="slot-tooltip-schedule">
+                      <div class="slot-tooltip-row" ng-repeat="s in sg.slots">
+                        <div>
+                          <p class="slot-tooltip-date">{{ s.dateFormatted }}</p>
+                          <p class="slot-tooltip-time">{{ s.startTime }} – {{ s.endTime }}</p>
+                        </div>
+                        <span class="slot-status-badge"
+                          ng-class="{
+                            'badge-open': !s.isFull && s.classSize === 'one-to-one',
+                            'badge-fill': !s.isFull && s.classSize === 'one-to-many',
+                            'badge-full': s.isFull
+                          }">
+                          <span ng-if="s.isFull">Full</span>
+                          <span ng-if="!s.isFull && s.classSize === 'one-to-one'">Open</span>
+                          <span ng-if="!s.isFull && s.classSize === 'one-to-many'">{{ s.confirmedCount }} / {{ s.maxStudents }} filled</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" class="btn-outline sm" ng-click="vm.viewAndBookPresetMatch(t, sg)">View &amp; Book</button>
+              </div>
+
+              <div class="slot-list-row slot-list-row-empty" ng-repeat="o in vm.tutorSubjectsWithoutSlots(t) track by o.subject">
+                <div class="slot-list-row-info">
+                  <i class="ti ti-calendar-x" aria-hidden="true"></i>
+                  <span>No preset for {{ o.subject }}</span>
+                </div>
+              </div>
+
+            </div>
           </div>
-          <div class="tutor-card-bar-spacer"></div>
-          <div class="tutor-card-price">
-            <small>Trial Rate</small>
-            <strong class="price">${{ t.pricePerSession }}/hr</strong>
-          </div>
-          <button class="btn-primary" ng-click="vm.goToBookTutor(t)">View &amp; Book →</button>
         </div>
       </div>
     </div>

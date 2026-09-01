@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public class StudentsController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var students = await _context.Students
+            .Include(s => s.PreferredModes)
             .Where(s => s.ParentUserId == userId)
             .ToListAsync();
         return Ok(students.Select(MapToDto));
@@ -30,7 +32,18 @@ public class StudentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateStudentDto dto)
     {
+        var nameError = NameValidator.Validate(dto.Name);
+        if (nameError != null) return BadRequest(new { message = nameError });
+
+        var goalError = ProfanityFilter.Validate(dto.LearningGoal);
+        if (goalError != null) return BadRequest(new { message = goalError });
+
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var nameTaken = await _context.Students.AnyAsync(s =>
+            s.ParentUserId == userId && !s.IsArchived && s.Name.ToLower() == dto.Name.Trim().ToLower());
+        if (nameTaken) return BadRequest(new { message = "You already have a child profile with this name." });
+
         var student = new Student
         {
             ParentUserId = userId,
@@ -54,7 +67,22 @@ public class StudentsController : ControllerBase
         var student = await _context.Students.FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
         if (student == null) return NotFound();
 
-        if (dto.Name != null) student.Name = dto.Name;
+        if (dto.Name != null)
+        {
+            var nameError = NameValidator.Validate(dto.Name);
+            if (nameError != null) return BadRequest(new { message = nameError });
+
+            var nameTaken = await _context.Students.AnyAsync(s =>
+                s.ParentUserId == userId && !s.IsArchived && s.Id != id && s.Name.ToLower() == dto.Name.Trim().ToLower());
+            if (nameTaken) return BadRequest(new { message = "You already have a child profile with this name." });
+
+            student.Name = dto.Name;
+        }
+        if (dto.LearningGoal != null)
+        {
+            var goalError = ProfanityFilter.Validate(dto.LearningGoal);
+            if (goalError != null) return BadRequest(new { message = goalError });
+        }
         if (dto.BirthDate != null) student.BirthDate = dto.BirthDate;
         if (dto.School != null) student.School = dto.School;
         if (dto.EducationLevel != null) student.EducationLevel = dto.EducationLevel;
@@ -156,6 +184,24 @@ public class StudentsController : ControllerBase
         return Ok(MapToDto(student));
     }
 
+    [HttpPatch("{id}/preferred-modes")]
+    public async Task<IActionResult> UpdatePreferredModes(int id, [FromBody] UpdatePreferredModesDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var student = await _context.Students
+            .Include(s => s.PreferredModes)
+            .FirstOrDefaultAsync(s => s.Id == id && s.ParentUserId == userId);
+        if (student == null) return NotFound();
+
+        _context.RemoveRange(student.PreferredModes);
+        student.PreferredModes = dto.Modes
+            .Select((mode, index) => new StudentPreferredMode { StudentId = id, Mode = mode, Sequence = index })
+            .ToList();
+
+        await _context.SaveChangesAsync();
+        return Ok(MapToDto(student));
+    }
+
     [HttpGet("booking")]
     public async Task<IActionResult> GetBookings()
     {
@@ -170,7 +216,7 @@ public class StudentsController : ControllerBase
             .Include(b => b.Student)
             .Include(b => b.Classes)
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
-            .Include(b => b.LessonReport).ThenInclude(lr => lr!.EditHistory)
+            .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
             .Where(b => studentIds.Contains(b.StudentId))
             .ToListAsync();
@@ -204,15 +250,18 @@ public class StudentsController : ControllerBase
                         ProposedDate = c.ProposedDate, ProposedTime = c.ProposedTime
                     }).ToList() ?? new()
                 },
-                LessonReport = b.LessonReport == null ? null : new LessonReportDto
+                LessonReports = b.LessonReports?.OrderBy(r => r.SessionDate).Select(r => new LessonReportSummaryDto
                 {
-                    Id = b.LessonReport.Id,
-                    Covered = b.LessonReport.Covered,
-                    Performance = b.LessonReport.Performance,
-                    Homework = b.LessonReport.Homework,
-                    SubmitDate = b.LessonReport.SubmitDate,
-                    EditHistory = b.LessonReport.EditHistory?.Select(e => new LessonReportEditDto { Date = e.Date, Changes = e.Changes }).ToList() ?? new()
-                },
+                    Id = r.Id,
+                    StudentId = r.StudentId,
+                    SessionDate = r.SessionDate,
+                    Attendance = r.Attendance,
+                    Engagement = r.Engagement,
+                    Understanding = r.Understanding,
+                    HomeworkCompletion = r.HomeworkCompletion,
+                    Remarks = r.Remarks,
+                    SubmittedAt = r.SubmittedAt.ToString("MMM d, yyyy")
+                }).ToList() ?? new(),
                 IssueReport = b.IssueReport == null ? null : new IssueReportDto
                 {
                     IssueType = b.IssueReport.IssueType,
@@ -274,6 +323,7 @@ public class StudentsController : ControllerBase
         SubjectSelect = s.SubjectSelect,
         LearningGoal = s.LearningGoal,
         PhotoUrl = s.PhotoUrl,
-        IsArchived = s.IsArchived
+        IsArchived = s.IsArchived,
+        PreferredModes = s.PreferredModes?.OrderBy(m => m.Sequence).Select(m => m.Mode).ToList() ?? new()
     };
 }

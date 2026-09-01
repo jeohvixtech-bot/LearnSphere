@@ -1,160 +1,207 @@
-<div class="dashboard-layout">
-  <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="avatar-circle">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Primary parent account</small></div>
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+    <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
     </div>
-    <nav class="sidebar-nav">
-      <a href="#!/parent/dashboard" class="nav-item">📊 Dashboard Overview</a>
-      <a href="#!/parent/students" class="nav-item">👤 Children Profiles</a>
-      <a href="#!/parent/search" class="nav-item">🔍 Find Tutors Catalog</a>
-      <a href="#!/parent/ai-match" class="nav-item">🤖 AI Speed Match</a>
-      <a href="#!/parent/personalize" class="nav-item">🎯 Personalize My Class</a>
-      <a href="#!/parent/sessions" class="nav-item active">📅 Sessions &amp; Activity</a>
-      <a href="#!/parent/billing" class="nav-item">💳 Billing &amp; Invoices</a>
-      <a href="#!/parent/chat" class="nav-item">💬 Direct Messages</a>
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <a href="#!/parent/dashboard" class="bs-sidebar-link">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard Overview
+      </a>
+      <a href="#!/parent/students" class="bs-sidebar-link">
+        <i class="ti ti-user" aria-hidden="true"></i> Children Profiles
+      </a>
+      <a href="#!/parent/search" class="bs-sidebar-link">
+        <i class="ti ti-search" aria-hidden="true"></i> Find Tutors Catalog
+      </a>
+      <a href="#!/parent/ai-match" class="bs-sidebar-link">
+        <i class="ti ti-robot" aria-hidden="true"></i> AI Speed Match
+      </a>
+      <a href="#!/parent/personalize" class="bs-sidebar-link">
+        <i class="ti ti-target" aria-hidden="true"></i> Personalize My Class
+      </a>
+      <a href="#!/parent/sessions" class="bs-sidebar-link active">
+        <i class="ti ti-calendar" aria-hidden="true"></i> Sessions &amp; Activity
+      </a>
+      <a href="#!/parent/billing" class="bs-sidebar-link">
+        <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
+      </a>
+      <a href="#!/parent/chat" class="bs-sidebar-link">
+        <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
+      </a>
     </nav>
   </aside>
 
   <main class="dashboard-main">
 
     <!-- ── Page Hero ──────────────────────────────── -->
-    <div class="profile-hero">
-      <div class="profile-hero-left">
-        <div class="profile-hero-icon">📅</div>
-        <div>
-          <h2 class="profile-hero-title">Sessions &amp; Activity</h2>
-          <p class="profile-hero-sub">Track your tutorial bookings, schedules, and lesson reports</p>
-        </div>
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:var(--space-4);">
+      <div>
+        <h1>Sessions &amp; Activity</h1>
+        <p class="bs-text-muted" style="margin:0;">Track your tutorial bookings, schedules, and lesson reports</p>
       </div>
-      <div class="profile-hero-right">
-        <div class="profile-hero-stat">
-          <strong>{{ vm.bookings.length }}</strong>
-          <small>Total Bookings</small>
+      <div style="display:flex; gap:var(--space-6);">
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.bookings.length }}</div>
+          <div class="bs-text-muted" style="font-size:12px;">Total Bookings</div>
         </div>
-        <div class="profile-hero-divider"></div>
-        <div class="profile-hero-stat">
-          <strong>{{ vm.confirmedAndCounteredBookings().length }}</strong>
-          <small>Upcoming</small>
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.confirmedAndCounteredBookings().length }}</div>
+          <div class="bs-text-muted" style="font-size:12px;">Upcoming</div>
         </div>
       </div>
     </div>
 
     <!-- ── Issue Report Success ────────────────────── -->
-    <div class="alert-success" ng-if="vm.issueSuccess">
+    <div ng-if="vm.issueSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       ✓ Incident dispatch logged. Administration is now investigating.
-      <button class="btn-link" ng-click="vm.issueSuccess = false; vm.issueForm.bookingId = null" style="margin-left:12px">Dismiss</button>
+      <button class="bs-btn bs-btn-ghost" style="margin-left:8px;" ng-click="vm.issueSuccess = false; vm.issueForm.bookingId = null">Dismiss</button>
     </div>
 
     <!-- ── Report Issue Form ───────────────────────── -->
-    <div class="card report-issue-card" ng-if="vm.issueForm.bookingId && !vm.issueSuccess">
-      <div class="report-issue-header">
-        <div class="report-issue-icon">⚠️</div>
+    <div class="bs-card bs-elev-sm" ng-if="vm.issueForm.bookingId && !vm.issueSuccess">
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
         <div>
-          <h3>Report Class Conflict</h3>
-          <p>Booking ID: #{{ vm.issueForm.bookingId }}</p>
+          <div class="bs-card-title">Report Class Conflict</div>
+          <p class="bs-text-muted" style="margin:0;">Booking ID: #{{ vm.issueForm.bookingId }}</p>
         </div>
-        <button class="btn-link" ng-click="vm.issueForm.bookingId = null" style="margin-left:auto">✕ Cancel</button>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.issueForm.bookingId = null">✕ Cancel</button>
       </div>
-      <form ng-submit="vm.submitIssue()" class="form-stack">
-        <div class="form-group">
+      <form ng-submit="vm.submitIssue()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+        <div class="bs-field" style="margin:0;">
           <label>Incident Type</label>
-          <select ng-model="vm.issueForm.issueType">
+          <select class="bs-input" ng-model="vm.issueForm.issueType">
             <option>Tutor was absent (No show)</option>
             <option>Tutor was late ( &gt; 20 mins)</option>
             <option>Other scheduling dispute</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>What happened?</label>
-          <textarea ng-model="vm.issueForm.details" rows="3" required
+        <div class="bs-field" style="margin:0;">
+          <label>What happened? <span style="color:var(--color-accent-2);">*</span></label>
+          <textarea class="bs-input" ng-model="vm.issueForm.details" rows="3" required
             placeholder="Provide details about wait times, response, or other issues..."></textarea>
+          <div ng-if="vm.issueError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ vm.issueError }}</div>
         </div>
-        <div class="btn-row">
-          <button type="button" class="btn-outline" ng-click="vm.issueForm.bookingId = null">Cancel</button>
-          <button type="submit" class="btn-danger">Submit Report</button>
+        <div style="display:flex; gap:var(--space-2);">
+          <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.issueForm.bookingId = null">Cancel</button>
+          <button type="submit" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);">Submit Report</button>
         </div>
       </form>
     </div>
 
     <!-- ── Reschedule Success ───────────────────────── -->
-    <div class="alert-success" ng-if="vm.rescheduleSuccess">
+    <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       ✓ Reschedule request submitted. New class dates have been updated.
     </div>
 
     <!-- ── Counter Accept Success ────────────────────── -->
-    <div class="alert-success" ng-if="vm.counterAcceptSuccess">
+    <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       ✓ Counter proposal accepted. Booking is now confirmed.
     </div>
 
     <!-- ── Pay Success ───────────────────────────── -->
-    <div class="alert-success" ng-if="vm.paySuccess">
+    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
+    <!-- ── Payment Summary ───────────────────────── -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.payingBooking && !vm.paySuccess">
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <div>
+          <div class="bs-card-title">Payment Summary</div>
+          <p class="bs-text-muted" style="margin:0;">Booking #{{ vm.payingBooking.bookingNumber }}</p>
+        </div>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.payingBooking = null">✕ Cancel</button>
+      </div>
+
+      <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+        <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Tutor</span><strong>{{ vm.payingBooking.tutorName }}</strong></div>
+        <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Student</span><strong>{{ vm.payingBooking.studentName }}</strong></div>
+        <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Subject</span><strong>{{ vm.payingBooking.subject }}</strong></div>
+        <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.payingBooking.mode }}</strong></div>
+      </div>
+
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Schedule ({{ vm.payingBooking.classes.length }} class{{ vm.payingBooking.classes.length === 1 ? '' : 'es' }})</div>
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--color-divider);" ng-repeat="c in vm.payingBooking.classes track by $index">
+          <span>{{ c.date | dmy }}</span><span>{{ c.time | hhmma }}</span>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
+        <span>Total</span>
+        <strong style="font-family:var(--font-heading); font-size:18px;">${{ vm.payingBooking.totalPrice }}.00</strong>
+      </div>
+
+      <div style="display:flex; gap:var(--space-2);">
+        <button class="bs-btn bs-btn-secondary" ng-click="vm.payingBooking = null">Cancel</button>
+        <button class="bs-btn bs-btn-primary" ng-click="vm.confirmPayInvoice()">Confirm Payment</button>
+      </div>
+    </div>
+
     <!-- ── Cancel Success ───────────────────────────── -->
-    <div class="alert-success" ng-if="vm.cancelSuccess">
+    <div ng-if="vm.cancelSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       ✓ Booking cancelled.
     </div>
 
     <!-- ── Reschedule Form ───────────────────────────── -->
-    <div class="card reschedule-panel" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
-      <div class="reschedule-header">
-        <div class="reschedule-title-row">
-          <span class="reschedule-icon">📅</span>
-          <div>
-            <h3>Reschedule Class</h3>
-            <p>{{ vm.rescheduleBooking.subject }} &bull; {{ vm.rescheduleBooking.tutorName }}</p>
-          </div>
+    <div class="bs-card bs-elev-sm" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <div>
+          <div class="bs-card-title">Reschedule Class</div>
+          <p class="bs-text-muted" style="margin:0;">{{ vm.rescheduleBooking.subject }} · {{ vm.rescheduleBooking.tutorName }}</p>
         </div>
-        <button class="btn-link" ng-click="vm.cancelReschedule()">✕ Cancel</button>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelReschedule()">✕ Cancel</button>
       </div>
-      <p class="reschedule-sub" ng-if="vm.isBookingConflicted(vm.rescheduleBooking)">
+      <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isBookingConflicted(vm.rescheduleBooking)">
         ⚠️ The tutor has blocked some of the original class dates. Please select new available dates below.
       </p>
-      <p class="reschedule-sub" ng-if="!vm.isBookingConflicted(vm.rescheduleBooking)" style="background:#f0fdf4;border-left-color:#16a34a">
+      <p style="font-size:13px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isBookingConflicted(vm.rescheduleBooking)">
         Enter new preferred dates for this booking below.
       </p>
-      <form ng-submit="vm.submitReschedule()" class="form-stack">
-        <div class="session-slot" ng-repeat="c in vm.rescheduleForm.classes track by $index"
-          ng-class="{'slot-blocked': vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)}">
-          <div class="session-slot-label" style="display:flex;align-items:center;gap:8px">
+      <form ng-submit="vm.submitReschedule()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+        <div ng-repeat="c in vm.rescheduleForm.classes track by $index" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);"
+          ng-style="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate) ? {outline:'1px solid var(--color-accent-2)'} : {}">
+          <div style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; margin-bottom:6px;">
             Class {{ $index + 1 }}
-            <span class="badge-blocked" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">🚫 Blocked</span>
+            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">🚫 Blocked</span>
           </div>
-          <div class="reschedule-orig-date">
-            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime }} ({{ vm.rescheduleBooking.durationHours }}h)
+          <div class="bs-text-muted" style="font-size:12px; margin-bottom:6px;">
+            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
-          <div class="form-row-3">
-            <div class="form-group">
-              <label>New Date</label>
-              <input type="text" ng-model="c.date" required placeholder="DD-MM-YYYY" fp-date
-                ng-class="{'input-blocked': c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)}" />
-              <span class="blocked-date-hint" ng-if="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)">
+          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+            <div class="bs-field" style="flex:1; min-width:140px; margin:0;">
+              <label>New Date <span style="color:var(--color-accent-2);">*</span></label>
+              <input class="bs-input" type="text" ng-model="c.date" required placeholder="DD-MM-YYYY" fp-date
+                ng-style="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+              <span ng-if="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)" style="color:var(--color-accent-2-700); font-size:12px;">
                 ⚠️ This date is also blocked by the tutor
               </span>
             </div>
-            <div class="form-group">
-              <label>Start Time</label>
-              <input type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+            <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+              <label>Start Time <span style="color:var(--color-accent-2);">*</span></label>
+              <input class="bs-input" type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
                 ng-change="vm.onRescheduleStartTimeChange(c)"
-                ng-class="{'input-blocked': c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)}" />
+                ng-style="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
             </div>
-            <div class="form-group">
+            <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
               <label>End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
-              <input type="text" value="{{ vm.rescheduleEndTime(c) }}" readonly disabled placeholder="Auto-calculated" />
+              <input class="bs-input" type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
             </div>
           </div>
-          <span class="blocked-date-hint" ng-if="c.date && vm.isTooSoon(c.date, c.time)">
+          <span ng-if="c.date && vm.isTooSoon(c.date, c.time)" style="color:var(--color-accent-2-700); font-size:12px;">
             ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
           </span>
         </div>
-        <p class="reschedule-sub" ng-if="vm.hasDuplicateReschedule()" style="background:#fef2f2;border-left-color:#dc2626">
+        <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateReschedule()">
           ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
-        <div class="btn-row" style="margin-top:4px">
-          <button type="button" class="btn-outline" ng-click="vm.cancelReschedule()">Cancel</button>
-          <button type="submit" class="btn-primary" ng-disabled="vm.hasTooSoonReschedule() || vm.hasDurationMismatchReschedule() || vm.hasDuplicateReschedule()">Confirm Reschedule →</button>
+        <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidReschedule()">
+          ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+        </p>
+        <div style="display:flex; gap:var(--space-2);">
+          <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelReschedule()">Cancel</button>
+          <button type="submit" class="bs-btn bs-btn-primary" ng-disabled="vm.hasInvalidReschedule() || vm.hasTooSoonReschedule() || vm.hasDurationMismatchReschedule() || vm.hasDuplicateReschedule()">Confirm Reschedule →</button>
         </div>
       </form>
     </div>
@@ -163,91 +210,95 @@
     <div ng-if="(!vm.issueForm.bookingId && !vm.rescheduleBooking) || vm.issueSuccess">
 
       <!-- Tab Bar -->
-      <div class="tab-bar">
-        <button class="tab-btn" ng-class="{'active': vm.sessionsTab === 'active'}" ng-click="vm.sessionsTab = 'active'">
-          📋 Active Bookings ({{ vm.nonCancelledBookings().length }})
+      <div class="bs-seg">
+        <button type="button" class="bs-seg-opt" ng-click="vm.sessionsTab = 'active'"
+          ng-style="{background: vm.sessionsTab === 'active' ? 'var(--color-accent)' : 'transparent', color: vm.sessionsTab === 'active' ? 'var(--color-bg)' : 'inherit'}">
+          Active Bookings ({{ vm.nonCancelledBookings().length }})
         </button>
-        <button class="tab-btn" ng-class="{'active': vm.sessionsTab === 'cancelled'}" ng-click="vm.sessionsTab = 'cancelled'">
-          ✕ Cancelled Bookings ({{ vm.cancelledBookings().length }})
+        <button type="button" class="bs-seg-opt" ng-click="vm.sessionsTab = 'cancelled'"
+          ng-style="{background: vm.sessionsTab === 'cancelled' ? 'var(--color-accent)' : 'transparent', color: vm.sessionsTab === 'cancelled' ? 'var(--color-bg)' : 'inherit'}">
+          Cancelled Bookings ({{ vm.cancelledBookings().length }})
         </button>
       </div>
 
-      <div class="sessions-list-header">
-        <span class="profile-registry-label">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-3);">
+        <span class="bs-text-muted" style="font-size:13px;">
           {{ vm.visibleBookings().length }} Booking{{ vm.visibleBookings().length !== 1 ? 's' : '' }}
         </span>
-        <a href="#!/parent/search" class="btn-primary sm">+ New Booking</a>
+        <a href="#!/parent/search" class="bs-btn bs-btn-primary">+ New Booking</a>
       </div>
 
-      <div class="empty-state-box" ng-if="!vm.visibleBookings().length">
-        <p ng-if="vm.sessionsTab === 'active'">No active bookings found. Start by finding a tutor!</p>
-        <p ng-if="vm.sessionsTab === 'cancelled'">No cancelled bookings.</p>
-        <a ng-if="vm.sessionsTab === 'active'" href="#!/parent/search" class="btn-primary sm" style="margin-top:10px;display:inline-block">Find a Tutor →</a>
+      <div style="text-align:center; padding:var(--space-6); background:var(--color-surface); border-radius:var(--radius-md); margin-top:var(--space-3);" ng-if="!vm.visibleBookings().length">
+        <p class="bs-text-muted" ng-if="vm.sessionsTab === 'active'">No active bookings found. Start by finding a tutor!</p>
+        <p class="bs-text-muted" ng-if="vm.sessionsTab === 'cancelled'">No cancelled bookings.</p>
+        <a ng-if="vm.sessionsTab === 'active'" href="#!/parent/search" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);">Find a Tutor →</a>
       </div>
 
       <!-- ── Booking cards ── -->
-      <div class="booking-card" ng-repeat="b in vm.visibleBookings()"
-        ng-class="{'conflicted': vm.isBookingConflicted(b)}">
+      <div class="bs-card bs-elev-sm" style="margin-top:var(--space-3);" ng-repeat="b in vm.visibleBookings()"
+        ng-style="vm.isBookingConflicted(b) ? {outline:'2px solid var(--color-accent-2)'} : {}">
 
         <!-- Top row: subject + parties + status -->
-        <div class="booking-card-top">
-          <div class="booking-card-left">
-            <span class="badge-subject">{{ b.subject }}</span>
-            <span class="booking-id-tag">#{{ b.bookingNumber }}</span>
-            <div class="booking-card-parties">
-              <span>👨‍🏫 {{ b.tutorName }}</span>
-              <span class="sep">•</span>
-              <span>👤 {{ b.studentName }}</span>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:var(--space-2);">
+          <div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
+              <span class="bs-text-muted" style="font-size:12px;">#{{ b.bookingNumber }}</span>
+            </div>
+            <div class="bs-text-muted" style="font-size:13px; margin-top:4px;">
+              <span>{{ b.tutorName }}</span>
+              <span> • </span>
+              <span>{{ b.studentName }}</span>
             </div>
           </div>
-          <span class="status-badge" ng-class="vm.isBookingConflicted(b) ? 'conflicted' : b.status">
+          <span class="bs-tag" ng-class="vm.isBookingConflicted(b) ? 'bs-tag-accent-2' : (b.status === 'confirmed' ? 'bs-tag-accent' : 'bs-tag-neutral')">
             {{ vm.isBookingConflicted(b) ? 'SCHEDULE CONFLICT' : (b.status | uppercase) }}
           </span>
         </div>
 
         <!-- Schedule chips -->
-        <div class="booking-card-schedule">
-          <div class="booking-date-chip" ng-repeat="c in b.classes track by $index">
-            <span class="booking-date">📅 {{ c.date | dmy }}</span>
-            <span class="booking-time">🕐 {{ c.time }} ({{ b.durationHours }}h)</span>
-          </div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+          <span class="bs-tag bs-tag-neutral" ng-repeat="c in b.classes track by $index">
+            {{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)
+          </span>
         </div>
 
         <!-- Footer: price + actions -->
-        <div class="booking-card-footer">
-          <div class="booking-card-price">
-            <small>Total</small>
-            <strong>${{ b.totalPrice }}.00</strong>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
+          <div>
+            <small class="bs-text-muted">Total</small><br/>
+            <strong style="font-family:var(--font-heading); font-size:18px;">${{ b.totalPrice }}.00</strong>
           </div>
-          <div class="booking-card-actions">
-            <button class="btn-primary sm"
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <button class="bs-btn bs-btn-primary"
               ng-if="b.status === 'confirmed'"
               ng-show="vm.getInvoiceForBooking(b.id) && vm.getInvoiceForBooking(b.id).status === 'Unpaid'"
-              ng-click="vm.payInvoice(vm.getInvoiceForBooking(b.id).id)">
-              💳 Pay Invoice
+              ng-click="vm.openPaySummary(b)">
+              Pay Invoice
             </button>
-            <button class="btn-outline sm"
+            <button class="bs-btn bs-btn-secondary"
               ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor'"
               ng-click="vm.acceptCounterProposal(b)">
               ✓ Accept Counter
             </button>
-            <button class="btn-outline sm"
-              ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor'"
+            <button class="bs-btn bs-btn-secondary"
+              ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor' && b.bookingType !== 'tutor-preset'"
               ng-click="vm.startReschedule(b)">
-              🔁 Counter Propose Again
+              Counter Propose Again
             </button>
-            <button ng-if="b.status === 'confirmed'"
-              ng-class="vm.isBookingConflicted(b) ? 'btn-warning sm' : 'btn-outline sm'"
+            <button ng-if="b.status === 'confirmed' && b.bookingType !== 'tutor-preset'"
+              class="bs-btn" ng-class="vm.isBookingConflicted(b) ? '' : 'bs-btn-secondary'"
+              ng-style="vm.isBookingConflicted(b) ? {background:'var(--color-accent-2)', color:'var(--color-bg)'} : {}"
               ng-click="vm.startReschedule(b)">
               <span ng-if="vm.isBookingConflicted(b)">⚠️ Reschedule Required</span>
-              <span ng-if="!vm.isBookingConflicted(b)">📅 Reschedule</span>
+              <span ng-if="!vm.isBookingConflicted(b)">Reschedule</span>
             </button>
-            <button class="btn-danger sm"
+            <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
               ng-if="b.status === 'confirmed'"
               ng-click="vm.startReportIssue(b.id)">
               ⚠️ Report Issue
             </button>
-            <button class="btn-outline sm"
+            <button class="bs-btn bs-btn-secondary"
               ng-if="b.status === 'pending' || b.status === 'countered' || b.status === 'confirmed'"
               ng-click="vm.cancelBooking(b)"
               ng-disabled="vm.bookingHasPaidInvoice(b.id)"
@@ -258,36 +309,45 @@
         </div>
 
         <!-- Counter proposal panel -->
-        <div class="counter-panel" ng-if="b.counterProposal && b.status === 'countered'">
-          <div class="counter-panel-header">
-            🔄 <span ng-if="b.counterProposal.proposedBy === 'tutor'">Tutor's Counter Proposal</span>
-            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">Your Reschedule Proposal <span class="badge-amber" style="font-size:10px;margin-left:4px">⏳ Awaiting tutor's acceptance</span></span>
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.counterProposal && b.status === 'countered'">
+          <div style="font-weight:600; font-size:13px; margin-bottom:6px;">
+            <span ng-if="b.counterProposal.proposedBy === 'tutor'">🔄 Tutor's Counter Proposal</span>
+            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">🔄 Your Reschedule Proposal <span class="bs-tag bs-tag-accent-2" style="font-size:10px;">⏳ Awaiting tutor's acceptance</span></span>
           </div>
-          <div class="counter-class-line" ng-repeat="c in b.counterProposal.classes track by $index">
-            <span>Class {{ $index + 1 }}:</span>
-            <span class="text-muted">{{ c.originalDate | dmy }}</span>
-            <span class="counter-arrow">→</span>
-            <strong>{{ c.proposedDate | dmy }} {{ c.proposedTime }} ({{ b.durationHours }}h)</strong>
+          <div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:4px;" ng-repeat="c in b.counterProposal.classes track by $index">
+            <span class="bs-text-muted">Class {{ $index + 1 }}:</span>
+            <span class="bs-text-muted">{{ c.originalDate | dmy }}</span>
+            <span>→</span>
+            <strong>{{ c.proposedDate | dmy }} {{ c.proposedTime | hhmma }} ({{ b.durationHours }}h)</strong>
           </div>
-          <p class="counter-message" ng-if="b.counterProposal.message">"{{ b.counterProposal.message }}"</p>
+          <p style="font-style:italic; margin-top:6px;" ng-if="b.counterProposal.message">"{{ b.counterProposal.message }}"</p>
         </div>
 
-        <!-- Lesson report panel -->
-        <div class="lesson-report-panel" ng-if="b.lessonReport">
-          <div class="lesson-report-header">📋 Lesson Report</div>
-          <div class="lesson-report-grid">
-            <div>
-              <span class="lesson-report-label">Topics Covered</span>
-              <p>{{ b.lessonReport.covered }}</p>
+        <!-- Lesson report panel — one entry per session date -->
+        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.lessonReports.length">
+          <div class="bs-card-title" style="font-size:14px;">📋 Lesson Reports</div>
+          <div style="border-top:1px solid var(--color-divider); padding-top:var(--space-2); margin-top:var(--space-2);" ng-repeat="r in b.lessonReports track by r.id">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <strong>{{ r.sessionDate | dmy }}</strong>
+              <span class="bs-tag bs-tag-accent" ng-if="r.attendance === 'present'">Present</span>
+              <span class="bs-tag bs-tag-accent-2" ng-if="r.attendance === 'late'">Late</span>
+              <span class="bs-tag bs-tag-neutral" ng-if="r.attendance === 'absent'">Absent</span>
             </div>
-            <div>
-              <span class="lesson-report-label">Performance</span>
-              <p>{{ b.lessonReport.performance }}</p>
+            <div style="display:flex; gap:var(--space-4); margin-top:6px; flex-wrap:wrap;" ng-if="r.attendance !== 'absent'">
+              <div>
+                <span style="font-size:11px; text-transform:uppercase; opacity:0.6;">Engagement</span>
+                <p style="margin:2px 0 0;">{{ r.engagement }} / 5 ★</p>
+              </div>
+              <div>
+                <span style="font-size:11px; text-transform:uppercase; opacity:0.6;">Understanding</span>
+                <p style="margin:2px 0 0;">{{ r.understanding | capitalize }}</p>
+              </div>
+              <div>
+                <span style="font-size:11px; text-transform:uppercase; opacity:0.6;">Homework</span>
+                <p style="margin:2px 0 0;">{{ r.homeworkCompletion | capitalize }}</p>
+              </div>
             </div>
-            <div>
-              <span class="lesson-report-label">Homework</span>
-              <p>{{ b.lessonReport.homework }}</p>
-            </div>
+            <p class="bs-text-muted" ng-if="r.remarks" style="margin-top:6px; font-style:italic;">"{{ r.remarks }}"</p>
           </div>
         </div>
 

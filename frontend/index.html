@@ -6,10 +6,11 @@
   <title>LearnSphere – Tutor Matching Platform</title>
 
   <!-- AngularJS 1.x + ngRoute -->
-  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
-  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular-route.min.js"></script>
+  <script src="libs/angular.min.js"></script>
+  <script src="libs/angular-route.min.js"></script>
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <link rel="stylesheet" href="libs/flatpickr.min.css" />
+  <link rel="stylesheet" href="libs/tabler-icons/tabler-icons.min.css" />
   <link rel="stylesheet" href="styles/main.css" />
 </head>
 <body>
@@ -18,52 +19,47 @@
   <div ng-controller="AppCtrl as app">
 
     <!-- Main Header -->
-    <header class="main-header" ng-if="app.isLoggedIn()">
-      <div class="header-inner">
-        <div class="brand">
-          <div class="brand-icon">📚</div>
-          <div>
-            <h1 class="brand-name">LearnSphere <span class="badge-demo">Demo</span></h1>
-            <p class="brand-tagline">Learn Continuously, Grow Confidently.</p>
-          </div>
-        </div>
+    <header class="bs-nav bs-scope" ng-if="app.isLoggedIn()" style="border-bottom:1px solid var(--color-divider); position:sticky; top:0; background:var(--color-bg); z-index:30;">
+      <span class="bs-nav-brand">LearnSphere</span>
+      <div style="display:flex; align-items:center; gap:var(--space-3); margin-left:auto;">
+        <span style="font-size:13px;">
+          <strong>{{ app.currentUser.name }}</strong>
+          <span class="bs-tag bs-tag-neutral" style="margin-left:6px; text-transform:capitalize;">{{ app.currentUser.role }}</span>
+        </span>
 
-        <nav class="header-nav">
-          <span class="user-info">
-            <strong>{{ app.currentUser.name }}</strong>
-            <em class="role-badge role-{{ app.currentUser.role }}">{{ app.currentUser.role }}</em>
-          </span>
+        <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:relative;" ng-click="app.toggleNotifDrawer()">
+          <i class="ti ti-bell" aria-hidden="true"></i>
+          <span ng-if="app.unreadCount > 0" style="position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:var(--color-accent-2);"></span>
+        </button>
 
-          <button class="notif-btn" ng-click="app.toggleNotifDrawer()">
-            🔔
-            <span class="notif-count" ng-if="app.unreadCount > 0">{{ app.unreadCount }}</span>
-          </button>
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ app.currentUser.name[0] }}</div>
 
-          <button class="btn-signout" ng-click="app.logout()">Sign Out</button>
-        </nav>
+        <button type="button" class="bs-btn bs-btn-secondary" ng-click="app.logout()">Sign Out</button>
       </div>
     </header>
 
     <!-- Notifications Drawer -->
-    <div class="notif-overlay" ng-if="app.notifDrawerOpen" ng-click="app.toggleNotifDrawer()"></div>
-    <aside class="notif-drawer" ng-if="app.notifDrawerOpen">
-      <div class="notif-drawer-header">
-        <span>🔔 Notifications Registry</span>
-        <button ng-click="app.toggleNotifDrawer()">✕</button>
-      </div>
-      <div class="notif-list">
-        <div class="notif-item" ng-repeat="n in app.notifications" ng-class="{'unread': !n.isRead}">
-          <span class="notif-dot"></span>
-          <div>
-            <h4>{{ n.title }}</h4>
-            <p>{{ n.message }}</p>
-            <small>{{ n.timestamp }}</small>
-          </div>
+    <div class="bs-dialog-backdrop bs-scope" ng-if="app.notifDrawerOpen" ng-click="app.toggleNotifDrawer()" style="justify-items:end; align-items:stretch; padding:0;">
+      <aside class="bs-card" ng-click="$event.stopPropagation()" style="width:340px; height:100%; border-radius:0; box-shadow:var(--shadow-lg); overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="bs-card-title">Notifications Registry</span>
+          <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="app.toggleNotifDrawer()">✕</button>
         </div>
-        <p ng-if="!app.notifications.length" class="empty-state">No notifications yet.</p>
-      </div>
-      <button class="btn-primary full-width" ng-click="app.markAllRead()">Mark all as read</button>
-    </aside>
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <div ng-repeat="n in app.notifications" style="display:flex; gap:10px; padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
+            ng-style="!n.isRead ? {background:'var(--color-accent-100)'} : {}">
+            <span style="width:8px; height:8px; border-radius:50%; background:var(--color-accent); flex-shrink:0; margin-top:6px;" ng-if="!n.isRead"></span>
+            <div>
+              <h4 style="margin:0; font-size:14px;">{{ n.title }}</h4>
+              <p style="margin:2px 0 0; font-size:13px;">{{ n.message }}</p>
+              <small class="bs-text-muted">{{ n.timestamp }}</small>
+            </div>
+          </div>
+          <p class="bs-text-muted" ng-if="!app.notifications.length">No notifications yet.</p>
+        </div>
+        <button type="button" class="bs-btn bs-btn-primary bs-btn-block" ng-click="app.markAllRead()">Mark all as read</button>
+      </aside>
+    </div>
 
     <!-- Route view -->
     <main class="main-content">
@@ -73,7 +69,7 @@
   </div>
 
   <!-- Flatpickr -->
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="libs/flatpickr.min.js"></script>
 
   <!-- App Scripts -->
   <script src="app/app.js"></script>
@@ -87,9 +83,14 @@
   <script src="app/services/notification.service.js"></script>
   <script src="app/services/invoice.service.js"></script>
   <script src="app/services/admin.service.js"></script>
+  <script src="app/services/preset-cancellation.service.js"></script>
   <script src="app/services/schedule.service.js"></script>
   <script src="app/services/pending-match.service.js"></script>
   <script src="app/services/subject-catalog.service.js"></script>
+  <script src="app/services/teaching-modes-catalog.service.js"></script>
+  <script src="app/services/profanity-filter.service.js"></script>
+  <script src="app/services/name-validation.service.js"></script>
+  <script src="app/directives/drag-drop.directives.js"></script>
   <script src="app/controllers/app.controller.js"></script>
   <script src="app/controllers/welcome.controller.js"></script>
   <script src="app/controllers/auth.controller.js"></script>
