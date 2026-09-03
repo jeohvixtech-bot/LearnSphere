@@ -34,25 +34,71 @@
 
       <div style="margin-top:10px;">
         <p style="font-size:11px;font-weight:600;color:var(--color-text-muted);
-                   text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px;">
+                   text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px;">
           Class status bar
         </p>
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
-            <span class="cal-seg-legend cal-seg--red"></span> Online class — video link missing
+        <div style="display:flex;flex-direction:column;gap:6px;">
+
+          <!-- Red — link missing -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--red"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Online class — video link missing
           </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
-            <span class="cal-seg-legend cal-seg--amber"></span> Past class — report pending
+
+          <!-- Amber — report pending -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--amber"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Past class — report pending
           </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
-            <span class="cal-seg-legend cal-seg--green"></span> Past class — all reports submitted
+
+          <!-- Green — all done -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--green"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Past class — all reports submitted
           </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
-            <span class="cal-seg-legend cal-seg--blue"></span> Future confirmed class
+
+          <!-- Blue — future confirmed -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blue"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Future confirmed class
           </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
-            <span class="cal-seg-legend cal-seg--grey"></span> Published slot — no students yet
+
+          <!-- Grey — published, no students -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--grey"></div>
+            </div>
+            Published slot — no students yet
           </div>
+
         </div>
       </div>
     </div>
@@ -272,28 +318,8 @@
         </button>
       </div>
 
-      <div class="bs-cal-day-detail" ng-repeat="day in vm.sortedSelectedCalDays() track by day">
-        <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ day }}, {{ vm.calYear }}</h4>
-        <p class="bs-text-muted" style="margin:0 0 8px;font-size:12px;">
-          Scheduled classes for this date now live in the Daily Summary panel below the calendar.
-        </p>
-
-        <div ng-if="vm.publishedSlotsOnDay(day).length">
-          <h5 style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; margin:var(--space-3) 0 6px;">
-            Your Published Slots
-          </h5>
-          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); margin-bottom:8px;" ng-repeat="slot in vm.publishedSlotsOnDay(day)">
-            <span class="bs-tag bs-tag-accent">{{ slot.subject }}<span ng-if="slot.level"> · {{ slot.level }}</span></span>
-            <strong style="display:block; margin-top:4px;">{{ slot.time | hhmma }} – {{ slot.endTime | hhmma }}</strong>
-            <p class="bs-text-muted" style="margin:2px 0 0;">{{ slot.mode }} · {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }} · ${{ slot.pricePerLesson }}/lesson</p>
-            <p ng-if="slot.isFull" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">Full — no more bookings accepted</p>
-            <p class="bs-text-muted" ng-if="!slot.isFull" style="font-size:13px; margin-top:4px;">Open for booking · not yet claimed by a parent</p>
-            <button class="bs-btn bs-btn-secondary" ng-click="vm.openCancelSlotModal(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px; color:var(--color-accent-2);">
-              <i class="ti ti-x" aria-hidden="true"></i> Cancel class
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- Day detail: published slots moved to Daily Summary modal -->
+      <!-- Block unavailable date range remains below -->
 
       <!-- Block Unavailable Dates -->
       <div style="border-top:1px solid var(--color-divider); padding-top:var(--space-3); margin-top:var(--space-2);">
@@ -358,7 +384,7 @@
     </div>
 
     <!-- Setup Class Modal -->
-    <div class="modal-overlay" ng-if="vm.setupClassOpen" ng-click="vm.closeSyllabusDropdown()">
+    <div class="modal-overlay" ng-if="vm.setupClassOpen">
       <div class="modal-card setup-class-modal">
         <div class="modal-header">
           <div>
@@ -493,95 +519,6 @@
             <div class="bs-field">
               <label>Price per lesson (RM / SGD based on country)</label>
               <input class="bs-input" type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
-            </div>
-
-            <!-- Syllabus topics -->
-            <div class="bs-field">
-              <label>
-                Syllabus topics
-                <span class="bs-text-muted" style="font-weight:400; font-size:11px;">
-                  Optional — select up to 6
-                </span>
-              </label>
-
-              <!-- Dropdown trigger -->
-              <div class="syllabus-dropdown-wrap" ng-click="$event.stopPropagation()"
-                ng-class="{'syllabus-dropdown-disabled': !vm.syllabusTopics.length}">
-
-                <button type="button" class="syllabus-dropdown-btn"
-                  ng-click="vm.toggleSyllabusDropdown()"
-                  ng-disabled="!vm.syllabusTopics.length">
-                  <span ng-if="vm.syllabusSelectedCount() === 0" class="bs-text-muted">
-                    {{ !vm.setupClassForm.subject ? 'Select subject first' : (vm.syllabusTopics.length ? '— Select topics —' : 'No syllabus topics available yet (optional)') }}
-                  </span>
-                  <span ng-if="vm.syllabusSelectedCount() > 0">
-                    {{ vm.syllabusSelectedCount() }} / 6 topics selected
-                  </span>
-                  <i class="ti ti-chevron-down"
-                    ng-style="{'transform': vm.syllabusDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'}"
-                    style="font-size:13px; margin-left:auto; transition:transform .15s;"
-                    aria-hidden="true"></i>
-                </button>
-
-                <!-- Dropdown panel -->
-                <div class="syllabus-dropdown-panel" ng-if="vm.syllabusDropdownOpen">
-
-                  <!-- Autocomplete search -->
-                  <div class="syllabus-search-wrap">
-                    <i class="ti ti-search" style="font-size:13px; color:#94a3b8;" aria-hidden="true"></i>
-                    <input type="text"
-                      ng-model="vm.syllabusSearch"
-                      placeholder="Search topics..."
-                      class="syllabus-search-input" />
-                  </div>
-
-                  <!-- Topic checkboxes -->
-                  <div class="syllabus-topic-list">
-                    <div class="syllabus-topic-item"
-                      ng-repeat="t in vm.filteredSyllabusTopics() track by t.id"
-                      ng-class="{
-                        'selected': vm.isSyllabusTopicSelected(t.id),
-                        'disabled': !vm.isSyllabusTopicSelected(t.id) && vm.syllabusSelectedCount() >= 6
-                      }"
-                      ng-click="vm.toggleSyllabusTopic(t.id)">
-                      <span class="syllabus-checkbox">
-                        <i class="ti"
-                          ng-class="vm.isSyllabusTopicSelected(t.id) ? 'ti-check' : ''"
-                          style="font-size:11px;"
-                          aria-hidden="true"></i>
-                      </span>
-                      <span class="syllabus-topic-name">{{ t.topic }}</span>
-                    </div>
-                    <div ng-if="vm.filteredSyllabusTopics().length === 0" class="syllabus-no-results">
-                      No topics found
-                    </div>
-                  </div>
-
-                  <div class="syllabus-dropdown-footer">
-                    <span class="bs-text-muted" style="font-size:11px;">
-                      {{ vm.syllabusSelectedCount() }} of 6 selected
-                    </span>
-                    <button type="button" class="bs-btn bs-btn-ghost"
-                      ng-click="vm.closeSyllabusDropdown()">Done</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Selected chips -->
-              <div class="syllabus-chips-row" ng-if="vm.syllabusSelectedCount() > 0">
-                <span class="syllabus-chip"
-                  ng-repeat="topicId in vm.setupClassForm.syllabusTopicIds track by topicId">
-                  {{ vm.syllabusTopicName(topicId) }}
-                  <button type="button" class="syllabus-chip-remove"
-                    ng-click="vm.removeSyllabusTopic(topicId)">
-                    <i class="ti ti-x" style="font-size:10px;" aria-hidden="true"></i>
-                  </button>
-                </span>
-              </div>
-
-              <p class="bs-text-muted" style="font-size:11px;" ng-if="vm.syllabusTopics.length > 0 && vm.syllabusSelectedCount() >= 6">
-                Maximum 6 topics selected.
-              </p>
             </div>
 
             <p ng-if="vm.setupClassError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.setupClassError }}</p>
@@ -739,49 +676,6 @@
           <button type="submit" class="bs-btn bs-btn-primary" ng-disabled="vm.hasInvalidTutorReschedule() || vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
         </div>
       </form>
-    </div>
-
-    <!-- Confirmed Classes -->
-    <div class="bs-card bs-elev-sm" ng-if="!vm.counterBooking && !vm.rescheduleBooking">
-      <div class="bs-card-title"><i class="ti ti-checkbox" aria-hidden="true"></i> Confirmed Classes Checklist</div>
-      <p class="bs-text-muted" ng-if="!vm.confirmedClasses().length">No active class appointments.</p>
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
-        ng-repeat="b in vm.confirmedClasses()"
-        ng-style="vm.isTutorBookingConflicted(b) ? {background:'var(--color-accent-2-100)'} : {}">
-        <div style="flex:1">
-          <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
-          <span class="bs-text-muted" style="font-size:12px;">#{{ b.bookingNumber }}</span>
-          <strong style="display:block; margin-top:2px;">Child: {{ b.studentName }}</strong>
-          <!-- Countered: show proposed dates, pending acceptance -->
-          <div ng-if="b.status === 'countered' && b.counterProposal">
-            <div style="display:flex; align-items:center; gap:8px;" ng-repeat="c in b.counterProposal.classes track by $index">
-              <p style="text-decoration:line-through; color:var(--color-neutral-500); font-size:12px; margin:0;">{{ c.originalDate | dmy }}</p>
-              <p style="margin:0; font-size:13px;">{{ c.proposedDate | dmy }} · {{ c.proposedTime | hhmma }} ({{ b.durationHours }}h)
-                <span class="bs-tag bs-tag-accent-2" ng-if="b.counterProposal.proposedBy === 'tutor'">⏳ Awaiting parent's acceptance</span>
-                <span class="bs-tag bs-tag-accent-2" ng-if="b.counterProposal.proposedBy !== 'tutor'">⏳ Parent proposed — awaiting your acceptance</span>
-              </p>
-            </div>
-          </div>
-          <!-- Confirmed: show actual booking classes -->
-          <div ng-if="b.status !== 'countered' || !b.counterProposal">
-            <div style="display:flex; align-items:center; gap:8px;" ng-repeat="c in b.classes track by $index">
-              <p class="bs-text-muted" style="margin:0; font-size:13px;">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
-              <span class="bs-tag bs-tag-accent" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
-            </div>
-          </div>
-        </div>
-        <button class="bs-btn bs-btn-primary"
-          ng-if="b.status === 'countered' && b.counterProposal && b.counterProposal.proposedBy !== 'tutor'"
-          ng-click="vm.acceptCounterProposal(b)">
-          ✓ Accept Proposal
-        </button>
-        <button class="bs-btn" ng-class="vm.isTutorBookingConflicted(b) ? '' : 'bs-btn-secondary'"
-          ng-style="vm.isTutorBookingConflicted(b) ? {background:'var(--color-accent-2)', color:'var(--color-bg)'} : {}"
-          ng-click="vm.startTutorReschedule(b)">
-          <span ng-if="vm.isTutorBookingConflicted(b)">⚠️ Reschedule Required</span>
-          <span ng-if="!vm.isTutorBookingConflicted(b)">Reschedule</span>
-        </button>
-      </div>
     </div>
 
     <!-- ── 2×2 PANEL GRID ───────────────────────────────────────────── -->
@@ -953,6 +847,7 @@
             ng-repeat="group in vm.groupedBookingsOnDay(currentDay) track by $index">
             <div class="ov-ds-group-hd">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span class="ov-ds-num">{{ $index + 1 }}</span>
                 <span class="bs-tag bs-tag-accent">{{ group.subject }}</span>
                 <span class="ov-chip-muted" ng-if="group.isGroup">
                   <i class="ti ti-users" style="font-size:10px;" aria-hidden="true"></i>
@@ -1083,6 +978,50 @@
               </div>
             </div>
           </div>
+
+          <!-- Published preset slots — unbooked, grey outline cards -->
+          <div ng-if="vm.publishedSlotsOnDay(currentDay).length">
+
+            <p class="ov-section-label" style="margin-top:12px;">
+              Published slots — open for booking
+            </p>
+
+            <div class="ov-slot-card"
+              ng-repeat="slot in vm.publishedSlotsOnDay(currentDay) track by slot.id">
+              <div class="ov-slot-card-hd">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span class="bs-tag" style="background:var(--color-surface);
+                    border:0.5px solid var(--color-divider);
+                    color:var(--color-text-muted);font-size:11px;">
+                    {{ slot.subject }}<span ng-if="slot.level"> · {{ slot.level }}</span>
+                  </span>
+                  <span class="ov-chip-muted">
+                    {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }}
+                  </span>
+                  <span class="ov-chip-muted" ng-if="slot.isFull"
+                    style="color:#b91c1c;background:#fef2f2;border-color:#fca5a5;">
+                    Full
+                  </span>
+                </div>
+                <span class="ov-ds-meta">
+                  {{ slot.time | hhmma }} – {{ slot.endTime | hhmma }} · {{ slot.mode }} · ${{ slot.pricePerLesson }}/lesson
+                </span>
+              </div>
+              <div class="ov-slot-card-body">
+                <p style="font-size:12px;color:var(--color-text-muted);margin:0;"
+                  ng-if="!slot.isFull">
+                  <i class="ti ti-clock" style="font-size:12px;" aria-hidden="true"></i>
+                  Open for booking — not yet claimed by a parent
+                </p>
+                <p style="font-size:12px;color:#b91c1c;margin:0;" ng-if="slot.isFull">
+                  <i class="ti ti-lock" style="font-size:12px;" aria-hidden="true"></i>
+                  Full — no more bookings accepted
+                </p>
+              </div>
+            </div>
+
+          </div>
+          <!-- end published slots -->
 
         </div>
       </div>

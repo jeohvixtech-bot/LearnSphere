@@ -2452,6 +2452,9 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
 ('Malaysia','Business Studies','Upper Six','Practice Questions',5),
 ('Malaysia','Business Studies','Upper Six','STPM Examination Preparation',6);
 "); } catch { }
+    // Speeds up the parent-facing tutor catalog query, which filters on both columns together
+    try { await context.Database.ExecuteSqlRawAsync(
+        "CREATE INDEX `IX_Tutors_Verified_Online` ON `Tutors` (`IsVerified`, `IsOnline`)"); } catch { }
     await DbSeeder.SeedAsync(context);
 }
 

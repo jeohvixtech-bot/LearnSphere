@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS Tutors (
     IsOnline         TINYINT(1)      NOT NULL DEFAULT 1,  -- offline hides the profile from parent search/booking entirely
     VerificationStatus VARCHAR(20)   NOT NULL DEFAULT 'not_submitted', -- not_submitted | pending | approved (no separate terminal "rejected" — see TutorDocuments)
     OfferingsUnlocked  TINYINT(1)    NOT NULL DEFAULT 0,  -- gates the offering builder until mandatory documents are approved
+    KEY IX_Tutors_Verified_Online (IsVerified, IsOnline),  -- the parent-facing catalog filters on both together
     CONSTRAINT FK_Tutors_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 

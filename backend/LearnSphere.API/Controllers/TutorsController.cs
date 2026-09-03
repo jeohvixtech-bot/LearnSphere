@@ -27,9 +27,20 @@ public class TutorsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search, [FromQuery] double? rating)
+    public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search, [FromQuery] double? rating, [FromQuery] int? page, [FromQuery] int? pageSize)
     {
+        // AsSplitQuery avoids a cartesian-product join across the 7 sibling
+        // collections below — without it, EF emits one giant join and a tutor
+        // with e.g. 4 reviews x 3 offerings x 4 qualifications comes back as
+        // 48 duplicate rows to de-dupe client-side, multiplying (not just
+        // adding) with every collection a tutor has. AsNoTracking since this
+        // is a read-only listing. Documents (verification files/admin notes)
+        // are deliberately NOT included — the public catalog has no business
+        // reason to ship them, and Tutor.Documents defaults to an empty list
+        // when un-included, so MapToDto stays safe without changes.
         var query = _context.Tutors
+            .AsNoTracking()
+            .AsSplitQuery()
             .Include(t => t.User)
             .Include(t => t.Subjects)
             .Include(t => t.Levels)
@@ -38,7 +49,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
-            .Include(t => t.Documents)
             .Where(t => t.IsVerified && t.IsOnline)
             .AsQueryable();
 
@@ -58,6 +68,17 @@ public class TutorsController : ControllerBase
 
         if (rating.HasValue)
             query = query.Where(t => t.Rating >= rating.Value);
+
+        // Pagination is opt-in — omit page/pageSize to get the full unpaginated
+        // list, exactly what every existing caller (parent search, AI match,
+        // welcome page) does today. A deterministic order is required for
+        // Skip/Take to page correctly under AsSplitQuery.
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var safePage = Math.Max(page.Value, 1);
+            var safeSize = Math.Max(pageSize.Value, 1);
+            query = query.OrderBy(t => t.Id).Skip((safePage - 1) * safeSize).Take(safeSize);
+        }
 
         var tutors = await query.ToListAsync();
         var syllabusMap = await LoadSyllabusMapAsync(

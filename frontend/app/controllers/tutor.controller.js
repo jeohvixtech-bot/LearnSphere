@@ -1445,13 +1445,9 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.setupClassForm = {
     mode: '', subject: '', level: '', country: '',
     classSize: 'one-to-one', maxStudents: 1,
-    pricePerLesson: 0,
-    syllabusTopicIds: []   // selected topic IDs (max 6)
+    pricePerLesson: 0
   };
 
-  self.syllabusTopics       = [];   // available topics loaded from API
-  self.syllabusSearch       = '';   // autocomplete filter text
-  self.syllabusDropdownOpen = false;
   self.setupClassSlots = {}; // { "YYYY-MM-DD": ["09:00 AM", ...], ... }
 
   // Grid rows are 30-minute slots (8:00 AM – 9:30 PM) — each row IS an exact,
@@ -1510,10 +1506,6 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.setupClassUniqueSubjectsList = [];
     self.setupClassForm.classSize = 'one-to-one';
     self.setupClassForm.maxStudents = 1;
-    self.setupClassForm.syllabusTopicIds = [];
-    self.syllabusTopics = [];
-    self.syllabusSearch = '';
-    self.syllabusDropdownOpen = false;
     self.setupClassError = '';
     self._slotDrag = null;
     self.setupClassOpen = true;
@@ -1770,75 +1762,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.setupClassForm.subject = '';
     self.setupClassForm.level = '';
     self.setupClassForm.country = '';
-    self.setupClassForm.syllabusTopicIds = [];
-    self.syllabusTopics = [];
-    self.syllabusSearch = '';
     rebuildSetupClassSubjectsForMode();
   };
 
   self.onSubjectChange = function () {
     var match = self.setupClassUniqueSubjectsList.find(function (o) { return o.subject === self.setupClassForm.subject; });
     if (match) { self.setupClassForm.level = match.level; self.setupClassForm.country = match.country; }
-
-    // Reset and load syllabus topics for the now-resolved country+subject+level
-    self.setupClassForm.syllabusTopicIds = [];
-    self.syllabusTopics = [];
-    self.syllabusSearch = '';
-
-    if (match) {
-      TutorService.getSyllabusTopics(match.country, self.setupClassForm.subject, match.level).then(function (res) {
-        self.syllabusTopics = res.data || [];
-      });
-    }
-  };
-
-  // ── Syllabus topic dropdown helpers ───────────────────────────────
-  // Filtered topics based on autocomplete search
-  self.filteredSyllabusTopics = function () {
-    var q = (self.syllabusSearch || '').toLowerCase();
-    return self.syllabusTopics.filter(function (t) {
-      return !q || t.topic.toLowerCase().indexOf(q) >= 0;
-    });
-  };
-
-  // Toggle a topic selection
-  self.toggleSyllabusTopic = function (topicId) {
-    var idx = self.setupClassForm.syllabusTopicIds.indexOf(topicId);
-    if (idx > -1) {
-      self.setupClassForm.syllabusTopicIds.splice(idx, 1);
-    } else {
-      if (self.setupClassForm.syllabusTopicIds.length >= 6) return;
-      self.setupClassForm.syllabusTopicIds.push(topicId);
-    }
-  };
-
-  self.isSyllabusTopicSelected = function (topicId) {
-    return self.setupClassForm.syllabusTopicIds.indexOf(topicId) > -1;
-  };
-
-  self.syllabusSelectedCount = function () {
-    return self.setupClassForm.syllabusTopicIds.length;
-  };
-
-  // Topic name by ID
-  self.syllabusTopicName = function (topicId) {
-    var t = self.syllabusTopics.find(function (t) { return t.id === topicId; });
-    return t ? t.topic : '';
-  };
-
-  // Remove a selected topic chip
-  self.removeSyllabusTopic = function (topicId) {
-    var idx = self.setupClassForm.syllabusTopicIds.indexOf(topicId);
-    if (idx > -1) self.setupClassForm.syllabusTopicIds.splice(idx, 1);
-  };
-
-  self.toggleSyllabusDropdown = function () {
-    self.syllabusDropdownOpen = !self.syllabusDropdownOpen;
-    if (self.syllabusDropdownOpen) self.syllabusSearch = '';
-  };
-
-  self.closeSyllabusDropdown = function () {
-    self.syllabusDropdownOpen = false;
   };
 
   // Mirrors the validation checks in submitSetupClass below — used to drive the
@@ -1890,8 +1819,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       country: self.setupClassForm.country,
       classSize: self.setupClassForm.classSize,
       maxStudents: self.setupClassForm.maxStudents,
-      pricePerLesson: self.setupClassForm.pricePerLesson,
-      syllabusTopicIds: self.setupClassForm.syllabusTopicIds
+      pricePerLesson: self.setupClassForm.pricePerLesson
     }).then(function () {
       self.setupClassSaving = false;
       self.setupClassOpen = false;
