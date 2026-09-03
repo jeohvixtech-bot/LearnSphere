@@ -38,6 +38,10 @@ public class AppDbContext : DbContext
     public DbSet<TutorPenalty> TutorPenalties { get; set; }
     public DbSet<SyllabusTopic> SyllabusTopics { get; set; }
     public DbSet<PresetGroupSyllabus> PresetGroupSyllabuses { get; set; }
+    public DbSet<PaymentGatewaySetting> PaymentGatewaySettings { get; set; }
+    public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+    public DbSet<TutorLedgerEntry> TutorLedgerEntries { get; set; }
+    public DbSet<CommissionSetting> CommissionSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -197,6 +201,43 @@ public class AppDbContext : DbContext
             .HasIndex(r => new { r.TutorId, r.BookingId })
             .IsUnique()
             .HasFilter("[BookingId] IS NOT NULL");
+
+        modelBuilder.Entity<CommissionSetting>()
+            .Property(c => c.RatePercent)
+            .HasPrecision(5, 2);
+
+        modelBuilder.Entity<TutorLedgerEntry>(entity =>
+        {
+            entity.Property(e => e.Amount).HasPrecision(10, 2);
+            entity.Property(e => e.RatePercent).HasPrecision(5, 2);
+
+            // Every balance read and every reconciliation pass filters on TutorId.
+            entity.HasIndex(e => e.TutorId).HasDatabaseName("IX_TutorLedgerEntries_TutorId");
+
+            // Reconciliation matches existing entries back to their source row.
+            entity.HasIndex(e => e.InvoiceId).HasDatabaseName("IX_TutorLedgerEntries_InvoiceId");
+            entity.HasIndex(e => e.PayoutId).HasDatabaseName("IX_TutorLedgerEntries_PayoutId");
+            entity.HasIndex(e => e.PenaltyId).HasDatabaseName("IX_TutorLedgerEntries_PenaltyId");
+
+            entity.HasOne(e => e.Tutor)
+                  .WithMany()
+                  .HasForeignKey(e => e.TutorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PaymentTransaction>(entity =>
+        {
+            entity.Property(t => t.Amount).HasPrecision(10, 2);
+
+            // Looking a transaction up by HitPay's id is the webhook's very first query,
+            // and it runs on every callback.
+            entity.HasIndex(t => t.PaymentRequestId).HasDatabaseName("IX_PaymentTransactions_PaymentRequestId");
+
+            entity.HasOne(t => t.Invoice)
+                  .WithMany()
+                  .HasForeignKey(t => t.InvoiceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<SyllabusTopic>(entity =>
         {

@@ -35,6 +35,29 @@ public class RequestPayoutDto
     public decimal Amount { get; set; }
 }
 
+// A tutor's wallet, split by fund. Withdrawable is real money they can cash out; Credit
+// is platform-granted value that can offset charges but never be paid out (always 0 until
+// the credit bucket ships).
+public class TutorBalanceDto
+{
+    public decimal Withdrawable { get; set; }
+    public decimal Credit { get; set; }
+    public decimal Total { get; set; }
+}
+
+// One line of the tutor's money statement — see TutorLedgerEntry.
+public class LedgerEntryDto
+{
+    public int Id { get; set; }
+    public string Fund { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public int? InvoiceId { get; set; }
+    public int? BookingId { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
 public class ChatMessageDto
 {
     public int Id { get; set; }

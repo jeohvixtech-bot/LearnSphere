@@ -1,0 +1,169 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
+      <a href="#!/admin/payment-gateway" class="nav-item active">💳 Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">💰 Platform Commission</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <!-- Save confirmation — floats over the page as a toast rather than shifting content -->
+    <div class="alert-success" ng-if="vm.gatewaySaveSuccess"
+      style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.15)">
+      ✓ Payment gateway settings saved.
+    </div>
+
+    <div class="card">
+      <h3>💳 Payment Gateway — HitPay</h3>
+      <p class="text-muted">
+        Parents are sent to HitPay's own hosted checkout page to pay. No card details ever
+        reach LearnSphere.
+      </p>
+    </div>
+
+    <!-- Current state banner: the single most important thing on this page is whether
+         real money is being taken or invoices are still being marked paid for free. -->
+    <div class="card" ng-if="vm.gateway">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <strong>Status:</strong>
+        <span class="badge badge-success" ng-if="vm.gateway.isEnabled">● LIVE — payments go through HitPay</span>
+        <span class="badge badge-warning" ng-if="!vm.gateway.isEnabled">● OFF — invoices are marked paid immediately</span>
+        <span class="badge" ng-if="vm.gateway.isEnabled" ng-class="vm.gateway.mode === 'live' ? 'badge-danger' : 'badge-info'">
+          {{ vm.gateway.mode === 'live' ? 'PRODUCTION' : 'SANDBOX' }}
+        </span>
+      </div>
+      <p class="text-muted" style="margin-top:10px" ng-if="!vm.gateway.isEnabled">
+        While the gateway is off, clicking "Confirm Payment" marks the invoice paid without
+        charging anything. Use this for local development only.
+      </p>
+      <p class="text-muted" style="margin-top:10px" ng-if="vm.gateway.updatedAt">
+        Last updated {{ vm.gateway.updatedAt | date:'d MMM yyyy, h:mm a' }}
+      </p>
+    </div>
+
+    <p class="field-error" ng-if="vm.gatewaySaveError" style="margin-bottom:12px">{{ vm.gatewaySaveError }}</p>
+
+    <div class="card">
+      <h4>API Credentials</h4>
+      <p class="text-muted">
+        From your HitPay dashboard: <strong>Settings → Payment Gateway → API Keys</strong>.
+        Sandbox and live are separate environments with separate keys — a sandbox key will
+        be rejected in live mode and vice versa.
+      </p>
+
+      <div class="form-group">
+        <label>Environment</label>
+        <select ng-model="vm.gatewayForm.mode">
+          <option value="sandbox">Sandbox (test payments)</option>
+          <option value="live">Live (real payments)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>
+          API Key
+          <span class="text-muted" ng-if="vm.gateway.hasApiKey"> — saved: {{ vm.gateway.apiKeyHint }}</span>
+        </label>
+        <input type="password" ng-model="vm.gatewayForm.apiKey" autocomplete="new-password"
+          placeholder="{{ vm.gateway.hasApiKey ? 'Leave blank to keep the saved key' : 'Paste your HitPay API key' }}" />
+        <small class="text-muted">
+          Stored server-side and never sent back to this page. Leave blank to keep the
+          existing key when changing anything else here.
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label>
+          Webhook Salt
+          <span class="text-muted" ng-if="vm.gateway.hasSalt"> — saved: {{ vm.gateway.saltHint }}</span>
+        </label>
+        <input type="password" ng-model="vm.gatewayForm.salt" autocomplete="new-password"
+          placeholder="{{ vm.gateway.hasSalt ? 'Leave blank to keep the saved salt' : 'Paste your HitPay webhook salt' }}" />
+        <small class="text-muted">
+          From <strong>Developers → Webhook Endpoints</strong>. Used to verify that incoming
+          payment callbacks genuinely came from HitPay — callbacks are rejected without it.
+        </small>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>Payment Settings</h4>
+
+      <div class="form-group">
+        <label>Currency</label>
+        <input type="text" ng-model="vm.gatewayForm.currency" maxlength="3" style="text-transform:uppercase" placeholder="SGD" />
+        <small class="text-muted">3-letter code, e.g. SGD or MYR. Must be enabled on your HitPay account.</small>
+      </div>
+
+      <div class="form-group">
+        <label>Return URL (frontend)</label>
+        <input type="text" ng-model="vm.gatewayForm.returnUrl" placeholder="http://127.0.0.1:3000" />
+        <small class="text-muted">Where parents land after paying. This is the LearnSphere frontend address, not the API.</small>
+      </div>
+
+      <div class="form-group">
+        <label>API Base URL <span class="text-muted">(optional)</span></label>
+        <input type="text" ng-model="vm.gatewayForm.apiBaseUrl" placeholder="Leave blank to detect automatically" />
+        <small class="text-muted">
+          Only needed if this API sits behind a proxy that rewrites the Host header. Blank
+          means the address HitPay should call is worked out from each incoming request.
+        </small>
+      </div>
+    </div>
+
+    <!-- The webhook endpoint has to be registered in HitPay's dashboard; showing the exact
+         URL here avoids the admin having to assemble it by hand. -->
+    <div class="card" ng-if="vm.gateway">
+      <h4>Webhook Endpoint</h4>
+      <p class="text-muted">
+        Register this URL in HitPay under <strong>Developers → Webhook Endpoints</strong> so
+        payments are confirmed even if the parent closes the browser before returning.
+      </p>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <code class="mono" style="flex:1; min-width:260px; padding:8px 10px; background:#f1f5f9; border-radius:6px; word-break:break-all;">{{ vm.gateway.webhookUrl }}</code>
+        <button class="btn btn-secondary" ng-click="vm.copyToClipboard(vm.gateway.webhookUrl)">Copy</button>
+      </div>
+      <p class="text-muted" style="margin-top:10px">
+        <strong>Note:</strong> HitPay refuses to accept a webhook on <code>localhost</code>,
+        <code>127.0.0.1</code> or any private network address — it rejects the whole payment,
+        not just the callback. When this API is running on such an address the webhook is
+        therefore left out of the request automatically, and payments are confirmed when the
+        parent is redirected back instead. That's enough to test the full flow locally. To
+        have webhooks actually fire, put the API on a public URL (or a tunnel) and set
+        <strong>API Base URL</strong> above to it.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <input type="checkbox" ng-model="vm.gatewayForm.isEnabled" style="width:auto; margin:0;" />
+          <span>Enable HitPay — route all parent payments through the gateway</span>
+        </label>
+        <small class="text-muted" ng-if="!vm.canEnableGateway()" style="color:#b91c1c">
+          Enter an API key above before enabling.
+        </small>
+        <small class="text-muted" ng-if="vm.gatewayForm.isEnabled && vm.gatewayForm.mode === 'live'" style="color:#b91c1c">
+          ⚠️ Live mode charges real money.
+        </small>
+      </div>
+
+      <button class="btn btn-primary" ng-click="vm.savePaymentGateway()"
+        ng-disabled="vm.gatewaySaving || !vm.canEnableGateway()">
+        {{ vm.gatewaySaving ? 'Saving…' : 'Save Settings' }}
+      </button>
+    </div>
+
+  </main>
+</div>

@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', 'AuthService', 'TutorService',
-  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService',
-function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService) {
+  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService', 'PayoutService',
+function ($scope, $location, $timeout, $interval, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, PayoutService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -173,7 +173,23 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   self.calYear = _now.getFullYear();
   self.calMonth = _now.getMonth(); // 0-indexed
 
+  // Wallet. Split by fund: withdrawable is real money the tutor can cash out, credit is
+  // platform-granted value that offsets charges but is never paid out. Sourced from the
+  // server-side ledger — the dashboard used to display a hardcoded figure that bore no
+  // relation to what the tutor had actually earned.
+  self.balance = null;
+  self.balanceError = '';
+
+  self.loadBalance = function () {
+    return PayoutService.getBalance().then(function (res) {
+      self.balance = res.data;
+    }).catch(function () {
+      self.balanceError = 'Balance unavailable';
+    });
+  };
+
   function init() {
+    self.loadBalance();
     TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
       // Pre-fill identity fields from any already-saved ID number doc, so a page

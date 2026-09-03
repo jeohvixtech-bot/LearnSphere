@@ -1,0 +1,126 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
+      <a href="#!/admin/payment-gateway" class="nav-item">💳 Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item active">💰 Platform Commission</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <div class="alert-success" ng-if="vm.commissionSaveSuccess"
+      style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.15)">
+      ✓ Commission rate saved.
+    </div>
+
+    <div class="card">
+      <h3>💰 Platform Commission</h3>
+      <p class="text-muted">
+        The platform's cut of each paid invoice. Charged to the <strong>tutor</strong> — deducted
+        from what they earned. Parents are unaffected: they still pay exactly the invoice amount.
+      </p>
+    </div>
+
+    <div class="card" ng-if="vm.commission">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <strong>Status:</strong>
+        <span class="badge badge-success" ng-if="vm.commission.ratePercent > 0">
+          ● ACTIVE — {{ vm.commission.ratePercent }}% per paid invoice
+        </span>
+        <span class="badge badge-warning" ng-if="!vm.commission.ratePercent">
+          ● OFF — tutors keep 100% of every invoice
+        </span>
+      </div>
+      <p class="text-muted" style="margin-top:10px" ng-if="vm.commission.effectiveFrom">
+        Applies to earnings from {{ vm.commission.effectiveFrom | date:'d MMM yyyy, h:mm a' }} onward.
+        Anything earned before that stays commission-free.
+      </p>
+    </div>
+
+    <!-- Makes the setting concrete: what it has actually taken so far. -->
+    <div class="card" ng-if="vm.commission && vm.commission.invoicesCharged">
+      <h4>Charged to date</h4>
+      <div style="display:flex; gap:32px; flex-wrap:wrap; margin-top:8px;">
+        <div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">
+            {{ vm.commission.totalChargedToDate | currency:'$' }}
+          </div>
+          <div class="text-muted" style="font-size:11px; text-transform:uppercase;">Net commission</div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">
+            {{ vm.commission.invoicesCharged }}
+          </div>
+          <div class="text-muted" style="font-size:11px; text-transform:uppercase;">Invoices charged</div>
+        </div>
+      </div>
+      <p class="text-muted" style="margin-top:10px; font-size:12px;">
+        Net of commission handed back on refunded invoices.
+      </p>
+    </div>
+
+    <p class="field-error" ng-if="vm.commissionSaveError" style="margin-bottom:12px">{{ vm.commissionSaveError }}</p>
+
+    <div class="card">
+      <h4>Set Rate</h4>
+      <div class="form-group">
+        <label>Commission rate (%)</label>
+        <div class="weightage-input">
+          <input type="number" ng-model="vm.commissionForm.ratePercent" min="0" max="100" step="0.5" placeholder="0" />
+          <span>%</span>
+        </div>
+        <small class="text-muted">
+          0 turns commission off entirely. On a $100 invoice, a 15% rate leaves the tutor $85.
+        </small>
+      </div>
+
+      <div class="card" style="background:#fffbeb; border-color:#fde68a;"
+        ng-if="vm.commissionForm.ratePercent > 0 && !vm.commission.effectiveFrom">
+        <strong>First time enabling commission</strong>
+        <p class="text-muted" style="margin:6px 0 0; font-size:13px;">
+          Commission will apply only to invoices paid from the moment you save. Everything
+          tutors have already earned stays untouched — enabling this will never claw back
+          money that has already been credited to them.
+        </p>
+      </div>
+
+      <div class="card" style="background:#fffbeb; border-color:#fde68a;"
+        ng-if="vm.commission.ratePercent > 0 && vm.commissionForm.ratePercent != vm.commission.ratePercent">
+        <strong>Changing an active rate</strong>
+        <p class="text-muted" style="margin:6px 0 0; font-size:13px;">
+          Commission already charged keeps the rate it was charged at — past deductions are
+          never rewritten. The new rate applies to invoices paid from now on.
+        </p>
+      </div>
+
+      <button class="btn btn-primary" ng-click="vm.saveCommission()" ng-disabled="vm.commissionSaving">
+        {{ vm.commissionSaving ? 'Saving…' : 'Save Rate' }}
+      </button>
+    </div>
+
+    <div class="card">
+      <h4>How it works</h4>
+      <ul class="text-muted" style="font-size:13px; line-height:1.7; padding-left:18px; margin:0;">
+        <li>When a parent's invoice is paid, the tutor is credited the full amount and the
+          commission is deducted as a separate line on their ledger.</li>
+        <li>Both lines appear on the tutor's statement, so the deduction is visible rather
+          than baked silently into a smaller number.</li>
+        <li>If an invoice is later refunded, the earning <em>and</em> its commission are both
+          reversed — the platform keeps no cut of money the parent didn't ultimately pay.</li>
+        <li>Commission is only ever taken from withdrawable funds today. Once the credit
+          bucket exists, credit will be consumed first.</li>
+      </ul>
+    </div>
+
+  </main>
+</div>

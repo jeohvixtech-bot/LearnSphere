@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,8 +15,15 @@ namespace LearnSphere.API.Controllers;
 public class InvoicesController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IHitPayService _hitPay;
+    private readonly ITutorLedgerService _ledger;
 
-    public InvoicesController(AppDbContext context) => _context = context;
+    public InvoicesController(AppDbContext context, IHitPayService hitPay, ITutorLedgerService ledger)
+    {
+        _context = context;
+        _hitPay = hitPay;
+        _ledger = ledger;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetMine()
@@ -52,6 +60,14 @@ public class InvoicesController : ControllerBase
         if (invoice.Booking.Status == "cancelled")
             return BadRequest(new { message = "This booking has been cancelled and its invoice can no longer be paid." });
 
+        // This endpoint marks an invoice Paid without any money changing hands — the
+        // original pre-gateway behavior, which only remains as the local-development path.
+        // Once a real gateway is armed it must be the ONLY way to reach Paid, otherwise
+        // anyone who can call this endpoint could settle their own invoice for free.
+        var setting = await _hitPay.GetSettingsAsync();
+        if (setting.IsEnabled && !string.IsNullOrWhiteSpace(setting.ApiKey))
+            return BadRequest(new { message = "Payments must go through the payment gateway. Please start the checkout instead." });
+
         invoice.Status = "Paid";
 
         // Notify parent
@@ -66,6 +82,10 @@ public class InvoicesController : ControllerBase
         });
 
         await _context.SaveChangesAsync();
+
+        // The tutor has earned this — append it to their ledger.
+        await _ledger.ReconcileTutorAsync(invoice.Booking.TutorId);
+
         return Ok(MapToDto(invoice));
     }
 
@@ -79,6 +99,9 @@ public class InvoicesController : ControllerBase
         if (invoice == null) return NotFound();
         if (invoice.Status != "Paid") return BadRequest(new { message = "Only paid invoices can be refunded." });
 
+        // Refunding removes the earning from the tutor's balance. Note this can leave the
+        // balance negative if they already withdrew against it — the ledger records that
+        // honestly rather than clamping it to zero and losing the debt.
         invoice.Status = "Refunded";
         invoice.Booking.Status = "cancelled";
 
@@ -97,6 +120,10 @@ public class InvoicesController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        // Reverses the earning entry written when this invoice was paid.
+        await _ledger.ReconcileTutorAsync(invoice.Booking.TutorId);
+
         return Ok(MapToDto(invoice));
     }
 

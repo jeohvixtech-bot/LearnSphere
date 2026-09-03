@@ -116,6 +116,18 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
     })
+    .when('/admin/payment-gateway', {
+      templateUrl: 'views/admin/payment-gateway.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
+    .when('/admin/commission', {
+      templateUrl: 'views/admin/commission.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
     .otherwise({ redirectTo: '/welcome' });
 
   function authGuard(requiredRole) {

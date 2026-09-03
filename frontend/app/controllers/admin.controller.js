@@ -1,8 +1,8 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AdminCtrl', ['$location', '$timeout', '$filter', 'AuthService', 'AdminService', 'TutorService', 'PresetCancellationService', 'ProfanityFilterService',
-function ($location, $timeout, $filter, AuthService, AdminService, TutorService, PresetCancellationService, ProfanityFilterService) {
+.controller('AdminCtrl', ['$location', '$timeout', '$filter', 'AuthService', 'AdminService', 'TutorService', 'PresetCancellationService', 'ProfanityFilterService', 'PaymentService',
+function ($location, $timeout, $filter, AuthService, AdminService, TutorService, PresetCancellationService, ProfanityFilterService, PaymentService) {
   var self = this;
   self.user = AuthService.getCurrentUser();
 
@@ -100,6 +100,123 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     self.loadTutorScores();
   };
 
+  // ── Payment Gateway (Admin → Payment Gateway) ───────────────────────
+  // The stored API key and salt are never sent to the browser — the GET returns only a
+  // masked hint plus a "one is saved" flag. The two key fields therefore start blank on
+  // every load and mean "leave the stored value alone" unless the admin types a new one.
+  self.gateway = null;
+  self.gatewayForm = { isEnabled: false, mode: 'sandbox', currency: 'SGD', returnUrl: '', apiBaseUrl: '', apiKey: '', salt: '' };
+  self.gatewayLoading = false;
+  self.gatewaySaving = false;
+  self.gatewaySaveError = '';
+  self.gatewaySaveSuccess = false;
+
+  self.loadPaymentGateway = function () {
+    self.gatewayLoading = true;
+    AdminService.getPaymentGateway().then(function (res) {
+      self.gateway = res.data;
+      self.gatewayForm = {
+        isEnabled: res.data.isEnabled,
+        mode: res.data.mode,
+        currency: res.data.currency,
+        returnUrl: res.data.returnUrl,
+        apiBaseUrl: res.data.apiBaseUrl || '',
+        apiKey: '',
+        salt: ''
+      };
+      self.gatewayLoading = false;
+    }).catch(function () { self.gatewayLoading = false; });
+  };
+
+  // Enabling the gateway with no key saved and none typed would take the immediate-pay
+  // fallback away while offering nothing that can complete a payment. The backend rejects
+  // this too; checking here keeps the button honest rather than relying on a failed POST.
+  self.canEnableGateway = function () {
+    if (!self.gatewayForm.isEnabled) return true;
+    return !!(self.gatewayForm.apiKey || (self.gateway && self.gateway.hasApiKey));
+  };
+
+  self.savePaymentGateway = function () {
+    if (self.gatewaySaving) return;
+    self.gatewaySaveError = '';
+
+    if (!self.canEnableGateway()) {
+      self.gatewaySaveError = 'Enter an API key before enabling the gateway.';
+      return;
+    }
+
+    self.gatewaySaving = true;
+    AdminService.updatePaymentGateway({
+      isEnabled: self.gatewayForm.isEnabled,
+      mode: self.gatewayForm.mode,
+      currency: self.gatewayForm.currency,
+      returnUrl: self.gatewayForm.returnUrl,
+      apiBaseUrl: self.gatewayForm.apiBaseUrl,
+      apiKey: self.gatewayForm.apiKey,
+      salt: self.gatewayForm.salt
+    }).then(function (res) {
+      self.gateway = res.data;
+      // Blank the secret inputs again — they've been stored, and leaving them populated
+      // would misleadingly suggest the page can show what's saved.
+      self.gatewayForm.apiKey = '';
+      self.gatewayForm.salt = '';
+      self.gatewayForm.isEnabled = res.data.isEnabled;
+      self.gatewaySaving = false;
+      self.gatewaySaveSuccess = true;
+      // Parent pages cache the enabled flag for the life of their page; drop it so a
+      // change here takes effect without a reload.
+      PaymentService.clearConfigCache();
+      $timeout(function () { self.gatewaySaveSuccess = false; }, 2500);
+    }).catch(function (err) {
+      self.gatewaySaving = false;
+      self.gatewaySaveError = (err.data && err.data.message) || 'Could not save the gateway settings. Please try again.';
+    });
+  };
+
+  self.copyToClipboard = function (text) {
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+  };
+
+  // ── Platform Commission (Admin → Platform Commission) ───────────────
+  // The rate the platform takes from each paid invoice, charged to the tutor. Saving a
+  // rate for the first time stamps EffectiveFrom server-side, which is what keeps
+  // already-earned money out of scope — see CommissionSetting.
+  self.commission = null;
+  self.commissionForm = { ratePercent: 0 };
+  self.commissionSaving = false;
+  self.commissionSaveError = '';
+  self.commissionSaveSuccess = false;
+
+  self.loadCommission = function () {
+    AdminService.getCommission().then(function (res) {
+      self.commission = res.data;
+      self.commissionForm.ratePercent = res.data.ratePercent;
+    }).catch(function () { /* page still renders with the defaults above */ });
+  };
+
+  self.saveCommission = function () {
+    if (self.commissionSaving) return;
+    self.commissionSaveError = '';
+
+    var rate = parseFloat(self.commissionForm.ratePercent);
+    if (isNaN(rate) || rate < 0 || rate > 100) {
+      self.commissionSaveError = 'Enter a rate between 0 and 100.';
+      return;
+    }
+
+    self.commissionSaving = true;
+    AdminService.updateCommission(rate).then(function (res) {
+      self.commission = res.data;
+      self.commissionForm.ratePercent = res.data.ratePercent;
+      self.commissionSaving = false;
+      self.commissionSaveSuccess = true;
+      $timeout(function () { self.commissionSaveSuccess = false; }, 2500);
+    }).catch(function (err) {
+      self.commissionSaving = false;
+      self.commissionSaveError = (err.data && err.data.message) || 'Could not save the commission rate. Please try again.';
+    });
+  };
+
   // Reschedule Rejections queue (Admin → Reschedule Rejections) — see
   // AdminController.GetPendingCancellations/ResolvePresetCancellation.
   self.rescheduleQueue = [];
@@ -131,6 +248,8 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     AdminService.getDisputes().then(function (res) { self.disputes = res.data; });
     AdminService.getScoringWeightages().then(function (res) { self.weightages = res.data; });
     self.loadRescheduleQueue();
+    self.loadPaymentGateway();
+    self.loadCommission();
   }
   init();
 

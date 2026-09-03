@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
@@ -15,11 +16,16 @@ public class AdminController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IPresetCancellationService _cancellationService;
+    private readonly IHitPayService _hitPay;
+    private readonly ITutorLedgerService _ledger;
 
-    public AdminController(AppDbContext context, IPresetCancellationService cancellationService)
+    public AdminController(AppDbContext context, IPresetCancellationService cancellationService,
+        IHitPayService hitPay, ITutorLedgerService ledger)
     {
         _context = context;
         _cancellationService = cancellationService;
+        _hitPay = hitPay;
+        _ledger = ledger;
     }
 
     [HttpGet("stats")]
@@ -193,6 +199,11 @@ public class AdminController : ControllerBase
             $"Admin-approved refund for {decision.Booking.Subject} on {decision.OriginalDate} (parent rejected the tutor's proposed reschedule).");
 
         await _context.SaveChangesAsync();
+
+        // The penalty row now exists and has an id — mirror it into the ledger so the
+        // tutor's balance reflects the deduction immediately rather than at next startup.
+        await _ledger.ReconcileTutorAsync(decision.Booking.TutorId);
+
         return Ok();
     }
 
@@ -238,6 +249,161 @@ public class AdminController : ControllerBase
         {
             Id = w.Id, Key = w.Key, Label = w.Label, Percent = w.Percent, SortOrder = w.SortOrder
         }));
+    }
+
+    // ── Payment Gateway (Admin → Payment Gateway) ───────────────────────
+    // The response never carries the API key or salt — only a masked hint and a "is one
+    // saved" flag. An admin who needs a different key pastes a new one; there is no path
+    // that reads an existing secret back out of the system.
+    [HttpGet("payment-gateway")]
+    public async Task<IActionResult> GetPaymentGateway()
+    {
+        var setting = await _hitPay.GetSettingsAsync();
+        var apiBaseUrl = !string.IsNullOrWhiteSpace(setting.ApiBaseUrl)
+            ? setting.ApiBaseUrl!.TrimEnd('/')
+            : $"{Request.Scheme}://{Request.Host}";
+
+        return Ok(new PaymentGatewaySettingDto
+        {
+            Provider = setting.Provider,
+            IsEnabled = setting.IsEnabled,
+            Mode = setting.Mode,
+            Currency = setting.Currency,
+            ReturnUrl = setting.ReturnUrl,
+            ApiBaseUrl = setting.ApiBaseUrl,
+            HasApiKey = !string.IsNullOrWhiteSpace(setting.ApiKey),
+            ApiKeyHint = Mask(setting.ApiKey),
+            HasSalt = !string.IsNullOrWhiteSpace(setting.Salt),
+            SaltHint = Mask(setting.Salt),
+            WebhookUrl = PaymentsController.BuildWebhookUrl(apiBaseUrl),
+            UpdatedAt = setting.UpdatedAt
+        });
+    }
+
+    [HttpPut("payment-gateway")]
+    public async Task<IActionResult> UpdatePaymentGateway([FromBody] UpdatePaymentGatewaySettingDto dto)
+    {
+        var mode = (dto.Mode ?? string.Empty).Trim().ToLowerInvariant();
+        if (mode != "sandbox" && mode != "live")
+            return BadRequest(new { message = "Mode must be either 'sandbox' or 'live'." });
+
+        var currency = (dto.Currency ?? string.Empty).Trim().ToUpperInvariant();
+        if (currency.Length != 3)
+            return BadRequest(new { message = "Currency must be a 3-letter code, e.g. SGD." });
+
+        var returnUrl = (dto.ReturnUrl ?? string.Empty).Trim();
+        if (!IsHttpUrl(returnUrl))
+            return BadRequest(new { message = "Return URL must be a valid http(s) address." });
+
+        var apiBaseUrl = string.IsNullOrWhiteSpace(dto.ApiBaseUrl) ? null : dto.ApiBaseUrl.Trim();
+        if (apiBaseUrl != null && !IsHttpUrl(apiBaseUrl))
+            return BadRequest(new { message = "API base URL must be a valid http(s) address, or left blank." });
+
+        var setting = await _hitPay.GetSettingsAsync();
+
+        // Blank means "keep what's stored" — the admin can't read the current key back, so
+        // requiring re-entry just to flip an unrelated toggle would force needless
+        // key handling.
+        if (!string.IsNullOrWhiteSpace(dto.ApiKey)) setting.ApiKey = dto.ApiKey.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Salt)) setting.Salt = dto.Salt.Trim();
+
+        // Refuse to arm a gateway that has no key: enabling it would take the immediate-pay
+        // fallback away while offering nothing that can actually complete a payment.
+        if (dto.IsEnabled && string.IsNullOrWhiteSpace(setting.ApiKey))
+            return BadRequest(new { message = "Enter an API key before enabling the gateway." });
+
+        setting.IsEnabled = dto.IsEnabled;
+        setting.Mode = mode;
+        setting.Currency = currency;
+        setting.ReturnUrl = returnUrl.TrimEnd('/');
+        setting.ApiBaseUrl = apiBaseUrl?.TrimEnd('/');
+        setting.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return await GetPaymentGateway();
+    }
+
+    private static bool IsHttpUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    // Shows only enough of a stored secret to recognise which one it is.
+    private static string? Mask(string? secret)
+    {
+        if (string.IsNullOrWhiteSpace(secret)) return null;
+        var tail = secret.Length <= 4 ? secret : secret[^4..];
+        return new string('•', 8) + tail;
+    }
+
+    // ── Platform Commission (Admin → Platform Commission) ───────────────
+    [HttpGet("commission")]
+    public async Task<IActionResult> GetCommission()
+    {
+        var setting = await GetOrCreateCommissionAsync();
+
+        var charged = await _context.TutorLedgerEntries
+            .Where(e => e.Type == LedgerEntryType.Commission || e.Type == LedgerEntryType.CommissionReversal)
+            .Select(e => new { e.Amount, e.Type, e.InvoiceId })
+            .ToListAsync();
+
+        return Ok(new CommissionSettingDto
+        {
+            RatePercent = setting.RatePercent,
+            EffectiveFrom = setting.EffectiveFrom,
+            UpdatedAt = setting.UpdatedAt,
+            // Entries are negative against the tutor; report the platform's take as a
+            // positive figure, net of anything handed back on refunds.
+            TotalChargedToDate = -charged.Sum(e => e.Amount),
+            InvoicesCharged = charged.Where(e => e.Type == LedgerEntryType.Commission)
+                                     .Select(e => e.InvoiceId).Distinct().Count()
+        });
+    }
+
+    [HttpPut("commission")]
+    public async Task<IActionResult> UpdateCommission([FromBody] UpdateCommissionSettingDto dto)
+    {
+        if (dto.RatePercent < 0m || dto.RatePercent > 100m)
+            return BadRequest(new { message = "Commission rate must be between 0 and 100." });
+
+        var setting = await GetOrCreateCommissionAsync();
+        var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : (int?)null;
+
+        var previousRate = setting.RatePercent;
+        setting.RatePercent = decimal.Round(dto.RatePercent, 2);
+        setting.UpdatedAt = DateTime.UtcNow;
+        setting.UpdatedByUserId = userId;
+
+        // Re-stamped on every transition from "off" to "on", not just the very first one.
+        //
+        // Keeping the original timestamp forever would mis-scope a switch-off-and-on-again:
+        // set 15%, drop to 0% for a month, then set 15% again, and every invoice paid
+        // during that commission-free month would suddenly be charged, because it still
+        // fell after the original EffectiveFrom. Re-stamping scopes commission to the
+        // period it was actually switched on. Adjusting an already-active rate (15% → 25%)
+        // leaves it alone, since commission never lapsed.
+        if (setting.RatePercent > 0m && previousRate <= 0m)
+            setting.EffectiveFrom = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        // Already-charged invoices keep their original rate; this only picks up invoices
+        // that became payable in the meantime.
+        if (previousRate != setting.RatePercent)
+            await _ledger.ReconcileAllAsync();
+
+        return await GetCommission();
+    }
+
+    private async Task<CommissionSetting> GetOrCreateCommissionAsync()
+    {
+        var setting = await _context.CommissionSettings.FirstOrDefaultAsync();
+        if (setting == null)
+        {
+            setting = new CommissionSetting();
+            _context.CommissionSettings.Add(setting);
+            await _context.SaveChangesAsync();
+        }
+        return setting;
     }
 
     [HttpGet("institutions")]

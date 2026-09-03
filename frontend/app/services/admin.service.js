@@ -25,6 +25,26 @@ angular.module('learnSphereApp')
     return $http.patch(API_URL + '/admin/disputes/' + bookingId + '/resolve', {}, h());
   };
 
+  // Payment gateway config (Admin → Payment Gateway). The GET never returns the API key
+  // or salt themselves — only masked hints and "is one saved" flags.
+  self.getPaymentGateway = function () {
+    return $http.get(API_URL + '/admin/payment-gateway', h());
+  };
+
+  // Leave apiKey/salt blank to keep whatever is already stored.
+  self.updatePaymentGateway = function (settings) {
+    return $http.put(API_URL + '/admin/payment-gateway', settings, h());
+  };
+
+  // Platform commission rate (Admin → Platform Commission).
+  self.getCommission = function () {
+    return $http.get(API_URL + '/admin/commission', h());
+  };
+
+  self.updateCommission = function (ratePercent) {
+    return $http.put(API_URL + '/admin/commission', { ratePercent: ratePercent }, h());
+  };
+
   self.getInstitutions = function (params) {
     return $http.get(API_URL + '/admin/institutions', { params: params });
   };

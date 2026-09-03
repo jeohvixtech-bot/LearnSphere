@@ -104,6 +104,47 @@
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
+    <!-- ── Returned from the payment gateway ──────────────────────
+         The API verifies the payment server-side before redirecting here, and the
+         controller re-confirms it against the server rather than trusting the URL. -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.paymentResult" style="border-left:4px solid;"
+      ng-style="{'border-left-color': vm.paymentResult.state === 'success' ? 'var(--color-accent)' : (vm.paymentResult.state === 'pending' ? '#f59e0b' : '#dc2626')}">
+      <div style="display:flex; align-items:flex-start; gap:var(--space-3);">
+        <div style="flex:1;">
+          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'success'">✓ Payment received</div>
+          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'pending'">⏳ Payment not confirmed yet</div>
+          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'failed'">✕ Payment did not go through</div>
+          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'cancelled'">Payment cancelled</div>
+
+          <p class="bs-text-muted" style="margin:4px 0 0; font-size:13px;" ng-if="vm.paymentResult.state === 'success'">
+            Invoice {{ vm.paymentResult.invoiceNumber }} is now paid. A digital receipt has been issued.
+          </p>
+          <p class="bs-text-muted" style="margin:4px 0 0; font-size:13px;" ng-if="vm.paymentResult.state === 'pending'">
+            We haven't had confirmation for invoice {{ vm.paymentResult.invoiceNumber }} yet. If you completed the
+            payment, it may take a moment to settle — check again shortly. Nothing is charged twice if you retry.
+          </p>
+          <p class="bs-text-muted" style="margin:4px 0 0; font-size:13px;" ng-if="vm.paymentResult.state === 'failed' || vm.paymentResult.state === 'cancelled'">
+            Invoice {{ vm.paymentResult.invoiceNumber }} is still unpaid. You can try paying it again below.
+          </p>
+          <p class="bs-text-muted" style="margin:4px 0 0; font-size:13px;" ng-if="vm.paymentResult.message">
+            {{ vm.paymentResult.message }}
+          </p>
+        </div>
+        <button class="bs-btn bs-btn-ghost" ng-click="vm.dismissPaymentResult()">✕</button>
+      </div>
+      <div style="display:flex; gap:var(--space-2);" ng-if="vm.paymentResult.state === 'pending' && vm.paymentResult.invoiceId">
+        <button class="bs-btn bs-btn-secondary" ng-disabled="vm.paymentResultChecking"
+          ng-click="vm.recheckPayment(vm.paymentResult.invoiceId)">
+          {{ vm.paymentResultChecking ? 'Checking…' : 'Check again' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Could not start a checkout ───────────────────────────── -->
+    <div ng-if="vm.payError" style="background:#fef2f2; color:#b91c1c; padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+      {{ vm.payError }}
+    </div>
+
     <!-- ── Payment Summary ───────────────────────── -->
     <div class="bs-card bs-elev-sm" ng-if="vm.payingBooking && !vm.paySuccess">
       <div style="display:flex; align-items:center; gap:var(--space-3);">
@@ -134,8 +175,10 @@
       </div>
 
       <div style="display:flex; gap:var(--space-2);">
-        <button class="bs-btn bs-btn-secondary" ng-click="vm.payingBooking = null">Cancel</button>
-        <button class="bs-btn bs-btn-primary" ng-click="vm.confirmPayInvoice()">Confirm Payment</button>
+        <button class="bs-btn bs-btn-secondary" ng-click="vm.payingBooking = null" ng-disabled="vm.payBusy">Cancel</button>
+        <button class="bs-btn bs-btn-primary" ng-click="vm.confirmPayInvoice()" ng-disabled="vm.payBusy">
+          {{ vm.payBusy ? 'Redirecting to payment…' : 'Confirm Payment' }}
+        </button>
       </div>
     </div>
 

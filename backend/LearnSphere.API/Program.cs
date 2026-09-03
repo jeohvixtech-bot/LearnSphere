@@ -36,6 +36,17 @@ builder.Services.AddAuthorization();
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPresetCancellationService, PresetCancellationService>();
+
+// HitPay payment gateway. Credentials aren't read from configuration — they live in the
+// PaymentGatewaySettings table, managed from Admin → Payment Gateway — so nothing needs
+// registering here beyond the HTTP client. The timeout is deliberately short: a parent is
+// waiting on this call before their browser can be sent to the checkout page.
+builder.Services.AddHttpClient("hitpay", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddScoped<IHitPayService, HitPayService>();
+builder.Services.AddScoped<ITutorLedgerService, TutorLedgerService>();
 // Real SMTP delivery once BOTH "Smtp:Host" and "Smtp:Password" are set (Password
 // is meant to come from user-secrets/environment, never committed to
 // appsettings.json) — falls back to logging emails to the console otherwise, so
@@ -2443,7 +2454,129 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
 ('Malaysia','Business Studies','Upper Six','Practice Questions',5),
 ('Malaysia','Business Studies','Upper Six','STPM Examination Preparation',6);
 "); } catch { }
+    // ── HitPay payment gateway ──────────────────────────────────────────
+    // Credentials live in the database rather than appsettings.json so an admin can
+    // rotate the key from the UI without a redeploy. The settings row is a singleton:
+    // the INSERT ... SELECT below seeds exactly one, and is a no-op on every later boot.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PaymentGatewaySettings` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `Provider` VARCHAR(50) NOT NULL DEFAULT 'hitpay',
+            `IsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+            `Mode` VARCHAR(20) NOT NULL DEFAULT 'sandbox',
+            `ApiKey` VARCHAR(500) NOT NULL DEFAULT '',
+            `Salt` VARCHAR(500) NOT NULL DEFAULT '',
+            `Currency` VARCHAR(10) NOT NULL DEFAULT 'SGD',
+            `ReturnUrl` VARCHAR(500) NOT NULL DEFAULT 'http://127.0.0.1:3000',
+            `ApiBaseUrl` VARCHAR(500) NULL,
+            `UpdatedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        INSERT INTO `PaymentGatewaySettings` (`Provider`,`IsEnabled`,`Mode`,`ApiKey`,`Salt`,`Currency`,`ReturnUrl`)
+        SELECT 'hitpay', 0, 'sandbox', '', '', 'SGD', 'http://127.0.0.1:3000'
+        WHERE NOT EXISTS (SELECT 1 FROM `PaymentGatewaySettings`)"); } catch { }
+
+    // One row per checkout attempt. FK cascades from Invoices: a deleted invoice has no
+    // payment history worth keeping, and nothing reads these rows except by invoice.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PaymentTransactions` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `InvoiceId` INT NOT NULL,
+            `Provider` VARCHAR(50) NOT NULL DEFAULT 'hitpay',
+            `PaymentRequestId` VARCHAR(191) NOT NULL DEFAULT '',
+            `ReferenceNumber` VARCHAR(100) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `Currency` VARCHAR(10) NOT NULL DEFAULT 'SGD',
+            `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+            `CheckoutUrl` VARCHAR(1000) NULL,
+            `PaymentId` VARCHAR(191) NULL,
+            `ResolvedVia` VARCHAR(30) NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `CompletedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`),
+            KEY `IX_PaymentTransactions_InvoiceId` (`InvoiceId`),
+            KEY `IX_PaymentTransactions_PaymentRequestId` (`PaymentRequestId`),
+            CONSTRAINT `FK_PaymentTransactions_Invoices_InvoiceId`
+                FOREIGN KEY (`InvoiceId`) REFERENCES `Invoices` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // Return the payer to the same origin they started from — localStorage (and therefore
+    // the login session) is per-origin, so bouncing them from localhost to 127.0.0.1 looks
+    // exactly like being logged out.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `PaymentTransactions` ADD COLUMN `ReturnOrigin` VARCHAR(500) NULL"); } catch { }
+
+    // ── Tutor money ledger ──────────────────────────────────────────────
+    // One append-only list of signed entries replaces the three separate sums
+    // PayoutsController used to compute in-line, so a balance can be explained rather
+    // than only recomputed. See TutorLedgerEntry.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorLedgerEntries` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `Fund` VARCHAR(20) NOT NULL DEFAULT 'withdrawable',
+            `Type` VARCHAR(40) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `InvoiceId` INT NULL,
+            `PayoutId` INT NULL,
+            `PenaltyId` INT NULL,
+            `BookingId` INT NULL,
+            `Reason` VARCHAR(500) NOT NULL DEFAULT '',
+            `ExpiresAt` DATETIME(6) NULL,
+            `CreatedByUserId` INT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_TutorLedgerEntries_TutorId` (`TutorId`),
+            KEY `IX_TutorLedgerEntries_InvoiceId` (`InvoiceId`),
+            KEY `IX_TutorLedgerEntries_PayoutId` (`PayoutId`),
+            KEY `IX_TutorLedgerEntries_PenaltyId` (`PenaltyId`),
+            CONSTRAINT `FK_TutorLedgerEntries_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // Records what commission a commission entry was charged at, so a later rate change
+    // never rewrites a deduction that already happened.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorLedgerEntries` ADD COLUMN `RatePercent` DECIMAL(5,2) NULL"); } catch { }
+
+    // ── Platform commission ─────────────────────────────────────────────
+    // Seeded at 0% with no EffectiveFrom, so commission stays inert until an admin sets a
+    // rate. EffectiveFrom is what stops a first-time rate change from retroactively
+    // billing every tutor for their entire earnings history.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `CommissionSettings` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `RatePercent` DECIMAL(5,2) NOT NULL DEFAULT 0,
+            `EffectiveFrom` DATETIME(6) NULL,
+            `UpdatedAt` DATETIME(6) NULL,
+            `UpdatedByUserId` INT NULL,
+            PRIMARY KEY (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        INSERT INTO `CommissionSettings` (`RatePercent`) SELECT 0
+        WHERE NOT EXISTS (SELECT 1 FROM `CommissionSettings`)"); } catch { }
+
     await DbSeeder.SeedAsync(context);
+
+    // Carries existing paid invoices, payouts and penalties into the ledger on first run,
+    // and repairs any drift on every run after. Idempotent by construction (it appends
+    // only the difference between what the ledger nets to and what the source records
+    // say), so it is safe to execute at every startup.
+    try
+    {
+        var ledger = scope.ServiceProvider.GetRequiredService<ITutorLedgerService>();
+        await ledger.ReconcileAllAsync();
+    }
+    catch (Exception ex)
+    {
+        // A ledger that can't be built must not stop the app from serving: payouts fail
+        // closed on a missing balance, which is the safe direction.
+        app.Logger.LogError(ex, "Tutor ledger reconciliation failed at startup");
+    }
 }
 
 app.UseSwagger();

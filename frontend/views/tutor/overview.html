@@ -85,9 +85,19 @@
           <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">★ {{ vm.tutor.rating }}</div>
           <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Rating</div>
         </div>
+        <!-- Real figure from the tutor ledger. Credit is only surfaced once there is any,
+             so the panel doesn't show an always-zero bucket before that feature lands. -->
         <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">$1,200.00</div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;"
+            ng-class="{'text-danger': vm.balance.withdrawable < 0}">
+            <span ng-if="vm.balance">{{ vm.balance.withdrawable | currency:'$' }}</span>
+            <span ng-if="!vm.balance && !vm.balanceError" class="bs-text-muted">…</span>
+            <span ng-if="vm.balanceError" class="bs-text-muted" style="font-size:14px;">—</span>
+          </div>
           <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Ready balance</div>
+          <div class="bs-text-muted" style="font-size:11px;" ng-if="vm.balance && vm.balance.credit > 0">
+            + {{ vm.balance.credit | currency:'$' }} credit
+          </div>
         </div>
       </div>
     </div>

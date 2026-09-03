@@ -17,13 +17,16 @@ public class TutorsController : ControllerBase
     private readonly IPresetCancellationService _cancellationService;
     private readonly IEmailService _emailService;
     private readonly IWebHostEnvironment _env;
+    private readonly ITutorLedgerService _ledger;
 
-    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService, IEmailService emailService, IWebHostEnvironment env)
+    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService,
+        IEmailService emailService, IWebHostEnvironment env, ITutorLedgerService ledger)
     {
         _context = context;
         _cancellationService = cancellationService;
         _emailService = emailService;
         _env = env;
+        _ledger = ledger;
     }
 
     [HttpGet]
@@ -1057,6 +1060,13 @@ public class TutorsController : ControllerBase
 
         _context.TutorTimeSlots.Remove(slot);
         await _context.SaveChangesAsync();
+
+        // A straight cancel charges the tutor a penalty and may cancel/shrink invoices;
+        // both move their balance, so bring the ledger in line now rather than leaving the
+        // dashboard showing a stale figure.
+        if (resolvedCount > 0)
+            await _ledger.ReconcileTutorAsync(tutor.Id);
+
         return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = isReschedule });
     }
 
