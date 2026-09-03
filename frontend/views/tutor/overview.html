@@ -255,16 +255,18 @@
           <!-- Ghost bar — keeps date centered when no bar -->
           <div class="cal-status-bar-ghost" ng-if="!vm.calBarsForDay(d).length"></div>
 
-          <!-- Date number — always centered -->
-          <span class="day-num">{{ d }}</span>
+          <!-- Cell content: date number stacked above holiday name -->
+          <div class="cal-cell-body">
+            <span class="day-num">{{ d }}</span>
+            <span class="day-holiday-name"
+              ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">
+              {{ vm.holidayName(d) }}
+            </span>
+          </div>
 
-          <!-- Keep existing blocked + holiday indicators -->
+          <!-- Blocked icon -->
           <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)">
             <i class="ti ti-ban" aria-hidden="true"></i>
-          </span>
-          <span class="day-holiday-name"
-            ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">
-            {{ vm.holidayName(d) }}
           </span>
 
         </button>
@@ -1351,10 +1353,28 @@
     <!-- ===== EDIT PROFILE TAB ===== -->
     <div ng-if="vm.activeTab === 'profile'" class="bs-card bs-elev-sm" style="max-width:640px;">
       <span class="bs-tag bs-tag-accent">TUTOR PROFILE MANAGEMENT</span>
-      <h3 style="margin:0;">Edit Profile Details</h3>
+      <h3 style="margin:0 0 16px;">Edit Profile Details</h3>
+
+      <!-- Sub-tab switcher -->
+      <div class="prof-subtabs">
+        <button type="button" class="prof-subtab"
+          ng-class="{'prof-subtab--active': vm.profileTab === 'verification'}"
+          ng-click="vm.profileTab = 'verification'">
+          <i class="ti ti-shield-check" aria-hidden="true"></i>
+          Verification
+        </button>
+        <button type="button" class="prof-subtab"
+          ng-class="{'prof-subtab--active': vm.profileTab === 'offerings'}"
+          ng-click="vm.profileTab = 'offerings'">
+          <i class="ti ti-book" aria-hidden="true"></i>
+          Offerings
+        </button>
+      </div>
 
       <form ng-submit="vm.saveProfile()" class="profile-form">
 
+        <!-- ══ VERIFICATION SUB-TAB ══ -->
+        <div ng-if="vm.profileTab === 'verification'">
         <!-- ══════════════════════════════════════════════
              VERIFICATION SECTION
              ══════════════════════════════════════════════ -->
@@ -1802,9 +1822,10 @@
           </div>
 
         </div>
+</div><!-- end verification sub-tab -->
 
-        <!-- ── Subject Offerings section ─────────────────────────────── -->
-        <div style="border-top:1.5px solid var(--color-divider);margin:28px 0 24px;"></div>
+<!-- ══ OFFERINGS SUB-TAB ══ -->
+<div ng-if="vm.profileTab === 'offerings'">
         <h3 style="margin:0 0 4px;">Subject Offerings</h3>
         <p class="bs-text-muted" style="margin:0 0 16px;font-size:13px;">
           Add the subjects, levels, and teaching modes you offer.
@@ -1909,6 +1930,7 @@
 
         <div ng-if="vm.profileSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">✓ Profile updated successfully.</div>
         <div ng-if="vm.profileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">{{ vm.profileError }}</div>
+</div><!-- end offerings sub-tab -->
       </form>
     </div><!-- end profile tab -->
 

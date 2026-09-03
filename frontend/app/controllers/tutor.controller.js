@@ -46,6 +46,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   // Tab state
   self.activeTab = 'overview';
+  // Sub-tab inside Edit Profile: 'verification' | 'offerings'
+  self.profileTab = 'verification';
 
   // Edit profile form
   self.profileForm = {};
@@ -1018,7 +1020,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // Multi-date selection for "Setup class" (up to 5 dates at once). Blocked/past days
   // can't be selected — same rule the single-day calendar already enforced.
   self.toggleCalDay = function (d) {
-    if (!d || self.isPastDay(d) || self.isBlocked(d)) return;
+    if (!d || self.isBlocked(d)) return;
     var idx = self.selectedCalDays.indexOf(d);
     if (idx > -1) { self.selectedCalDays.splice(idx, 1); return; }
     if (self.selectedCalDays.length >= 5) return;
@@ -1037,11 +1039,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // reportSelectedDay — it never touches selectedCalDays/Setup Class state.
   self.onCalDayClick = function (d) {
     if (!d) return;
+    // Past days update reportSelectedDay AND toggle into selectedCalDays
+    // so Daily Summary can show them. Setup Class modal excludes past
+    // dates automatically via setupClassSelectedDates filter.
     if (self.isPastDay(d)) {
       self.reportSelectedDay = calDayStr(d);
       self._recomputeReportView();
-      return;
     }
+    // toggleCalDay now allows past days (isBlocked guard still applies)
     self.toggleCalDay(d);
   };
 
@@ -1468,11 +1473,16 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   }
 
   self.setupClassSelectedDates = function () {
-    return self.selectedCalDays.slice().sort(function (a, b) { return a - b; }).map(calDayStr);
+    return self.selectedCalDays
+      .filter(function (d) { return !self.isPastDay(d); })
+      .slice().sort(function (a, b) { return a - b; })
+      .map(calDayStr);
   };
 
   self.setupClassSelectedDatesLabel = function () {
-    var days = self.selectedCalDays.slice().sort(function (a, b) { return a - b; });
+    var days = self.selectedCalDays
+      .filter(function (d) { return !self.isPastDay(d); })
+      .slice().sort(function (a, b) { return a - b; });
     if (!days.length) return '';
     return days.join(', ') + ' · ' + self.calYear;
   };
