@@ -152,8 +152,15 @@ angular.module('learnSphereApp', ['ngRoute'])
   }
 }])
 
-.run(['$rootScope', '$location', 'AuthService', function ($rootScope, $location, AuthService) {
+.run(['$rootScope', '$location', '$window', 'AuthService', function ($rootScope, $location, $window, AuthService) {
   $rootScope.$on('$routeChangeError', function () {
     $location.path('/welcome');
+  });
+
+  // A scroll position left over from one page (e.g. a long tutor overview)
+  // otherwise bleeds into the next route, landing the user mid-page instead
+  // of at the top.
+  $rootScope.$on('$routeChangeSuccess', function () {
+    $window.scrollTo(0, 0);
   });
 }]);

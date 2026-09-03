@@ -30,7 +30,30 @@
         <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch blocked">🚫</span> Blocked by You</div>
         <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch past"></span> Past Date</div>
         <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch published"></span> Your Published Slots</div>
-        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="bs-legend-swatch link-missing"></span> Video Link Missing</div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <p style="font-size:11px;font-weight:600;color:var(--color-text-muted);
+                   text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px;">
+          Class status bar
+        </p>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span class="cal-seg-legend cal-seg--red"></span> Online class — video link missing
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span class="cal-seg-legend cal-seg--amber"></span> Past class — report pending
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span class="cal-seg-legend cal-seg--green"></span> Past class — all reports submitted
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span class="cal-seg-legend cal-seg--blue"></span> Future confirmed class
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+            <span class="cal-seg-legend cal-seg--grey"></span> Published slot — no students yet
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -60,20 +83,8 @@
         <div>
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <h3 style="margin:0;">{{ vm.tutor.name }}</h3>
-            <!-- Tier reflects vm.tutor.tier, computed server-side from the same
-                 weighted rating/activeness/disputes/experience formula as AI Speed
-                 Match (see TutorsController.ComputeTutorTierAsync) — not a fixed label. -->
-            <span class="bs-tag" ng-if="vm.tutor.tier === 'Gold'" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">
-              <i class="ti ti-trophy" style="font-size:12px;" aria-hidden="true"></i> Gold Teacher
-            </span>
-            <span class="bs-tag" ng-if="vm.tutor.tier === 'Silver'" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
-              <i class="ti ti-medal" style="font-size:12px;" aria-hidden="true"></i> Silver Teacher
-            </span>
-            <span class="bs-tag" ng-if="vm.tutor.tier === 'Bronze'" style="background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
-              <i class="ti ti-award" style="font-size:12px;" aria-hidden="true"></i> Bronze Teacher
-            </span>
-            <span class="bs-tag bs-tag-neutral" ng-if="!vm.tutor.tier || vm.tutor.tier === 'Normal'">
-              Teacher
+            <span class="bs-tag bs-tag-accent-2">
+              <i class="ti ti-trophy" style="font-size:12px;" aria-hidden="true"></i> Gold teacher
             </span>
             <span class="bs-tag bs-tag-accent" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">
               <i class="ti ti-check" style="font-size:11px;" aria-hidden="true"></i> Verified
@@ -223,107 +234,47 @@
       <div class="bs-cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
       <div class="bs-cal-grid">
         <span class="bs-cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
-        <button type="button" class="bs-cal-day" ng-repeat="d in vm.calDaysArray() track by $index"
+        <button type="button" class="bs-cal-day"
+          ng-repeat="d in vm.calDaysArray() track by $index"
           ng-click="vm.onCalDayClick(d)"
           ng-class="{
-            'selected': vm.isCalDaySelected(d),
+            'selected':            vm.isCalDaySelected(d),
             'report-day-selected': vm.isPastDay(d) && vm.isReportSelectedDay(d),
-            'past-day': vm.isPastDay(d),
-            'blocked': !vm.isPastDay(d) && vm.isBlocked(d),
-            'public-holiday-sg': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
-            'public-holiday': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d),
-            'has-paid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayAllBookingsPaid(d),
-            'has-unpaid': !vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length && vm.dayHasUnpaidBooking(d),
-            'report-dot-amber': vm.reportDotsByDay[d] === 'amber',
-            'report-dot-green': vm.reportDotsByDay[d] === 'green'
+            'past-day':            vm.isPastDay(d),
+            'blocked':             !vm.isPastDay(d) && vm.isBlocked(d),
+            'public-holiday-sg':   !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
+            'public-holiday':      !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)
           }">
+
+          <!-- Left status bar -->
+          <div class="cal-status-bar" ng-if="vm.calBarsForDay(d).length">
+            <div class="cal-status-seg"
+              ng-repeat="seg in vm.calBarsForDay(d) track by seg.colour"
+              ng-class="'cal-seg--' + seg.colour">{{ seg.count }}</div>
+          </div>
+          <!-- Ghost bar — keeps date centered when no bar -->
+          <div class="cal-status-bar-ghost" ng-if="!vm.calBarsForDay(d).length"></div>
+
+          <!-- Date number — always centered -->
           <span class="day-num">{{ d }}</span>
-          <span class="day-published-dot" ng-if="!vm.isPastDay(d) && vm.publishedSlotsOnDay(d).length" title="{{ vm.publishedSlotsOnDay(d).length }} published slot(s)"></span>
-          <span class="day-link-missing-dot" ng-if="!vm.isPastDay(d) && vm.videoLinkDotForDay(d) === 'link-missing'" title="Online class missing a video conference link"></span>
-          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)"><i class="ti ti-ban" aria-hidden="true"></i></span>
-          <span class="day-holiday-name" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">{{ vm.holidayName(d) }}</span>
-          <span class="day-label" ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.bookingsOnDay(d).length">
-            <i class="ti" ng-class="vm.dayHasUnpaidBooking(d) ? 'ti-lock' : 'ti-circle-check'"
-              ng-style="{color: vm.dayHasUnpaidBooking(d) ? 'var(--color-accent-2)' : '#16a34a'}"
-              style="font-size:9px;" aria-hidden="true"></i>
+
+          <!-- Keep existing blocked + holiday indicators -->
+          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)">
+            <i class="ti ti-ban" aria-hidden="true"></i>
           </span>
+          <span class="day-holiday-name"
+            ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">
+            {{ vm.holidayName(d) }}
+          </span>
+
         </button>
       </div>
 
-      <div ng-if="vm.onlineBookingsMissingLink() > 0" style="background:#fffbeb; color:#92400e; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px; display:flex; align-items:center; gap:8px;">
-        <i class="ti ti-alert-triangle" aria-hidden="true"></i>
-        {{ vm.onlineBookingsMissingLink() }} online class(es) missing a video conference link
-      </div>
-
       <div class="bs-cal-day-detail" ng-repeat="day in vm.sortedSelectedCalDays() track by day">
-        <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> Scheduled Classes for {{ vm.calMonthName() }} {{ day }}, {{ vm.calYear }}</h4>
-        <p class="bs-text-muted" ng-if="!vm.groupedBookingsOnDay(day).length">No lessons on this day.</p>
-        <div class="bs-scheduled-group" ng-repeat="group in vm.groupedBookingsOnDay(day) track by $index" ng-init="gkey = group.presetGroupId || group.bookings[0].id">
-          <div class="bs-scheduled-group-hd">
-            <span class="bs-tag bs-tag-accent">{{ group.subject }}</span>
-            <span class="bs-tag bs-tag-neutral" ng-if="group.isGroup">
-              <i class="ti ti-users" aria-hidden="true"></i> Group class · {{ group.students.length }} student(s)
-            </span>
-          </div>
-          <p class="bs-text-muted" style="margin:4px 0 0;">{{ group.time | hhmma }} ({{ group.durationHours }}h) · ${{ group.totalPrice }}.00 each</p>
-
-          <div class="bs-scheduled-students">
-            <div class="bs-scheduled-student-row" ng-repeat="s in group.students">
-              <span class="bs-scheduled-avatar">{{ s.studentName.charAt(0) }}</span>
-              <strong>{{ s.studentName }}</strong>
-              <p ng-if="!vm.isPaid(s.bookingId)" style="color:var(--color-accent-2-700); font-size:12px; margin:2px 0 0;">⏳ Awaiting parent payment to unlock workspace.</p>
-            </div>
-          </div>
-
-          <!-- Video conference link — Online confirmed classes only, one link shared by the whole group -->
-          <div ng-if="vm.isOnlineConfirmed(group.bookings[0])" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--color-divider);">
-
-            <!-- Not set yet -->
-            <div class="bs-video-link-missing" ng-if="!group.videoConferenceLink && !(vm.videoLink[gkey] && vm.videoLink[gkey].editing)">
-              <p style="color:#92400e; font-size:12px; margin:0 0 6px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> No video conference link set yet.</p>
-              <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.openGroupVideoLinkInput(group)">
-                <i class="ti ti-link" aria-hidden="true"></i> Add link
-              </button>
-            </div>
-
-            <!-- Editing (either first time, or re-editing an existing link) -->
-            <div class="bs-video-link-input-wrap" ng-if="vm.videoLink[gkey] && vm.videoLink[gkey].editing">
-              <div class="bs-field" style="margin:0;">
-                <label>Video conference link</label>
-                <input class="bs-input" type="url" ng-model="vm.videoLink[gkey].inputValue" placeholder="https://zoom.us/j/..." />
-              </div>
-              <p ng-if="vm.videoLink[gkey].error" style="color:var(--color-accent-2-700); font-size:12px; margin:4px 0 0;">{{ vm.videoLink[gkey].error }}</p>
-              <div style="display:flex; gap:8px; margin-top:6px;">
-                <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelGroupVideoLinkInput(group)" ng-disabled="vm.videoLink[gkey].saving">Cancel</button>
-                <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.saveGroupVideoLink(group)" ng-disabled="vm.videoLink[gkey].saving || !vm.videoLink[gkey].inputValue">
-                  {{ vm.videoLink[gkey].saving ? 'Saving…' : 'Save link' }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Set — shown until the tutor clicks Edit -->
-            <div class="bs-video-link-box" ng-if="group.videoConferenceLink && !(vm.videoLink[gkey] && vm.videoLink[gkey].editing)">
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span style="font-size:12px; word-break:break-all; flex:1; min-width:120px;">{{ group.videoConferenceLink }}</span>
-                <button type="button" class="bs-btn bs-btn-ghost" ng-click="vm.openGroupVideoLinkInput(group)"><i class="ti ti-edit" aria-hidden="true"></i> Edit</button>
-              </div>
-              <div style="display:flex; gap:8px; margin-top:6px;">
-                <a ng-if="vm.isGroupJoinEnabled(group)" class="bs-btn" style="background:#16a34a; color:#fff;"
-                  ng-href="{{ group.videoConferenceLink }}" target="_blank" rel="noopener"
-                  title="Join class">
-                  <i class="ti ti-video" aria-hidden="true"></i> Join class
-                </a>
-                <button ng-if="!vm.isGroupJoinEnabled(group)" type="button" class="bs-btn bs-btn-secondary" disabled
-                  title="Available 10 min before class">
-                  <i class="ti ti-video" aria-hidden="true"></i> Join (available 10 min before)
-                </button>
-                <button type="button" ng-if="vm.isGroupJoinEnabled(group)" class="bs-btn bs-btn-secondary" ng-click="vm.copyVideoLink(group.videoConferenceLink)">
-                  <i class="ti ti-copy" aria-hidden="true"></i> Copy
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <h4><i class="ti ti-calendar-event" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ day }}, {{ vm.calYear }}</h4>
+        <p class="bs-text-muted" style="margin:0 0 8px;font-size:12px;">
+          Scheduled classes for this date now live in the Daily Summary panel below the calendar.
+        </p>
 
         <div ng-if="vm.publishedSlotsOnDay(day).length">
           <h5 style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; margin:var(--space-3) 0 6px;">
@@ -335,35 +286,6 @@
             <p class="bs-text-muted" style="margin:2px 0 0;">{{ slot.mode }} · {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }} · ${{ slot.pricePerLesson }}/lesson</p>
             <p ng-if="slot.isFull" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">Full — no more bookings accepted</p>
             <p class="bs-text-muted" ng-if="!slot.isFull" style="font-size:13px; margin-top:4px;">Open for booking · not yet claimed by a parent</p>
-
-            <!-- Video conference link — set here before/regardless of enrollment,
-                 applies to the whole recurring series and any students already in it. -->
-            <div ng-if="slot.mode === 'Online'" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--color-divider);">
-              <div ng-if="!slot.videoConferenceLink && !(vm.slotVideoLink[slot.id] && vm.slotVideoLink[slot.id].editing)">
-                <p style="color:#92400e; font-size:12px; margin:0 0 6px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> No video conference link set yet.</p>
-                <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.openSlotVideoLinkInput(slot)">
-                  <i class="ti ti-link" aria-hidden="true"></i> Add link
-                </button>
-              </div>
-              <div ng-if="vm.slotVideoLink[slot.id] && vm.slotVideoLink[slot.id].editing">
-                <div class="bs-field" style="margin:0;">
-                  <label>Video conference link</label>
-                  <input class="bs-input" type="url" ng-model="vm.slotVideoLink[slot.id].inputValue" placeholder="https://zoom.us/j/..." />
-                </div>
-                <p ng-if="vm.slotVideoLink[slot.id].error" style="color:var(--color-accent-2-700); font-size:12px; margin:4px 0 0;">{{ vm.slotVideoLink[slot.id].error }}</p>
-                <div style="display:flex; gap:8px; margin-top:6px;">
-                  <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelSlotVideoLinkInput(slot)" ng-disabled="vm.slotVideoLink[slot.id].saving">Cancel</button>
-                  <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.saveSlotVideoLink(slot)" ng-disabled="vm.slotVideoLink[slot.id].saving || !vm.slotVideoLink[slot.id].inputValue">
-                    {{ vm.slotVideoLink[slot.id].saving ? 'Saving…' : 'Save link' }}
-                  </button>
-                </div>
-              </div>
-              <div ng-if="slot.videoConferenceLink && !(vm.slotVideoLink[slot.id] && vm.slotVideoLink[slot.id].editing)" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span style="font-size:12px; word-break:break-all; flex:1; min-width:120px;">{{ slot.videoConferenceLink }}</span>
-                <button type="button" class="bs-btn bs-btn-ghost" ng-click="vm.openSlotVideoLinkInput(slot)"><i class="ti ti-edit" aria-hidden="true"></i> Edit</button>
-              </div>
-            </div>
-
             <button class="bs-btn bs-btn-secondary" ng-click="vm.openCancelSlotModal(slot)" ng-disabled="vm.cancelSlotBusy" style="margin-top:8px; color:var(--color-accent-2);">
               <i class="ti ti-x" aria-hidden="true"></i> Cancel class
             </button>
@@ -471,9 +393,21 @@
           </p>
 
           <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()" ng-mouseleave="vm._slotDrag = null">
-            <p class="bs-text-muted" style="margin:0 0 8px;font-size:11px">
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+              <span style="font-size:11px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--confirmed"></span> Confirmed booking
+              </span>
+              <span style="font-size:11px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--preset"></span> Published preset slot
+              </span>
+              <span style="font-size:11px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--selected"></span> Your new selection
+              </span>
+            </div>
+            <p class="bs-text-muted" style="margin:0 0 8px;font-size:11px;">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
-              Click a single slot, or click-and-drag down a column to combine several into one class (first slot's start time to last slot's end time). Grayed-out slots are already-scheduled classes or published slots you've already set up.
+              Click a single slot, or click-and-drag to combine slots into one class.
+              Coloured blocks are existing classes and cannot be selected.
             </p>
             <table class="setup-grid">
               <thead>
@@ -486,19 +420,34 @@
                 <tr ng-repeat="slot in vm.setupClassGridSlots">
                   <td class="setup-grid-timecol">{{ vm.setupClassGridSlotLabel(slot) }}</td>
                   <td ng-repeat="dateStr in vm.setupClassSelectedDates()"
-                    class="setup-grid-cell"
+                    ng-if="!vm.setupSlotInBlock(dateStr, slot) || vm.setupSlotIsBlockStart(dateStr, slot)"
+                    ng-attr-rowspan="{{ vm.setupSlotIsBlockStart(dateStr, slot) ? vm.setupBlockRowspan(dateStr, slot) : undefined }}"
                     ng-class="{
+                      'setup-grid-cell':    !vm.setupSlotInBlock(dateStr, slot) && !vm.isSetupSlotSelected(dateStr, slot),
                       'setup-cell-selected': vm.isSetupSlotSelected(dateStr, slot),
-                      'setup-cell-booked': vm.isSetupSlotBooked(dateStr, slot),
-                      'setup-cell-dragging': !vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotDragPreview(dateStr, slot)
+                      'setup-cell-dragging': !vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotDragPreview(dateStr, slot),
+                      'setup-cell-block':   !!vm.setupSlotInBlock(dateStr, slot)
                     }"
-                    ng-mousedown="!vm.isSetupSlotBooked(dateStr, slot) && vm.startSlotDrag(dateStr, slot, $event)"
+                    ng-mousedown="!vm.isSetupSlotBooked(dateStr, slot) && !vm.setupSlotInBlock(dateStr, slot) && vm.startSlotDrag(dateStr, slot, $event)"
                     ng-mouseenter="vm.dragOverSlot(dateStr, slot)">
-                    <span ng-if="vm.isSetupSlotBooked(dateStr, slot)"><i class="ti ti-lock"></i> Booked</span>
-                    <span ng-if="!vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotSelected(dateStr, slot)">
-                      <i class="ti ti-check"></i>
+
+                    <span ng-if="!vm.setupSlotInBlock(dateStr, slot) && vm.isSetupSlotSelected(dateStr, slot)">
+                      <i class="ti ti-check" aria-hidden="true"></i>
                       <span ng-if="vm.setupSlotRangeLabel(dateStr, slot)">{{ vm.setupSlotRangeLabel(dateStr, slot) }}</span>
                     </span>
+
+                    <div class="setup-block setup-block--confirmed"
+                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'confirmed'">
+                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
+                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
+                    </div>
+
+                    <div class="setup-block setup-block--preset"
+                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'preset'">
+                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
+                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
+                    </div>
+
                   </td>
                 </tr>
               </tbody>
@@ -833,65 +782,370 @@
       </div>
     </div>
 
-    <!-- ── Class Reports Portal (merged with day detail) ── -->
-    <!-- Hidden until tutor clicks a date on the calendar (vm.reportSelectedDay is set by toggleCalDay) -->
-    <div class="bs-card bs-elev-sm" ng-if="!vm.counterBooking && !vm.rescheduleBooking && vm.reportSelectedDay">
-      <div class="bs-card-title">
-        <i class="ti ti-file-text" aria-hidden="true"></i>
-        Class Reports
+    <!-- ── 2×2 PANEL GRID ───────────────────────────────────────────── -->
+    <div class="ov-panel-grid">
+
+      <!-- Panel 1: Confirmed Classes -->
+      <div class="ov-panel" ng-click="vm.openPanel('confirmed')">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'confirmed'}">
+          <i class="ti ti-checkbox ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Confirmed Classes</span>
+          <span class="ov-panel-badge ov-panel-badge--ok"
+            ng-if="vm.confirmedClassesThisMonth().length">
+            {{ vm.confirmedClassesThisMonth().length }} this month
+          </span>
+          <span class="ov-panel-badge ov-panel-badge--muted"
+            ng-if="!vm.confirmedClassesThisMonth().length">None this month</span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
       </div>
 
-      <!-- Date selected -->
-      <div ng-if="vm.reportSelectedDay">
+      <!-- Panel 2: Daily Summary — disabled until date selected -->
+      <div class="ov-panel"
+        ng-click="vm.sortedSelectedCalDays().length && vm.openPanel('daily')"
+        ng-class="{'ov-panel--disabled': !vm.sortedSelectedCalDays().length}">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'daily'}">
+          <i class="ti ti-calendar-event ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Daily Summary</span>
+          <span class="ov-panel-badge ov-panel-badge--ok"
+            ng-if="vm.sortedSelectedCalDays().length">
+            {{ vm.sortedSelectedCalDays().length }} date{{ vm.sortedSelectedCalDays().length === 1 ? '' : 's' }} selected
+          </span>
+          <span class="ov-panel-badge ov-panel-badge--muted"
+            ng-if="!vm.sortedSelectedCalDays().length">Select a date</span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
+      </div>
 
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <span class="bs-tag bs-tag-accent">{{ vm.formatSessionDate(vm.reportSelectedDay) }}</span>
-          <span ng-if="vm.reportAllSubmittedOnSelectedDay" class="bs-tag bs-tag-accent">
-            <i class="ti ti-circle-check" aria-hidden="true"></i>
-            All reports submitted
+      <!-- Panel 3: Class Reports -->
+      <div class="ov-panel" ng-click="vm.openPanel('reports')">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'reports'}">
+          <i class="ti ti-file-text ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Class Reports</span>
+          <span class="ov-panel-badge ov-panel-badge--warn"
+            ng-if="vm.totalPendingReports() > 0">
+            {{ vm.totalPendingReports() }} pending
           </span>
-          <span ng-if="!vm.reportAllSubmittedOnSelectedDay && vm.reportSelectedDayStudents.length" class="bs-tag bs-tag-accent-2">
-            <i class="ti ti-alert-circle" aria-hidden="true"></i>
-            Reports pending
-          </span>
+          <span class="ov-panel-badge ov-panel-badge--ok"
+            ng-if="vm.totalPendingReports() === 0">All up to date</span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <!-- Panel 4: Coming soon -->
+      <div class="ov-panel ov-panel--empty">
+        <div class="ov-panel-hd">
+          <i class="ti ti-dots ov-panel-icon" style="color:var(--color-text-muted);" aria-hidden="true"></i>
+          <span class="ov-panel-title" style="color:var(--color-text-muted);">Coming soon</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── MODAL BACKDROP ───────────────────────────────────────────── -->
+    <div class="ov-modal-backdrop" ng-if="vm.activePanel" ng-click="vm.closePanel()"></div>
+
+    <!-- ── MODAL 1: Confirmed Classes ───────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'confirmed'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-checkbox" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Confirmed Classes</strong>
+          <div class="ov-modal-sub">
+            {{ vm.calMonthName() }} {{ vm.calYear }}
+            · {{ vm.confirmedClassesThisMonth().length }} booking{{ vm.confirmedClassesThisMonth().length === 1 ? '' : 's' }}
+          </div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="ov-modal-body">
+
+        <div class="ov-modal-empty" ng-if="!vm.confirmedClassesThisMonth().length">
+          <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+          <p>No confirmed classes for {{ vm.calMonthName() }} {{ vm.calYear }}</p>
         </div>
 
-        <!-- No completed class on selected date -->
-        <div ng-if="!vm.reportSelectedDayStudents.length">
-          <p class="bs-text-muted">No reports yet — this class hasn't taken place.</p>
+        <div class="ov-cc-row"
+          ng-repeat="row in vm.confirmedClassesThisMonth() track by row.key">
+          <div class="ov-cc-row-top">
+            <span class="bs-tag bs-tag-accent">{{ row.subject }}</span>
+            <span class="ov-cc-date">{{ vm.formatDateShort(row.date) }} · {{ row.time }}</span>
+          </div>
+          <div class="ov-cc-row-bot">
+            <span class="ov-sdot"
+              ng-repeat="s in row.students | limitTo:4" title="{{ s.studentName }}">
+              {{ s.studentName[0] }}
+            </span>
+            <span class="ov-sdot ov-sdot--ov" ng-if="row.students.length > 4">
+              +{{ row.students.length - 4 }}
+            </span>
+            <!-- Online: link set -->
+            <span class="ov-link-badge ov-link-badge--ok"
+              ng-if="row.mode === 'Online' && row.videoConferenceLink">
+              <i class="ti ti-video" style="font-size:10px;" aria-hidden="true"></i> Link set
+            </span>
+            <!-- Online: link missing — clickable, jumps to date -->
+            <button class="ov-link-badge ov-link-badge--warn"
+              ng-if="row.mode === 'Online' && !row.videoConferenceLink"
+              ng-click="vm.jumpToCalendarDate(row.date); $event.stopPropagation()">
+              <i class="ti ti-alert-circle" style="font-size:10px;" aria-hidden="true"></i>
+              No link — add now
+            </button>
+            <!-- Non-online -->
+            <span class="ov-link-badge ov-link-badge--muted" ng-if="row.mode !== 'Online'">
+              <i class="ti ti-home" style="font-size:10px;" aria-hidden="true"></i> {{ row.mode }}
+            </span>
+          </div>
         </div>
 
-        <!-- Student list for selected date -->
-        <div ng-if="vm.reportSelectedDayStudents.length">
-          <p class="bs-text-muted" style="margin-bottom:8px; font-size:12px; text-transform:uppercase; letter-spacing:0.05em;">
-            {{ vm.reportSelectedDayStudents.length }}
-            student(s) in this session
-          </p>
+      </div>
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+      </div>
+    </div>
 
-          <div class="report-student-row"
-            ng-repeat="s in vm.reportSelectedDayStudents track by s.studentId">
+    <!-- ── MODAL 2: Daily Summary ────────────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'daily'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-calendar-event" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Daily Summary</strong>
+          <div class="ov-modal-sub">
+            {{ vm.sortedSelectedCalDays().length }} date{{ vm.sortedSelectedCalDays().length === 1 ? '' : 's' }} selected · click a tab to switch
+          </div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
 
-            <div class="report-student-info">
-              <div class="avatar-sm">{{ s.studentName[0] }}</div>
-              <div>
-                <strong>{{ s.studentName }}</strong>
+      <!-- Date tabs -->
+      <div class="ov-date-tabs">
+        <div class="ov-date-tab"
+          ng-repeat="d in vm.sortedSelectedCalDays() track by $index"
+          ng-class="{'ov-date-tab--active': vm.dailySummaryTabIndex === $index}"
+          ng-click="vm.selectDailySummaryTab($index)">
+          <span class="ov-date-tab-label">{{ vm.dailySummaryTabLabel(d) }}</span>
+          <span class="ov-tab-badge ov-tab-badge--ok"
+            ng-if="vm.dailySummaryTabStatus(d) === 'ok'">
+            {{ vm.groupedBookingsOnDay(d).length }} class{{ vm.groupedBookingsOnDay(d).length === 1 ? '' : 'es' }}
+          </span>
+          <span class="ov-tab-badge ov-tab-badge--warn"
+            ng-if="vm.dailySummaryTabStatus(d) === 'warn'">no link</span>
+          <span class="ov-tab-badge ov-tab-badge--muted"
+            ng-if="vm.dailySummaryTabStatus(d) === 'empty'">no classes</span>
+        </div>
+      </div>
+
+      <div class="ov-modal-body">
+        <div ng-init="currentDay = vm.sortedSelectedCalDays()[vm.dailySummaryTabIndex]">
+
+          <div class="ov-modal-empty" ng-if="!vm.groupedBookingsOnDay(currentDay).length">
+            <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+            <p>No classes scheduled for {{ vm.dailySummaryTabLabel(currentDay) }}</p>
+          </div>
+
+          <div class="ov-ds-group"
+            ng-repeat="group in vm.groupedBookingsOnDay(currentDay) track by $index">
+            <div class="ov-ds-group-hd">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span class="bs-tag bs-tag-accent">{{ group.subject }}</span>
+                <span class="ov-chip-muted" ng-if="group.isGroup">
+                  <i class="ti ti-users" style="font-size:10px;" aria-hidden="true"></i>
+                  Group · {{ group.students.length }} students
+                </span>
+                <span class="ov-chip-muted" ng-if="!group.isGroup">1-to-1</span>
+                <span class="ov-chip-soon" ng-if="group.isStartingSoon">
+                  <i class="ti ti-radio" style="font-size:10px;" aria-hidden="true"></i> Starting soon
+                </span>
               </div>
+              <span class="ov-ds-meta">{{ group.time }} · {{ group.durationHours }}h · {{ group.mode }}</span>
             </div>
 
-            <!-- Submitted -->
-            <span ng-if="s.submitted" class="bs-tag bs-tag-accent">
-              <i class="ti ti-check" aria-hidden="true"></i>
-              Submitted
-            </span>
+            <div class="ov-ds-group-body">
+              <!-- Student dots -->
+              <div class="ov-dots-row">
+                <span class="ov-sdot-lg"
+                  ng-repeat="s in group.students | limitTo:8" title="{{ s.studentName }}">
+                  {{ s.studentName[0] }}
+                </span>
+                <span class="ov-sdot-lg ov-sdot--ov" ng-if="group.students.length > 8">
+                  +{{ group.students.length - 8 }}
+                </span>
+              </div>
 
-            <!-- Pending — fill report button -->
-            <span ng-if="!s.submitted" class="bs-tag bs-tag-accent-2" style="margin-right:8px;">Pending</span>
-            <button ng-if="!s.submitted && !vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]"
-              class="bs-btn bs-btn-secondary"
-              ng-click="vm.openReportForm(s.studentId, s.sessionDate, s.booking)">
-              <i class="ti ti-edit" aria-hidden="true"></i>
-              Fill report
-            </button>
+              <!-- Expand student list -->
+              <button class="ov-expand-btn"
+                ng-click="group._expanded = !group._expanded">
+                <i class="ti" ng-class="group._expanded ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
+                {{ group._expanded ? 'Hide' : 'View all ' + group.students.length + ' students' }}
+              </button>
+              <div class="ov-student-list" ng-if="group._expanded">
+                <div class="ov-s-row" ng-repeat="s in group.students track by s.studentId">
+                  <span class="ov-sdot-lg">{{ s.studentName[0] }}</span>
+                  <span class="ov-sname">{{ s.studentName }}</span>
+                </div>
+              </div>
+
+              <!-- Video link — online only -->
+              <div class="ov-link-section" ng-if="group.mode === 'Online'">
+                <p class="ov-section-label">Video conference link</p>
+
+                <!-- No link, input closed -->
+                <div ng-if="!group.videoConferenceLink && !vm.groupVideoLinkState(group)">
+                  <div class="ov-link-missing">
+                    <i class="ti ti-alert-circle" aria-hidden="true"></i>
+                    No link set — required before this online class
+                  </div>
+                  <button class="bs-btn bs-btn-secondary" style="margin-top:6px;font-size:12px;"
+                    ng-click="vm.openGroupVideoLinkInput(group)">
+                    <i class="ti ti-link" aria-hidden="true"></i> Add video conference link
+                  </button>
+                </div>
+
+                <!-- Input open -->
+                <div class="ov-link-input-wrap"
+                  ng-if="vm.groupVideoLinkState(group) && vm.groupVideoLinkState(group).editing">
+                  <div style="display:flex;gap:6px;align-items:flex-start;">
+                    <textarea ng-model="vm.groupVideoLinkState(group).inputValue"
+                      placeholder="Paste Zoom, Google Meet, Teams or any video link..."
+                      rows="2"
+                      style="flex:1;font-size:12px;resize:none;border:0.5px solid var(--color-accent-300);
+                             border-radius:var(--radius);padding:7px 10px;line-height:1.5;
+                             word-break:break-all;box-sizing:border-box;"></textarea>
+                    <button class="bs-btn bs-btn-primary"
+                      style="flex-shrink:0;margin-top:1px;font-size:12px;"
+                      ng-click="vm.saveGroupVideoLink(group)"
+                      ng-disabled="vm.groupVideoLinkState(group).saving">
+                      <i class="ti ti-check" aria-hidden="true"></i>
+                      {{ vm.groupVideoLinkState(group).saving ? 'Saving...' : 'Save' }}
+                    </button>
+                  </div>
+                  <p class="ov-link-note">
+                    <i class="ti ti-info-circle" aria-hidden="true"></i>
+                    Free conferencing platforms may have time limits.
+                    This link applies to all {{ group.students.length }} students.
+                  </p>
+                  <p style="color:var(--color-accent-2-700);font-size:12px;margin:4px 0 0;"
+                    ng-if="vm.groupVideoLinkState(group).error">
+                    {{ vm.groupVideoLinkState(group).error }}
+                  </p>
+                  <button class="bs-btn" style="font-size:12px;margin-top:6px;"
+                    ng-click="vm.cancelGroupVideoLinkInput(group)">Cancel</button>
+                </div>
+
+                <!-- Link set -->
+                <div ng-if="group.videoConferenceLink && !vm.groupVideoLinkState(group)">
+                  <div class="ov-link-box"
+                    ng-class="{'ov-link-box--active': vm.isGroupJoinEnabled(group)}">
+                    {{ group.videoConferenceLink }}
+                  </div>
+                  <div class="ov-link-note">
+                    <i class="ti ti-info-circle" aria-hidden="true"></i>
+                    This link applies to all {{ group.students.length }} students
+                  </div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+                    <a class="bs-btn bs-btn-primary"
+                      ng-if="vm.isGroupJoinEnabled(group)"
+                      ng-href="{{ group.videoConferenceLink }}" target="_blank"
+                      style="font-size:12px;text-decoration:none;background:#059669;">
+                      <i class="ti ti-video" aria-hidden="true"></i> Join class
+                    </a>
+                    <button class="bs-btn bs-btn-secondary"
+                      ng-if="vm.isGroupJoinEnabled(group)"
+                      style="font-size:12px;"
+                      ng-click="vm.copyVideoLink(group.videoConferenceLink)">
+                      <i class="ti ti-copy" aria-hidden="true"></i> Copy link
+                    </button>
+                    <span class="ov-join-disabled" ng-if="!vm.isGroupJoinEnabled(group)">
+                      <i class="ti ti-video" aria-hidden="true"></i>
+                      Join class — available 10 min before
+                    </span>
+                    <button class="bs-btn" style="font-size:12px;"
+                      ng-click="vm.openGroupVideoLinkInput(group)">
+                      <i class="ti ti-edit" aria-hidden="true"></i> Edit link
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Non-online -->
+              <div ng-if="group.mode !== 'Online'"
+                style="border-top:0.5px solid var(--color-divider);padding-top:8px;
+                       margin-top:8px;font-size:12px;color:var(--color-text-muted);
+                       display:flex;align-items:center;gap:5px;">
+                <i class="ti ti-home" aria-hidden="true"></i>
+                {{ group.mode }} — no video link required
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+        <div style="display:flex;gap:6px;">
+          <button class="bs-btn"
+            ng-if="vm.dailySummaryTabIndex > 0"
+            ng-click="vm.selectDailySummaryTab(vm.dailySummaryTabIndex - 1)">
+            <i class="ti ti-chevron-left" aria-hidden="true"></i> Prev date
+          </button>
+          <button class="bs-btn bs-btn-secondary"
+            ng-if="vm.dailySummaryTabIndex < vm.sortedSelectedCalDays().length - 1"
+            ng-click="vm.selectDailySummaryTab(vm.dailySummaryTabIndex + 1)">
+            Next date <i class="ti ti-chevron-right" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL 3: Class Reports ─────────────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'reports'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-file-text" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Class Reports</strong>
+          <div class="ov-modal-sub" ng-if="vm.reportSelectedDay">
+            {{ vm.formatSessionDate(vm.reportSelectedDay) }} · {{ vm.reportSelectedDayStudents.length }} student(s)
+          </div>
+          <div class="ov-modal-sub" ng-if="!vm.reportSelectedDay">
+            Select a completed date on the calendar first
+          </div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="ov-modal-body">
+
+        <div class="ov-modal-empty" ng-if="!vm.reportSelectedDay">
+          <i class="ti ti-calendar-event" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+          <p>Click a completed class date on the calendar, then open this panel.</p>
+        </div>
+
+        <div ng-if="vm.reportSelectedDay">
+          <div class="ov-modal-empty" ng-if="!vm.reportSelectedDayStudents.length">
+            <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+            <p>No completed classes on this date.</p>
+          </div>
+
+          <!-- Pending -->
+          <p class="ov-section-label" ng-if="vm.pendingReportsList().length">Pending reports</p>
+          <div ng-repeat="s in vm.pendingReportsList() track by s.studentId">
+            <div class="ov-report-row">
+              <div>
+                <div class="ov-report-name">{{ s.studentName }}</div>
+                <div class="ov-report-meta">{{ s.booking.subject }} · {{ vm.reportSelectedDay }}</div>
+              </div>
+              <button ng-if="!vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]"
+                class="bs-btn bs-btn-secondary" style="font-size:11px;font-weight:500;"
+                ng-click="vm.openReportForm(s.studentId, s.sessionDate, s.booking)">
+                <i class="ti ti-edit" aria-hidden="true"></i> Fill report
+              </button>
+            </div>
 
             <!-- Success flash -->
             <span ng-if="vm.reportSuccess[vm._reportKey(s.studentId, s.sessionDate)]"
@@ -900,7 +1154,8 @@
               Report submitted!
             </span>
 
-            <!-- Assessment form — inline below student row -->
+            <!-- Assessment form — same fields/functions as before, just ported
+                 into this modal instead of the old inline card. -->
             <div class="report-form-wrap"
               ng-if="vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]">
 
@@ -1040,41 +1295,56 @@
 
             </div>
             <!-- end assessment form -->
-
           </div>
-          <!-- end student list -->
-        </div>
 
-        <!-- Submitted reports log — grouped by preset group -->
-        <div ng-if="vm.reportGroups.length" style="margin-top:16px;">
-          <h5 style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em;">Submitted reports</h5>
-
-          <div class="report-log-group"
-            ng-repeat="group in vm.reportGroups track by group.presetGroupId">
-
-            <div class="report-log-date-group"
-              ng-repeat="report in group.reports track by $index">
-              <div class="report-log-row">
-                <i class="ti ti-file-check"
-                  style="font-size:14px; color:var(--color-accent); flex-shrink:0;" aria-hidden="true"></i>
-                <div style="flex:1;">
-                  <strong style="font-size:13px;">{{ report.studentName }}</strong>
-                  <span class="bs-text-muted" style="font-size:12px; margin-left:6px;">
-                    {{ vm.formatSessionDate(report.sessionDate) }}
-                  </span>
-                </div>
-                <span class="bs-tag bs-tag-accent">Submitted</span>
+          <!-- Submitted -->
+          <p class="ov-section-label" style="margin-top:14px;"
+            ng-if="vm.submittedReportsList().length">Submitted</p>
+          <div class="ov-report-row"
+            ng-repeat="s in vm.submittedReportsList() track by s.studentId">
+            <div>
+              <div class="ov-report-name" style="color:var(--color-text-secondary);">
+                {{ s.studentName }}
               </div>
+              <div class="ov-report-meta">{{ s.booking.subject }} · {{ vm.reportSelectedDay }}</div>
             </div>
+            <span class="bs-tag" style="font-size:11px;background:var(--color-accent-50);
+                  color:var(--color-accent-700);border:0.5px solid var(--color-accent-200);">
+              <i class="ti ti-check" aria-hidden="true"></i> Submitted
+            </span>
+          </div>
 
+          <!-- Submitted reports log — grouped by preset group, across all dates -->
+          <div ng-if="vm.reportGroups.length" style="margin-top:16px;">
+            <h5 style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em;">Submitted reports (all sessions)</h5>
+
+            <div class="report-log-group"
+              ng-repeat="group in vm.reportGroups track by group.presetGroupId">
+
+              <div class="report-log-date-group"
+                ng-repeat="report in group.reports track by $index">
+                <div class="report-log-row">
+                  <i class="ti ti-file-check"
+                    style="font-size:14px; color:var(--color-accent); flex-shrink:0;" aria-hidden="true"></i>
+                  <div style="flex:1;">
+                    <strong style="font-size:13px;">{{ report.studentName }}</strong>
+                    <span class="bs-text-muted" style="font-size:12px; margin-left:6px;">
+                      {{ vm.formatSessionDate(report.sessionDate) }}
+                    </span>
+                  </div>
+                  <span class="bs-tag bs-tag-accent">Submitted</span>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
 
       </div>
-      <!-- end date selected -->
-
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+      </div>
     </div>
-    <!-- end Class Reports Portal -->
 
     </div><!-- end overview tab -->
 
@@ -1532,6 +1802,14 @@
           </div>
 
         </div>
+
+        <!-- ── Subject Offerings section ─────────────────────────────── -->
+        <div style="border-top:1.5px solid var(--color-divider);margin:28px 0 24px;"></div>
+        <h3 style="margin:0 0 4px;">Subject Offerings</h3>
+        <p class="bs-text-muted" style="margin:0 0 16px;font-size:13px;">
+          Add the subjects, levels, and teaching modes you offer.
+          Offerings are only visible to parents after your profile is verified.
+        </p>
 
         <div ng-if="vm.tutor.verificationStatus !== 'not_submitted'">
 

@@ -102,6 +102,110 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.reportDotsByDay = result;
   }
 
+  // ── Calendar left-side status bar ────────────────────────────────
+  // One coloured, stacked bar per day summarising every preset-group class
+  // occurring that day — red (online, no link) > amber (past, report
+  // pending) > green (past, all reports in) > blue (future, confirmed) >
+  // grey (published, nobody enrolled yet), each shown as its own segment
+  // with a count rather than collapsing to a single dot.
+  self.calBarsByDay = {};
+
+  function recomputeCalBars() {
+    if (!self.tutor) return;
+    var result   = {};
+    var now      = new Date();
+    var priority = { red: 4, amber: 3, green: 2, blue: 1, grey: 0 };
+
+    function isPastDate(dateStr) {
+      var d     = new Date(dateStr + 'T00:00:00');
+      var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return d < today;
+    }
+
+    // { presetGroupId_dayNum: colour }
+    var groupColours = {};
+
+    // 1. Confirmed / completed preset-group bookings
+    self.bookings.forEach(function (b) {
+      if (!b.presetGroupId || b.tutorId !== self.tutor.id) return;
+      if (b.status !== 'confirmed' && b.status !== 'countered' && b.status !== 'completed') return;
+
+      var dates = [];
+      (b.classes || []).forEach(function (c) {
+        var d = new Date(c.date + 'T00:00:00');
+        if (d.getFullYear() === self.calYear && d.getMonth() === self.calMonth) dates.push(c.date);
+      });
+      (b.presetSlots || []).forEach(function (ps) {
+        var slot = ps.tutorTimeSlot || ps;
+        if (slot && slot.day) {
+          var d = new Date(slot.day + 'T00:00:00');
+          if (d.getFullYear() === self.calYear && d.getMonth() === self.calMonth) dates.push(slot.day);
+        }
+      });
+
+      dates.forEach(function (dateStr) {
+        var dayNum = new Date(dateStr + 'T00:00:00').getDate();
+        var key    = b.presetGroupId + '_' + dayNum;
+        var colour;
+
+        if (isPastDate(dateStr)) {
+          if (b.status === 'completed') {
+            var hasReport = (b.lessonReports || []).some(function (r) {
+              return r.studentId === b.studentId && r.sessionDate === dateStr;
+            });
+            colour = hasReport ? 'green' : 'amber';
+          } else {
+            colour = 'blue';
+          }
+        } else {
+          colour = (b.mode === 'Online' && !b.videoConferenceLink) ? 'red' : 'blue';
+        }
+
+        if (!groupColours[key] || priority[colour] > priority[groupColours[key]]) {
+          groupColours[key] = colour;
+        }
+      });
+    });
+
+    // 2. Published preset slots with no enrolled students (grey)
+    // TODO: Flow A bookings excluded for now — include in future
+    (self.tutor.timetable || []).forEach(function (slot) {
+      if (!slot.mode || !slot.day || !slot.presetGroupId) return;
+      var d = new Date(slot.day + 'T00:00:00');
+      if (d.getFullYear() !== self.calYear || d.getMonth() !== self.calMonth) return;
+      var key = slot.presetGroupId + '_' + d.getDate();
+      if (!groupColours[key]) groupColours[key] = 'grey';
+    });
+
+    // 3. Bucket by dayNum → colour → count
+    var dayBuckets = {};
+    Object.keys(groupColours).forEach(function (key) {
+      var parts  = key.split('_');
+      var dayNum = parseInt(parts[parts.length - 1]);
+      var colour = groupColours[key];
+      if (!dayBuckets[dayNum]) dayBuckets[dayNum] = {};
+      dayBuckets[dayNum][colour] = (dayBuckets[dayNum][colour] || 0) + 1;
+    });
+
+    // 4. Build ordered segment arrays: red > amber > green > blue > grey
+    var ORDER = ['red', 'amber', 'green', 'blue', 'grey'];
+    Object.keys(dayBuckets).forEach(function (dayNum) {
+      var segs = [];
+      ORDER.forEach(function (colour) {
+        if (dayBuckets[dayNum][colour]) {
+          segs.push({ colour: colour, count: dayBuckets[dayNum][colour] });
+        }
+      });
+      result[parseInt(dayNum)] = segs;
+    });
+
+    self.calBarsByDay = result;
+  }
+
+  self.calBarsForDay = function (dayNum) {
+    return self.calBarsByDay[dayNum] || [];
+  };
+
   function recomputeReportSelectedDayStudents() {
     if (!self.reportSelectedDay) {
       self.reportSelectedDayStudents = [];
@@ -148,6 +252,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   self._recomputeReportView = function () {
     recomputeReportDots();
+    recomputeCalBars();
     recomputeReportSelectedDayStudents();
     recomputeReportGroups();
   };
@@ -172,6 +277,60 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   var _now = new Date();
   self.calYear = _now.getFullYear();
   self.calMonth = _now.getMonth(); // 0-indexed
+
+  // ── Overview panel modal state ────────────────────────────────
+  // null | 'confirmed' | 'daily' | 'reports'
+  self.activePanel = null;
+
+  self.openPanel = function (name) { self.activePanel = name; };
+  self.closePanel = function () { self.activePanel = null; };
+
+  // Daily Summary tab index (into sortedSelectedCalDays)
+  self.dailySummaryTabIndex = 0;
+  self.selectDailySummaryTab = function (idx) { self.dailySummaryTabIndex = idx; };
+
+  // Format a calendar day number to full label e.g. "Tuesday, 8 Sep 2026"
+  self.dailySummaryTabLabel = function (dayNum) {
+    if (!dayNum) return '';
+    var d = new Date(self.calYear + '-' +
+      String(self.calMonth + 1).padStart(2, '0') + '-' +
+      String(dayNum).padStart(2, '0'));
+    var days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  };
+
+  // Tab badge status: 'ok' | 'warn' | 'empty'
+  self.dailySummaryTabStatus = function (dayNum) {
+    var groups = self.groupedBookingsOnDay(dayNum);
+    if (!groups.length) return 'empty';
+    var hasOnlineNoLink = groups.some(function (g) {
+      return g.mode === 'Online' && !g.videoConferenceLink;
+    });
+    return hasOnlineNoLink ? 'warn' : 'ok';
+  };
+
+  // Amber badge in Confirmed Classes clicked — jump calendar to date,
+  // close current modal, open Daily Summary
+  self.jumpToCalendarDate = function (dateStr) {
+    var parts = dateStr.split('-');
+    var year  = parseInt(parts[0]);
+    var month = parseInt(parts[1]) - 1;
+    var day   = parseInt(parts[2]);
+    if (self.calYear !== year || self.calMonth !== month) {
+      self.calYear  = year;
+      self.calMonth = month;
+    }
+    self.selectedCalDays      = [day];
+    self.reportSelectedDay    = dateStr;
+    self._recomputeReportView && self._recomputeReportView();
+    self.dailySummaryTabIndex = 0;
+    self.activePanel          = 'daily';
+  };
+
+  $scope.$watch(function () { return self.selectedCalDays.length; }, function () {
+    self.dailySummaryTabIndex = 0;
+  });
 
   function init() {
     TutorService.getByUser(user.userId).then(function (res) {
@@ -267,6 +426,71 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     }).sort(function (a, b) {
       return BOOKING_STATUS_ORDER[a.status] - BOOKING_STATUS_ORDER[b.status];
     });
+  };
+
+  // One row per preset-group class occurrence this month (merging every
+  // enrolled student into the same row, same idea as groupedBookingsOnDay
+  // but scoped to the whole month rather than one calendar day) — backs the
+  // Confirmed Classes panel/modal.
+  self.confirmedClassesThisMonth = function () {
+    if (!self.tutor) return [];
+    var monthStart = new Date(self.calYear, self.calMonth, 1);
+    var monthEnd   = new Date(self.calYear, self.calMonth + 1, 0);
+    var results    = [];
+    var seen       = {};
+
+    self.bookings.filter(function (b) {
+      return b.tutorId === self.tutor.id &&
+             (b.status === 'confirmed' || b.status === 'countered');
+    }).forEach(function (b) {
+      var dates = [];
+      (b.classes || []).forEach(function (c) {
+        var d = new Date(c.date + 'T00:00:00');
+        if (d >= monthStart && d <= monthEnd) dates.push({ date: c.date, time: c.time });
+      });
+      (b.presetSlots || []).forEach(function (ps) {
+        var slot = ps.tutorTimeSlot || ps;
+        if (slot && slot.day) {
+          var d = new Date(slot.day + 'T00:00:00');
+          if (d >= monthStart && d <= monthEnd)
+            dates.push({ date: slot.day, time: slot.time || b.startTime || '' });
+        }
+      });
+
+      dates.forEach(function (entry) {
+        var gid = b.presetGroupId || ('flow-a-' + b.id);
+        var key = gid + '_' + entry.date;
+        if (seen[key]) {
+          seen[key].students.push({ studentId: b.studentId, studentName: b.studentName });
+          if (b.videoConferenceLink && !seen[key].videoConferenceLink)
+            seen[key].videoConferenceLink = b.videoConferenceLink;
+        } else {
+          var row = {
+            key:                 key,
+            presetGroupId:       b.presetGroupId || null,
+            bookingId:           b.id,
+            subject:             b.subject,
+            mode:                b.mode,
+            date:                entry.date,
+            time:                entry.time,
+            videoConferenceLink: b.videoConferenceLink || null,
+            students:            [{ studentId: b.studentId, studentName: b.studentName }]
+          };
+          seen[key] = row;
+          results.push(row);
+        }
+      });
+    });
+
+    return results.sort(function (a, b) { return a.date.localeCompare(b.date); });
+  };
+
+  self.formatDateShort = function (dateStr) {
+    if (!dateStr) return '';
+    var d      = new Date(dateStr + 'T00:00:00');
+    var days   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()];
   };
 
   self.completedClasses = function () {
@@ -388,6 +612,31 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     var days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  };
+
+  self.totalPendingReports = function () {
+    if (!self.tutor) return 0;
+    var count = 0;
+    (self.bookings || []).forEach(function (b) {
+      if (b.status !== 'completed' || b.tutorId !== self.tutor.id) return;
+      var reports = b.lessonReports || [];
+      var dates   = (b.classes || []).map(function (c) { return c.date; });
+      dates.forEach(function (date) {
+        var has = reports.some(function (r) {
+          return r.studentId === b.studentId && r.sessionDate === date;
+        });
+        if (!has) count++;
+      });
+    });
+    return count;
+  };
+
+  self.pendingReportsList = function () {
+    return (self.reportSelectedDayStudents || []).filter(function (s) { return !s.submitted; });
+  };
+
+  self.submittedReportsList = function () {
+    return (self.reportSelectedDayStudents || []).filter(function (s) { return s.submitted; });
   };
 
   // ── Malaysia + Singapore public holidays ────────────────────────────
@@ -1328,6 +1577,63 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       var range = parseTimeRangeMinutesForBooked(slot.time + ' - ' + (slot.endTime || slot.time));
       return range && slotStart < range.end && range.start < slotEnd;
     });
+  };
+
+  // ── Setup grid: existing-class blocks ────────────────────────────────
+  // Renders confirmed bookings and already-published preset slots as solid
+  // blocks spanning their full duration on the grid, instead of leaving the
+  // tutor to infer "booked" from grayed-out 30-min cells alone.
+  self.setupClassBlocksForDate = function (dateStr) {
+    if (!self.tutor) return [];
+    var blocks = [];
+
+    self.bookings.forEach(function (b) {
+      if (b.tutorId !== self.tutor.id) return;
+      if (b.status !== 'confirmed' && b.status !== 'countered') return;
+      (b.classes || []).forEach(function (c) {
+        if (c.date !== dateStr) return;
+        var range = parseTimeRangeMinutesForBooked(c.time);
+        if (!range) return;
+        var exists = blocks.some(function (bl) {
+          return bl.startMin === range.start && bl.endMin === range.end && bl.subject === b.subject;
+        });
+        if (!exists) blocks.push({ startMin: range.start, endMin: range.end,
+          subject: b.subject || '', mode: b.mode || '', type: 'confirmed' });
+      });
+    });
+
+    (self.tutor.timetable || []).forEach(function (slot) {
+      if (!slot.mode || slot.day !== dateStr) return;
+      var range = parseTimeRangeMinutesForBooked(slot.time + ' - ' + (slot.endTime || slot.time));
+      if (!range) return;
+      var covered = blocks.some(function (bl) {
+        return bl.startMin < range.end && range.start < bl.endMin;
+      });
+      if (!covered) blocks.push({ startMin: range.start, endMin: range.end,
+        subject: slot.subject || '', mode: slot.mode || '', type: 'preset' });
+    });
+
+    return blocks;
+  };
+
+  self.setupSlotInBlock = function (dateStr, totalMin) {
+    return self.setupClassBlocksForDate(dateStr).find(function (bl) {
+      return totalMin >= bl.startMin && totalMin < bl.endMin;
+    }) || null;
+  };
+
+  self.setupSlotIsBlockStart = function (dateStr, totalMin) {
+    var block = self.setupSlotInBlock(dateStr, totalMin);
+    return block && block.startMin === totalMin;
+  };
+
+  self.setupBlockRowspan = function (dateStr, totalMin) {
+    var block = self.setupSlotInBlock(dateStr, totalMin);
+    return block ? Math.max(1, Math.round((block.endMin - block.startMin) / 30)) : 1;
+  };
+
+  self.setupBlockAt = function (dateStr, totalMin) {
+    return self.setupSlotInBlock(dateStr, totalMin);
   };
 
   self.toggleSetupSlot = function (dateStr, totalMin) {
