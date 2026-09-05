@@ -9,6 +9,9 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   self.stats = null;
   self.unverifiedTutors = [];
   self.disputes = [];
+  self.remarkDisputes = [];
+  self.archivedDisputes = [];
+  self.archivedRemarkDisputes = [];
   self.systemLogs = [];
 
   // Scoring config — weightages are persisted server-side (ScoringWeightages
@@ -129,6 +132,9 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     AdminService.getStats().then(function (res) { self.stats = res.data; });
     AdminService.getUnverifiedTutors().then(function (res) { self.unverifiedTutors = res.data; });
     AdminService.getDisputes().then(function (res) { self.disputes = res.data; });
+    AdminService.getRemarkDisputes().then(function (res) { self.remarkDisputes = res.data; });
+    AdminService.getArchivedDisputes().then(function (res) { self.archivedDisputes = res.data; });
+    AdminService.getArchivedRemarkDisputes().then(function (res) { self.archivedRemarkDisputes = res.data; });
     AdminService.getScoringWeightages().then(function (res) { self.weightages = res.data; });
     self.loadRescheduleQueue();
   }
@@ -280,6 +286,15 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     AdminService.resolveDispute(dispute.id).then(function () {
       self.disputes = self.disputes.filter(function (d) { return d.id !== dispute.id; });
       self.systemLogs.unshift('Conflict resolved for class: #' + dispute.id + ' (Just now)');
+      AdminService.getArchivedDisputes().then(function (res) { self.archivedDisputes = res.data; });
+    });
+  };
+
+  self.resolveRemarkDispute = function (dispute, approve) {
+    AdminService.resolveRemarkDispute(dispute.id, approve).then(function () {
+      self.remarkDisputes = self.remarkDisputes.filter(function (d) { return d.id !== dispute.id; });
+      self.systemLogs.unshift((approve ? 'Hid remark' : 'Rejected hide request for remark') + ' #' + dispute.id + ' (Just now)');
+      AdminService.getArchivedRemarkDisputes().then(function (res) { self.archivedRemarkDisputes = res.data; });
     });
   };
 }]);

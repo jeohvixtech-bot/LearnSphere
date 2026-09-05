@@ -1,8 +1,8 @@
 <div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Primary parent account</small></div>
     </div>
     <nav style="display:flex; flex-direction:column; gap:2px;">
       <a href="#!/parent/dashboard" class="bs-sidebar-link">
@@ -43,17 +43,17 @@
       <div style="display:flex; gap:var(--space-6);">
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.bookings.length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Total Bookings</div>
+          <div class="bs-text-muted" style="font-size:13px;">Total Bookings</div>
         </div>
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.confirmedAndCounteredBookings().length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Upcoming</div>
+          <div class="bs-text-muted" style="font-size:13px;">Upcoming</div>
         </div>
       </div>
     </div>
 
     <!-- ── Issue Report Success ────────────────────── -->
-    <div ng-if="vm.issueSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div ng-if="vm.issueSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
       ✓ Incident dispatch logged. Administration is now investigating.
       <button class="bs-btn bs-btn-ghost" style="margin-left:8px;" ng-click="vm.issueSuccess = false; vm.issueForm.bookingId = null">Dismiss</button>
     </div>
@@ -62,7 +62,7 @@
     <div class="bs-card bs-elev-sm" ng-if="vm.issueForm.bookingId && !vm.issueSuccess">
       <div style="display:flex; align-items:center; gap:var(--space-3);">
         <div>
-          <div class="bs-card-title">Report Class Conflict</div>
+          <div class="bs-card-title">{{ vm.issueForm.isEdit ? 'Edit Reported Issue' : 'Report Class Conflict' }}</div>
           <p class="bs-text-muted" style="margin:0;">Booking ID: #{{ vm.issueForm.bookingId }}</p>
         </div>
         <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.issueForm.bookingId = null">✕ Cancel</button>
@@ -80,27 +80,27 @@
           <label>What happened? <span style="color:var(--color-accent-2);">*</span></label>
           <textarea class="bs-input" ng-model="vm.issueForm.details" rows="3" required
             placeholder="Provide details about wait times, response, or other issues..."></textarea>
-          <div ng-if="vm.issueError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ vm.issueError }}</div>
+          <div ng-if="vm.issueError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ vm.issueError }}</div>
         </div>
         <div style="display:flex; gap:var(--space-2);">
           <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.issueForm.bookingId = null">Cancel</button>
-          <button type="submit" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);">Submit Report</button>
+          <button type="submit" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);">{{ vm.issueForm.isEdit ? 'Save Changes' : 'Submit Report' }}</button>
         </div>
       </form>
     </div>
 
     <!-- ── Reschedule Success ───────────────────────── -->
-    <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
       ✓ Reschedule request submitted. New class dates have been updated.
     </div>
 
     <!-- ── Counter Accept Success ────────────────────── -->
-    <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
       ✓ Counter proposal accepted. Booking is now confirmed.
     </div>
 
     <!-- ── Pay Success ───────────────────────────── -->
-    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
@@ -114,23 +114,23 @@
         <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.payingBooking = null">✕ Cancel</button>
       </div>
 
-      <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:13px;">
+      <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:14px;">
         <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Tutor</span><strong>{{ vm.payingBooking.tutorName }}</strong></div>
         <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Student</span><strong>{{ vm.payingBooking.studentName }}</strong></div>
         <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Subject</span><strong>{{ vm.payingBooking.subject }}</strong></div>
         <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.payingBooking.mode }}</strong></div>
       </div>
 
-      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Schedule ({{ vm.payingBooking.classes.length }} class{{ vm.payingBooking.classes.length === 1 ? '' : 'es' }})</div>
+      <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Schedule ({{ vm.payingBooking.classes.length }} class{{ vm.payingBooking.classes.length === 1 ? '' : 'es' }})</div>
       <div style="display:flex; flex-direction:column; gap:2px;">
-        <div style="display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--color-divider);" ng-repeat="c in vm.payingBooking.classes track by $index">
+        <div style="display:flex; justify-content:space-between; font-size:14px; padding:4px 0; border-bottom:1px solid var(--color-divider);" ng-repeat="c in vm.payingBooking.classes track by $index">
           <span>{{ c.date | dmy }}</span><span>{{ c.time | hhmma }}</span>
         </div>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:center; padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
         <span>Total</span>
-        <strong style="font-family:var(--font-heading); font-size:18px;">${{ vm.payingBooking.totalPrice }}.00</strong>
+        <strong style="font-family:var(--font-heading); font-size:19px;">${{ vm.payingBooking.totalPrice }}.00</strong>
       </div>
 
       <div style="display:flex; gap:var(--space-2);">
@@ -140,7 +140,7 @@
     </div>
 
     <!-- ── Cancel Success ───────────────────────────── -->
-    <div ng-if="vm.cancelSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div ng-if="vm.cancelSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
       ✓ Booking cancelled.
     </div>
 
@@ -153,20 +153,20 @@
         </div>
         <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelReschedule()">✕ Cancel</button>
       </div>
-      <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isBookingConflicted(vm.rescheduleBooking)">
+      <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isBookingConflicted(vm.rescheduleBooking)">
         ⚠️ The tutor has blocked some of the original class dates. Please select new available dates below.
       </p>
-      <p style="font-size:13px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isBookingConflicted(vm.rescheduleBooking)">
+      <p style="font-size:14px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isBookingConflicted(vm.rescheduleBooking)">
         Enter new preferred dates for this booking below.
       </p>
       <form ng-submit="vm.submitReschedule()" style="display:flex; flex-direction:column; gap:var(--space-3);">
         <div ng-repeat="c in vm.rescheduleForm.classes track by $index" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);"
           ng-style="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate) ? {outline:'1px solid var(--color-accent-2)'} : {}">
-          <div style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; margin-bottom:6px;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:6px;">
             Class {{ $index + 1 }}
             <span class="bs-tag bs-tag-accent-2" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">🚫 Blocked</span>
           </div>
-          <div class="bs-text-muted" style="font-size:12px; margin-bottom:6px;">
+          <div class="bs-text-muted" style="font-size:13px; margin-bottom:6px;">
             Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
           </div>
           <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
@@ -174,7 +174,7 @@
               <label>New Date <span style="color:var(--color-accent-2);">*</span></label>
               <input class="bs-input" type="text" ng-model="c.date" required placeholder="DD-MM-YYYY" fp-date
                 ng-style="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
-              <span ng-if="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)" style="color:var(--color-accent-2-700); font-size:12px;">
+              <span ng-if="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)" style="color:var(--color-accent-2-700); font-size:13px;">
                 ⚠️ This date is also blocked by the tutor
               </span>
             </div>
@@ -189,14 +189,14 @@
               <input class="bs-input" type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
             </div>
           </div>
-          <span ng-if="c.date && vm.isTooSoon(c.date, c.time)" style="color:var(--color-accent-2-700); font-size:12px;">
+          <span ng-if="c.date && vm.isTooSoon(c.date, c.time)" style="color:var(--color-accent-2-700); font-size:13px;">
             ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
           </span>
         </div>
-        <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateReschedule()">
+        <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateReschedule()">
           ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
-        <p style="font-size:13px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidReschedule()">
+        <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidReschedule()">
           ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
         </p>
         <div style="display:flex; gap:var(--space-2);">
@@ -222,7 +222,7 @@
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-3);">
-        <span class="bs-text-muted" style="font-size:13px;">
+        <span class="bs-text-muted" style="font-size:14px;">
           {{ vm.visibleBookings().length }} Booking{{ vm.visibleBookings().length !== 1 ? 's' : '' }}
         </span>
         <a href="#!/parent/search" class="bs-btn bs-btn-primary">+ New Booking</a>
@@ -243,9 +243,9 @@
           <div>
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
-              <span class="bs-text-muted" style="font-size:12px;">#{{ b.bookingNumber }}</span>
+              <span class="bs-text-muted" style="font-size:13px;">#{{ b.bookingNumber }}</span>
             </div>
-            <div class="bs-text-muted" style="font-size:13px; margin-top:4px;">
+            <div class="bs-text-muted" style="font-size:14px; margin-top:4px;">
               <span>{{ b.tutorName }}</span>
               <span> • </span>
               <span>{{ b.studentName }}</span>
@@ -258,19 +258,49 @@
 
         <!-- Schedule chips -->
         <div style="display:flex; flex-wrap:wrap; gap:6px;">
-          <span class="bs-tag bs-tag-neutral" ng-repeat="c in b.classes track by $index">
+          <span class="bs-tag" ng-repeat="c in b.classes track by $index"
+            ng-class="(c.status === 'completed' && !c.remark) ? 'bs-tag-accent' : 'bs-tag-neutral'">
             {{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)
+            <span ng-if="c.status === 'completed' && !c.remark" style="border-left:1px solid currentColor; opacity:0.9; margin-left:6px; padding-left:6px; cursor:pointer;"
+              ng-click="vm.openRemarkForm(c.id, null)">
+              <i class="ti ti-star" aria-hidden="true"></i> Give a remark
+            </span>
           </span>
+        </div>
+
+        <!-- Remarks already left on this booking's completed classes — most recent first -->
+        <div style="display:flex; flex-direction:column; gap:8px;" ng-repeat="c in b.classes | orderBy:'-date' track by $index">
+          <div style="border-top:1px dashed var(--color-divider); padding-top:8px;" ng-if="c.status === 'completed' && c.remark">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-2);">
+              <div>
+                <small class="bs-text-muted">Your remark on {{ c.date | dmy }} class</small>
+                <div style="margin-top:2px;">
+                  <i class="ti ti-star" ng-repeat="n in [1,2,3,4,5]"
+                    ng-style="{'color': n <= c.remark.rating ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '14px'}"
+                    aria-hidden="true"></i>
+                </div>
+                <p style="margin:4px 0 0; font-size:14px;">{{ c.remark.text }}</p>
+              </div>
+              <div style="display:flex; gap:4px; flex-shrink:0;">
+                <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" title="Edit" ng-click="vm.openRemarkForm(c.id, c.remark)">
+                  <i class="ti ti-edit" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" title="Delete" ng-click="vm.deleteRemark(c.remark)">
+                  <i class="ti ti-trash" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Video conference join — Online confirmed bookings only -->
         <div ng-if="b.mode === 'Online' && b.status === 'confirmed'" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3);">
-          <p ng-if="!b.videoConferenceLink" class="bs-text-muted" style="margin:0; font-size:13px;">
+          <p ng-if="!b.videoConferenceLink" class="bs-text-muted" style="margin:0; font-size:14px;">
             <i class="ti ti-video-off" aria-hidden="true"></i> Your tutor has not set the video conference link yet.
           </p>
           <div ng-if="b.videoConferenceLink" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span ng-if="vm.isParentLinkVisible(b)" style="font-size:12px; word-break:break-all; flex:1; min-width:120px;">{{ b.videoConferenceLink }}</span>
-            <span ng-if="!vm.isParentLinkVisible(b)" class="bs-text-muted" style="font-size:13px; flex:1;">Video link ready — visible 1 hour before class.</span>
+            <span ng-if="vm.isParentLinkVisible(b)" style="font-size:13px; word-break:break-all; flex:1; min-width:120px;">{{ b.videoConferenceLink }}</span>
+            <span ng-if="!vm.isParentLinkVisible(b)" class="bs-text-muted" style="font-size:14px; flex:1;">Video link ready — visible 1 hour before class.</span>
             <a ng-if="vm.isParentJoinEnabled(b)" class="bs-btn" style="background:#16a34a; color:#fff;"
               ng-href="{{ b.videoConferenceLink }}" target="_blank" rel="noopener"
               title="Join class">
@@ -290,7 +320,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
           <div>
             <small class="bs-text-muted">Total</small><br/>
-            <strong style="font-family:var(--font-heading); font-size:18px;">${{ b.totalPrice }}.00</strong>
+            <strong style="font-family:var(--font-heading); font-size:19px;">${{ b.totalPrice }}.00</strong>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:6px;">
             <button class="bs-btn bs-btn-primary"
@@ -317,7 +347,7 @@
               <span ng-if="!vm.isBookingConflicted(b)">Reschedule</span>
             </button>
             <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
-              ng-if="b.status === 'confirmed'"
+              ng-if="b.status === 'confirmed' && (!b.issueReport || b.issueReport.resolved)"
               ng-click="vm.startReportIssue(b.id)">
               ⚠️ Report Issue
             </button>
@@ -331,13 +361,33 @@
           </div>
         </div>
 
+        <!-- Your reported issue — shown once a report exists on this booking -->
+        <div style="background:var(--color-accent-2-100); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.issueReport">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-2);">
+            <div>
+              <div style="font-weight:600; font-size:13px; color:var(--color-accent-2-800);">⚠️ Your reported issue — {{ b.issueReport.issueType }}</div>
+              <p style="margin:4px 0 0; font-size:13px;">{{ b.issueReport.details }}</p>
+              <small class="bs-text-muted">Reported at {{ b.issueReport.timestamp }}</small>
+              <div ng-if="b.issueReport.resolved" class="bs-tag bs-tag-accent-2" style="margin-top:6px; font-size:11px;">✓ Resolved by admin</div>
+            </div>
+            <div style="display:flex; gap:4px; flex-shrink:0;" ng-if="!b.issueReport.resolved">
+              <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" title="Edit" ng-click="vm.startEditIssue(b)">
+                <i class="ti ti-edit" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" title="Withdraw" ng-click="vm.deleteIssue(b)">
+                <i class="ti ti-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Counter proposal panel -->
         <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.counterProposal && b.status === 'countered'">
-          <div style="font-weight:600; font-size:13px; margin-bottom:6px;">
+          <div style="font-weight:600; font-size:14px; margin-bottom:6px;">
             <span ng-if="b.counterProposal.proposedBy === 'tutor'">🔄 Tutor's Counter Proposal</span>
-            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">🔄 Your Reschedule Proposal <span class="bs-tag bs-tag-accent-2" style="font-size:10px;">⏳ Awaiting tutor's acceptance</span></span>
+            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">🔄 Your Reschedule Proposal <span class="bs-tag bs-tag-accent-2" style="font-size:11px;">⏳ Awaiting tutor's acceptance</span></span>
           </div>
-          <div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:4px;" ng-repeat="c in b.counterProposal.classes track by $index">
+          <div style="display:flex; align-items:center; gap:8px; font-size:14px; margin-top:4px;" ng-repeat="c in b.counterProposal.classes track by $index">
             <span class="bs-text-muted">Class {{ $index + 1 }}:</span>
             <span class="bs-text-muted">{{ c.originalDate | dmy }}</span>
             <span>→</span>
@@ -348,7 +398,7 @@
 
         <!-- Lesson report panel — one entry per session date -->
         <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.lessonReports.length">
-          <div class="bs-card-title" style="font-size:14px;">📋 Lesson Reports</div>
+          <div class="bs-card-title" style="font-size:15px;">📋 Lesson Reports</div>
           <div style="border-top:1px solid var(--color-divider); padding-top:var(--space-2); margin-top:var(--space-2);" ng-repeat="r in b.lessonReports track by r.id">
             <div style="display:flex; align-items:center; gap:6px;">
               <strong>{{ r.sessionDate | dmy }}</strong>
@@ -358,15 +408,15 @@
             </div>
             <div style="display:flex; gap:var(--space-4); margin-top:6px; flex-wrap:wrap;" ng-if="r.attendance !== 'absent'">
               <div>
-                <span style="font-size:11px; text-transform:uppercase; opacity:0.6;">Engagement</span>
+                <span style="font-size:12px; text-transform:uppercase; opacity:0.6;">Engagement</span>
                 <p style="margin:2px 0 0;">{{ r.engagement }} / 5 ★</p>
               </div>
               <div>
-                <span style="font-size:11px; text-transform:uppercase; opacity:0.6;">Understanding</span>
+                <span style="font-size:12px; text-transform:uppercase; opacity:0.6;">Understanding</span>
                 <p style="margin:2px 0 0;">{{ r.understanding | capitalize }}</p>
               </div>
               <div>
-                <span style="font-size:11px; text-transform:uppercase; opacity:0.6;">Homework</span>
+                <span style="font-size:12px; text-transform:uppercase; opacity:0.6;">Homework</span>
                 <p style="margin:2px 0 0;">{{ r.homeworkCompletion | capitalize }}</p>
               </div>
             </div>
@@ -377,6 +427,43 @@
       </div><!-- end ng-repeat -->
 
     </div><!-- end sessions list -->
+
+    <!-- Class Remark Modal -->
+    <div class="modal-overlay" ng-if="vm.remarkModalOpen">
+      <div class="modal-card" style="max-width:440px">
+        <div class="modal-header">
+          <div>
+            <h3>{{ vm.remarkForm.remarkId ? 'Edit your remark' : 'Give a remark' }}</h3>
+          </div>
+          <button type="button" class="modal-close" ng-click="vm.closeRemarkForm()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="bs-field">
+            <label>Rating</label>
+            <div style="display:flex; gap:4px;">
+              <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-repeat="n in [1,2,3,4,5]" ng-click="vm.remarkForm.rating = n" style="padding:0;">
+                <i class="ti ti-star" ng-style="{'color': n <= vm.remarkForm.rating ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '24px'}" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+          <div class="bs-field">
+            <label>Your remark</label>
+            <textarea class="bs-input" rows="4" ng-model="vm.remarkForm.text" placeholder="How was this class?"></textarea>
+          </div>
+          <p ng-if="vm.remarkError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.remarkError }}</p>
+        </div>
+
+        <div class="modal-footer">
+          <div style="display:flex; gap:8px; margin-left:auto;">
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeRemarkForm()">Cancel</button>
+            <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.submitRemark()" ng-disabled="vm.remarkSaving">
+              {{ vm.remarkSaving ? 'Saving...' : (vm.remarkForm.remarkId ? 'Save changes' : 'Submit remark') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </main>
 </div>

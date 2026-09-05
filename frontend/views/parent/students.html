@@ -1,8 +1,8 @@
 <div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Primary parent account</small></div>
     </div>
     <nav style="display:flex; flex-direction:column; gap:2px;">
       <a href="#!/parent/dashboard" class="bs-sidebar-link">
@@ -96,11 +96,11 @@
       <div style="display:flex; gap:var(--space-6);">
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.activeStudents().length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Active Profiles</div>
+          <div class="bs-text-muted" style="font-size:13px;">Active Profiles</div>
         </div>
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:20px;">SG &amp; MY</div>
-          <div class="bs-text-muted" style="font-size:12px;">Coverage</div>
+          <div class="bs-text-muted" style="font-size:13px;">Coverage</div>
         </div>
       </div>
     </div>
@@ -123,7 +123,7 @@
           </button>
         </div>
 
-        <span class="bs-text-muted" style="font-size:13px; display:block; margin-top:var(--space-2);">
+        <span class="bs-text-muted" style="font-size:14px; display:block; margin-top:var(--space-2);">
           {{ vm.visibleStudents().length }} Profile{{ vm.visibleStudents().length !== 1 ? 's' : '' }} {{ vm.studentsTab === 'archived' ? 'Archived' : 'Registered' }}
         </span>
 
@@ -151,8 +151,8 @@
               <div style="width:48px; height:48px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
               <div style="flex:1; min-width:0;">
                 <div class="bs-card-title">{{ s.name }}</div>
-                <span class="bs-text-muted" style="font-size:12px;">{{ s.educationLevel }}</span>
-                <div class="bs-text-muted" style="font-size:12px;">{{ s.school }}</div>
+                <span class="bs-text-muted" style="font-size:13px;">{{ s.educationLevel }}</span>
+                <div class="bs-text-muted" style="font-size:13px;">{{ s.school }}</div>
               </div>
               <button type="button" ng-if="!s.isArchived" class="bs-btn bs-btn-secondary" ng-click="$event.stopPropagation(); vm.startEditStudent(s)">Edit</button>
               <button type="button" ng-if="!s.isArchived" class="bs-btn bs-btn-secondary" ng-click="$event.stopPropagation(); vm.archiveStudent(s)">Archive</button>
@@ -187,7 +187,7 @@
             </div>
 
             <div style="margin-top:var(--space-2);" ng-if="s.learningGoal">
-              <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Learning Goal</span>
+              <span style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Learning Goal</span>
               <p style="font-style:italic; margin:2px 0 0;">"{{ s.learningGoal }}"</p>
             </div>
 
@@ -247,7 +247,7 @@
                 <div class="bs-field" style="flex:1; min-width:160px; margin:0;">
                   <label>Full Name <span style="color:var(--color-accent-2);">*</span></label>
                   <input class="bs-input" type="text" ng-model="vm.editStudentForm.name" ng-change="vm.validateEditStudentName()" required />
-                  <div ng-if="vm.editStudentNameError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ vm.editStudentNameError }}</div>
+                  <div ng-if="vm.editStudentNameError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ vm.editStudentNameError }}</div>
                 </div>
                 <div class="bs-field" style="flex:1; min-width:160px; margin:0;">
                   <label>School</label>
@@ -256,7 +256,7 @@
               </div>
               <div class="bs-field" style="margin:0;">
                 <label>Subjects Needed</label>
-                <p class="bs-text-muted" style="font-size:12px;">Select a country, then a subject, then click Add Subject.</p>
+                <p class="bs-text-muted" style="font-size:13px;">Select a country, then a subject, then click Add Subject.</p>
                 <div class="offering-builder">
                   <div class="bs-field" style="margin:0;">
                     <label>Country</label>
@@ -278,7 +278,7 @@
                 <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;" ng-if="vm.editStudentSubjects.length">
                   <span class="bs-tag bs-tag-accent" style="gap:6px;" ng-repeat="c in vm.editStudentSubjects">
                     {{ c.country }} · {{ c.level }} · {{ c.subject }}
-                    <button type="button" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1; padding:0;" ng-click="vm.removeEditStudentSubject($index)">×</button>
+                    <button type="button" style="background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1; padding:0;" ng-click="vm.removeEditStudentSubject($index)">×</button>
                   </span>
                 </div>
               </div>
@@ -332,14 +332,14 @@
                     </div>
                   </div>
                 </div>
-                <p ng-if="vm.preferredModesError" style="color:var(--color-accent-2-700); font-size:12px;">{{ vm.preferredModesError }}</p>
+                <p ng-if="vm.preferredModesError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.preferredModesError }}</p>
               </div>
 
               <div class="bs-field" style="margin:0;">
                 <label>Learning Goals</label>
                 <textarea class="bs-input" ng-model="vm.editStudentForm.learningGoal" rows="2"
                   placeholder="e.g. Prepare for O-Levels..."></textarea>
-                <div ng-if="vm.editStudentGoalError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ vm.editStudentGoalError }}</div>
+                <div ng-if="vm.editStudentGoalError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ vm.editStudentGoalError }}</div>
               </div>
               <div style="display:flex; gap:8px;">
                 <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelEditStudent()">Cancel</button>
@@ -354,7 +354,7 @@
       <!-- ── Right: Add Student Form ────────────── -->
       <div class="bs-card bs-elev-sm">
         <div style="display:flex; align-items:center; gap:var(--space-3);">
-          <span class="bs-tag bs-tag-accent" style="font-size:16px; padding:8px;">✚</span>
+          <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">✚</span>
           <div>
             <h4 style="margin:0;">Add New Child</h4>
             <p class="bs-text-muted" style="margin:0;">Fill in your child's details to find the right tutor match</p>
@@ -363,11 +363,11 @@
 
         <form ng-submit="vm.createStudent()" style="display:flex; flex-direction:column; gap:var(--space-3);">
 
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Basic Information</div>
+          <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Basic Information</div>
           <div class="bs-field" style="margin:0;">
             <label>Child Full Name <span style="color:var(--color-accent-2);">*</span></label>
             <input class="bs-input" type="text" ng-model="vm.studentForm.name" ng-change="vm.validateStudentName()" required placeholder="e.g. Jessica Tan" />
-            <div ng-if="vm.studentNameError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ vm.studentNameError }}</div>
+            <div ng-if="vm.studentNameError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ vm.studentNameError }}</div>
           </div>
 
           <div class="bs-field" style="position:relative; margin:0;">
@@ -414,13 +414,13 @@
               <button type="button" class="bs-btn bs-btn-ghost" ng-click="vm.backToSchoolSearch()">← Back to search</button>
             </div>
 
-            <p ng-if="vm.schoolError" style="color:var(--color-accent-2-700); font-size:12px;">{{ vm.schoolError }}</p>
+            <p ng-if="vm.schoolError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.schoolError }}</p>
           </div>
 
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Academic Details</div>
+          <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Academic Details</div>
           <div class="bs-field" style="margin:0;">
             <label>Subjects Needed <span style="color:var(--color-accent-2);">*</span></label>
-            <p class="bs-text-muted" style="font-size:12px;">Select a country, then a subject, then click Add Subject. At least one subject is required.</p>
+            <p class="bs-text-muted" style="font-size:13px;">Select a country, then a subject, then click Add Subject. At least one subject is required.</p>
             <div class="offering-builder">
               <div class="bs-field" style="margin:0;">
                 <label>Country</label>
@@ -442,10 +442,10 @@
             <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;" ng-if="vm.studentSubjects.length">
               <span class="bs-tag bs-tag-accent" style="gap:6px;" ng-repeat="c in vm.studentSubjects">
                 {{ c.country }} · {{ c.level }} · {{ c.subject }}
-                <button type="button" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1; padding:0;" ng-click="vm.removeStudentSubject($index)">×</button>
+                <button type="button" style="background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1; padding:0;" ng-click="vm.removeStudentSubject($index)">×</button>
               </span>
             </div>
-            <p ng-if="vm.studentSubjectsError" style="color:var(--color-accent-2-700); font-size:12px;">{{ vm.studentSubjectsError }}</p>
+            <p ng-if="vm.studentSubjectsError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.studentSubjectsError }}</p>
           </div>
 
           <div class="bs-field" style="margin:0;">
@@ -497,15 +497,15 @@
                 </div>
               </div>
             </div>
-            <p ng-if="vm.newStudentPreferredModesError" style="color:var(--color-accent-2-700); font-size:12px;">{{ vm.newStudentPreferredModesError }}</p>
+            <p ng-if="vm.newStudentPreferredModesError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.newStudentPreferredModesError }}</p>
           </div>
 
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Learning Goals</div>
+          <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Learning Goals</div>
           <div class="bs-field" style="margin:0;">
             <label>Milestones &amp; Objectives <span class="bs-text-muted" style="font-weight:400;">(optional)</span></label>
             <textarea class="bs-input" ng-model="vm.studentForm.learningGoal" rows="3"
               placeholder="e.g. Improve algebra speed, prepare for national exams..."></textarea>
-            <div ng-if="vm.studentGoalError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ vm.studentGoalError }}</div>
+            <div ng-if="vm.studentGoalError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ vm.studentGoalError }}</div>
           </div>
 
           <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="!!vm.studentNameError">

@@ -46,7 +46,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Where(t => t.IsVerified && t.IsOnline)
@@ -83,7 +82,25 @@ public class TutorsController : ControllerBase
         var tutors = await query.ToListAsync();
         var syllabusMap = await LoadSyllabusMapAsync(
             tutors.SelectMany(t => t.TimeSlots).Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(tutors.Select(t => MapToDto(t, syllabusMap)));
+
+        // Featured remark per tutor: highest like count wins, ties (including
+        // the common all-zero-likes case) broken by most recent — one ordering
+        // covers both the "most liked" and "fall back to most recent" rules.
+        var tutorIds = tutors.Select(t => t.Id).ToList();
+        var publishedRemarks = await _context.ClassRemarks
+            .Include(r => r.Likes)
+            .Where(r => tutorIds.Contains(r.TutorId) && r.Status == "published")
+            .ToListAsync();
+        var featuredByTutor = publishedRemarks
+            .GroupBy(r => r.TutorId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(r => r.Likes.Count).ThenByDescending(r => r.CreatedAt).First());
+
+        return Ok(tutors.Select(t => MapToDto(t, syllabusMap,
+            featuredByTutor.TryGetValue(t.Id, out var fr)
+                ? new ClassRemarkSummaryDto { Text = fr.Text, Rating = fr.Rating, ParentDisplayName = fr.ParentDisplayName }
+                : null)));
     }
 
     // AI Speed Match score, one row per verified/online tutor. Reads live weightage
@@ -308,7 +325,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -381,7 +397,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -395,13 +410,20 @@ public class TutorsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByUser(int userId)
     {
+        // AsSplitQuery avoids the same cartesian-product join fixed on the
+        // public catalog's GetAll — 7 sibling collections in one query
+        // otherwise multiply a tutor's row count across every combination of
+        // documents/offerings/slots/etc. This isn't the tutor's own read-only
+        // listing (Update() re-fetches for tracked edits elsewhere), but this
+        // call site never mutates what it loads, so AsNoTracking is safe too.
         var tutor = await _context.Tutors
+            .AsNoTracking()
+            .AsSplitQuery()
             .Include(t => t.User)
             .Include(t => t.Subjects)
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -509,7 +531,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -538,7 +559,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -570,7 +590,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -1196,78 +1215,6 @@ public class TutorsController : ControllerBase
         return Ok(new { message = "Video conference link saved.", updatedBookings = affectedBookings.Count });
     }
 
-    [HttpPost("{id}/reviews")]
-    [Authorize(Roles = "parent")]
-    public async Task<IActionResult> AddReview(int id, [FromBody] CreateReviewDto dto)
-    {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var userName = User.FindFirstValue(ClaimTypes.Name)!;
-
-        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
-        if (tutor == null) return NotFound();
-
-        if (dto.Rating < 1 || dto.Rating > 5)
-            return BadRequest(new { message = "Rating must be between 1 and 5." });
-
-        if (string.IsNullOrWhiteSpace(dto.Text))
-            return BadRequest(new { message = "Review text cannot be empty." });
-
-        var reviewProfanityError = ProfanityFilter.Validate(dto.Text);
-        if (reviewProfanityError != null) return BadRequest(new { message = reviewProfanityError });
-
-        if (dto.BookingId.HasValue)
-        {
-            var booking = await _context.Bookings
-                .Include(b => b.Student)
-                .FirstOrDefaultAsync(b => b.Id == dto.BookingId.Value);
-
-            if (booking == null
-                || booking.Status != "completed"
-                || booking.TutorId != id
-                || booking.Student.ParentUserId != userId)
-            {
-                return BadRequest(new { message = "No qualifying completed booking found." });
-            }
-
-            var duplicate = await _context.TutorReviews
-                .AnyAsync(r => r.BookingId == dto.BookingId.Value);
-
-            if (duplicate)
-                return Conflict(new { message = "A review for this booking has already been submitted." });
-        }
-
-        var review = new TutorReview
-        {
-            TutorId = id,
-            Author = userName,
-            Text = dto.Text,
-            Rating = dto.Rating,
-            BookingId = dto.BookingId
-        };
-        _context.TutorReviews.Add(review);
-
-        tutor.Rating = (tutor.Rating * tutor.ReviewCount + dto.Rating) / (tutor.ReviewCount + 1);
-        tutor.ReviewCount += 1;
-
-        await _context.SaveChangesAsync();
-
-        var updated = await _context.Tutors
-            .Include(t => t.User)
-            .Include(t => t.Subjects)
-            .Include(t => t.Levels)
-            .Include(t => t.Modes)
-            .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
-            .Include(t => t.TimeSlots)
-            .Include(t => t.Offerings)
-            .Include(t => t.Documents)
-            .FirstOrDefaultAsync(t => t.Id == id);
-
-        var syllabusMapReview = await LoadSyllabusMapAsync(
-            updated!.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(MapToDto(updated!, syllabusMapReview));
-    }
-
     // Mandatory documents an offering-unlock decision is based on: identity + at
     // least one academic level. Kept in one place so SubmitVerification's
     // pre-check and ConfirmVerification's unlock check can't drift apart.
@@ -1746,7 +1693,7 @@ public class TutorsController : ControllerBase
         return Ok(new { message = "Decisions applied and tutor notified.", verified = fullyApproved });
     }
 
-    private static TutorDto MapToDto(Tutor t, Dictionary<string, List<string>>? syllabusMap = null)
+    private static TutorDto MapToDto(Tutor t, Dictionary<string, List<string>>? syllabusMap = null, ClassRemarkSummaryDto? featuredRemark = null)
     {
         var sm = syllabusMap ?? new Dictionary<string, List<string>>();
         return new()
@@ -1777,7 +1724,7 @@ public class TutorsController : ControllerBase
             SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt,
             ReplacesDocumentId = d.ReplacesDocumentId
         }).ToList(),
-        Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
+        FeaturedRemark = featuredRemark,
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto
         {
             Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId,

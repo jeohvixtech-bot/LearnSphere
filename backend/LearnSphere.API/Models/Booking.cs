@@ -44,6 +44,7 @@ public class BookingClass
     public Booking Booking { get; set; } = null!;
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+    public string Status { get; set; } = "scheduled"; // scheduled | completed
 }
 
 // One row per TutorTimeSlot consumed by a (possibly multi-session) preset-class
@@ -132,4 +133,9 @@ public class IssueReport
     // Real date/time, needed for the AI Speed Match "Tutor Dispute (Refresh Monthly)"
     // scoring criterion — Timestamp above predates that need and carries no date part.
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // Set when admin resolves the dispute from the Resolution Disputes desk —
+    // kept (not deleted) so the Archive tab has a full record of past disputes.
+    public bool Resolved { get; set; }
+    public DateTime? ResolvedAt { get; set; }
 }

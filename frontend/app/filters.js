@@ -108,4 +108,13 @@ angular.module('learnSphereApp')
     if (!s) return '';
     return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
   };
+})
+// Truncates to `len` characters (default 60), appending an ellipsis only when
+// actually truncated — used for the welcome page's featured-remark snippet.
+.filter('truncate', function () {
+  return function (s, len) {
+    if (!s) return '';
+    len = len || 60;
+    return s.length > len ? s.slice(0, len).trim() + '…' : s;
+  };
 });

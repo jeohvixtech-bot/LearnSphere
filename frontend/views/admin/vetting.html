@@ -10,6 +10,7 @@
       <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
       <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
       <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item">🗄️ Archive</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -38,7 +39,7 @@
               <div ng-if="!t.imageUrl" class="avatar avatar-fallback">{{ t.name[0] }}</div>
               <div>
                 <strong>{{ t.name }}</strong>
-                <p class="text-muted" style="font-size:12px; margin:2px 0 0;">
+                <p class="text-muted" style="font-size:13px; margin:2px 0 0;">
                   {{ t.email }} · {{ t.experienceYears }} yrs exp
                 </p>
                 <div class="qual-tags" style="margin-top:4px;">
@@ -53,11 +54,11 @@
               <span class="label-tag red" ng-if="t.verificationStatus === 'rejected'">
                 <i class="ti ti-x" aria-hidden="true"></i> Rejected
               </span>
-              <span style="font-size:12px; color:#94a3b8;">
+              <span style="font-size:13px; color:#94a3b8;">
                 {{ (t.documents || []).length }} document(s) submitted
               </span>
               <i class="ti ti-chevron-down"
-                style="font-size:16px; color:#94a3b8; transition:transform .2s;"
+                style="font-size:17px; color:#94a3b8; transition:transform .2s;"
                 ng-style="{'transform': vm.expandedTutorId === t.id ? 'rotate(180deg)' : 'rotate(0)'}"
                 aria-hidden="true"></i>
             </div>
@@ -74,7 +75,7 @@
                 <div class="vetting-doc-info">
                   <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                     <span class="vetting-doc-type-label">{{ vm.docTypeLabel(doc.documentType) }}</span>
-                    <span class="label-tag" style="font-size:10px;"
+                    <span class="label-tag" style="font-size:11px;"
                       ng-class="{
                         'amber': doc.status === 'pending',
                         'indigo': doc.status === 'approved',
@@ -93,22 +94,22 @@
                   <!-- File link or external URL -->
                   <div ng-if="doc.fileUrl">
                     <a ng-href="{{ doc.fileUrl }}" target="_blank" class="vetting-doc-link">
-                      <i class="ti ti-external-link" style="font-size:12px;" aria-hidden="true"></i>
+                      <i class="ti ti-external-link" style="font-size:13px;" aria-hidden="true"></i>
                       {{ doc.fileName || 'View document' }}
-                      <span ng-if="doc.fileSizeBytes" class="text-muted" style="font-size:11px;">
+                      <span ng-if="doc.fileSizeBytes" class="text-muted" style="font-size:12px;">
                         ({{ vm.formatFileSize(doc.fileSizeBytes) }})
                       </span>
                     </a>
                   </div>
                   <div ng-if="doc.externalUrl && !doc.fileUrl">
                     <a ng-href="{{ doc.externalUrl }}" target="_blank" class="vetting-doc-link">
-                      <i class="ti ti-external-link" style="font-size:12px;" aria-hidden="true"></i>
+                      <i class="ti ti-external-link" style="font-size:13px;" aria-hidden="true"></i>
                       {{ doc.externalUrl }}
                     </a>
                   </div>
                   <!-- identity_id has no file — just the typed ID type/number -->
                   <div ng-if="doc.documentType === 'identity_id'" class="vetting-doc-link">
-                    <i class="ti ti-id-badge-2" style="font-size:12px;" aria-hidden="true"></i>
+                    <i class="ti ti-id-badge-2" style="font-size:13px;" aria-hidden="true"></i>
                     {{ doc.idType }}: {{ doc.idNumber }}
                   </div>
 
@@ -120,13 +121,13 @@
 
                   <!-- Admin note if previously rejected -->
                   <p class="vetting-prev-note" ng-if="doc.adminNote && doc.status === 'rejected'">
-                    <i class="ti ti-message" style="font-size:12px;" aria-hidden="true"></i>
+                    <i class="ti ti-message" style="font-size:13px;" aria-hidden="true"></i>
                     Previous note: "{{ doc.adminNote }}"
                   </p>
 
                   <!-- Replacement indicator — this doc is a fresh re-upload fixing a
                        previously rejected one (shown just above, same slot) -->
-                  <p class="text-muted" style="font-size:11px; margin:4px 0 0;" ng-if="doc.replacesDocumentId">
+                  <p class="text-muted" style="font-size:12px; margin:4px 0 0;" ng-if="doc.replacesDocumentId">
                     <i class="ti ti-arrow-back-up" aria-hidden="true"></i> Replacement for the rejected upload above
                   </p>
                 </div>
@@ -167,14 +168,14 @@
                       ng-model="rev.freeText"
                       placeholder="Enter specific rejection reason..."
                       rows="2"
-                      style="margin-top:6px; width:100%; font-size:13px;"></textarea>
+                      style="margin-top:6px; width:100%; font-size:14px;"></textarea>
                   </div>
 
                   <!-- Stage button -->
                   <button type="button" class="btn-primary sm"
                     ng-if="!rev.staged && rev.status"
                     ng-click="vm.stageDocReview(doc)">
-                    <i class="ti ti-device-floppy" style="font-size:13px;" aria-hidden="true"></i>
+                    <i class="ti ti-device-floppy" style="font-size:14px;" aria-hidden="true"></i>
                     Stage decision
                   </button>
 
@@ -185,7 +186,7 @@
                   </span>
 
                   <!-- Error -->
-                  <p class="field-error" style="font-size:12px; margin:4px 0 0;" ng-if="rev.error">
+                  <p class="field-error" style="font-size:13px; margin:4px 0 0;" ng-if="rev.error">
                     {{ rev.error }}
                   </p>
                 </div>
@@ -209,7 +210,7 @@
                   ng-click="vm.confirmAndVerify(t)"
                   ng-disabled="!vm.canConfirmTutor(t) || t.confirming"
                   title="{{ vm.canConfirmTutor(t) ? 'Apply all staged decisions and notify the tutor' : 'Every pending document must have a staged decision first' }}">
-                  <i class="ti ti-shield-check" style="font-size:13px;" aria-hidden="true"></i>
+                  <i class="ti ti-shield-check" style="font-size:14px;" aria-hidden="true"></i>
                   {{ t.confirming ? 'Applying...' : 'Confirm & Verify' }}
                 </button>
               </div>

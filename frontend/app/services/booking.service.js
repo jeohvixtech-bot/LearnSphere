@@ -36,6 +36,14 @@ angular.module('learnSphereApp')
     return $http.post(API_URL + '/bookings/' + id + '/issue', data, h());
   };
 
+  self.updateIssue = function (id, data) {
+    return $http.put(API_URL + '/bookings/' + id + '/issue', data, h());
+  };
+
+  self.deleteIssue = function (id) {
+    return $http.delete(API_URL + '/bookings/' + id + '/issue', h());
+  };
+
   self.cancel = function (id) {
     return $http.post(API_URL + '/bookings/' + id + '/cancel', {}, h());
   };

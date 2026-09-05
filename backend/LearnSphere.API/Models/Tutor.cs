@@ -33,7 +33,6 @@ public class Tutor
     public List<TutorLevel> Levels { get; set; } = new();
     public List<TutorMode> Modes { get; set; } = new();
     public List<TutorQualification> Qualifications { get; set; } = new();
-    public List<TutorReview> Reviews { get; set; } = new();
     public List<TutorTimeSlot> TimeSlots { get; set; } = new();
     public List<Booking> Bookings { get; set; } = new();
     public List<Payout> Payouts { get; set; } = new();
@@ -119,17 +118,6 @@ public class TutorQualification
     public int TutorId { get; set; }
     public Tutor Tutor { get; set; } = null!;
     public string Qualification { get; set; } = string.Empty;
-}
-
-public class TutorReview
-{
-    public int Id { get; set; }
-    public int TutorId { get; set; }
-    public Tutor Tutor { get; set; } = null!;
-    public string Author { get; set; } = string.Empty;
-    public string Text { get; set; } = string.Empty;
-    public int Rating { get; set; }
-    public int? BookingId { get; set; }
 }
 
 public class TutorTimeSlot

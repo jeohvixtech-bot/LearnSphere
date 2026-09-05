@@ -10,6 +10,7 @@
       <a href="#!/admin/disputes" class="nav-item active">⚠️ Resolution Disputes</a>
       <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
       <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item">🗄️ Archive</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -43,6 +44,40 @@
           <button class="btn-outline">Contact Parent</button>
           <button class="btn-danger" ng-click="vm.resolveDispute(d)">
             ✓ Verify Dispute & Resolve Case
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <span class="label-tag red">Tutor Hide Requests</span>
+      <h3>Remark Disputes</h3>
+      <p class="text-muted">A tutor has asked for one of their class remarks to be hidden — approve to hide it from parents, or reject to leave it published.</p>
+
+      <div class="empty-state-box large" ng-if="!vm.remarkDisputes.length">
+        ✔️ No remark hide requests pending.
+      </div>
+
+      <div class="dispute-card" ng-repeat="d in vm.remarkDisputes">
+        <div class="dispute-card-header">
+          <div>
+            <strong class="text-danger">REMARK #{{ d.id }}</strong>
+            <p>Tutor: {{ d.tutorName }}</p>
+          </div>
+          <span class="status-badge pending">PENDING_AUDIT</span>
+        </div>
+        <div class="dispute-details">
+          <p><strong>Rating:</strong> {{ d.rating }} / 5</p>
+          <p><strong>Remark:</strong> "{{ d.text }}"</p>
+          <p><strong>From:</strong> {{ d.parentDisplayName }}</p>
+          <p><strong>Tutor's reason for hiding:</strong> "{{ d.disputeReason }}"</p>
+        </div>
+        <div class="dispute-actions">
+          <button class="btn-outline" ng-click="vm.resolveRemarkDispute(d, false)">
+            Reject Dispute
+          </button>
+          <button class="btn-danger" ng-click="vm.resolveRemarkDispute(d, true)">
+            ✓ Approve Hide
           </button>
         </div>
       </div>

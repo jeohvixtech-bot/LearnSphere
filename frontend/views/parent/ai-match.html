@@ -1,8 +1,8 @@
 <div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Primary parent account</small></div>
     </div>
     <nav style="display:flex; flex-direction:column; gap:2px;">
       <a href="#!/parent/dashboard" class="bs-sidebar-link">
@@ -55,8 +55,8 @@
           <div style="width:48px; height:48px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
           <div>
             <div class="bs-card-title">{{ s.name }}</div>
-            <span class="bs-text-muted" style="font-size:12px;">{{ s.educationLevel }}</span>
-            <div class="bs-text-muted" style="font-size:12px;" ng-if="s.school">{{ s.school }}</div>
+            <span class="bs-text-muted" style="font-size:13px;">{{ s.educationLevel }}</span>
+            <div class="bs-text-muted" style="font-size:13px;" ng-if="s.school">{{ s.school }}</div>
           </div>
         </div>
         <div class="bs-field" style="margin-top:var(--space-2);" ng-if="s.subjectSelect" ng-click="$event.stopPropagation()">
@@ -83,56 +83,69 @@
         No tutors currently offer this subject in a mode this child prefers. Try another subject, update the child's preferred modes, or check back later.
       </p>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:var(--space-4);">
-        <div class="bs-card bs-elev-sm" ng-repeat="t in vm.aiMatchResults">
-          <div style="display:flex; gap:var(--space-3);">
-            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ t.name }}" />
-            <div ng-if="!t.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:24px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ t.name[0] }}</div>
-            <div style="min-width:0; flex:1;">
-              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span class="bs-card-title">{{ t.name }}</span>
-                <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:10px;">✓ Verified</span>
-                <!-- Tier derived from the same score matchScore already carries —
-                     see parent.controller.js#scoreToTier, kept in sync with the
-                     backend bands in TutorsController.ScoreToTier. -->
-                <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Gold'" class="bs-tag" style="font-size:10px; background:#fffbeb; color:#b45309; border:1px solid #fde68a;">
-                  <i class="ti ti-trophy" aria-hidden="true"></i> Gold Teacher
-                </span>
-                <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Silver'" class="bs-tag" style="font-size:10px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
-                  <i class="ti ti-medal" aria-hidden="true"></i> Silver Teacher
-                </span>
-                <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Bronze'" class="bs-tag" style="font-size:10px; background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
-                  <i class="ti ti-award" aria-hidden="true"></i> Bronze Teacher
-                </span>
-                <span ng-if="$index === 0 && t.matchScore" class="bs-tag bs-tag-accent-2" style="font-size:10px;">🏆 Top Match</span>
-                <span ng-if="t.matchScore" class="bs-tag bs-tag-outline" style="font-size:10px;"
-                  title="Rating {{ t.matchScore.ratingPoints }} pts · Activeness {{ t.matchScore.activenessPoints }} pts · Disputes {{ t.matchScore.disputePoints }} pts · Experience {{ t.matchScore.experiencePoints }} pts">
-                  ⚡ Match Score: {{ t.matchScore.score }}
-                </span>
-              </div>
-              <p class="bs-card-meta" style="margin-top:2px;">{{ t.experienceYears }} yrs experience</p>
-              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
-                <span class="bs-tag bs-tag-neutral" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
-              </div>
+      <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+        <div class="bs-card bs-elev-sm" ng-repeat="t in vm.aiMatchResults" style="display:flex; flex-direction:row; align-items:flex-start; gap:var(--space-4);">
+
+          <!-- Column 1: avatar + name/badges/experience/quals -->
+          <div style="flex:0 0 190px; min-width:0;">
+            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover;" alt="{{ t.name }}" />
+            <div ng-if="!t.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:24px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px;">
+              <span class="bs-card-title">{{ t.name }}</span>
+              <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:11px;">✓ Verified</span>
+            </div>
+            <!-- Tier derived from the same score matchScore already carries —
+                 see parent.controller.js#scoreToTier, kept in sync with the
+                 backend bands in TutorsController.ScoreToTier. -->
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+              <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Gold'" class="bs-tag" style="font-size:11px; background:#fffbeb; color:#b45309; border:1px solid #fde68a;">
+                <i class="ti ti-trophy" aria-hidden="true"></i> Gold
+              </span>
+              <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Silver'" class="bs-tag" style="font-size:11px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
+                <i class="ti ti-medal" aria-hidden="true"></i> Silver
+              </span>
+              <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Bronze'" class="bs-tag" style="font-size:11px; background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
+                <i class="ti ti-award" aria-hidden="true"></i> Bronze
+              </span>
+              <span ng-if="$index === 0 && t.matchScore" class="bs-tag bs-tag-accent-2" style="font-size:11px;">🏆 Top Match</span>
+              <span ng-if="t.matchScore" class="bs-tag bs-tag-outline" style="font-size:11px;"
+                title="Rating {{ t.matchScore.ratingPoints }} pts · Activeness {{ t.matchScore.activenessPoints }} pts · Disputes {{ t.matchScore.disputePoints }} pts · Experience {{ t.matchScore.experiencePoints }} pts">
+                ⚡ {{ t.matchScore.score }}
+              </span>
+            </div>
+            <p class="bs-card-meta" style="margin-top:6px;">{{ t.experienceYears }} yrs experience</p>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+              <span class="bs-tag bs-tag-neutral" ng-repeat="q in t.qualifications | limitTo:3">{{ q }}</span>
             </div>
           </div>
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6; margin-top:var(--space-2);">Teaches</div>
-          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
-            <span class="bs-tag bs-tag-outline" ng-repeat="sub in t.subjects">{{ sub }}</span>
-          </div>
-          <p class="bs-card-body" style="font-style:italic; margin-top:var(--space-2);">"{{ t.bio }}"</p>
 
-          <div style="display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap;">
-            <span style="font-size:13px;">★ {{ t.rating }} <span class="bs-text-muted">({{ t.reviewCount }} reviews)</span></span>
-            <span class="bs-tag bs-tag-neutral" ng-repeat="m in t.modes">{{ m }}</span>
+          <!-- Column 2: subjects + bio -->
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Teaches</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+              <span class="bs-tag bs-tag-outline" ng-repeat="sub in t.subjects">{{ sub }}</span>
+            </div>
+            <p class="bs-card-body" style="font-style:italic; margin-top:var(--space-2);" ng-if="t.bio">"{{ t.bio }}"</p>
           </div>
+
+          <!-- Column 3: rating, bulletin board, available classes -->
+          <div style="flex:0 0 220px; min-width:0; border-left:0.5px solid var(--color-divider); padding-left:var(--space-3); display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:14px;">★ {{ t.rating }} <span class="bs-text-muted">({{ t.reviewCount }})</span></span>
+              <span class="bs-tag bs-tag-neutral" ng-repeat="m in t.modes">{{ m }}</span>
+            </div>
+
+            <button type="button" class="btn-outline sm" style="border:none; background:none; color:var(--color-accent); padding:0; align-self:flex-start; display:inline-flex; align-items:center; gap:4px;"
+              ng-click="vm.openBulletinBoard(t)">
+              <i class="ti ti-message-2" aria-hidden="true"></i> Bulletin board
+            </button>
 
           <!-- Available preset classes — tooltip system kept exactly as-is
                (see frontend/views/parent/search.html for the same pattern) -->
-          <div class="tutor-slot-strip">
+          <div class="tutor-slot-strip" style="padding:0; background:none; border-top:none;">
             <p class="tutor-slot-strip-label">
               <i class="ti ti-calendar-event" aria-hidden="true"></i>
-              Available classes through {{ vm.nextMonthLabel() }}
+              Classes through {{ vm.nextMonthLabel() }}
             </p>
             <div class="tutor-slot-list">
 
@@ -203,6 +216,49 @@
 
             </div>
           </div>
+
+          </div><!-- end column 3 -->
+
+        </div>
+      </div>
+
+      <!-- ── Bulletin Board Modal ─────────────────────────────────── -->
+      <div class="ov-modal-backdrop" ng-if="vm.bulletinModalTutor" ng-click="vm.closeBulletinBoard()"></div>
+      <div class="ov-modal" ng-if="vm.bulletinModalTutor" ng-click="$event.stopPropagation()">
+        <div class="ov-modal-hd">
+          <i class="ti ti-message-2" aria-hidden="true"></i>
+          <div style="flex:1;">
+            <strong>{{ vm.bulletinModalTutor.name }}'s Bulletin Board</strong>
+            <div class="ov-modal-sub">
+              {{ vm.bulletinModalTutor._bulletinRemarks ? vm.bulletinModalTutor._bulletinRemarks.length : 0 }} remark{{ vm.bulletinModalTutor._bulletinRemarks && vm.bulletinModalTutor._bulletinRemarks.length === 1 ? '' : 's' }}
+            </div>
+          </div>
+          <button class="ov-modal-close" ng-click="vm.closeBulletinBoard()" aria-label="Close">
+            <i class="ti ti-x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="ov-modal-body">
+          <div class="ov-modal-empty" ng-if="vm.bulletinModalTutor._bulletinRemarks && !vm.bulletinModalTutor._bulletinRemarks.length">
+            <i class="ti ti-message-2" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+            <p>No remarks yet.</p>
+          </div>
+          <div ng-repeat="r in vm.bulletinModalTutor._bulletinRemarks track by r.id" style="border-bottom:0.5px solid var(--color-divider); padding-bottom:10px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <i class="ti ti-star" ng-repeat="n in [1,2,3,4,5]"
+                ng-style="{'color': n <= r.rating ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '14px'}"
+                aria-hidden="true"></i>
+              <span class="bs-text-muted" style="font-size:13px;">{{ r.parentDisplayName }}</span>
+            </div>
+            <p style="font-size:14px; margin:6px 0;">{{ r.text }}</p>
+            <button type="button" class="bs-btn bs-btn-ghost" style="font-size:13px; padding:0;"
+              ng-disabled="r.likedByMe" ng-click="vm.likeRemark(vm.bulletinModalTutor, r)">
+              <i class="ti ti-thumb-up" ng-style="{color: r.likedByMe ? 'var(--color-accent-2)' : 'inherit'}" aria-hidden="true"></i>
+              {{ r.likeCount }}
+            </button>
+          </div>
+        </div>
+        <div class="ov-modal-footer">
+          <button class="bs-btn" ng-click="vm.closeBulletinBoard()">Close</button>
         </div>
       </div>
     </div>

@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService) {
+  'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService', 'RemarkService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -281,11 +281,59 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.calMonth = _now.getMonth(); // 0-indexed
 
   // ── Overview panel modal state ────────────────────────────────
-  // null | 'confirmed' | 'daily' | 'reports'
+  // null | 'confirmed' | 'daily' | 'reports' | 'bulletin'
   self.activePanel = null;
 
   self.openPanel = function (name) { self.activePanel = name; };
   self.closePanel = function () { self.activePanel = null; };
+
+  // ── Tutor Bulletin Board — every remark left on this tutor's classes,
+  // regardless of status, loaded once at init (so the panel tile's badge is
+  // accurate before the tutor ever opens it) and refreshed after a dispute
+  // request. ──
+  self.bulletinRemarks = [];
+  self.bulletinDisputeFormFor = null; // the remark currently showing its reason prompt
+  self.bulletinDisputeReason = '';
+  self.bulletinDisputeError = '';
+
+  function loadBulletinRemarks() {
+    if (!self.tutor) return;
+    RemarkService.getMineForTutor(self.tutor.id).then(function (res) {
+      self.bulletinRemarks = res.data;
+    });
+  }
+
+  self.bulletinPendingCount = function () {
+    return self.bulletinRemarks.filter(function (r) { return r.status === 'dispute_requested'; }).length;
+  };
+
+  self.bulletinPublishedCount = function () {
+    return self.bulletinRemarks.filter(function (r) { return r.status === 'published'; }).length;
+  };
+
+  self.openBulletinDisputeForm = function (remark) {
+    self.bulletinDisputeFormFor = remark;
+    self.bulletinDisputeReason = '';
+    self.bulletinDisputeError = '';
+  };
+
+  self.cancelBulletinDisputeForm = function () {
+    self.bulletinDisputeFormFor = null;
+  };
+
+  self.submitBulletinDispute = function () {
+    if (!self.bulletinDisputeReason.trim()) {
+      self.bulletinDisputeError = 'Please explain why you\'re requesting this remark be hidden.';
+      return;
+    }
+    var remark = self.bulletinDisputeFormFor;
+    RemarkService.dispute(remark.id, self.bulletinDisputeReason.trim()).then(function () {
+      remark.status = 'dispute_requested';
+      self.bulletinDisputeFormFor = null;
+    }).catch(function (err) {
+      self.bulletinDisputeError = (err.data && err.data.message) ? err.data.message : 'Failed to submit. Please try again.';
+    });
+  };
 
   // Daily Summary tab index (into sortedSelectedCalDays)
   self.dailySummaryTabIndex = 0;
@@ -358,6 +406,16 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       rebuildModePools(res.data.modes);
       rebuildSetupClassModesList();
       maybeInitChat();
+      loadBulletinRemarks();
+      // recomputeCalBars() (inside _recomputeReportView) bails out until
+      // self.tutor is set — if BookingService.getAll() below happened to
+      // resolve first (bookings is the lighter/faster call), that first
+      // recompute silently no-ops and the calendar's status-bar counts never
+      // populate until something unrelated (a calendar click, or the 15s
+      // poll) happens to trigger another one. Re-running it here, now that
+      // self.tutor is finally set, closes that race instead of leaving the
+      // counts to show up "whenever."
+      self._recomputeReportView();
     });
     BookingService.getAll().then(function (res) {
       self._setBookings(res.data);
@@ -498,16 +556,6 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.completedClasses = function () {
     if (!self.tutor) return [];
     return self.bookings.filter(function (b) { return b.tutorId === self.tutor.id && b.status === 'completed'; });
-  };
-
-  self.completedThisMonth = function () {
-    var now = new Date();
-    return self.completedClasses().filter(function (b) {
-      return (b.classes || []).some(function (c) {
-        var d = parseLocalDate(c.date);
-        return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-      });
-    });
   };
 
   // ── Open assessment form for a student + date ─────────────────────

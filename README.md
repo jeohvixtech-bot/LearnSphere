@@ -213,7 +213,9 @@ npx serve . -p 3000
 | POST | `/api/bookings/{id}/cancel` | JWT (parent, owner) | Cancel a booking — voids any unpaid invoice, frees the seat on every preset slot it covers (Flow B), notifies the tutor if they'd already responded. Blocked once `completed`/`cancelled`, or once the invoice is `Paid` |
 | POST | `/api/bookings/{id}/lesson-report` | JWT | Submit a lesson report |
 | PATCH | `/api/bookings/{id}/lesson-report` | JWT | Edit an existing lesson report (audit trail saved) |
-| POST | `/api/bookings/{id}/issue` | JWT | Report an issue on a booking |
+| POST | `/api/bookings/{id}/issue` | JWT | Report an issue on a booking. Filing again after admin has resolved the previous report reopens it rather than being silently ignored |
+| PUT | `/api/bookings/{id}/issue` | JWT (parent, owner) | Edit your own still-unresolved issue report |
+| DELETE | `/api/bookings/{id}/issue` | JWT (parent, owner) | Withdraw your own still-unresolved issue report. Blocked once admin has resolved it |
 
 ### Preset-Class Cancellations
 
@@ -232,6 +234,20 @@ Parent-facing side of a tutor cancelling a published preset (Flow B) slot — se
 |--------|----------|------|-------------|
 | POST | `/api/incident` | JWT | Report an issue on a booking |
 | GET | `/api/incident` | JWT | Get all incidents |
+
+### Class Remarks (Bulletin Board)
+
+Route prefix here is just `api` (spans `bookingclasses/`, `remarks/`, and `tutors/{id}/remarks/` sub-paths per the feature spec) rather than a single controller-name prefix.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/bookingclasses/{bookingClassId}/remarks` | JWT (parent) | Rate + write a remark for one completed class. One remark per class; recomputes the tutor's rating afterward |
+| PUT | `/api/remarks/{id}` | JWT (parent, owner) | Edit your own remark's rating/text; recomputes the tutor's rating afterward |
+| DELETE | `/api/remarks/{id}` | JWT (parent, owner) | Delete your own remark; recomputes the tutor's rating afterward |
+| POST | `/api/remarks/{id}/dispute` | JWT (tutor, owner) | Request a published remark be hidden, with a required reason — queues it for admin review (see Admin → Remark Disputes below) |
+| POST | `/api/remarks/{id}/like` | JWT (parent) | Like a remark (once per parent) |
+| GET | `/api/tutors/{id}/remarks` | JWT (parent) | List a tutor's published remarks (Bulletin Board), with like counts |
+| GET | `/api/tutors/{id}/remarks/mine` | JWT (tutor, owner) | List all of the caller's own remarks regardless of status, for their own record-keeping |
 
 ### Chat
 
@@ -271,8 +287,12 @@ Parent-facing side of a tutor cancelling a published preset (Flow B) slot — se
 | GET | `/api/admin/stats` | JWT (admin) | Platform statistics (parents, tutors, sessions, revenue) |
 | GET | `/api/admin/tutors/unverified` | JWT (admin) | List unverified tutors pending vetting |
 | PATCH | `/api/admin/tutors/{id}/verify` | JWT (admin) | Verify a tutor |
-| GET | `/api/admin/disputes` | JWT (admin) | List disputed bookings |
-| PATCH | `/api/admin/disputes/{bookingId}/resolve` | JWT (admin) | Resolve a dispute |
+| GET | `/api/admin/disputes` | JWT (admin) | List unresolved disputed bookings |
+| PATCH | `/api/admin/disputes/{bookingId}/resolve` | JWT (admin) | Resolve a dispute — marks the `IssueReport` resolved (not deleted) and the booking `completed`, so it moves to the Archive tab instead of vanishing |
+| GET | `/api/admin/disputes/archive` | JWT (admin) | List resolved disputes (Archive tab) |
+| GET | `/api/admin/remark-disputes` | JWT (admin) | List pending tutor "hide this remark" requests (`Status = dispute_requested`) |
+| PATCH | `/api/admin/remark-disputes/{id}/resolve` | JWT (admin) | Approve (`hidden`) or reject (`published`) a remark hide request; recomputes the tutor's rating either way |
+| GET | `/api/admin/remark-disputes/archive` | JWT (admin) | List resolved remark hide requests, approved or rejected (Archive tab) |
 | GET | `/api/admin/institutions` | — | Search institutions (filter: `country`, `type`, `search`) |
 | GET | `/api/admin/scoring-weightages` | — | Get the AI Speed Match scoring config (6 fixed rows: Tutor Rating, Activeness, Disputes, Experience, + 2 reserved). Public read — the parent-facing match score needs these percentages too |
 | PUT | `/api/admin/scoring-weightages` | JWT (admin) | Update weightage percentages by `key` (0–100, clamped). Point-scale bands per criterion are fixed/not editable, only the weightage % each contributes to the total score |
@@ -358,16 +378,6 @@ Parent-facing side of a tutor cancelling a published preset (Flow B) slot — se
 | `Id` | INT (PK, AUTO_INCREMENT) | |
 | `TutorId` | INT (FK → Tutors.Id) | |
 | `Qualification` | VARCHAR | e.g. `NIE Trained`, `B.Sc. Mathematics` |
-
-### TutorReviews
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | INT (PK, AUTO_INCREMENT) | |
-| `TutorId` | INT (FK → Tutors.Id) | |
-| `Author` | VARCHAR | Reviewer name |
-| `Text` | VARCHAR | Review content |
-| `Rating` | INT | 1–5 |
 
 ### TutorTimeSlots
 
@@ -493,6 +503,40 @@ One-to-many log of every reschedule proposal made on a booking, by either party 
 | `Details` | VARCHAR | Full description |
 | `Timestamp` | VARCHAR | Display-only, time-of-day (no date) |
 | `CreatedAt` | DATETIME(6) | Real date/time — used by the AI Speed Match "Tutor Dispute (Refresh Monthly)" scoring criterion |
+| `Resolved` | TINYINT(1) | Set true (not deleted) when admin resolves the dispute, so the Admin Archive tab keeps a record. A parent can edit/withdraw their report only while `Resolved = 0`; reporting again after resolution reopens the same row |
+| `ResolvedAt` | DATETIME(6) NULL | When admin resolved it |
+
+### ClassRemarks
+
+A parent's rating + written remark on one specific completed class (`BookingClass`), not a whole booking — a multi-session booking gets one remark per session. Powers the tutor's public "Bulletin Board" and rolls up into `Tutors.Rating`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `BookingClassId` | INT (FK → BookingClasses.Id, CASCADE DELETE) | Unique — one remark per class |
+| `TutorId` | INT (FK → Tutors.Id, CASCADE DELETE) | |
+| `ParentUserId` | INT | |
+| `ParentDisplayName` | VARCHAR(200) | Masked from the parent's real name at creation time (see `NameMasking.Mask`) — stored, not recomputed on read, so a later name change doesn't retroactively alter past remarks |
+| `Rating` | INT | 1–5 |
+| `Text` | VARCHAR | Remark body |
+| `Status` | VARCHAR(20) | `published` (visible everywhere) \| `dispute_requested` (tutor asked admin to hide it) \| `hidden` (admin approved the hide — stays visible to the tutor only, greyed out) |
+| `DisputeReason` | VARCHAR NULL | Tutor's stated reason for requesting a hide; kept after resolution so the Archive tab can distinguish "never disputed" from "disputed and resolved" |
+| `CreatedAt` | DATETIME(6) | |
+| `EditedAt` | DATETIME(6) NULL | Set when the parent edits their remark |
+| `ResolvedAt` | DATETIME(6) NULL | Set when admin resolves a `dispute_requested` hide request (approve or reject) |
+
+Only `published` remarks count toward `Tutors.Rating` — and it's an **average of per-parent averages**, not a flat average: each parent's ratings are averaged within their own relationship first, then those per-parent averages are averaged together, so a long-running weekly family can't drown out another family's single rated class.
+
+### ClassRemarkLikes
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `ClassRemarkId` | INT (FK → ClassRemarks.Id, CASCADE DELETE) | |
+| `ParentUserId` | INT | |
+| `CreatedAt` | DATETIME(6) | |
+
+> Unique on `(ClassRemarkId, ParentUserId)` — a parent can like a given remark only once.
 
 ### Invoices
 
@@ -617,6 +661,8 @@ AI Speed Match scoring config (Admin → Scoring Config page). Seeded once with 
 - Forced dashboard popup whenever a tutor cancels a confirmed preset (Flow B) class — shown every time the parent lands on the dashboard until resolved. If the tutor proposed a replacement date, it's Accept (moves to the new date, defaults selected) or Reject (queued for admin review — nothing refunds automatically until an admin approves it); if the tutor cancelled with no replacement, it's an acknowledge-only notice that a credit is on its way. Ignoring an Accept/Reject choice past the proposed date/time auto-accepts it next time the dashboard loads
 - Direct parent-tutor chat (auto-refreshing every few seconds so replies show up without a reload), scoped per child-tutor conversation
 - Notification bell drawer
+- Rate + write a remark on each completed class (Bulletin Board); edit or delete your own remark, like other parents' remarks
+- Edit or withdraw your own reported issue on a booking while it's still awaiting admin review
 
 ### Tutor
 - Interactive calendar (paid = green, unpaid = amber); day dot reflects *all* of a day's bookings, not just the first — any unpaid session takes priority over an all-paid day
@@ -627,16 +673,18 @@ AI Speed Match scoring config (Admin → Scoring Config page). Seeded once with 
 - Submit and edit lesson reports (with audit trail)
 - Teaching offerings builder (subject + level + mode + qualification + price)
 - Online/offline visibility switch — going offline immediately hides the profile from parent search and blocks new bookings
-- Stats dashboard (sessions this month, rating, balance)
+- Stats dashboard: live AI Speed Match score (one decimal place) and Gold/Silver/Bronze tier badge — same formula and thresholds as the admin Scoring Config leaderboard, not a separate calculation — plus ready balance
 - Direct parent-tutor chat, scoped per child-tutor conversation
+- Bulletin Board of parents' ratings/remarks on your classes; request admin to hide a specific remark with a reason
 
 ### Admin
 - Platform metrics (parents, tutors, sessions, revenue)
 - Operations system log
 - Tutor vetting queue (verify credentials)
-- Dispute resolution desk
+- Dispute resolution desk, plus a separate queue for tutor requests to hide a specific parent remark (approve to hide, reject to keep it published)
 - Scoring Config: set AI Speed Match weightage percentages per criterion (Rating, Activeness, Disputes, Experience), view the fixed point-scale reference tables, and a live Tutor Scores leaderboard showing every verified/online tutor's current score with its full breakdown
 - Reschedule Rejections queue: a separate desk (not the general dispute log) for preset-class reschedules a parent declined — resolving one is what actually issues the refund and charges the tutor's 20% penalty; nothing financial happens from the parent's Reject click alone
+- Archive tab: resolved booking disputes and resolved remark-hide requests are kept here (marked resolved, never deleted) for audit/history instead of disappearing once acted on
 
 ### Architecture
 - JWT authentication (7-day tokens, role-based routes)

@@ -6,16 +6,16 @@
       <div>
         <h3 ng-if="vm.currentCancellation().proposedDate" style="margin-bottom:2px;">Your class was rescheduled</h3>
         <h3 ng-if="!vm.currentCancellation().proposedDate" style="margin-bottom:2px;">Your class was cancelled</h3>
-        <p class="bs-text-muted" style="font-size:13px; margin:0;">{{ vm.currentCancellation().tutorName }} · {{ vm.currentCancellation().subject }}</p>
+        <p class="bs-text-muted" style="font-size:14px; margin:0;">{{ vm.currentCancellation().tutorName }} · {{ vm.currentCancellation().subject }}</p>
       </div>
 
       <div class="bs-dialog-body">
         <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px;">
-          <div style="display:flex; justify-content:space-between; font-size:13px;">
+          <div style="display:flex; justify-content:space-between; font-size:14px;">
             <span class="bs-text-muted">Original class</span>
             <strong>{{ vm.currentCancellation().originalDate | dmy }}, {{ vm.currentCancellation().originalTime | hhmma }}</strong>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:13px;" ng-if="vm.currentCancellation().proposedDate">
+          <div style="display:flex; justify-content:space-between; font-size:14px;" ng-if="vm.currentCancellation().proposedDate">
             <span class="bs-text-muted">Proposed new date</span>
             <strong>{{ vm.currentCancellation().proposedDate | dmy }}, {{ vm.currentCancellation().proposedTime | hhmma }}</strong>
           </div>
@@ -28,7 +28,7 @@
           {{ vm.currentCancellation().tutorName }} cancelled this class with no replacement offered. You'll receive a refund credit for it.
         </p>
 
-        <p ng-if="vm.cancellationActionError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.cancellationActionError }}</p>
+        <p ng-if="vm.cancellationActionError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.cancellationActionError }}</p>
       </div>
 
       <div class="bs-dialog-actions" ng-if="vm.currentCancellation().proposedDate" style="justify-content:flex-start;">
@@ -49,8 +49,8 @@
 
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Primary parent account</small></div>
     </div>
     <nav style="display:flex; flex-direction:column; gap:2px;">
       <a href="#!/parent/dashboard" class="bs-sidebar-link active">
@@ -83,29 +83,29 @@
   <main class="dashboard-main">
 
     <!-- ── Pay Success ───────────────────────────── -->
-    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
       ✓ Payment successful. Invoice has been marked as paid.
     </div>
 
     <!-- ── Welcome Hero ───────────────────────────── -->
     <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:var(--space-4);">
       <div>
-        <div style="font-family:var(--font-heading); font-weight:600; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700);">Parent Dashboard</div>
+        <div style="font-family:var(--font-heading); font-weight:600; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700);">Parent Dashboard</div>
         <h1 style="margin-top:4px;">Welcome back, {{ vm.user.name.split(' ')[0] }}</h1>
         <p class="bs-text-muted" style="margin:0;">Here's an overview of your children's tutoring activity</p>
       </div>
       <div style="display:flex; gap:var(--space-6);">
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.students.length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Children</div>
+          <div class="bs-text-muted" style="font-size:13px;">Children</div>
         </div>
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.confirmedAndCounteredBookings().length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Upcoming</div>
+          <div class="bs-text-muted" style="font-size:13px;">Upcoming</div>
         </div>
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.pendingPayments().length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Payments Due</div>
+          <div class="bs-text-muted" style="font-size:13px;">Payments Due</div>
         </div>
       </div>
     </div>
@@ -115,7 +115,7 @@
       <div>
         <span class="bs-tag bs-tag-accent-2">★ Action Required</span>
         <h4 style="margin-top:var(--space-2);">Session Confirmed — Payment Pending</h4>
-        <p style="margin:0; font-size:13px;">Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
+        <p style="margin:0; font-size:14px;">Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-2);">
           <span class="bs-tag bs-tag-neutral" ng-repeat="inv in vm.pendingPayments()">
             {{ inv.subject }} · <strong>${{ inv.amount }}.00</strong>
@@ -131,7 +131,7 @@
     <div class="bs-card bs-elev-sm">
       <div style="display:flex; justify-content:space-between; align-items:baseline;">
         <div class="bs-card-title">Upcoming Tutorials</div>
-        <a href="#!/parent/sessions" class="bs-btn bs-btn-ghost" style="font-size:12px;">View All →</a>
+        <a href="#!/parent/sessions" class="bs-btn bs-btn-ghost" style="font-size:13px;">View All →</a>
       </div>
 
       <div ng-if="!vm.confirmedAndCounteredBookings().length" style="text-align:center; padding:var(--space-4) 0;">
@@ -158,7 +158,7 @@
     <div class="bs-card bs-elev-sm">
       <div style="display:flex; justify-content:space-between; align-items:baseline;">
         <div class="bs-card-title">Active Children Profiles</div>
-        <a href="#!/parent/students" class="bs-btn bs-btn-ghost" style="font-size:12px;">+ Add Child</a>
+        <a href="#!/parent/students" class="bs-btn bs-btn-ghost" style="font-size:13px;">+ Add Child</a>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-3);">
@@ -166,7 +166,7 @@
           <div style="width:40px; height:40px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
           <div style="min-width:0;">
             <strong>{{ s.name }}</strong>
-            <p class="bs-text-muted" style="font-size:12px; margin:2px 0 0;">{{ s.educationLevel }} · {{ s.school }}</p>
+            <p class="bs-text-muted" style="font-size:13px; margin:2px 0 0;">{{ s.educationLevel }} · {{ s.school }}</p>
             <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
               <span class="bs-tag bs-tag-neutral" ng-repeat="c in s.subjectCombos | limitTo:3">{{ c.subject }}</span>
             </div>
@@ -179,7 +179,7 @@
     </div>
 
     <!-- ── Notice Banner ─────────────────────────── -->
-    <div style="background:var(--color-neutral-100); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">
+    <div style="background:var(--color-neutral-100); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
       <strong>Scheduled Maintenance:</strong>&nbsp; The dashboard will be offline on June 15th, 2:00 AM – 4:00 AM SGT.
     </div>
 

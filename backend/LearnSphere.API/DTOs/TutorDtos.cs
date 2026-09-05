@@ -48,9 +48,19 @@ public class TutorDto
     public bool OfferingsUnlocked { get; set; }
     public DateTime? LastSubmittedAt { get; set; }
     public List<TutorDocumentDto> Documents { get; set; } = new();
-    public List<ReviewDto> Reviews { get; set; } = new();
     public List<TimeSlotDto> Timetable { get; set; } = new();
     public List<TutorOfferingDto> Offerings { get; set; } = new();
+
+    // Populated only by GetAll (the public catalog listing) — see the
+    // FeaturedRemark selection rule in TutorsController.GetAll.
+    public ClassRemarkSummaryDto? FeaturedRemark { get; set; }
+}
+
+public class ClassRemarkSummaryDto
+{
+    public string Text { get; set; } = string.Empty;
+    public int Rating { get; set; }
+    public string ParentDisplayName { get; set; } = string.Empty;
 }
 
 public class TutorDocumentDto
@@ -94,13 +104,6 @@ public class VerificationDecisionDto
 public class ApplyVerificationDecisionsDto
 {
     public List<VerificationDecisionDto> Decisions { get; set; } = new();
-}
-
-public class ReviewDto
-{
-    public string Author { get; set; } = string.Empty;
-    public string Text { get; set; } = string.Empty;
-    public int Rating { get; set; }
 }
 
 public class TimeSlotDto
@@ -214,13 +217,6 @@ public class AddTimeSlotDto
 {
     public string Day { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
-}
-
-public class CreateReviewDto
-{
-    public int Rating { get; set; }
-    public string Text { get; set; } = string.Empty;
-    public int? BookingId { get; set; }
 }
 
 // Date/time only — no student, subject or message details — so parents can

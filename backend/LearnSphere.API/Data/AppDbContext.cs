@@ -13,7 +13,8 @@ public class AppDbContext : DbContext
     public DbSet<TutorLevel> TutorLevels { get; set; }
     public DbSet<TutorMode> TutorModes { get; set; }
     public DbSet<TutorQualification> TutorQualifications { get; set; }
-    public DbSet<TutorReview> TutorReviews { get; set; }
+    public DbSet<ClassRemark> ClassRemarks { get; set; }
+    public DbSet<ClassRemarkLike> ClassRemarkLikes { get; set; }
     public DbSet<TutorTimeSlot> TutorTimeSlots { get; set; }
     public DbSet<Student> Students { get; set; }
     public DbSet<StudentPreferredMode> StudentPreferredModes { get; set; }
@@ -192,11 +193,33 @@ public class AppDbContext : DbContext
             .Property(s => s.PricePerLesson)
             .HasPrecision(10, 2);
 
-        // Filtered unique index: one review per booking (only when BookingId is set)
-        modelBuilder.Entity<TutorReview>()
-            .HasIndex(r => new { r.TutorId, r.BookingId })
-            .IsUnique()
-            .HasFilter("[BookingId] IS NOT NULL");
+        modelBuilder.Entity<ClassRemark>(entity =>
+        {
+            // One remark per class instance.
+            entity.HasIndex(e => e.BookingClassId).IsUnique().HasDatabaseName("UQ_ClassRemark_BookingClass");
+
+            entity.HasOne(e => e.BookingClass)
+                .WithMany()
+                .HasForeignKey(e => e.BookingClassId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Tutor)
+                .WithMany()
+                .HasForeignKey(e => e.TutorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ClassRemarkLike>(entity =>
+        {
+            // One like per parent per remark — no unlike, so this is a pure insert guard.
+            entity.HasIndex(e => new { e.ClassRemarkId, e.ParentUserId })
+                .IsUnique().HasDatabaseName("UQ_ClassRemarkLike_RemarkParent");
+
+            entity.HasOne(e => e.ClassRemark)
+                .WithMany(r => r.Likes)
+                .HasForeignKey(e => e.ClassRemarkId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<SyllabusTopic>(entity =>
         {

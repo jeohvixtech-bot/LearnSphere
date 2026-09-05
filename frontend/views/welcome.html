@@ -15,9 +15,9 @@
       <!-- ── Hero ────────────────────────────────── -->
       <div style="display:flex; gap:var(--space-8); align-items:center; flex-wrap:wrap;">
         <div style="flex:1 1 480px; min-width:320px;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700); margin-bottom:var(--space-2);">Tutor matching, made simple</div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700); margin-bottom:var(--space-2);">Tutor matching, made simple</div>
           <h1 style="max-width:11ch;">Learning that fits your family's life</h1>
-          <p style="font-size:17px; max-width:46ch; opacity:0.85;">Browse verified NIE-trained tutors across Singapore &amp; Malaysia, book instantly, and keep every lesson, message and invoice in one place.</p>
+          <p style="font-size:18px; max-width:46ch; opacity:0.85;">Browse verified NIE-trained tutors across Singapore &amp; Malaysia, book instantly, and keep every lesson, message and invoice in one place.</p>
           <div style="display:flex; gap:var(--space-3); margin-top:var(--space-4); flex-wrap:wrap;">
             <a href="#!/login" class="bs-btn bs-btn-primary">I'm a parent</a>
             <a href="#!/login" class="bs-btn bs-btn-secondary">I'm a tutor</a>
@@ -35,17 +35,17 @@
           <div>
             <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">01</div>
             <h4 style="margin-top:var(--space-2);">Tell us what you need</h4>
-            <p class="bs-text-muted" style="font-size:14px;">Subject, level, preferred mode and schedule for each child.</p>
+            <p class="bs-text-muted" style="font-size:15px;">Subject, level, preferred mode and schedule for each child.</p>
           </div>
           <div>
             <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">02</div>
             <h4 style="margin-top:var(--space-2);">Compare matched tutors</h4>
-            <p class="bs-text-muted" style="font-size:14px;">Ratings, reviews and classes you can book instantly.</p>
+            <p class="bs-text-muted" style="font-size:15px;">Ratings, reviews and classes you can book instantly.</p>
           </div>
           <div>
             <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">03</div>
             <h4 style="margin-top:var(--space-2);">Learn, track, pay</h4>
-            <p class="bs-text-muted" style="font-size:14px;">Lesson reports, a shared calendar, and invoices in one place.</p>
+            <p class="bs-text-muted" style="font-size:15px;">Lesson reports, a shared calendar, and invoices in one place.</p>
           </div>
         </div>
       </div>
@@ -62,15 +62,19 @@
             style="cursor:pointer">
             <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius-lg);" alt="{{ t.name }}" />
             <div ng-if="!t.imageUrl" class="bs-halftone" style="width:100%; height:120px; border-radius:var(--radius-lg); background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:40px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>
-            <div class="bs-card-title">{{ t.name }} <span ng-if="t.isVerified" title="Verified" style="color:var(--color-accent); font-size:13px;">✓</span></div>
+            <div class="bs-card-title">{{ t.name }} <span ng-if="t.isVerified" title="Verified" style="color:var(--color-accent); font-size:14px;">✓</span></div>
             <div class="bs-card-meta">{{ t.subjects.slice(0,2).join(', ') }} · ★ {{ t.rating }} ({{ t.reviewCount }})</div>
+            <div class="bs-card-meta" style="margin-top:4px; font-style:italic;" ng-if="t.featuredRemark">
+              "{{ t.featuredRemark.text | truncate:60 }}" — {{ t.featuredRemark.parentDisplayName }}
+              <span style="font-style:normal;">({{ t.featuredRemark.rating }}★)</span>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- ── For tutors callout ──────────────────── -->
       <div style="margin-top:var(--space-8);">
-        <div style="font-family:var(--font-heading); font-weight:600; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-2-700); margin-bottom:var(--space-2);">For tutors</div>
+        <div style="font-family:var(--font-heading); font-weight:600; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-2-700); margin-bottom:var(--space-2);">For tutors</div>
         <h2>Teach on your own schedule</h2>
         <p style="opacity:0.85; max-width:46ch;">Set your own hours, publish classes parents can book instantly, and get paid securely after every confirmed session.</p>
         <a href="#!/login" class="bs-btn bs-btn-secondary" style="margin-top:var(--space-2);">I'm a tutor</a>
@@ -81,7 +85,7 @@
 
   <!-- ── Footer ───────────────────────────────────── -->
   <div style="margin-top:var(--space-8); padding:var(--space-6); border-top:1px solid var(--color-divider);">
-    <div style="max-width:1180px; margin:0 auto; font-size:13px; opacity:0.6;">LearnSphere — tutor matching for families.</div>
+    <div style="max-width:1180px; margin:0 auto; font-size:14px; opacity:0.6;">LearnSphere — tutor matching for families.</div>
   </div>
 
 </div>

@@ -126,10 +126,23 @@ public class BookingsController : ControllerBase
 
         // A confirmed booking whose classes have all already happened auto-transitions to
         // completed — this is what unlocks lesson reports and tutor reviews for it.
+        // Independently, each individual BookingClass flips to "completed" once its own
+        // Date is in the past — this is what unlocks a class remark for that specific
+        // session (see ClassRemarksController), regardless of whether the rest of a
+        // multi-session booking has finished yet.
         var today = DateTime.Today.ToString("yyyy-MM-dd");
         var anyAutoCompleted = false;
         foreach (var b in bookings)
         {
+            foreach (var c in b.Classes)
+            {
+                if (c.Status != "completed" && string.Compare(c.Date, today, StringComparison.Ordinal) < 0)
+                {
+                    c.Status = "completed";
+                    anyAutoCompleted = true;
+                }
+            }
+
             if (b.Status == "confirmed" && b.Classes.Count > 0
                 && b.Classes.All(c => string.Compare(c.Date, today, StringComparison.Ordinal) < 0))
             {
@@ -145,9 +158,23 @@ public class BookingsController : ControllerBase
             .Select(f => f.BookingId!.Value)
             .ToHashSetAsync();
 
+        // The parent's own remark (if any) on each completed class instance —
+        // drives the Sessions page's "already reviewed" state and Edit/Delete.
+        var bookingClassIds = bookings.SelectMany(b => b.Classes).Select(c => c.Id).ToList();
+        var remarksByBookingClassId = await _context.ClassRemarks
+            .Where(r => bookingClassIds.Contains(r.BookingClassId))
+            .ToDictionaryAsync(r => r.BookingClassId, r => new BookingClassRemarkDto
+            {
+                Id = r.Id, Rating = r.Rating, Text = r.Text
+            });
+
         return Ok(bookings.Select(b => {
             var dto = MapToDto(b);
             dto.IsFirstClass = firstClassBookingIds.Contains(b.Id);
+            foreach (var c in dto.Classes)
+            {
+                if (remarksByBookingClassId.TryGetValue(c.Id, out var remark)) c.Remark = remark;
+            }
             return dto;
         }));
     }
@@ -865,7 +892,63 @@ public class BookingsController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             };
         }
+        else if (booking.IssueReport.Resolved)
+        {
+            // Previous report was already resolved and archived — this is a
+            // fresh issue, so reopen the report rather than silently no-oping.
+            booking.IssueReport.IssueType = dto.IssueType;
+            booking.IssueReport.Details = dto.Details;
+            booking.IssueReport.Timestamp = DateTime.Now.ToString("h:mm:ss tt");
+            booking.IssueReport.CreatedAt = DateTime.UtcNow;
+            booking.IssueReport.Resolved = false;
+            booking.IssueReport.ResolvedAt = null;
+        }
 
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPut("{id}/issue")]
+    public async Task<IActionResult> UpdateIssue(int id, [FromBody] CreateIssueReportDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var booking = await _context.Bookings
+            .Include(b => b.IssueReport)
+            .Include(b => b.Student)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking == null || booking.IssueReport == null) return NotFound();
+        if (booking.Student.ParentUserId != userId) return Forbid();
+        if (booking.IssueReport.Resolved)
+            return BadRequest(new { message = "This issue has already been resolved by admin and can no longer be edited." });
+
+        var issueProfanityError = ProfanityFilter.Validate(dto.Details);
+        if (issueProfanityError != null) return BadRequest(new { message = issueProfanityError });
+
+        booking.IssueReport.IssueType = dto.IssueType;
+        booking.IssueReport.Details = dto.Details;
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpDelete("{id}/issue")]
+    public async Task<IActionResult> DeleteIssue(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var booking = await _context.Bookings
+            .Include(b => b.IssueReport)
+            .Include(b => b.Student)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking == null || booking.IssueReport == null) return NotFound();
+        if (booking.Student.ParentUserId != userId) return Forbid();
+        if (booking.IssueReport.Resolved)
+            return BadRequest(new { message = "This issue has already been resolved by admin and can no longer be withdrawn." });
+
+        _context.IssueReports.Remove(booking.IssueReport);
         await _context.SaveChangesAsync();
         return Ok();
     }
@@ -897,7 +980,7 @@ public class BookingsController : ControllerBase
         IsFirstClass = false, // populated by GET /bookings — see GetAll
         VideoConferenceLink = b.VideoConferenceLink,
         VideoLinkReminderStatus = b.VideoLinkReminderStatus,
-        Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
+        Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Id = c.Id, Date = c.Date, Time = c.Time, Status = c.Status }).ToList() ?? new(),
         CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {
             Message = pendingProposal.Message,
@@ -924,7 +1007,8 @@ public class BookingsController : ControllerBase
         {
             IssueType = b.IssueReport.IssueType,
             Details = b.IssueReport.Details,
-            Timestamp = b.IssueReport.Timestamp
+            Timestamp = b.IssueReport.Timestamp,
+            Resolved = b.IssueReport.Resolved
         }
         };
     }

@@ -78,22 +78,51 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> GetDisputes()
     {
         var disputes = await _context.Bookings
-            .Where(b => b.IssueReport != null)
+            .Where(b => b.IssueReport != null && !b.IssueReport.Resolved)
             .Include(b => b.IssueReport)
             .Include(b => b.Tutor).ThenInclude(t => t.User)
             .Include(b => b.Student)
             .ToListAsync();
 
-        return Ok(disputes.Select(b => new
-        {
-            b.Id,
-            b.Subject,
-            b.Status,
-            TutorName = b.Tutor?.User?.Name,
-            StudentName = b.Student?.Name,
-            b.IssueReport
-        }));
+        return Ok(disputes.Select(ToDisputeDto));
     }
+
+    // Resolved disputes — kept for audit/history instead of deleted (see
+    // ResolveDispute below), so admin can look back at what was decided.
+    [HttpGet("disputes/archive")]
+    public async Task<IActionResult> GetArchivedDisputes()
+    {
+        var disputes = await _context.Bookings
+            .Where(b => b.IssueReport != null && b.IssueReport.Resolved)
+            .Include(b => b.IssueReport)
+            .Include(b => b.Tutor).ThenInclude(t => t.User)
+            .Include(b => b.Student)
+            .OrderByDescending(b => b.IssueReport!.ResolvedAt)
+            .ToListAsync();
+
+        return Ok(disputes.Select(ToDisputeDto));
+    }
+
+    private static AdminDisputeDto ToDisputeDto(Booking b) => new AdminDisputeDto
+    {
+        Id = b.Id,
+        Subject = b.Subject,
+        Status = b.Status,
+        TutorName = b.Tutor?.User?.Name,
+        StudentName = b.Student?.Name,
+        // Mapped to a DTO rather than the raw entity — IssueReport.Booking.Tutor.User
+        // .TutorProfile loops back to Tutor and beyond, which System.Text.Json can't
+        // serialize (a cyclic-reference crash), so this endpoint 500'd on any real
+        // dispute rather than actually returning one.
+        IssueReport = b.IssueReport == null ? null : new IssueReportDto
+        {
+            IssueType = b.IssueReport.IssueType,
+            Details = b.IssueReport.Details,
+            Timestamp = b.IssueReport.Timestamp,
+            Resolved = b.IssueReport.Resolved
+        },
+        ResolvedAt = b.IssueReport?.ResolvedAt?.ToString("yyyy-MM-dd HH:mm")
+    };
 
     [HttpPatch("disputes/{bookingId}/resolve")]
     public async Task<IActionResult> ResolveDispute(int bookingId)
@@ -104,11 +133,96 @@ public class AdminController : ControllerBase
 
         if (booking == null) return NotFound();
 
+        // Marked resolved rather than deleted, so it moves to the Archive tab
+        // instead of vanishing without a trace.
         if (booking.IssueReport != null)
         {
-            _context.IssueReports.Remove(booking.IssueReport);
+            booking.IssueReport.Resolved = true;
+            booking.IssueReport.ResolvedAt = DateTime.UtcNow;
         }
         booking.Status = "completed";
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    // Separate from the dispute desk above (parent-reported issues on a
+    // booking) — this queue is a tutor asking for a class remark to be
+    // hidden (see ClassRemarksController.Dispute).
+    [HttpGet("remark-disputes")]
+    public async Task<IActionResult> GetRemarkDisputes()
+    {
+        var disputes = await _context.ClassRemarks
+            .Include(r => r.Tutor).ThenInclude(t => t.User)
+            .Where(r => r.Status == "dispute_requested")
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync();
+
+        return Ok(disputes.Select(ToRemarkDisputeDto));
+    }
+
+    // Resolved hide requests (approved -> hidden, or rejected -> back to
+    // published) — kept for audit/history, distinguished from remarks that
+    // were never disputed via DisputeReason being set.
+    [HttpGet("remark-disputes/archive")]
+    public async Task<IActionResult> GetArchivedRemarkDisputes()
+    {
+        var disputes = await _context.ClassRemarks
+            .Include(r => r.Tutor).ThenInclude(t => t.User)
+            .Where(r => r.DisputeReason != null && r.Status != "dispute_requested")
+            .OrderByDescending(r => r.ResolvedAt)
+            .ToListAsync();
+
+        return Ok(disputes.Select(ToRemarkDisputeDto));
+    }
+
+    private static AdminRemarkDisputeDto ToRemarkDisputeDto(ClassRemark r) => new AdminRemarkDisputeDto
+    {
+        Id = r.Id,
+        TutorId = r.TutorId,
+        TutorName = r.Tutor?.User?.Name ?? string.Empty,
+        Rating = r.Rating,
+        Text = r.Text,
+        ParentDisplayName = r.ParentDisplayName,
+        DisputeReason = r.DisputeReason,
+        CreatedAt = r.CreatedAt,
+        Status = r.Status,
+        ResolvedAt = r.ResolvedAt
+    };
+
+    [HttpPatch("remark-disputes/{id}/resolve")]
+    public async Task<IActionResult> ResolveRemarkDispute(int id, [FromBody] ResolveRemarkDisputeDto dto)
+    {
+        var remark = await _context.ClassRemarks.FirstOrDefaultAsync(r => r.Id == id);
+        if (remark == null) return NotFound();
+        if (remark.Status != "dispute_requested")
+            return BadRequest(new { message = "This remark isn't awaiting a dispute decision." });
+
+        remark.Status = dto.Approve ? "hidden" : "published";
+        remark.ResolvedAt = DateTime.UtcNow;
+
+        // Hidden remarks no longer count toward the tutor's rating/review count —
+        // recompute from the current published set as an average-of-parent-
+        // averages, not a flat average (same logic and reasoning as
+        // ClassRemarksController.RecomputeTutorRatingAsync — a parent with many
+        // rated classes shouldn't drown out other families' signal).
+        var tutor = await _context.Tutors.FindAsync(remark.TutorId);
+        if (tutor != null)
+        {
+            var published = await _context.ClassRemarks
+                .Where(r => r.TutorId == remark.TutorId && r.Id != remark.Id && r.Status == "published")
+                .Select(r => new { r.ParentUserId, r.Rating })
+                .ToListAsync();
+            if (!dto.Approve) published.Add(new { remark.ParentUserId, remark.Rating }); // stays published — count it back in
+
+            var perParentAverages = published
+                .GroupBy(r => r.ParentUserId)
+                .Select(g => g.Average(r => r.Rating))
+                .ToList();
+
+            tutor.Rating = perParentAverages.Count > 0 ? Math.Round(perParentAverages.Average(), 2) : 0;
+            tutor.ReviewCount = published.Count;
+        }
 
         await _context.SaveChangesAsync();
         return Ok();

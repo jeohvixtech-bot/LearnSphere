@@ -119,21 +119,6 @@ CREATE TABLE IF NOT EXISTS TutorDocuments (
 -- TutorReviews
 -- Added: BookingId (nullable) + filtered unique index (task 2 / AddReviewBookingId migration)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS TutorReviews (
-    Id         INT AUTO_INCREMENT PRIMARY KEY,
-    TutorId    INT         NOT NULL,
-    Author     LONGTEXT    NOT NULL,
-    Text       LONGTEXT    NOT NULL,
-    Rating     INT         NOT NULL DEFAULT 5,
-    BookingId  INT         NULL,                        -- nullable; links review to a specific completed booking
-    CONSTRAINT FK_TutorReviews_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
-);
-
--- Filtered unique index: one review per (tutor, booking) — only enforced when BookingId IS NOT NULL
--- MySQL equivalent of the EF Core HasFilter("[BookingId] IS NOT NULL")
-CREATE UNIQUE INDEX UQ_TutorReviews_TutorBooking
-    ON TutorReviews (TutorId, BookingId);               -- MySQL enforces uniqueness only on non-NULL pairs naturally
-
 -- ============================================================
 -- TutorTimeSlots
 -- ============================================================
@@ -288,7 +273,41 @@ CREATE TABLE IF NOT EXISTS BookingClasses (
     BookingId  INT         NOT NULL,
     Date       LONGTEXT    NOT NULL,
     Time       LONGTEXT    NOT NULL,
+    Status     VARCHAR(20) NOT NULL DEFAULT 'scheduled', -- scheduled | completed — flips lazily once Date is in the past, see BookingsController.GetAll
     CONSTRAINT FK_BookingClasses_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ClassRemarks — replaces the old whole-booking TutorReviews. One remark per
+-- completed class instance (BookingClass), not per booking, so a multi-
+-- session booking gets one remark per session.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ClassRemarks (
+    Id                INT          AUTO_INCREMENT PRIMARY KEY,
+    BookingClassId    INT          NOT NULL,
+    TutorId           INT          NOT NULL,
+    ParentUserId      INT          NOT NULL,
+    ParentDisplayName VARCHAR(200) NOT NULL DEFAULT '', -- masked at creation time — see NameMasking.Mask
+    Rating            INT          NOT NULL DEFAULT 5,
+    Text              LONGTEXT     NOT NULL,
+    Status            VARCHAR(20)  NOT NULL DEFAULT 'published', -- published | dispute_requested | hidden
+    DisputeReason     LONGTEXT     NULL,
+    CreatedAt         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    EditedAt          DATETIME(6)  NULL,
+    ResolvedAt        DATETIME(6)  NULL, -- set when admin resolves a dispute_requested hide request (approve or reject) — see AdminController Archive tab
+    UNIQUE KEY UQ_ClassRemark_BookingClass (BookingClassId),
+    KEY IX_ClassRemarks_TutorId (TutorId),
+    CONSTRAINT FK_ClassRemarks_BookingClasses FOREIGN KEY (BookingClassId) REFERENCES BookingClasses(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_ClassRemarks_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ClassRemarkLikes (
+    Id             INT         AUTO_INCREMENT PRIMARY KEY,
+    ClassRemarkId  INT         NOT NULL,
+    ParentUserId   INT         NOT NULL,
+    CreatedAt      DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY UQ_ClassRemarkLike_RemarkParent (ClassRemarkId, ParentUserId),
+    CONSTRAINT FK_ClassRemarkLikes_ClassRemarks FOREIGN KEY (ClassRemarkId) REFERENCES ClassRemarks(Id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -387,6 +406,8 @@ CREATE TABLE IF NOT EXISTS IssueReports (
     Details     LONGTEXT    NOT NULL,
     Timestamp   LONGTEXT    NOT NULL,        -- display-only, time-of-day (no date) — see CreatedAt
     CreatedAt   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), -- real date/time, used by the AI Speed Match "Tutor Dispute (Refresh Monthly)" scoring criterion
+    Resolved    TINYINT(1)  NOT NULL DEFAULT 0, -- set true instead of deleting on resolve, so the Archive tab keeps a record
+    ResolvedAt  DATETIME(6) NULL,
     CONSTRAINT FK_IssueReports_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 

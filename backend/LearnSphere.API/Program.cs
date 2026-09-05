@@ -2455,6 +2455,55 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
     // Speeds up the parent-facing tutor catalog query, which filters on both columns together
     try { await context.Database.ExecuteSqlRawAsync(
         "CREATE INDEX `IX_Tutors_Verified_Online` ON `Tutors` (`IsVerified`, `IsOnline`)"); } catch { }
+
+    // ── Class Remarks & Tutor Bulletin Board — retires TutorReviews (whole-
+    // booking, never rendered in the frontend) in favour of ClassRemarks,
+    // scoped to one specific completed class instance. ──
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `BookingClasses` ADD COLUMN `Status` VARCHAR(20) NOT NULL DEFAULT 'scheduled'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ClassRemarks` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BookingClassId` INT NOT NULL,
+            `TutorId` INT NOT NULL,
+            `ParentUserId` INT NOT NULL,
+            `ParentDisplayName` VARCHAR(200) NOT NULL DEFAULT '',
+            `Rating` INT NOT NULL DEFAULT 5,
+            `Text` LONGTEXT NOT NULL,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'published',
+            `DisputeReason` LONGTEXT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `EditedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_ClassRemark_BookingClass` (`BookingClassId`),
+            KEY `IX_ClassRemarks_TutorId` (`TutorId`),
+            CONSTRAINT `FK_ClassRemarks_BookingClasses` FOREIGN KEY (`BookingClassId`) REFERENCES `BookingClasses` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_ClassRemarks_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ClassRemarkLikes` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `ClassRemarkId` INT NOT NULL,
+            `ParentUserId` INT NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_ClassRemarkLike_RemarkParent` (`ClassRemarkId`, `ParentUserId`),
+            CONSTRAINT `FK_ClassRemarkLikes_ClassRemarks` FOREIGN KEY (`ClassRemarkId`) REFERENCES `ClassRemarks` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "DROP TABLE IF EXISTS `TutorReviews`"); } catch { }
+
+    // Admin Archive tab — resolved disputes/hide requests are kept (not
+    // deleted) so they can be listed separately from the active queues.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `IssueReports` ADD COLUMN `Resolved` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `IssueReports` ADD COLUMN `ResolvedAt` DATETIME(6) NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ClassRemarks` ADD COLUMN `ResolvedAt` DATETIME(6) NULL"); } catch { }
+
     await DbSeeder.SeedAsync(context);
 }
 

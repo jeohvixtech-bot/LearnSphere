@@ -1,8 +1,8 @@
 <div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Primary parent account</small></div>
     </div>
     <nav style="display:flex; flex-direction:column; gap:2px;">
       <a href="#!/parent/dashboard" class="bs-sidebar-link">
@@ -108,7 +108,7 @@
         <div class="bs-field">
           <label>Offer Price ($/session)</label>
           <input class="bs-input" type="number" ng-model="vm.personalize.price" min="0" step="0.01" placeholder="e.g. 50" />
-          <p class="bs-text-muted" style="margin-top:6px;font-size:12px">Platform may apply an additional 5% charge.</p>
+          <p class="bs-text-muted" style="margin-top:6px;font-size:13px">Platform may apply an additional 5% charge.</p>
         </div>
 
       </div>
@@ -137,9 +137,9 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
             <div>
               <strong>{{ a.subject || 'No subject specified' }}</strong>
-              <p class="bs-text-muted" style="margin:2px 0 0;font-size:12px">Saved {{ a.savedAt }}</p>
+              <p class="bs-text-muted" style="margin:2px 0 0;font-size:13px">Saved {{ a.savedAt }}</p>
             </div>
-            <button type="button" style="background:none; border:none; color:var(--color-accent-2); cursor:pointer; font-size:16px; line-height:1; padding:0;" ng-click="vm.removePersonalizeApplication(a.id)" title="Remove">×</button>
+            <button type="button" style="background:none; border:none; color:var(--color-accent-2); cursor:pointer; font-size:17px; line-height:1; padding:0;" ng-click="vm.removePersonalizeApplication(a.id)" title="Remove">×</button>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
             <span class="bs-tag bs-tag-neutral" ng-if="a.mode">{{ a.mode }}</span>
@@ -147,7 +147,7 @@
             <span class="bs-tag bs-tag-neutral" ng-if="a.country">{{ a.country }}</span>
             <span class="bs-tag bs-tag-accent" ng-if="a.price">${{ a.price }}/session</span>
           </div>
-          <p class="bs-text-muted" ng-if="a.description" style="margin-top:10px;font-size:13px;">{{ a.description }}</p>
+          <p class="bs-text-muted" ng-if="a.description" style="margin-top:10px;font-size:14px;">{{ a.description }}</p>
         </div>
       </div>
     </div>

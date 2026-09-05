@@ -30,8 +30,21 @@ public class BookingDto
 
 public class BookingClassDto
 {
+    public int Id { get; set; }
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+    public string Status { get; set; } = "scheduled"; // scheduled | completed
+
+    // Populated only by BookingsController.GetAll (the parent's own Sessions
+    // list) — the parent's own remark on this class, if they've left one.
+    public BookingClassRemarkDto? Remark { get; set; }
+}
+
+public class BookingClassRemarkDto
+{
+    public int Id { get; set; }
+    public int Rating { get; set; }
+    public string Text { get; set; } = string.Empty;
 }
 
 public class CreateBookingDto
@@ -110,6 +123,19 @@ public class IssueReportDto
     public string IssueType { get; set; } = string.Empty;
     public string Details { get; set; } = string.Empty;
     public string Timestamp { get; set; } = string.Empty;
+    public bool Resolved { get; set; }
+}
+
+// GET /admin/disputes and /admin/disputes/archive
+public class AdminDisputeDto
+{
+    public int Id { get; set; }
+    public string Subject { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? TutorName { get; set; }
+    public string? StudentName { get; set; }
+    public IssueReportDto? IssueReport { get; set; }
+    public string? ResolvedAt { get; set; }
 }
 
 public class CreateIssueReportDto

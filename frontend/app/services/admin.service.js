@@ -21,6 +21,22 @@ angular.module('learnSphereApp')
     return $http.patch(API_URL + '/admin/disputes/' + bookingId + '/resolve', {}, h());
   };
 
+  self.getArchivedDisputes = function () {
+    return $http.get(API_URL + '/admin/disputes/archive', h());
+  };
+
+  self.getRemarkDisputes = function () {
+    return $http.get(API_URL + '/admin/remark-disputes', h());
+  };
+
+  self.resolveRemarkDispute = function (id, approve) {
+    return $http.patch(API_URL + '/admin/remark-disputes/' + id + '/resolve', { approve: approve }, h());
+  };
+
+  self.getArchivedRemarkDisputes = function () {
+    return $http.get(API_URL + '/admin/remark-disputes/archive', h());
+  };
+
   self.getInstitutions = function (params) {
     return $http.get(API_URL + '/admin/institutions', { params: params });
   };

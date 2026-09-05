@@ -1,8 +1,8 @@
 <div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-      <div><strong style="font-size:14px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:12px;">Primary parent account</small></div>
+      <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+      <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Primary parent account</small></div>
     </div>
     <nav style="display:flex; flex-direction:column; gap:2px;">
       <a href="#!/parent/dashboard" class="bs-sidebar-link">
@@ -43,11 +43,11 @@
       <div style="display:flex; gap:var(--space-6);">
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.invoices.length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Total Invoices</div>
+          <div class="bs-text-muted" style="font-size:13px;">Total Invoices</div>
         </div>
         <div style="text-align:center;">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Unpaid</div>
+          <div class="bs-text-muted" style="font-size:13px;">Unpaid</div>
         </div>
       </div>
     </div>
@@ -55,24 +55,24 @@
     <!-- ── Summary Cards ──────────────────────────── -->
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:var(--space-3); margin-top:var(--space-4);" ng-if="vm.invoices.length">
       <div class="bs-card" style="flex-direction:row; align-items:center; gap:var(--space-3);">
-        <span class="bs-tag bs-tag-accent" style="font-size:16px; padding:8px;">📋</span>
+        <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">📋</span>
         <div>
           <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ vm.invoices.length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Total Invoices</div>
+          <div class="bs-text-muted" style="font-size:13px;">Total Invoices</div>
         </div>
       </div>
       <div class="bs-card" style="flex-direction:row; align-items:center; gap:var(--space-3);">
-        <span class="bs-tag bs-tag-accent" style="font-size:16px; padding:8px;">✓</span>
+        <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">✓</span>
         <div>
           <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ (vm.invoices | filter:{status:'Paid'}).length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Paid</div>
+          <div class="bs-text-muted" style="font-size:13px;">Paid</div>
         </div>
       </div>
       <div class="bs-card" style="flex-direction:row; align-items:center; gap:var(--space-3);">
-        <span class="bs-tag bs-tag-accent-2" style="font-size:16px; padding:8px;">⏳</span>
+        <span class="bs-tag bs-tag-accent-2" style="font-size:17px; padding:8px;">⏳</span>
         <div>
           <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</div>
-          <div class="bs-text-muted" style="font-size:12px;">Outstanding</div>
+          <div class="bs-text-muted" style="font-size:13px;">Outstanding</div>
         </div>
       </div>
     </div>
@@ -98,7 +98,7 @@
       </div>
 
       <div style="margin-top:var(--space-3);">
-        <span class="bs-text-muted" style="font-size:13px;">{{ vm.visibleInvoices().length }} Invoice{{ vm.visibleInvoices().length !== 1 ? 's' : '' }}</span>
+        <span class="bs-text-muted" style="font-size:14px;">{{ vm.visibleInvoices().length }} Invoice{{ vm.visibleInvoices().length !== 1 ? 's' : '' }}</span>
 
         <div style="text-align:center; padding:var(--space-6); background:var(--color-surface); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="!vm.visibleInvoices().length">
           <p class="bs-text-muted" style="margin:0;" ng-if="vm.invoicesTab === 'active'">No non-cancelled invoices.</p>
@@ -114,7 +114,7 @@
               <tr ng-repeat="inv in vm.visibleInvoices()">
                 <td>
                   <div style="font-weight:600;">{{ inv.invoiceNumber }}</div>
-                  <div class="bs-text-muted" style="font-size:11px;">Booking {{ inv.bookingNumber }}</div>
+                  <div class="bs-text-muted" style="font-size:12px;">Booking {{ inv.bookingNumber }}</div>
                 </td>
                 <td>{{ inv.subject || '—' }}</td>
                 <td>{{ inv.date | dmy }}</td>

@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'RemarkService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, RemarkService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -427,7 +427,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.countryFilter = 'Singapore';
 
   // Issue report
-  self.issueForm = { bookingId: null, issueType: 'Tutor was absent (No show)', details: '' };
+  self.issueForm = { bookingId: null, issueType: 'Tutor was absent (No show)', details: '', isEdit: false };
   self.issueSuccess = false;
 
   // Chat
@@ -1062,19 +1062,37 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     // (grows upward) rather than computing `top` from an estimated height
     // works regardless of the tooltip's actual rendered height, which varies
     // with how many dates are in the schedule.
+    //
+    // maxTooltipHeight must match .slot-tooltip's max-height in main.css —
+    // used as the flip threshold below (previously 260, which didn't match
+    // the CSS's 340 and let some rows open downward with too little room,
+    // clipping the tooltip against the browser window instead of flipping).
+    var maxTooltipHeight = 340;
+    var viewportMargin = 12;
     var spaceBelow = window.innerHeight - rowRect.bottom;
-    var flipUp = spaceBelow < 260;
+    var spaceAbove = rowRect.top;
+    var flipUp = spaceBelow < maxTooltipHeight;
+
+    // Safety clamp: even after flip logic, cap the tooltip to however much
+    // room is actually available in the chosen direction, so a future change
+    // to .slot-tooltip's max-height (or an unusually short viewport) degrades
+    // to the tooltip's own internal scroll instead of clipping against the
+    // browser window again.
+    var availableSpace = (flipUp ? spaceAbove : spaceBelow) - viewportMargin - 6;
+    var clampedMaxHeight = Math.max(120, Math.min(maxTooltipHeight, availableSpace));
 
     sg._tooltipStyle = flipUp ? {
       display: 'block',
       top: 'auto',
       bottom: (window.innerHeight - rowRect.top + 6) + 'px',
-      left: left + 'px'
+      left: left + 'px',
+      'max-height': clampedMaxHeight + 'px'
     } : {
       display: 'block',
       top: (rowRect.bottom + 6) + 'px',
       bottom: 'auto',
-      left: left + 'px'
+      left: left + 'px',
+      'max-height': clampedMaxHeight + 'px'
     };
   };
 
@@ -1892,7 +1910,20 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // Report an issue
   self.startReportIssue = function (bookingId) {
     self.issueForm.bookingId = bookingId;
+    self.issueForm.issueType = 'Tutor was absent (No show)';
     self.issueForm.details = '';
+    self.issueForm.isEdit = false;
+    self.issueSuccess = false;
+    self.issueError = '';
+  };
+
+  // Reopens the form pre-filled with the parent's own already-submitted
+  // report, in edit mode — same form/modal as reporting a new one.
+  self.startEditIssue = function (booking) {
+    self.issueForm.bookingId = booking.id;
+    self.issueForm.issueType = booking.issueReport.issueType;
+    self.issueForm.details = booking.issueReport.details;
+    self.issueForm.isEdit = true;
     self.issueSuccess = false;
     self.issueError = '';
   };
@@ -1900,10 +1931,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.submitIssue = function () {
     self.issueError = ProfanityFilterService.validate(self.issueForm.details);
     if (self.issueError) return;
-    BookingService.reportIssue(self.issueForm.bookingId, {
-      issueType: self.issueForm.issueType,
-      details: self.issueForm.details
-    }).then(function () {
+    var payload = { issueType: self.issueForm.issueType, details: self.issueForm.details };
+    var request = self.issueForm.isEdit
+      ? BookingService.updateIssue(self.issueForm.bookingId, payload)
+      : BookingService.reportIssue(self.issueForm.bookingId, payload);
+
+    request.then(function () {
       self.issueSuccess = true;
       self.issueForm.bookingId = null;
       BookingService.getAll().then(function (res) { self.bookings = res.data; });
@@ -1912,6 +1945,91 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }, 3000);
     }, function (err) {
       self.issueError = (err.data && err.data.message) ? err.data.message : 'Failed to submit. Please try again.';
+    });
+  };
+
+  self.deleteIssue = function (booking) {
+    if (!confirm('Withdraw this reported issue? This cannot be undone.')) return;
+    BookingService.deleteIssue(booking.id).then(function () {
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    });
+  };
+
+  // ── Class remarks — one star rating + text per completed class instance ──
+  self.remarkModalOpen = false;
+  self.remarkForm = { bookingClassId: null, remarkId: null, rating: 5, text: '' };
+  self.remarkError = '';
+  self.remarkSaving = false;
+
+  self.openRemarkForm = function (bookingClassId, existingRemark) {
+    self.remarkForm = {
+      bookingClassId: bookingClassId,
+      remarkId: existingRemark ? existingRemark.id : null,
+      rating: existingRemark ? existingRemark.rating : 5,
+      text: existingRemark ? existingRemark.text : ''
+    };
+    self.remarkError = '';
+    self.remarkModalOpen = true;
+  };
+
+  self.closeRemarkForm = function () {
+    self.remarkModalOpen = false;
+  };
+
+  self.submitRemark = function () {
+    self.remarkError = ProfanityFilterService.validate(self.remarkForm.text);
+    if (self.remarkError) return;
+    if (!self.remarkForm.rating) { self.remarkError = 'Please select a star rating.'; return; }
+
+    self.remarkSaving = true;
+    var payload = { rating: self.remarkForm.rating, text: self.remarkForm.text };
+    var request = self.remarkForm.remarkId
+      ? RemarkService.update(self.remarkForm.remarkId, payload)
+      : RemarkService.create(self.remarkForm.bookingClassId, payload);
+
+    request.then(function () {
+      self.remarkSaving = false;
+      self.remarkModalOpen = false;
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    }).catch(function (err) {
+      self.remarkSaving = false;
+      self.remarkError = (err.data && err.data.message) ? err.data.message : 'Failed to save. Please try again.';
+    });
+  };
+
+  self.deleteRemark = function (remark) {
+    if (!confirm('Delete this remark? This cannot be undone.')) return;
+    RemarkService.remove(remark.id).then(function () {
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    });
+  };
+
+  // Bulletin board — published remark list for a tutor, shown in a popup
+  // modal (only one open at a time). Lazy-loaded once per tutor, cached on
+  // the tutor object so reopening doesn't re-fetch.
+  self.bulletinModalTutor = null;
+
+  self.openBulletinBoard = function (t) {
+    self.bulletinModalTutor = t;
+    if (!t._bulletinRemarks) {
+      RemarkService.getForTutor(t.id).then(function (res) {
+        t._bulletinRemarks = res.data;
+      });
+    }
+  };
+
+  self.closeBulletinBoard = function () {
+    self.bulletinModalTutor = null;
+  };
+
+  self.likeRemark = function (t, remark) {
+    if (remark.likedByMe) return;
+    RemarkService.like(remark.id).then(function (res) {
+      remark.likedByMe = true;
+      remark.likeCount = res.data.likeCount;
+    }).catch(function () {
+      // Already liked (409) or stale state — resync from the server.
+      RemarkService.getForTutor(t.id).then(function (res) { t._bulletinRemarks = res.data; });
     });
   };
 
