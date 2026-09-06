@@ -149,6 +149,22 @@ CREATE TABLE IF NOT EXISTS TutorTimeSlots (
 );
 
 -- ============================================================
+-- TutorBlockedDates — a tutor-declared "I'm unavailable" date range (e.g.
+-- vacation). Previously only ever kept in the AngularJS ScheduleService's
+-- in-memory object, so it silently disappeared on every page refresh.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorBlockedDates (
+    Id          INT          NOT NULL AUTO_INCREMENT,
+    TutorId     INT          NOT NULL,
+    StartDate   VARCHAR(10)  NOT NULL, -- YYYY-MM-DD
+    EndDate     VARCHAR(10)  NOT NULL, -- YYYY-MM-DD
+    CreatedAt   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (Id),
+    KEY IX_TutorBlockedDates_TutorId (TutorId),
+    CONSTRAINT FK_TutorBlockedDates_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
 -- SyllabusTopics — platform-defined topics per country+subject+level.
 -- Seeded once by admin. Max 6 topics per subject+level combination.
 -- ============================================================

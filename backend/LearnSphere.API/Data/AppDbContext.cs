@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<ClassRemark> ClassRemarks { get; set; }
     public DbSet<ClassRemarkLike> ClassRemarkLikes { get; set; }
     public DbSet<TutorTimeSlot> TutorTimeSlots { get; set; }
+    public DbSet<TutorBlockedDate> TutorBlockedDates { get; set; }
     public DbSet<Student> Students { get; set; }
     public DbSet<StudentPreferredMode> StudentPreferredModes { get; set; }
     public DbSet<Booking> Bookings { get; set; }

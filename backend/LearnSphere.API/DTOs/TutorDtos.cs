@@ -226,3 +226,16 @@ public class BusyTimeDto
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
 }
+
+public class TutorBlockedDateDto
+{
+    public int Id { get; set; }
+    public string Start { get; set; } = string.Empty;
+    public string End { get; set; } = string.Empty;
+}
+
+public class CreateTutorBlockedDateDto
+{
+    public string StartDate { get; set; } = string.Empty;
+    public string EndDate { get; set; } = string.Empty;
+}

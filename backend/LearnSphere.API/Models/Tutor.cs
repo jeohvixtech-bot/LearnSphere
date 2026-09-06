@@ -182,3 +182,16 @@ public class PresetGroupSyllabus
     public int SyllabusTopicId { get; set; }
     public SyllabusTopic SyllabusTopic { get; set; } = null!;
 }
+
+// A tutor-declared "I'm unavailable" date range (e.g. vacation) — previously
+// only ever kept in the AngularJS ScheduleService's in-memory object, so it
+// silently disappeared on every page refresh. Persisted here instead.
+public class TutorBlockedDate
+{
+    public int Id { get; set; }
+    public int TutorId { get; set; }
+    public Tutor Tutor { get; set; } = null!;
+    public string StartDate { get; set; } = string.Empty; // YYYY-MM-DD
+    public string EndDate { get; set; } = string.Empty;   // YYYY-MM-DD
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

@@ -394,6 +394,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         self.verif.idNumber = existingIdDoc.idNumber || '';
       }
       self.blockedRanges = ScheduleService.getBlocked(res.data.id);
+      ScheduleService.loadBlocked(res.data.id);
       self.profileForm = {
         bio: res.data.bio,
         experienceYears: res.data.experienceYears,
@@ -927,6 +928,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   };
 
   self.confirmBlock = function () {
+    if (self.blockSubmitting) return; // guards against a double-click racing two POSTs past the overlap check
     var s = self.blockForm.startDate, e = self.blockForm.endDate;
     if (!s || !e) return;
     var start = parseLocalDate(s);
@@ -945,13 +947,24 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     }
 
     var conflicts = [];
-    self.confirmedClasses().forEach(function (b) {
+    // Scanned by each class's OWN status/date, not the parent booking's status —
+    // a booking can be 'completed' overall (e.g. an admin resolved a dispute on
+    // it — see AdminController.ResolveDispute) while still carrying individual
+    // classes that haven't happened yet (a multi-session series isn't done just
+    // because one session on it was disputed). Filtering to confirmedClasses()
+    // (status confirmed/countered only) let those still-upcoming classes evade
+    // this check entirely. 'pending' bookings are excluded (not yet accepted,
+    // nothing committed); 'cancelled' bookings and already-'completed' classes
+    // are irrelevant to a forward-looking block.
+    self.bookings.filter(function (b) {
+      return b.tutorId === self.tutor.id && b.status !== 'pending' && b.status !== 'cancelled';
+    }).forEach(function (b) {
       // For countered bookings, check proposed dates (already rescheduled) not original dates
       var classesToCheck = (b.status === 'countered' && b.counterProposal && b.counterProposal.classes && b.counterProposal.classes.length)
         ? b.counterProposal.classes.map(function (cp) {
             return { date: cp.proposedDate || cp.originalDate, time: cp.proposedTime || cp.originalTime };
           })
-        : (b.classes || []);
+        : (b.classes || []).filter(function (c) { return c.status !== 'completed'; });
       classesToCheck.forEach(function (c) {
         var d = parseLocalDate(c.date);
         if (d >= start && d <= end) {
@@ -981,15 +994,21 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     });
 
     self.blockConflicts = [];
-    ScheduleService.addBlock(self.tutor.id, s, e); // normalises to YYYY-MM-DD strings
-    self.blockForm.startDate = '';
-    self.blockForm.endDate = '';
+    self.blockSubmitting = true;
+    ScheduleService.addBlock(self.tutor.id, s, e).then(function () { // normalises to YYYY-MM-DD strings
+      self.blockForm.startDate = '';
+      self.blockForm.endDate = '';
+    }).catch(function (err) {
+      self.blockOverlapError = (err.data && err.data.message) || 'Could not save the blocked range. Please try again.';
+    }).finally(function () {
+      self.blockSubmitting = false;
+    });
   };
 
   self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; self.blockPresetWarning = ''; };
 
   self.removeBlock = function (idx) {
-    self.blockedRanges.splice(idx, 1);
+    ScheduleService.removeBlock(self.tutor.id, idx);
   };
 
   self.isBlocked = function (dayNum) {

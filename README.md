@@ -172,6 +172,9 @@ npx serve . -p 3000
 | GET | `/api/tutors/preset-slots` | — | List a tutor's published preset class slots matching a student's subject/level/country and preferred modes (Flow B — see `?studentId=`, `?country=`). Not currently called by the frontend — the parent catalog reads preset slots straight off `GET /api/tutors`' `timetable` field instead — kept for any future tutor-scoped preset browsing |
 | GET | `/api/tutors/match-scores` | — | AI Speed Match score for every verified/online tutor, computed live from admin-configured `ScoringWeightages` percentages combined with each tutor's current rating, experience, and this-calendar-month completed-class/dispute counts. Returns both the final score and each criterion's raw metric + points, per tutor |
 | POST | `/api/tutors/{id}/setup-class` | JWT (owner) | Publish one or more preset class slots a parent can book directly, no per-request approval. Every slot in one request is tagged with a shared `PresetGroupId` (`PRESET` + zero-padded id of the batch's first slot) so the catalog groups them as one class rather than merging unrelated batches that share a subject. Each slot may optionally carry its own `durationMinutes`, overriding the request-level default — used when the tutor's UI combines several dragged 30-min grid cells into one longer class |
+| GET | `/api/tutors/{id}/blocked-dates` | JWT (owner) | List this tutor's declared unavailable date ranges |
+| POST | `/api/tutors/{id}/blocked-dates` | JWT (owner) | Block a date range (`startDate`, `endDate`); rejected if it overlaps an existing blocked range |
+| DELETE | `/api/tutors/{id}/blocked-dates/{blockId}` | JWT (owner) | Remove a blocked date range |
 
 > To reschedule a class: delete the old slot and add a new one.
 
@@ -403,6 +406,17 @@ Route prefix here is just `api` (spans `bookingclasses/`, `remarks/`, and `tutor
 | `PresetGroupId` | VARCHAR(20) NULL | Shared across every slot from one Setup Class submission (e.g. all occurrences of a weekly recurring class) — `PRESET` + zero-padded id of the batch's first slot. Lets the catalog group a recurring series as one class instead of merging unrelated batches that share a subject |
 
 > `EndTime` through `PresetGroupId` are only populated for tutor-preset class slots (Flow B) — the slot a tutor publishes ahead of time that a parent can book directly, without a per-request confirmation step.
+
+### TutorBlockedDates
+
+A tutor-declared "I'm unavailable" date range (e.g. vacation). Previously only ever kept in the AngularJS `ScheduleService`'s in-memory object, so it silently disappeared on every page refresh — now persisted server-side.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | INT (PK, AUTO_INCREMENT) | |
+| `TutorId` | INT (FK → Tutors.Id, CASCADE DELETE) | |
+| `StartDate` / `EndDate` | VARCHAR(10) | `YYYY-MM-DD`, inclusive range |
+| `CreatedAt` | DATETIME(6) | |
 
 ### StudentPreferredModes
 

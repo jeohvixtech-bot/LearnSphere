@@ -2504,6 +2504,22 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `ClassRemarks` ADD COLUMN `ResolvedAt` DATETIME(6) NULL"); } catch { }
 
+    // Tutor-declared unavailable date ranges — previously only ever kept in
+    // the AngularJS ScheduleService's in-memory object, so they silently
+    // disappeared on every page refresh.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorBlockedDates` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `StartDate` VARCHAR(10) NOT NULL,
+            `EndDate` VARCHAR(10) NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_TutorBlockedDates_TutorId` (`TutorId`),
+            CONSTRAINT `FK_TutorBlockedDates_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
     await DbSeeder.SeedAsync(context);
 }
 

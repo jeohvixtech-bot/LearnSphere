@@ -344,8 +344,8 @@
           </div>
           <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
             ng-click="vm.confirmBlock()"
-            ng-disabled="!vm.blockForm.startDate || !vm.blockForm.endDate">
-            Confirm Block
+            ng-disabled="!vm.blockForm.startDate || !vm.blockForm.endDate || vm.blockSubmitting">
+            {{ vm.blockSubmitting ? 'Saving…' : 'Confirm Block' }}
           </button>
         </div>
 

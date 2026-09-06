@@ -1155,6 +1155,71 @@ public class TutorsController : ControllerBase
         return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = isReschedule });
     }
 
+    // A tutor-declared "I'm unavailable" date range — previously only ever kept
+    // in the AngularJS ScheduleService's in-memory object (see
+    // frontend/app/services/schedule.service.js), so it silently disappeared on
+    // every page refresh. These three endpoints persist it instead.
+    [HttpGet("{id}/blocked-dates")]
+    [Authorize]
+    public async Task<IActionResult> GetBlockedDates(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FindAsync(id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        var blocks = await _context.TutorBlockedDates
+            .Where(b => b.TutorId == id)
+            .OrderBy(b => b.StartDate)
+            .ToListAsync();
+
+        return Ok(blocks.Select(b => new TutorBlockedDateDto { Id = b.Id, Start = b.StartDate, End = b.EndDate }));
+    }
+
+    [HttpPost("{id}/blocked-dates")]
+    [Authorize]
+    public async Task<IActionResult> AddBlockedDate(int id, [FromBody] CreateTutorBlockedDateDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FindAsync(id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(dto.StartDate) || string.IsNullOrWhiteSpace(dto.EndDate)
+            || string.Compare(dto.EndDate, dto.StartDate, StringComparison.Ordinal) < 0)
+            return BadRequest(new { message = "Invalid date range." });
+
+        var existing = await _context.TutorBlockedDates.Where(b => b.TutorId == id).ToListAsync();
+        var overlaps = existing.Any(b =>
+            string.Compare(dto.StartDate, b.EndDate, StringComparison.Ordinal) <= 0 &&
+            string.Compare(b.StartDate, dto.EndDate, StringComparison.Ordinal) <= 0);
+        if (overlaps)
+            return BadRequest(new { message = "This date range overlaps with a period you already blocked." });
+
+        var block = new TutorBlockedDate { TutorId = id, StartDate = dto.StartDate, EndDate = dto.EndDate };
+        _context.TutorBlockedDates.Add(block);
+        await _context.SaveChangesAsync();
+
+        return Ok(new TutorBlockedDateDto { Id = block.Id, Start = block.StartDate, End = block.EndDate });
+    }
+
+    [HttpDelete("{id}/blocked-dates/{blockId}")]
+    [Authorize]
+    public async Task<IActionResult> RemoveBlockedDate(int id, int blockId)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FindAsync(id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        var block = await _context.TutorBlockedDates.FirstOrDefaultAsync(b => b.Id == blockId && b.TutorId == id);
+        if (block == null) return NotFound();
+
+        _context.TutorBlockedDates.Remove(block);
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
     // Sets one shared video conference link for a published preset class — works
     // whether or not any student has enrolled yet, unlike the booking-level
     // PATCH /bookings/{id}/video-link (which needs a Booking row to exist).

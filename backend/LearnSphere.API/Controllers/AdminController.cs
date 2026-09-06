@@ -129,6 +129,7 @@ public class AdminController : ControllerBase
     {
         var booking = await _context.Bookings
             .Include(b => b.IssueReport)
+            .Include(b => b.Classes)
             .FirstOrDefaultAsync(b => b.Id == bookingId);
 
         if (booking == null) return NotFound();
@@ -140,7 +141,20 @@ public class AdminController : ControllerBase
             booking.IssueReport.Resolved = true;
             booking.IssueReport.ResolvedAt = DateTime.UtcNow;
         }
-        booking.Status = "completed";
+
+        // Resolving the dispute is now tracked entirely on IssueReport.Resolved
+        // above — it shouldn't also force the whole booking to "completed". A
+        // multi-session (preset) booking can have a dispute tied to one already-
+        // finished class while other classes in the same series are still
+        // scheduled; blindly completing the booking here previously let a tutor
+        // block over those still-upcoming classes with no conflict warning (the
+        // block-conflict scanner only checks confirmed/countered bookings — see
+        // tutor.controller.js confirmBlock). Only flip to "completed" if every
+        // class in the booking has actually happened.
+        if (booking.Classes.Count > 0 && booking.Classes.All(c => c.Status == "completed"))
+        {
+            booking.Status = "completed";
+        }
 
         await _context.SaveChangesAsync();
         return Ok();

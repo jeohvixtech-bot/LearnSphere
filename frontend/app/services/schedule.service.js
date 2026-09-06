@@ -1,8 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.factory('ScheduleService', function () {
-  var _blocked = {}; // { tutorId: [{ start, end }, ...] }  (both stored as YYYY-MM-DD strings)
+.factory('ScheduleService', ['$http', '$q', 'API_URL', 'AuthService', function ($http, $q, API_URL, AuthService) {
+  var _blocked = {}; // { tutorId: [{ id, start, end }, ...] }  (both stored as YYYY-MM-DD strings)
+  var h = function () { return { headers: AuthService.authHeader() }; };
 
   // Robustly parse any date value to a local-midnight Date.
   // Handles: Date objects, "YYYY-MM-DD", "D/MM/YYYY", "DD/MM/YYYY", "DD-MM-YYYY".
@@ -32,17 +33,47 @@ angular.module('learnSphereApp')
   }
 
   return {
+    // Synchronous — reads whatever's currently cached. Returns the SAME array
+    // reference every time for a given tutorId, so callers that stash it
+    // (e.g. vm.blockedRanges = ScheduleService.getBlocked(id)) keep seeing
+    // updates made via loadBlocked/addBlock/removeBlock without re-assigning.
     getBlocked: function (tutorId) {
       if (!_blocked[tutorId]) _blocked[tutorId] = [];
       return _blocked[tutorId];
     },
+
+    // Fetches this tutor's persisted blocked ranges from the backend and
+    // populates the cache in place (see getBlocked note above). Call this
+    // once when the tutor's own profile loads — previously nothing did, so
+    // ScheduleService's in-memory object always started empty on refresh and
+    // the tutor's blocked ranges appeared to just vanish.
+    loadBlocked: function (tutorId) {
+      var cache = this.getBlocked(tutorId);
+      return $http.get(API_URL + '/tutors/' + tutorId + '/blocked-dates', h()).then(function (res) {
+        cache.length = 0;
+        (res.data || []).forEach(function (b) { cache.push({ id: b.id, start: b.start, end: b.end }); });
+        return cache;
+      });
+    },
+
     addBlock: function (tutorId, start, end) {
-      if (!_blocked[tutorId]) _blocked[tutorId] = [];
-      _blocked[tutorId].push({ start: toYMD(start), end: toYMD(end) });
+      var cache = this.getBlocked(tutorId);
+      return $http.post(API_URL + '/tutors/' + tutorId + '/blocked-dates',
+        { startDate: toYMD(start), endDate: toYMD(end) }, h()).then(function (res) {
+        cache.push({ id: res.data.id, start: res.data.start, end: res.data.end });
+        return res.data;
+      });
     },
+
     removeBlock: function (tutorId, idx) {
-      if (_blocked[tutorId]) _blocked[tutorId].splice(idx, 1);
+      var cache = this.getBlocked(tutorId);
+      var block = cache[idx];
+      if (!block) return $q.resolve();
+      return $http.delete(API_URL + '/tutors/' + tutorId + '/blocked-dates/' + block.id, h()).then(function () {
+        cache.splice(idx, 1);
+      });
     },
+
     isBlocked: function (tutorId, dateStr) {
       if (!tutorId || !dateStr) return false;
       var d = toDay(dateStr);
@@ -51,4 +82,4 @@ angular.module('learnSphereApp')
       });
     }
   };
-});
+}]);
