@@ -497,22 +497,45 @@ public class BookingsController : ControllerBase
         var previousStatus = booking.Status;
         booking.Status = dto.Status;
 
-        // When the other party accepts a pending counter proposal, apply it to the actual booking classes
+        // When the other party accepts a pending counter proposal, apply it to the actual booking classes.
+        // Merged in place onto the existing rows (matched by original date/time) rather than wiping and
+        // re-inserting every class in the booking — a class not named in the proposal (e.g. an already-
+        // completed session elsewhere in the same multi-session booking) is left completely untouched, so
+        // its Id, Status, and any ClassRemark tied to it via BookingClassId (ON DELETE CASCADE) survive.
+        // The old wipe-and-recreate approach cascade-deleted that class's remark and reset it back to
+        // Status="scheduled" even though it had already happened, on EVERY accepted counter-proposal.
         if (dto.Status == "confirmed" && previousStatus == "countered"
             && pendingProposal?.Classes?.Count > 0)
         {
-            var finalClasses = pendingProposal.Classes.Select(cp => (
-                Date: string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
-                Time: string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
-            )).ToList();
+            var updatesByClassId = new Dictionary<int, (string? Date, string? Time)>();
+            foreach (var cp in pendingProposal.Classes)
+            {
+                var match = booking.Classes.FirstOrDefault(c =>
+                    c.Date == cp.OriginalDate && c.Time.StartsWith(cp.OriginalTime));
+                if (match != null) updatesByClassId[match.Id] = (cp.ProposedDate, cp.ProposedTime);
+            }
+
+            var finalClasses = booking.Classes.Select(c =>
+            {
+                var date = c.Date; var time = c.Time;
+                if (updatesByClassId.TryGetValue(c.Id, out var u))
+                {
+                    if (!string.IsNullOrEmpty(u.Date)) date = u.Date;
+                    if (!string.IsNullOrEmpty(u.Time)) time = u.Time;
+                }
+                return (Date: date, Time: time);
+            }).ToList();
 
             if (HasOverlappingClasses(finalClasses))
                 return BadRequest(new { message = "Two or more classes in this proposal overlap on the same date and time." });
 
-            _context.BookingClasses.RemoveRange(booking.Classes);
-            foreach (var c in finalClasses)
+            foreach (var c in booking.Classes)
             {
-                _context.BookingClasses.Add(new BookingClass { BookingId = id, Date = c.Date, Time = c.Time });
+                if (updatesByClassId.TryGetValue(c.Id, out var u))
+                {
+                    if (!string.IsNullOrEmpty(u.Date)) c.Date = u.Date;
+                    if (!string.IsNullOrEmpty(u.Time)) c.Time = u.Time;
+                }
             }
 
             pendingProposal.Status = "accepted";

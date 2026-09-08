@@ -377,6 +377,22 @@
           </div>
         </div>
 
+        <!-- Published-but-unbooked preset slots inside the range — nobody's enrolled,
+             so the tutor moves or cancels the slot themselves, no parent involved. -->
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockSlotConflicts.length">
+          <strong>⚠️ Published class{{ vm.blockSlotConflicts.length !== 1 ? 'es' : '' }} in this range</strong>
+          <p style="margin:2px 0 0;">{{ vm.blockSlotConflicts.length }} published slot{{ vm.blockSlotConflicts.length !== 1 ? 's' : '' }} nobody's booked yet {{ vm.blockSlotConflicts.length !== 1 ? 'are' : 'is' }} sitting in this range. Reschedule or cancel {{ vm.blockSlotConflicts.length !== 1 ? 'them' : 'it' }} before blocking.</p>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="slot in vm.blockSlotConflicts">
+              <span class="bs-tag bs-tag-accent">{{ slot.subject }}</span>
+              <span class="bs-text-muted" style="font-size:13px;">{{ slot.day | dmy }} · {{ slot.time | hhmma }}</span>
+              <button class="bs-btn bs-btn-secondary" style="margin-left:auto;" ng-click="vm.openCancelSlotModal(slot)">
+                Reschedule →
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div style="display:flex; flex-direction:column; gap:6px; margin-top:var(--space-2);" ng-if="vm.blockedRanges.length">
           <div style="display:flex; align-items:center; gap:8px; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="r in vm.blockedRanges track by $index">
             <span>🚫</span>
@@ -877,7 +893,13 @@
                   <i class="ti ti-radio" style="font-size:11px;" aria-hidden="true"></i> Starting soon
                 </span>
               </div>
-              <span class="ov-ds-meta">{{ group.time }} · {{ group.durationHours }}h · {{ group.mode }}</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="ov-ds-meta">{{ group.time }} · {{ group.durationHours }}h · {{ group.mode }}</span>
+                <button class="bs-btn bs-btn-secondary" style="font-size:12px;padding:4px 10px;"
+                  ng-if="!group.isGroup" ng-click="vm.startTutorRescheduleById(group.bookings[0].id)">
+                  Reschedule
+                </button>
+              </div>
             </div>
 
             <div class="ov-ds-group-body">
@@ -899,9 +921,13 @@
                 {{ group._expanded ? 'Hide' : 'View all ' + group.students.length + ' students' }}
               </button>
               <div class="ov-student-list" ng-if="group._expanded">
-                <div class="ov-s-row" ng-repeat="s in group.students track by s.studentId">
+                <div class="ov-s-row" ng-repeat="s in group.students track by s.studentId" style="display:flex;align-items:center;gap:8px;">
                   <span class="ov-sdot-lg">{{ s.studentName[0] }}</span>
                   <span class="ov-sname">{{ s.studentName }}</span>
+                  <button class="bs-btn bs-btn-secondary" style="font-size:12px;padding:4px 10px;margin-left:auto;"
+                    ng-click="vm.startTutorRescheduleById(s.bookingId)">
+                    Reschedule
+                  </button>
                 </div>
               </div>
 
@@ -1036,6 +1062,10 @@
                   <i class="ti ti-lock" style="font-size:13px;" aria-hidden="true"></i>
                   Full — no more bookings accepted
                 </p>
+                <button class="bs-btn bs-btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:8px;"
+                  ng-click="vm.openCancelSlotModal(slot)">
+                  Reschedule / Cancel
+                </button>
               </div>
             </div>
 

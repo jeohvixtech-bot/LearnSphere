@@ -1196,6 +1196,24 @@ public class TutorsController : ControllerBase
         if (overlaps)
             return BadRequest(new { message = "This date range overlaps with a period you already blocked." });
 
+        // Same conflict check the tutor dashboard's confirmBlock() runs client-side —
+        // enforced here too so a block can never land straight over a real, still-
+        // upcoming class no matter how the request is made (stale client, a missed
+        // client-side check, or any future caller besides the current UI). Matches
+        // that check's own logic: any non-cancelled/non-pending booking, any class
+        // that hasn't already happened.
+        var candidateClasses = await _context.BookingClasses
+            .Where(c => c.Booking.TutorId == id
+                && c.Booking.Status != "pending" && c.Booking.Status != "cancelled"
+                && c.Status != "completed")
+            .Select(c => c.Date)
+            .ToListAsync();
+        var hasClassConflict = candidateClasses.Any(date =>
+            string.Compare(date, dto.StartDate, StringComparison.Ordinal) >= 0 &&
+            string.Compare(date, dto.EndDate, StringComparison.Ordinal) <= 0);
+        if (hasClassConflict)
+            return BadRequest(new { message = "This date range overlaps with a scheduled class. Reschedule or cancel it first." });
+
         var block = new TutorBlockedDate { TutorId = id, StartDate = dto.StartDate, EndDate = dto.EndDate };
         _context.TutorBlockedDates.Add(block);
         await _context.SaveChangesAsync();

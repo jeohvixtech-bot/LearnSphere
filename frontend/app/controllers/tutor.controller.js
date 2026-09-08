@@ -764,6 +764,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.blockForm = { startDate: '', endDate: '' };
   self.blockedRanges = [];
   self.blockConflicts = [];
+  self.blockSlotConflicts = [];
   self.blockOverlapError = '';
   self.blockPresetWarning = '';
 
@@ -973,14 +974,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       });
     });
 
-    if (conflicts.length) {
-      self.blockConflicts = conflicts;
-      return;
-    }
-
     // Preset (Flow B) slots in the newly-blocked range: one with active bookings just
-    // gets a heads-up (existing students are unaffected, it just won't take new ones);
-    // one nobody has booked yet is quietly removed since it'll never be filled now.
+    // gets a heads-up (existing students are unaffected via the real-class check above,
+    // it just won't take new ones). One nobody's booked yet is no longer silently
+    // deleted — it's surfaced as its own conflict so the tutor reschedules it
+    // themselves (openCancelSlotModal, the existing "propose new date" flow for a
+    // published slot) or cancels it outright, same as a real booked class must be
+    // resolved before the block can go through.
+    var slotConflicts = [];
     self.blockPresetWarning = '';
     (self.tutor.timetable || []).forEach(function (slot) {
       if (!slot.mode) return; // not a preset slot
@@ -989,15 +990,31 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       if (slot.confirmedCount > 0 && !slot.isFull) {
         self.blockPresetWarning = 'This date has active class bookings. Blocking it will not affect existing students but no new bookings will be accepted.';
       } else if (slot.confirmedCount === 0 && !slot.isFull) {
-        TutorService.deleteSlot(self.tutor.id, slot.id);
+        slotConflicts.push(slot);
       }
     });
 
+    if (conflicts.length || slotConflicts.length) {
+      self.blockConflicts = conflicts;
+      self.blockSlotConflicts = slotConflicts;
+      return;
+    }
+
     self.blockConflicts = [];
+    self.blockSlotConflicts = [];
     self.blockSubmitting = true;
     ScheduleService.addBlock(self.tutor.id, s, e).then(function () { // normalises to YYYY-MM-DD strings
       self.blockForm.startDate = '';
       self.blockForm.endDate = '';
+      // Any unbooked preset slot inside the new range was just auto-deleted
+      // server-side (above) — self.tutor.timetable still has the old copy
+      // until reloaded, so the calendar kept showing those dates as published
+      // slots (and re-flagging them as "still overlapping") until a full page
+      // refresh forced a fresh fetch.
+      return TutorService.getByUser(user.userId).then(function (res) {
+        self.tutor.timetable = res.data.timetable;
+        self._recomputeReportView();
+      });
     }).catch(function (err) {
       self.blockOverlapError = (err.data && err.data.message) || 'Could not save the blocked range. Please try again.';
     }).finally(function () {
@@ -1005,7 +1022,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     });
   };
 
-  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockOverlapError = ''; self.blockPresetWarning = ''; };
+  self.clearBlockConflicts = function () { self.blockConflicts = []; self.blockSlotConflicts = []; self.blockOverlapError = ''; self.blockPresetWarning = ''; };
 
   self.removeBlock = function (idx) {
     ScheduleService.removeBlock(self.tutor.id, idx);
@@ -1493,11 +1510,26 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     TutorService.deleteSlot(self.tutor.id, slot.id, body).then(function () {
       self.cancelSlotBusy = false;
       self.cancelSlotModal = null;
-      TutorService.getByUser(user.userId).then(function (res) {
-        self.tutor = res.data;
-        rebuildSetupClassModesList();
+      // Drop it from the block-conflict list too, if it's showing there — resolved
+      // via reschedule or straight cancel either way, it's no longer in the tutor's
+      // way of confirming the block they were trying to make.
+      self.blockSlotConflicts = self.blockSlotConflicts.filter(function (sc) { return sc.id !== slot.id; });
+      // Waited on together, then recomputed once — self.tutor.timetable (which the
+      // calendar's day bars read for published-slot markers) and self.bookings used
+      // to refresh independently in parallel with no ordering guarantee, so
+      // _setBookings' recompute could run against a still-stale timetable (the
+      // moved/cancelled slot's old date) and nothing re-triggered it once the
+      // tutor reload actually landed — the calendar wouldn't show the change until
+      // an unrelated action (or a full page reload) recomputed it again.
+      $q.all([
+        TutorService.getByUser(user.userId).then(function (res) {
+          self.tutor = res.data;
+          rebuildSetupClassModesList();
+        }),
+        BookingService.getAll().then(function (res) { self.bookings = res.data; })
+      ]).then(function () {
+        self._recomputeReportView();
       });
-      BookingService.getAll().then(function (res) { self._setBookings(res.data); });
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
     }).catch(function (err) {
       self.cancelSlotBusy = false;
@@ -2026,9 +2058,15 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   self.startTutorReschedule = function (booking) {
     self.rescheduleBooking = booking;
-    self.rescheduleForm.classes = (booking.classes || []).map(function (c) {
-      return { originalDate: c.date, originalTime: c.time, proposedDate: c.date, proposedTime: c.time, proposedStartTime: extractStartTime(c.time) };
-    });
+    // Already-completed classes in the same (possibly multi-session) booking are
+    // excluded — there's nothing to reschedule since they already happened, and
+    // pre-filling proposedDate with their own past date made isTooSoon flag them
+    // as "less than 6 hours away", which is technically true but meaningless.
+    self.rescheduleForm.classes = (booking.classes || [])
+      .filter(function (c) { return c.status !== 'completed'; })
+      .map(function (c) {
+        return { originalDate: c.date, originalTime: c.time, proposedDate: c.date, proposedTime: c.time, proposedStartTime: extractStartTime(c.time) };
+      });
     self.rescheduleSuccess = false;
   };
 
