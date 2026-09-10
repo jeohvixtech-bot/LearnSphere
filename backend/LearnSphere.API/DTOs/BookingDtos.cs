@@ -1,3 +1,4 @@
+using LearnSphere.API.Models;
 namespace LearnSphere.API.DTOs;
 
 public class BookingDto
@@ -27,8 +28,17 @@ public class BookingDto
 
 public class BookingClassDto
 {
+    // Ignored on the way in (a new booking's sessions have no id yet); populated on the
+    // way out so a caller can address one specific session — which is what marking a
+    // session delivered needs.
+    public int Id { get; set; }
+
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+
+    // Scheduled | Delivered | Cancelled. Only a delivered session on a paid invoice ever
+    // becomes payable, so this is what the tutor's checklist reflects.
+    public string DeliveryStatus { get; set; } = SessionDeliveryStatus.Scheduled;
 }
 
 public class CreateBookingDto

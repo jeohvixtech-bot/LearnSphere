@@ -26,6 +26,9 @@
       <a href="#!/parent/billing" class="bs-sidebar-link active">
         <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
       </a>
+      <a href="#!/parent/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Credit
+      </a>
       <a href="#!/parent/chat" class="bs-sidebar-link">
         <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
       </a>
@@ -118,7 +121,7 @@
                 </td>
                 <td>{{ inv.subject || '—' }}</td>
                 <td>{{ inv.date | dmy }}</td>
-                <td style="font-family:var(--font-heading); font-weight:600;">${{ inv.amount }}.00</td>
+                <td style="font-family:var(--font-heading); font-weight:600;">{{ inv.amount | currency:'$' }}</td>
                 <td>
                   <span class="bs-tag" ng-class="inv.status === 'Paid' ? 'bs-tag-accent' : (inv.status === 'Cancelled' ? 'bs-tag-neutral' : 'bs-tag-accent-2')">
                     {{ inv.status | uppercase }}

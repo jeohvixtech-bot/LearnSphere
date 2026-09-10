@@ -26,6 +26,9 @@
       <a href="#!/parent/billing" class="bs-sidebar-link">
         <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
       </a>
+      <a href="#!/parent/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Credit
+      </a>
       <a href="#!/parent/chat" class="bs-sidebar-link">
         <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
       </a>
@@ -175,7 +178,7 @@
                 <p style="margin-top:8px;font-weight:700">Pending payments:</p>
                 <ul style="margin:4px 0 0 18px">
                   <li ng-repeat="inv in vm.deleteBlockedInfo.unpaidInvoices">
-                    {{ inv.invoiceNumber }} — ${{ inv.amount }}.00 ({{ inv.tutorName }})
+                    {{ inv.invoiceNumber }} — {{ inv.amount | currency:'$' }} ({{ inv.tutorName }})
                   </li>
                 </ul>
               </div>

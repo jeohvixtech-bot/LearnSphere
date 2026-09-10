@@ -9,6 +9,9 @@
         <a href="#!/tutor/overview" class="bs-sidebar-link active">
           <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
         </a>
+      <a href="#!/tutor/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Earnings
+      </a>
         <a href="#!/tutor/chat" class="bs-sidebar-link">
           <i class="ti ti-message" aria-hidden="true"></i> Direct messages
         </a>
@@ -252,7 +255,7 @@
         <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); margin-bottom:8px;" ng-repeat="b in vm.bookingsOnDay(day)">
           <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
           <strong style="display:block; margin-top:4px;">Child: {{ b.studentName }}</strong>
-          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.classOnDay(b, day).time | hhmma }} ({{ b.durationHours }}h) · ${{ b.totalPrice }}.00</p>
+          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.classOnDay(b, day).time | hhmma }} ({{ b.durationHours }}h) · {{ b.totalPrice | currency:'$' }}</p>
           <p ng-if="vm.isPaid(b.id)" style="color:var(--color-accent-700); font-size:13px; margin-top:4px;">✓ Payment verified. Workspace unlocked.</p>
           <p ng-if="!vm.isPaid(b.id)" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">⏳ Awaiting parent payment to unlock workspace.</p>
         </div>
@@ -716,9 +719,20 @@
           </div>
           <!-- Confirmed: show actual booking classes -->
           <div ng-if="b.status !== 'countered' || !b.counterProposal">
-            <div style="display:flex; align-items:center; gap:8px;" ng-repeat="c in b.classes track by $index">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;" ng-repeat="c in b.classes track by $index">
               <p class="bs-text-muted" style="margin:0; font-size:13px;">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
               <span class="bs-tag bs-tag-accent" ng-if="vm.isStartingSoon(c.date)">STARTING SOON</span>
+
+              <!-- Confirming a session is taught is what makes it payable at the month-end
+                   cutoff. Nothing is settled here — the batch still needs admin approval —
+                   so it stays a toggle rather than a one-way action. -->
+              <span class="bs-tag bs-tag-accent" ng-if="c.deliveryStatus === 'Delivered'">✓ DELIVERED</span>
+              <button type="button" class="bs-btn bs-btn-ghost" style="font-size:12px; padding:2px 6px;"
+                ng-disabled="vm.sessionBusyId === c.id"
+                ng-click="vm.toggleSessionDelivered(b, c)">
+                <span ng-if="c.deliveryStatus !== 'Delivered'">Mark delivered</span>
+                <span ng-if="c.deliveryStatus === 'Delivered'">Undo</span>
+              </button>
             </div>
           </div>
         </div>

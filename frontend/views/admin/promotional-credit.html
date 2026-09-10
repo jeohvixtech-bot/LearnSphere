@@ -1,0 +1,200 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
+      <a href="#!/admin/payment-gateway" class="nav-item">💳 Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">💰 Platform Fees</a>
+      <a href="#!/admin/promotional-credit" class="nav-item active">🎁 Promotional Credit</a>
+      <a href="#!/admin/payouts" class="nav-item">🏦 Payout Batches</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <div class="card">
+      <h3>🎁 Promotional Credit</h3>
+      <p class="text-muted">
+        Non-withdrawable value granted to tutors. It offsets <strong>first match commission</strong>
+        and nothing else — it can never be paid out in cash, and it expires 6 months after it
+        is granted.
+      </p>
+      <p class="text-muted" style="font-size:13px;">
+        Credit is spent automatically: the moment a tutor is charged first-match commission,
+        the oldest grant covers it and the same amount is returned to their withdrawable
+        balance. There is no "apply" step.
+      </p>
+    </div>
+
+    <div class="card" ng-if="vm.commission">
+      <h4>Campaign cost to date</h4>
+      <div style="display:flex; gap:32px; flex-wrap:wrap; margin-top:8px;">
+        <div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">
+            {{ vm.commission.creditGranted | currency:'$' }}
+          </div>
+          <div class="text-muted" style="font-size:11px; text-transform:uppercase;">Granted</div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">
+            {{ vm.commission.creditConsumed | currency:'$' }}
+          </div>
+          <div class="text-muted" style="font-size:11px; text-transform:uppercase;">Actually used</div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">
+            {{ (vm.commission.creditGranted - vm.commission.creditConsumed) | currency:'$' }}
+          </div>
+          <div class="text-muted" style="font-size:11px; text-transform:uppercase;">Outstanding</div>
+        </div>
+      </div>
+      <p class="text-muted" style="font-size:12px; margin-top:10px;">
+        Only the "actually used" figure is real forgone revenue. Outstanding credit costs
+        nothing until a tutor makes a first match, and costs nothing at all if it expires unused.
+      </p>
+    </div>
+
+    <div class="alert-danger" ng-if="vm.creditError">{{ vm.creditError }}</div>
+    <div class="alert-success" ng-if="vm.creditSuccess">{{ vm.creditSuccess }}</div>
+
+    <!-- ── Launch campaign ────────────────────────────────────────── -->
+    <div class="card">
+      <h4>Launch campaign</h4>
+      <p class="text-muted" style="font-size:13px;">
+        Grants credit to the earliest-registered tutors who do not already hold one. Re-running
+        this tops up the cohort — tutors already granted are skipped, never double-paid.
+      </p>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Amount each</label>
+          <input type="number" min="1" step="0.01" ng-model="vm.campaignForm.amount" style="width:120px; padding:8px;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">First N tutors</label>
+          <input type="number" min="1" step="1" ng-model="vm.campaignForm.tutorLimit" style="width:120px; padding:8px;" />
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Reason</label>
+          <input type="text" ng-model="vm.campaignForm.reason" style="width:100%; padding:8px;" />
+        </div>
+        <button class="btn btn-primary" ng-click="vm.runCampaign()" ng-disabled="vm.creditBusy">
+          {{ vm.creditBusy ? 'Working…' : 'Run campaign' }}
+        </button>
+      </div>
+
+      <div class="alert-success" ng-if="vm.campaignResult" style="margin-top:14px;">
+        Granted to {{ vm.campaignResult.tutorsGranted }} tutor(s),
+        {{ vm.campaignResult.totalGranted | currency:'$' }} total.
+        {{ vm.campaignResult.skippedAlreadyGranted }} already held a grant and were skipped.
+      </div>
+    </div>
+
+    <!-- ── Single grant ───────────────────────────────────────────── -->
+    <div class="card">
+      <h4>Grant to one tutor</h4>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Tutor</label>
+          <select ng-model="vm.creditForm.tutorId" style="padding:8px; min-width:220px;">
+            <option ng-value="null">— choose —</option>
+            <option ng-repeat="t in vm.allTutors" ng-value="t.id">
+              {{ t.name }} (credit {{ t.credit | number:2 }})
+            </option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Amount</label>
+          <input type="number" min="0.01" step="0.01" ng-model="vm.creditForm.amount" style="width:120px; padding:8px;" />
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Reason</label>
+          <input type="text" ng-model="vm.creditForm.reason" style="width:100%; padding:8px;"
+            placeholder="e.g. Referral reward — referred Tutor B" />
+        </div>
+        <button class="btn btn-primary" ng-click="vm.grantCredit()" ng-disabled="vm.creditBusy">Grant</button>
+      </div>
+    </div>
+
+    <!-- ── Parent wallet credit ───────────────────────────────────── -->
+    <div class="card">
+      <h4>Parent wallet credit</h4>
+      <p class="text-muted" style="font-size:13px;">
+        Credit a parent can spend on any LearnSphere invoice — goodwill, compensation, or
+        settling a dispute in their favour. Like a refund credit it is
+        <strong>non-withdrawable</strong> and expires 6 months from today. Refunds land in
+        the same wallet automatically, so this is only for grants outside a refund.
+      </p>
+
+      <div class="alert-danger" ng-if="vm.walletError">{{ vm.walletError }}</div>
+      <div class="alert-success" ng-if="vm.walletSuccess">{{ vm.walletSuccess }}</div>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Parent</label>
+          <select ng-model="vm.walletForm.parentUserId" style="padding:8px; min-width:260px;">
+            <option ng-value="null">— choose —</option>
+            <option ng-repeat="p in vm.allParents" ng-value="p.id">
+              {{ p.name }} ({{ p.email }}) — wallet {{ p.balance | number:2 }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Amount</label>
+          <input type="number" min="0.01" step="0.01" ng-model="vm.walletForm.amount" style="width:120px; padding:8px;" />
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Reason</label>
+          <input type="text" ng-model="vm.walletForm.reason" style="width:100%; padding:8px;"
+            placeholder="e.g. Goodwill for a cancelled class" />
+        </div>
+        <button class="btn btn-primary" ng-click="vm.grantWalletCredit()" ng-disabled="vm.walletBusy">
+          {{ vm.walletBusy ? 'Working…' : 'Add credit' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Manual adjustment ──────────────────────────────────────── -->
+    <div class="card">
+      <h4>Balance adjustment</h4>
+      <p class="text-muted" style="font-size:13px;">
+        A signed correction to a tutor's <strong>withdrawable</strong> balance — fee adjustment,
+        extra compensation, or fixing something that went wrong. Negative claws money back.
+        Every adjustment is recorded permanently and is never re-derived away.
+      </p>
+
+      <div class="alert-danger" ng-if="vm.adjustError">{{ vm.adjustError }}</div>
+      <div class="alert-success" ng-if="vm.adjustSuccess">{{ vm.adjustSuccess }}</div>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Tutor</label>
+          <select ng-model="vm.adjustForm.tutorId" style="padding:8px; min-width:220px;">
+            <option ng-value="null">— choose —</option>
+            <option ng-repeat="t in vm.allTutors" ng-value="t.id">
+              {{ t.name }} (balance {{ t.withdrawable | number:2 }})
+            </option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Amount (± )</label>
+          <input type="number" step="0.01" ng-model="vm.adjustForm.amount" style="width:120px; padding:8px;" />
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <label style="display:block; font-size:12px; text-transform:uppercase;" class="text-muted">Reason (required)</label>
+          <input type="text" ng-model="vm.adjustForm.reason" style="width:100%; padding:8px;" />
+        </div>
+        <button class="btn btn-primary" ng-click="vm.submitAdjustment()" ng-disabled="vm.adjustBusy">Apply</button>
+      </div>
+    </div>
+
+  </main>
+</div>

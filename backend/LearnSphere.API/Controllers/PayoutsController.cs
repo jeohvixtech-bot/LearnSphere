@@ -40,6 +40,8 @@ public class PayoutsController : ControllerBase
         {
             Withdrawable = balance.Withdrawable,
             Credit = balance.Credit,
+            CreditExpiringSoon = balance.CreditExpiringSoon,
+            NextCreditExpiryAt = balance.NextCreditExpiryAt,
             Total = balance.Total
         });
     }
@@ -84,44 +86,29 @@ public class PayoutsController : ControllerBase
         return Ok(payouts.Select(MapToDto));
     }
 
+    // Tutors do not request payouts, and this endpoint deliberately refuses.
+    //
+    // It predates the monthly payout run and drew straight against the ledger balance,
+    // which is NOT the same thing as what a tutor is owed: the balance recognises an
+    // earning the moment a parent's invoice is paid, while money may only be transferred
+    // for sessions that have actually been delivered. Left enabled, a tutor could cash out
+    // a month of lessons the day they were paid for and before any of them were taught —
+    // bypassing the one gate that stops the platform paying for teaching that never
+    // happened.
+    //
+    // Kept as an explicit refusal rather than deleted so an older client gets an
+    // explanation instead of a 404. Payouts are calculated at the month-end cutoff and
+    // released as an admin-approved batch — see PayoutBatchService.
     [HttpPost]
-    public async Task<IActionResult> Request([FromBody] RequestPayoutDto dto)
+    public IActionResult RequestPayout([FromBody] RequestPayoutDto dto)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.UserId == userId);
-        if (tutor == null) return NotFound(new { message = "Tutor profile not found." });
-
-        // Available balance now comes from the ledger rather than being re-derived from
-        // three separate sums here. Same number by construction — reconciliation writes an
-        // entry per paid invoice, payout and penalty — but with an auditable trail behind
-        // it, and one definition of "balance" shared with the dashboard.
-        await _ledger.ReconcileTutorAsync(tutor.Id);
-        var balance = await _ledger.GetBalanceAsync(tutor.Id);
-
-        if (dto.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        // Only the withdrawable fund can be cashed out. Credit is deliberately excluded:
-        // it exists to offset platform charges, never to be paid out.
-        if (dto.Amount > balance.Withdrawable)
-            return BadRequest(new { message = $"Insufficient balance. Available: {balance.Withdrawable:F2}" });
-
-        var payout = new Payout
+        return BadRequest(new
         {
-            TutorId = tutor.Id,
-            Amount = dto.Amount,
-            Date = DateTime.Now.ToString("yyyy-MM-dd"),
-            Status = "Processing"
-        };
-
-        _context.Payouts.Add(payout);
-        await _context.SaveChangesAsync();
-
-        // Debit immediately, so a second request in the same session can't spend the same
-        // funds twice while waiting for the next reconciliation pass.
-        await _ledger.ReconcileTutorAsync(tutor.Id);
-
-        return Ok(MapToDto(payout));
+            message = "Payouts are no longer requested. Your earnings for each month are " +
+                      "calculated automatically at the month-end cutoff, once your sessions " +
+                      "are delivered and the parent's invoice is settled, and transferred in " +
+                      "the first week of the following month."
+        });
     }
 
     private static PayoutDto MapToDto(Payout p) => new()

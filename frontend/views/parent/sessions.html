@@ -26,6 +26,9 @@
       <a href="#!/parent/billing" class="bs-sidebar-link">
         <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
       </a>
+      <a href="#!/parent/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Credit
+      </a>
       <a href="#!/parent/chat" class="bs-sidebar-link">
         <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
       </a>
@@ -169,9 +172,24 @@
         </div>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
-        <span>Total</span>
-        <strong style="font-family:var(--font-heading); font-size:18px;">${{ vm.payingBooking.totalPrice }}.00</strong>
+      <!-- Quotes what will actually be charged. The tutor's price is only part of it:
+           the platform markup is added on top, and showing the base here would name a
+           figure the parent is then not charged. -->
+      <div style="display:flex; flex-direction:column; gap:4px; padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
+        <div style="display:flex; justify-content:space-between; font-size:13px;" ng-if="vm.markupPercent > 0">
+          <span class="bs-text-muted">Tuition</span>
+          <span>{{ vm.payingBooking.totalPrice | currency:'$' }}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px;" ng-if="vm.markupPercent > 0">
+          <span class="bs-text-muted">Platform fee ({{ vm.markupPercent }}%)</span>
+          <span>{{ vm.markupOn(vm.payingBooking.totalPrice) | currency:'$' }}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Total</span>
+          <strong style="font-family:var(--font-heading); font-size:18px;">
+            {{ vm.billedTotal(vm.payingBooking.totalPrice) | currency:'$' }}
+          </strong>
+        </div>
       </div>
 
       <div style="display:flex; gap:var(--space-2);">
@@ -310,7 +328,7 @@
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
           <div>
             <small class="bs-text-muted">Total</small><br/>
-            <strong style="font-family:var(--font-heading); font-size:18px;">${{ b.totalPrice }}.00</strong>
+            <strong style="font-family:var(--font-heading); font-size:18px;">{{ vm.billedTotal(b.totalPrice) | currency:'$' }}</strong>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:6px;">
             <button class="bs-btn bs-btn-primary"

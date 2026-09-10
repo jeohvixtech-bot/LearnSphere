@@ -30,7 +30,7 @@ public class TutorsControllerReviewTests
         string callerName = "TestUser",
         string callerRole = "parent")
     {
-        var ctrl = new TutorsController(db);
+        var ctrl = TestControllerFactory.Tutors(db);
 
         var claims = new[]
         {

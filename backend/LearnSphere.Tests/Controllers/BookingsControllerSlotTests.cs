@@ -23,7 +23,7 @@ public class BookingsControllerSlotTests
     private static (BookingsController controller, LearnSphere.API.Data.AppDbContext db) BuildSut()
     {
         var db   = TestDbContextFactory.Create();
-        var ctrl = new BookingsController(db);
+        var ctrl = TestControllerFactory.Bookings(db);
         return (ctrl, db);
     }
 
@@ -45,7 +45,7 @@ public class BookingsControllerSlotTests
             TotalPrice   = 50m,
             Classes      = new List<BookingClassDto>
             {
-                new() { Date = "2026-08-01", Time = "10:00" }
+                new() { Date = "2026-08-01", Time = "10:00 AM - 11:00 AM" }
             }
         };
 
@@ -62,7 +62,7 @@ public class BookingsControllerSlotTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        var tutor = new Tutor { UserId = user.Id };
+        var tutor = new Tutor { UserId = user.Id, IsVerified = true, IsOnline = true };
         db.Tutors.Add(tutor);
 
         var parent = new User { Email = "p@p.com", PasswordHash = "x", Role = "parent", Name = "Parent", CreatedAt = DateTime.UtcNow };
@@ -95,8 +95,8 @@ public class BookingsControllerSlotTests
         db.Users.AddRange(userA, userB);
         await db.SaveChangesAsync();
 
-        var tutorA = new Tutor { UserId = userA.Id };
-        var tutorB = new Tutor { UserId = userB.Id };
+        var tutorA = new Tutor { UserId = userA.Id, IsVerified = true, IsOnline = true };
+        var tutorB = new Tutor { UserId = userB.Id, IsVerified = true, IsOnline = true };
         db.Tutors.AddRange(tutorA, tutorB);
         await db.SaveChangesAsync();
 
@@ -134,7 +134,7 @@ public class BookingsControllerSlotTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        var tutor = new Tutor { UserId = user.Id };
+        var tutor = new Tutor { UserId = user.Id, IsVerified = true, IsOnline = true };
         db.Tutors.Add(tutor);
 
         var parent = new User { Email = "p@p.com", PasswordHash = "x", Role = "parent", Name = "Parent", CreatedAt = DateTime.UtcNow };

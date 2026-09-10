@@ -39,7 +39,7 @@ public class SlotPropertyTests
         db.Users.Add(tutorUser);
         db.SaveChanges();
 
-        var tutor = new Tutor { UserId = tutorUser.Id };
+        var tutor = new Tutor { UserId = tutorUser.Id, IsVerified = true, IsOnline = true };
         db.Tutors.Add(tutor);
         db.SaveChanges();
 
@@ -84,9 +84,7 @@ public class SlotPropertyTests
     private static BookingsController BuildController(
         LearnSphere.API.Data.AppDbContext db, User parentUser)
     {
-        return new BookingsController(db)
-        {
-            ControllerContext = new ControllerContext
+        return TestControllerFactory.Bookings(db).WithControllerContext(new ControllerContext
             {
                 HttpContext = new DefaultHttpContext
                 {
@@ -99,8 +97,7 @@ public class SlotPropertyTests
                         },
                         authenticationType: "Test"))
                 }
-            }
-        };
+            });
     }
 
     // ── Property 7 ──────────────────────────────────────────────────────────
@@ -171,7 +168,7 @@ public class SlotPropertyTests
                 TotalPrice   = 50m,
                 Classes      = new List<BookingClassDto>
                 {
-                    new BookingClassDto { Date = "2025-09-01", Time = "10:00" }
+                    new BookingClassDto { Date = "2025-09-01", Time = "10:00 AM - 11:00 AM" }
                 }
             };
 
@@ -250,7 +247,7 @@ public class SlotPropertyTests
                 TotalPrice    = 75m,
                 Classes       = new List<BookingClassDto>
                 {
-                    new BookingClassDto { Date = "2025-09-15", Time = "14:00" }
+                    new BookingClassDto { Date = "2025-09-15", Time = "02:00 PM - 03:00 PM" }
                 }
             };
 

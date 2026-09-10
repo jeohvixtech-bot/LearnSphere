@@ -86,9 +86,7 @@ public class ReviewPropertyTests
             db.SaveChanges();
 
             // Build the controller with the parent's identity claims
-            var controller = new TutorsController(db)
-            {
-                ControllerContext = new ControllerContext
+            var controller = TestControllerFactory.Tutors(db).WithControllerContext(new ControllerContext
                 {
                     HttpContext = new DefaultHttpContext
                     {
@@ -101,8 +99,7 @@ public class ReviewPropertyTests
                             },
                             authenticationType: "Test"))
                     }
-                }
-            };
+                });
 
             // Act — synchronous wrapper required because FsCheck [Property] doesn't
             // support async Task return values in FsCheck.Xunit 3.x
@@ -222,9 +219,7 @@ public class ReviewPropertyTests
             db.SaveChanges();
 
             // Build controller with parent role claim
-            var controller = new TutorsController(db)
-            {
-                ControllerContext = new ControllerContext
+            var controller = TestControllerFactory.Tutors(db).WithControllerContext(new ControllerContext
                 {
                     HttpContext = new DefaultHttpContext
                     {
@@ -237,8 +232,7 @@ public class ReviewPropertyTests
                             },
                             authenticationType: "Test"))
                     }
-                }
-            };
+                });
 
             // Act — synchronous wrapper required because FsCheck [Property] doesn't
             // support async Task return values in FsCheck.Xunit 3.x
@@ -367,9 +361,7 @@ public class ReviewPropertyTests
             db.SaveChanges();
 
             // Build the controller with the parent's identity claims
-            var controller = new TutorsController(db)
-            {
-                ControllerContext = new ControllerContext
+            var controller = TestControllerFactory.Tutors(db).WithControllerContext(new ControllerContext
                 {
                     HttpContext = new DefaultHttpContext
                     {
@@ -382,8 +374,7 @@ public class ReviewPropertyTests
                             },
                             authenticationType: "Test"))
                     }
-                }
-            };
+                });
 
             var dto = new CreateReviewDto
             {
@@ -507,9 +498,7 @@ public class ReviewPropertyTests
             int reviewsBefore = db.TutorReviews.Count();
 
             // Build controller with parent identity
-            var controller = new TutorsController(db)
-            {
-                ControllerContext = new ControllerContext
+            var controller = TestControllerFactory.Tutors(db).WithControllerContext(new ControllerContext
                 {
                     HttpContext = new DefaultHttpContext
                     {
@@ -522,8 +511,7 @@ public class ReviewPropertyTests
                             },
                             authenticationType: "Test"))
                     }
-                }
-            };
+                });
 
             // Act
             var result = controller.AddReview(tutor.Id, new CreateReviewDto
@@ -618,9 +606,7 @@ public class ReviewPropertyTests
             int reviewsBefore = db.TutorReviews.Count();
 
             // Build controller with parent identity
-            var controller = new TutorsController(db)
-            {
-                ControllerContext = new ControllerContext
+            var controller = TestControllerFactory.Tutors(db).WithControllerContext(new ControllerContext
                 {
                     HttpContext = new DefaultHttpContext
                     {
@@ -633,8 +619,7 @@ public class ReviewPropertyTests
                             },
                             authenticationType: "Test"))
                     }
-                }
-            };
+                });
 
             // Act
             var result = controller.AddReview(tutor.Id, new CreateReviewDto

@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'PaymentService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, PaymentService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'PaymentService', 'WalletService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, PaymentService, WalletService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -607,7 +607,95 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   };
 
   // Load data
+  // ── Platform markup ─────────────────────────────────────────────────
+  // A tutor's price is not what the parent pays: the platform adds a markup on top, and
+  // the invoice raised at booking time carries the marked-up total. Booking screens quote
+  // the figure below rather than the tutor's price, because a confirmation dialog that
+  // says one number and charges another is how trust in a payment flow is lost.
+  //
+  // Read from the payment config because at quoting time no invoice exists yet to read it
+  // from. Defaults to 0, so if the config never loads the parent sees the tutor's price
+  // rather than a wrong marked-up guess.
+  self.markupPercent = 0;
+
+  self.markupOn = function (base) {
+    var b = parseFloat(base) || 0;
+    return Math.round(b * (self.markupPercent / 100) * 100) / 100;
+  };
+
+  // What the parent will actually be billed for a given tutor-side price.
+  self.billedTotal = function (base) {
+    var b = parseFloat(base) || 0;
+    return Math.round((b + b * (self.markupPercent / 100)) * 100) / 100;
+  };
+
+  // ── Wallet (Parent → Wallet) ────────────────────────────────────────
+  // Non-withdrawable credit that can settle any LearnSphere invoice. Refunds land here by
+  // default, and it expires 6 months after it is granted — which is why the balance card
+  // warns about what is about to lapse rather than only showing a total.
+  self.wallet = null;
+  self.walletStatement = [];
+  self.walletError = '';
+  self.walletBusy = false;
+  self.walletSuccess = '';
+
+  var WALLET_LABELS = {
+    refund_credit: 'Refund credited',
+    adjustment: 'Adjustment',
+    payment_usage: 'Applied to invoice',
+    expiry: 'Credit expired'
+  };
+
+  self.walletLabel = function (type) { return WALLET_LABELS[type] || type; };
+
+  self.loadWallet = function () {
+    return WalletService.getBalance().then(function (res) {
+      self.wallet = res.data;
+    }).catch(function () { self.walletError = 'Wallet unavailable'; });
+  };
+
+  self.loadWalletStatement = function () {
+    return WalletService.getStatement().then(function (res) {
+      self.walletStatement = res.data;
+    }).catch(function () { self.walletStatement = []; });
+  };
+
+  // Invoices this parent could still spend credit on.
+  self.payableInvoices = function () {
+    return (self.invoices || []).filter(function (i) { return i.status === 'Unpaid'; });
+  };
+
+  // Spends credit against one invoice. If credit covers the bill outright the invoice is
+  // settled here and needs no card at all; a partial application just reduces what is left
+  // to pay at checkout.
+  self.applyWalletCredit = function (invoice) {
+    if (self.walletBusy) return;
+    self.walletError = '';
+    self.walletSuccess = '';
+    self.walletBusy = true;
+
+    WalletService.apply(invoice.id, 0).then(function (res) {
+      self.walletBusy = false;
+      self.walletSuccess = res.data.settled
+        ? 'Invoice ' + invoice.invoiceNumber + ' settled in full using ' +
+          res.data.applied.toFixed(2) + ' of credit.'
+        : res.data.applied.toFixed(2) + ' applied. ' + res.data.cashDue.toFixed(2) + ' still to pay by card.';
+
+      self.loadWallet();
+      self.loadWalletStatement();
+      InvoiceService.getAll().then(function (r) { self.invoices = r.data; });
+    }).catch(function (err) {
+      self.walletBusy = false;
+      self.walletError = (err.data && err.data.message) || 'Could not apply your credit. Please try again.';
+    });
+  };
+
   function init() {
+    self.loadWallet();
+    self.loadWalletStatement();
+    PaymentService.getConfig().then(function (cfg) {
+      self.markupPercent = cfg.markupPercent || 0;
+    });
     // Consumed synchronously up front (PendingMatchService is a plain in-memory
     // store, no async needed) so both loads below — which run in parallel with no
     // guaranteed order — can agree on the same values regardless of which

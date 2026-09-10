@@ -74,6 +74,9 @@
       <a href="#!/parent/billing" class="bs-sidebar-link">
         <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
       </a>
+      <a href="#!/parent/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Credit
+      </a>
       <a href="#!/parent/chat" class="bs-sidebar-link">
         <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
       </a>
@@ -118,12 +121,12 @@
         <p style="margin:0; font-size:13px;">Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-2);">
           <span class="bs-tag bs-tag-neutral" ng-repeat="inv in vm.pendingPayments()">
-            {{ inv.subject }} · <strong>${{ inv.amount }}.00</strong>
+            {{ inv.subject }} · <strong>{{ inv.amount | currency:'$' }}</strong>
           </span>
         </div>
       </div>
       <button class="bs-btn bs-btn-primary" ng-click="vm.payInvoice(vm.pendingPayments()[0].id)">
-        Pay Now (${{ vm.pendingPayments()[0].amount }}.00)
+        Pay Now ({{ vm.pendingPayments()[0].amount | currency:'$' }})
       </button>
     </div>
 

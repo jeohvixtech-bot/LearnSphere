@@ -71,7 +71,7 @@ public class PayoutPropertyTests
             db.SaveChanges();
 
             // Build the AdminController (no auth claims needed — controller just uses db)
-            var controller = new AdminController(db);
+            var controller = TestControllerFactory.Admin(db);
 
             // Act — PATCH /api/admin/payouts/{id}/approve
             var result = controller.ApprovePayout(payout.Id)

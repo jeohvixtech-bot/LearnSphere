@@ -42,6 +42,9 @@ public class AppDbContext : DbContext
     public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
     public DbSet<TutorLedgerEntry> TutorLedgerEntries { get; set; }
     public DbSet<CommissionSetting> CommissionSettings { get; set; }
+    public DbSet<ParentWalletEntry> ParentWalletEntries { get; set; }
+    public DbSet<TutorPayable> TutorPayables { get; set; }
+    public DbSet<PayoutBatch> PayoutBatches { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -202,9 +205,69 @@ public class AppDbContext : DbContext
             .IsUnique()
             .HasFilter("[BookingId] IS NOT NULL");
 
-        modelBuilder.Entity<CommissionSetting>()
-            .Property(c => c.RatePercent)
-            .HasPrecision(5, 2);
+        modelBuilder.Entity<CommissionSetting>(entity =>
+        {
+            entity.Property(c => c.RatePercent).HasPrecision(5, 2);
+            entity.Property(c => c.MarkupPercent).HasPrecision(5, 2);
+            entity.Property(c => c.FirstMatchCommissionPercent).HasPrecision(5, 2);
+        });
+
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.Property(i => i.Amount).HasPrecision(10, 2);
+            entity.Property(i => i.BaseAmount).HasPrecision(10, 2);
+            entity.Property(i => i.MarkupAmount).HasPrecision(10, 2);
+            entity.Property(i => i.MarkupPercent).HasPrecision(5, 2);
+            entity.Property(i => i.WalletCreditApplied).HasPrecision(10, 2);
+
+            // Derived from Amount and WalletCreditApplied — a column would be a second
+            // place for the same fact to live, and therefore a place for it to drift.
+            entity.Ignore(i => i.CashDue);
+        });
+
+        modelBuilder.Entity<ParentWalletEntry>(entity =>
+        {
+            entity.Property(e => e.Amount).HasPrecision(10, 2);
+
+            // Every balance read filters on the parent; consumption walks their grants.
+            entity.HasIndex(e => e.ParentUserId).HasDatabaseName("IX_ParentWalletEntries_ParentUserId");
+            entity.HasIndex(e => e.InvoiceId).HasDatabaseName("IX_ParentWalletEntries_InvoiceId");
+            entity.HasIndex(e => e.SourceEntryId).HasDatabaseName("IX_ParentWalletEntries_SourceEntryId");
+
+            entity.HasOne(e => e.ParentUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.ParentUserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TutorPayable>(entity =>
+        {
+            entity.Property(p => p.Amount).HasPrecision(10, 2);
+
+            // One payable per tutor per period. The cutoff can therefore be re-run without
+            // creating a second claim on the same month's money.
+            entity.HasIndex(p => new { p.TutorId, p.Period })
+                  .IsUnique()
+                  .HasDatabaseName("UQ_TutorPayable_Tutor_Period");
+
+            entity.HasOne(p => p.Tutor)
+                  .WithMany()
+                  .HasForeignKey(p => p.TutorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.PayoutBatch)
+                  .WithMany(b => b.Payables)
+                  .HasForeignKey(p => p.PayoutBatchId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<PayoutBatch>(entity =>
+        {
+            entity.Property(b => b.TotalAmount).HasPrecision(12, 2);
+
+            // One batch per period, so "has September been paid?" has a single answer.
+            entity.HasIndex(b => b.Period).IsUnique().HasDatabaseName("UQ_PayoutBatch_Period");
+        });
 
         modelBuilder.Entity<TutorLedgerEntry>(entity =>
         {

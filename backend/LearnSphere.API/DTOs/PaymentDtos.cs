@@ -48,15 +48,38 @@ public class CommissionSettingDto
     public DateTime? EffectiveFrom { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
-    // How much has actually been charged under this scheme so far — the figure that makes
-    // the page meaningful rather than just a number in a box.
+    // Added on top of the base price; paid by the parent.
+    public decimal MarkupPercent { get; set; }
+
+    // Taken out of the base price on a match's first tuition period; paid by the tutor.
+    public decimal FirstMatchCommissionPercent { get; set; }
+    public DateTime? FirstMatchEffectiveFrom { get; set; }
+
+    // How much has actually been charged under this scheme so far — the figures that make
+    // the page meaningful rather than just numbers in a box. Each fee line is reported
+    // separately because they come from different pockets.
     public decimal TotalChargedToDate { get; set; }
     public int InvoicesCharged { get; set; }
+
+    public decimal TotalMarkupToDate { get; set; }
+    public decimal TotalFirstMatchToDate { get; set; }
+    public int FirstMatchesCharged { get; set; }
+
+    // Promotional credit the platform has granted, and how much of it has been spent
+    // offsetting first-match commission — the true cost of the launch campaign.
+    public decimal CreditGranted { get; set; }
+    public decimal CreditConsumed { get; set; }
 }
 
 public class UpdateCommissionSettingDto
 {
     public decimal RatePercent { get; set; }
+    public decimal MarkupPercent { get; set; }
+    public decimal FirstMatchCommissionPercent { get; set; }
+
+    // Turns first-match commission on from now. Leaving it false lets an admin adjust the
+    // rate without arming it, which is the safe default for a fee this large.
+    public bool EnableFirstMatchCommission { get; set; }
 }
 
 public class PaymentConfigDto
@@ -65,6 +88,12 @@ public class PaymentConfigDto
     public string Provider { get; set; } = "hitpay";
     public string Currency { get; set; } = "SGD";
     public string Mode { get; set; } = "sandbox";
+
+    // The platform markup added on top of a tutor's price. Sent to the client so a booking
+    // screen can quote what the parent will actually be billed — before the booking exists
+    // there is no invoice to read it from, and quoting the tutor's base price would show a
+    // total that does not match the amount charged moments later.
+    public decimal MarkupPercent { get; set; }
 }
 
 public class CheckoutResponseDto

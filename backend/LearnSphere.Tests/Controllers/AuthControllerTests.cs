@@ -7,6 +7,7 @@ using LearnSphere.API.Services;
 using LearnSphere.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LearnSphere.Tests.Controllers;
 
@@ -37,8 +38,9 @@ public class AuthControllerTests
     private static (AuthController controller, AppDbContext db) BuildSut()
     {
         var db      = TestDbContextFactory.Create();
-        var service = new AuthService(db, BuildConfig());
-        var ctrl    = new AuthController(service);
+        var service = new AuthService(db, BuildConfig(), TestControllerFactory.Email());
+        var ctrl    = new AuthController(service, TestControllerFactory.Environment(),
+                                         NullLogger<AuthController>.Instance);
         return (ctrl, db);
     }
 

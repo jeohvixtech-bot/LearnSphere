@@ -47,6 +47,9 @@ builder.Services.AddHttpClient("hitpay", client =>
 });
 builder.Services.AddScoped<IHitPayService, HitPayService>();
 builder.Services.AddScoped<ITutorLedgerService, TutorLedgerService>();
+builder.Services.AddScoped<IPlatformFeeService, PlatformFeeService>();
+builder.Services.AddScoped<IParentWalletService, ParentWalletService>();
+builder.Services.AddScoped<IPayoutBatchService, PayoutBatchService>();
 // Real SMTP delivery once BOTH "Smtp:Host" and "Smtp:Password" are set (Password
 // is meant to come from user-secrets/environment, never committed to
 // appsettings.json) — falls back to logging emails to the console otherwise, so
@@ -2559,6 +2562,128 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
     try { await context.Database.ExecuteSqlRawAsync(@"
         INSERT INTO `CommissionSettings` (`RatePercent`) SELECT 0
         WHERE NOT EXISTS (SELECT 1 FROM `CommissionSettings`)"); } catch { }
+
+    // ── Operational financial flow ──────────────────────────────────────
+    // Platform markup (charged to the parent, on top of the base price) and the one-time
+    // first-match commission (charged to the tutor, out of the base price). Both default
+    // to the launch model's rates; FirstMatchEffectiveFrom stays NULL so nothing is
+    // charged retroactively until an admin switches it on.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CommissionSettings` ADD COLUMN `MarkupPercent` DECIMAL(5,2) NOT NULL DEFAULT 15"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CommissionSettings` ADD COLUMN `FirstMatchCommissionPercent` DECIMAL(5,2) NOT NULL DEFAULT 100"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CommissionSettings` ADD COLUMN `FirstMatchEffectiveFrom` DATETIME(6) NULL"); } catch { }
+
+    // Invoices gain a fee breakdown. Amount keeps its meaning ("what the parent is
+    // billed") so nothing that already reads it changes behaviour.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `BaseAmount` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `MarkupAmount` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `MarkupPercent` DECIMAL(5,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `IsFirstMatch` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `WalletCreditApplied` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+
+    // Invoices raised before markup existed billed exactly the base price, so that is what
+    // their base is. Guarded on BaseAmount = 0 to stay idempotent across restarts.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "UPDATE `Invoices` SET `BaseAmount` = `Amount` WHERE `BaseAmount` = 0"); } catch { }
+
+    // Mark historical invoices that opened a match, so first-match commission has
+    // something to key on if it is ever switched on for existing data.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        UPDATE `Invoices` i
+        JOIN `StudentTutorFirstClasses` f ON f.`BookingId` = i.`BookingId`
+        SET i.`IsFirstMatch` = 1
+        WHERE i.`IsFirstMatch` = 0"); } catch { }
+
+    // Per-session delivery status — the gate on paying a tutor for a lesson that actually
+    // happened. Sessions already in the past are backfilled as Delivered, which matches
+    // the existing behaviour of auto-completing a booking once all its dates have passed.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `BookingClasses` ADD COLUMN `DeliveryStatus` VARCHAR(20) NOT NULL DEFAULT 'Scheduled'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `BookingClasses` ADD COLUMN `DeliveredAt` DATETIME(6) NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "UPDATE `BookingClasses` SET `DeliveryStatus` = 'Delivered' " +
+        "WHERE `DeliveryStatus` = 'Scheduled' AND `Date` < DATE_FORMAT(CURDATE(), '%Y-%m-%d')"); } catch { }
+
+    // Links a credit consumption/expiry back to the grant it draws down, so promotional
+    // credit can be spent oldest-first and expire per grant without ever editing a row.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorLedgerEntries` ADD COLUMN `SourceEntryId` INT NULL"); } catch { }
+
+    // ── Parent wallet ───────────────────────────────────────────────────
+    // Non-withdrawable credit that can pay any LearnSphere invoice. Same append-only rules
+    // as the tutor ledger.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ParentWalletEntries` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `ParentUserId` INT NOT NULL,
+            `Type` VARCHAR(40) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `InvoiceId` INT NULL,
+            `SourceEntryId` INT NULL,
+            `Reason` VARCHAR(500) NOT NULL DEFAULT '',
+            `ExpiresAt` DATETIME(6) NULL,
+            `CreatedByUserId` INT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_ParentWalletEntries_ParentUserId` (`ParentUserId`),
+            KEY `IX_ParentWalletEntries_InvoiceId` (`InvoiceId`),
+            KEY `IX_ParentWalletEntries_SourceEntryId` (`SourceEntryId`),
+            CONSTRAINT `FK_ParentWalletEntries_Users` FOREIGN KEY (`ParentUserId`)
+                REFERENCES `Users` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // ── Payout batches ──────────────────────────────────────────────────
+    // Created before TutorPayables because a payable points at a batch.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PayoutBatches` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BatchNumber` VARCHAR(40) NOT NULL DEFAULT '',
+            `Period` VARCHAR(7) NOT NULL DEFAULT '',
+            `TotalAmount` DECIMAL(12,2) NOT NULL DEFAULT 0,
+            `TutorCount` INT NOT NULL DEFAULT 0,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `ApprovedAt` DATETIME(6) NULL,
+            `ApprovedByUserId` INT NULL,
+            `TransferredAt` DATETIME(6) NULL,
+            `TransferredByUserId` INT NULL,
+            `Notes` VARCHAR(1000) NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_PayoutBatch_Period` (`Period`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorPayables` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `Period` VARCHAR(7) NOT NULL DEFAULT '',
+            `PeriodStart` VARCHAR(10) NOT NULL DEFAULT '',
+            `PeriodEnd` VARCHAR(10) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `SessionCount` INT NOT NULL DEFAULT 0,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            `PayoutBatchId` INT NULL,
+            `PayoutId` INT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_TutorPayable_Tutor_Period` (`TutorId`, `Period`),
+            KEY `IX_TutorPayables_PayoutBatchId` (`PayoutBatchId`),
+            CONSTRAINT `FK_TutorPayables_Tutors` FOREIGN KEY (`TutorId`)
+                REFERENCES `Tutors` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_TutorPayables_PayoutBatches` FOREIGN KEY (`PayoutBatchId`)
+                REFERENCES `PayoutBatches` (`Id`) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
 
     await DbSeeder.SeedAsync(context);
 

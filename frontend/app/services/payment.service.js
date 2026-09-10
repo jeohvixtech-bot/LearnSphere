@@ -23,7 +23,9 @@ angular.module('learnSphereApp')
           // to the legacy path rather than blocking entirely. The backend still refuses
           // the legacy path whenever the gateway really is armed, so this cannot be used
           // to slip past a live gateway.
-          return { gatewayEnabled: false, currency: 'SGD', mode: 'sandbox' };
+          // markupPercent 0 rather than absent: a booking screen multiplies by it, and
+          // an undefined here would quote the parent "$NaN".
+          return { gatewayEnabled: false, currency: 'SGD', mode: 'sandbox', markupPercent: 0 };
         });
     }
     return configPromise;

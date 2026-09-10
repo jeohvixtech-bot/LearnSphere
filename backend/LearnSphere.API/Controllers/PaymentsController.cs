@@ -17,14 +17,16 @@ public class PaymentsController : ControllerBase
     private readonly AppDbContext _context;
     private readonly IHitPayService _hitPay;
     private readonly ITutorLedgerService _ledger;
+    private readonly IPlatformFeeService _fees;
     private readonly ILogger<PaymentsController> _logger;
 
     public PaymentsController(AppDbContext context, IHitPayService hitPay,
-        ITutorLedgerService ledger, ILogger<PaymentsController> logger)
+        ITutorLedgerService ledger, IPlatformFeeService fees, ILogger<PaymentsController> logger)
     {
         _context = context;
         _hitPay = hitPay;
         _ledger = ledger;
+        _fees = fees;
         _logger = logger;
     }
 
@@ -120,12 +122,14 @@ public class PaymentsController : ControllerBase
         // checkout that cannot possibly succeed — report it as off so the caller falls
         // back to the legacy path instead.
         var usable = setting.IsEnabled && !string.IsNullOrWhiteSpace(setting.ApiKey);
+        var fees = await _fees.GetSettingsAsync();
         return Ok(new PaymentConfigDto
         {
             GatewayEnabled = usable,
             Provider = setting.Provider,
             Currency = setting.Currency,
-            Mode = setting.Mode
+            Mode = setting.Mode,
+            MarkupPercent = fees.MarkupPercent
         });
     }
 
@@ -155,6 +159,13 @@ public class PaymentsController : ControllerBase
         if (!setting.IsEnabled || string.IsNullOrWhiteSpace(setting.ApiKey))
             return BadRequest(new { message = "Online payment is not available right now. Please contact support." });
 
+        // Only the CASH balance goes to the gateway. Wallet credit the parent already
+        // applied has settled part of this bill, and charging the full Amount would take
+        // that money from them a second time.
+        var cashDue = invoice.CashDue;
+        if (cashDue <= 0m)
+            return BadRequest(new { message = "This invoice is already covered by your wallet credit. Apply it from your wallet to settle the invoice." });
+
         var apiBaseUrl = ResolveApiBaseUrl(setting);
 
         // Persisted before the outbound call so the row's own id can be the redirect
@@ -165,7 +176,7 @@ public class PaymentsController : ControllerBase
             InvoiceId = invoice.Id,
             Provider = setting.Provider,
             ReferenceNumber = invoice.InvoiceNumber,
-            Amount = invoice.Amount,
+            Amount = cashDue,
             Currency = setting.Currency,
             Status = "pending",
             ResolvedVia = "checkout",
@@ -192,7 +203,7 @@ public class PaymentsController : ControllerBase
         {
             created = await _hitPay.CreatePaymentRequestAsync(
                 setting,
-                invoice.Amount,
+                cashDue,
                 invoice.Booking.Student?.ParentUser?.Email,
                 invoice.Booking.Student?.ParentUser?.Name,
                 purpose,
@@ -226,7 +237,7 @@ public class PaymentsController : ControllerBase
             PaymentRequestId = created.Id,
             InvoiceId = invoice.Id,
             InvoiceNumber = invoice.InvoiceNumber,
-            Amount = invoice.Amount,
+            Amount = cashDue,
             Currency = setting.Currency
         });
     }
@@ -482,7 +493,7 @@ public class PaymentsController : ControllerBase
         InvoiceStatus = invoice.Status,
         PaymentStatus = paymentStatus,
         Paid = paid,
-        Amount = invoice.Amount,
+        Amount = invoice.CashDue,
         Message = message
     };
 }

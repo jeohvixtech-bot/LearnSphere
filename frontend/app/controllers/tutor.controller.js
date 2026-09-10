@@ -179,6 +179,8 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
   // relation to what the tutor had actually earned.
   self.balance = null;
   self.balanceError = '';
+  self.statement = [];
+  self.payouts = [];
 
   self.loadBalance = function () {
     return PayoutService.getBalance().then(function (res) {
@@ -188,8 +190,76 @@ function ($scope, $location, $timeout, $interval, AuthService, TutorService, Boo
     });
   };
 
+  // The entries behind the balance. This is the point of an append-only ledger: a tutor
+  // asking "why is my balance this?" gets an answer rather than a recomputation.
+  self.loadStatement = function () {
+    return PayoutService.getStatement().then(function (res) {
+      self.statement = res.data;
+    }).catch(function () { self.statement = []; });
+  };
+
+  self.loadPayouts = function () {
+    return PayoutService.getAll().then(function (res) {
+      self.payouts = res.data;
+    }).catch(function () { self.payouts = []; });
+  };
+
+  // Turns a ledger entry type into something a person can read. Kept here rather than in
+  // the template so the two funds' vocabularies stay in one place.
+  var LEDGER_LABELS = {
+    earning: 'Lesson earnings',
+    earning_reversal: 'Earnings reversed',
+    penalty: 'Penalty',
+    payout: 'Paid out',
+    adjustment: 'Admin adjustment',
+    commission: 'Platform commission',
+    commission_reversal: 'Commission returned',
+    first_match_commission: 'First match commission',
+    first_match_commission_reversal: 'First match commission returned',
+    credit_grant: 'Promotional credit granted',
+    credit_consumption: 'Promotional credit used',
+    credit_expiry: 'Promotional credit expired',
+    commission_offset: 'Commission offset by credit'
+  };
+
+  self.ledgerLabel = function (type) {
+    return LEDGER_LABELS[type] || type;
+  };
+
+  // Marking a session taught is what makes it payable at the month-end cutoff, so this is
+  // the tutor's own confirmation that the lesson happened. Toggles rather than one-way:
+  // a mis-click has to be correctable, and nothing is settled until the batch is approved.
+  self.sessionBusyId = null;
+
+  self.toggleSessionDelivered = function (booking, cls) {
+    if (self.sessionBusyId) return;
+    var next = cls.deliveryStatus === 'Delivered' ? 'Scheduled' : 'Delivered';
+    self.sessionBusyId = cls.id;
+
+    BookingService.setSessionDelivery(booking.id, cls.id, next).then(function (res) {
+      cls.deliveryStatus = res.data.deliveryStatus;
+      self.sessionBusyId = null;
+      // The balance itself doesn't move — delivery gates the payout, not the earning —
+      // but refreshing keeps the wallet honest if anything else changed meanwhile.
+      self.loadBalance();
+    }).catch(function (err) {
+      self.sessionBusyId = null;
+      alert((err.data && err.data.message) || 'Could not update that session. Please try again.');
+    });
+  };
+
+  self.withdrawableEntries = function () {
+    return (self.statement || []).filter(function (e) { return e.fund === 'withdrawable'; });
+  };
+
+  self.creditEntries = function () {
+    return (self.statement || []).filter(function (e) { return e.fund === 'credit'; });
+  };
+
   function init() {
     self.loadBalance();
+    self.loadStatement();
+    self.loadPayouts();
     TutorService.getByUser(user.userId).then(function (res) {
       self.tutor = res.data;
       // Pre-fill identity fields from any already-saved ID number doc, so a page

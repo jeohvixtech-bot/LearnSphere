@@ -177,21 +177,51 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     if (navigator.clipboard) navigator.clipboard.writeText(text);
   };
 
-  // ── Platform Commission (Admin → Platform Commission) ───────────────
-  // The rate the platform takes from each paid invoice, charged to the tutor. Saving a
-  // rate for the first time stamps EffectiveFrom server-side, which is what keeps
-  // already-earned money out of scope — see CommissionSetting.
+  // ── Platform Fees (Admin → Platform Fees) ───────────────────────────
+  // Three separate rates, and they do NOT work the same way:
+  //   markup                 added on top of the base price; the PARENT pays it
+  //   first match commission taken out of the base price on a match's first tuition
+  //                          period; the TUTOR pays it, and promotional credit offsets it
+  //   recurring commission   a per-invoice cut of everything else; 0 in the launch model
+  //
+  // Saving a rate for the first time stamps EffectiveFrom server-side, which is what
+  // keeps already-earned money out of scope — see CommissionSetting.
   self.commission = null;
-  self.commissionForm = { ratePercent: 0 };
+  self.commissionForm = {
+    ratePercent: 0,
+    markupPercent: 15,
+    firstMatchCommissionPercent: 100,
+    enableFirstMatchCommission: false
+  };
   self.commissionSaving = false;
   self.commissionSaveError = '';
   self.commissionSaveSuccess = false;
 
   self.loadCommission = function () {
-    AdminService.getCommission().then(function (res) {
+    AdminService.getPlatformFees().then(function (res) {
       self.commission = res.data;
-      self.commissionForm.ratePercent = res.data.ratePercent;
+      self.commissionForm = {
+        ratePercent: res.data.ratePercent,
+        markupPercent: res.data.markupPercent,
+        firstMatchCommissionPercent: res.data.firstMatchCommissionPercent,
+        enableFirstMatchCommission: !!res.data.firstMatchEffectiveFrom
+      };
     }).catch(function () { /* page still renders with the defaults above */ });
+  };
+
+  // What a tutor actually takes home on a first match under the current settings — the
+  // number that makes the consequence of arming this fee concrete rather than abstract.
+  self.firstMatchPreview = function (base) {
+    var b = base || 100;
+    var pct = parseFloat(self.commissionForm.firstMatchCommissionPercent) || 0;
+    if (!self.commissionForm.enableFirstMatchCommission) return b;
+    return Math.round((b - (b * pct / 100)) * 100) / 100;
+  };
+
+  self.markupPreview = function (base) {
+    var b = base || 100;
+    var pct = parseFloat(self.commissionForm.markupPercent) || 0;
+    return Math.round((b + (b * pct / 100)) * 100) / 100;
   };
 
   self.saveCommission = function () {
@@ -199,22 +229,229 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     self.commissionSaveError = '';
 
     var rate = parseFloat(self.commissionForm.ratePercent);
-    if (isNaN(rate) || rate < 0 || rate > 100) {
-      self.commissionSaveError = 'Enter a rate between 0 and 100.';
+    var markup = parseFloat(self.commissionForm.markupPercent);
+    var firstMatch = parseFloat(self.commissionForm.firstMatchCommissionPercent);
+
+    function invalid(v) { return isNaN(v) || v < 0 || v > 100; }
+    if (invalid(rate) || invalid(markup) || invalid(firstMatch)) {
+      self.commissionSaveError = 'Every rate must be between 0 and 100.';
       return;
     }
 
     self.commissionSaving = true;
-    AdminService.updateCommission(rate).then(function (res) {
+    AdminService.updatePlatformFees({
+      ratePercent: rate,
+      markupPercent: markup,
+      firstMatchCommissionPercent: firstMatch,
+      enableFirstMatchCommission: !!self.commissionForm.enableFirstMatchCommission
+    }).then(function (res) {
       self.commission = res.data;
       self.commissionForm.ratePercent = res.data.ratePercent;
+      self.commissionForm.markupPercent = res.data.markupPercent;
+      self.commissionForm.firstMatchCommissionPercent = res.data.firstMatchCommissionPercent;
+      self.commissionForm.enableFirstMatchCommission = !!res.data.firstMatchEffectiveFrom;
       self.commissionSaving = false;
       self.commissionSaveSuccess = true;
       $timeout(function () { self.commissionSaveSuccess = false; }, 2500);
     }).catch(function (err) {
       self.commissionSaving = false;
-      self.commissionSaveError = (err.data && err.data.message) || 'Could not save the commission rate. Please try again.';
+      self.commissionSaveError = (err.data && err.data.message) || 'Could not save the platform fees. Please try again.';
     });
+  };
+
+  // ── Promotional Credit (Admin → Promotional Credit) ─────────────────
+  // Non-withdrawable value granted to tutors that offsets first-match commission. The
+  // ledger spends it automatically the next time it reconciles, so there is no separate
+  // "apply" step here.
+  self.creditForm = { tutorId: null, amount: 500, reason: '' };
+  self.campaignForm = { amount: 500, tutorLimit: 100, reason: 'Launch campaign — commission-free first match' };
+  self.creditBusy = false;
+  self.creditError = '';
+  self.creditSuccess = '';
+  self.campaignResult = null;
+
+  self.grantCredit = function () {
+    if (self.creditBusy) return;
+    self.creditError = '';
+    self.creditSuccess = '';
+
+    var amount = parseFloat(self.creditForm.amount);
+    if (!self.creditForm.tutorId) { self.creditError = 'Choose a tutor.'; return; }
+    if (isNaN(amount) || amount <= 0) { self.creditError = 'Enter an amount greater than zero.'; return; }
+
+    self.creditBusy = true;
+    AdminService.grantCredit(self.creditForm.tutorId, amount, self.creditForm.reason)
+      .then(function (res) {
+        self.creditBusy = false;
+        self.creditSuccess = 'Granted ' + amount.toFixed(2) + ', expiring ' +
+          (res.data.expiresAt || '').substring(0, 10) + '.';
+        self.creditForm.reason = '';
+        self.loadCommission();
+      }).catch(function (err) {
+        self.creditBusy = false;
+        self.creditError = (err.data && err.data.message) || 'Could not grant the credit. Please try again.';
+      });
+  };
+
+  self.runCampaign = function () {
+    if (self.creditBusy) return;
+    if (!confirm('Grant promotional credit to the earliest ' + self.campaignForm.tutorLimit +
+                 ' tutors who do not already hold a grant?')) return;
+
+    self.creditError = '';
+    self.creditSuccess = '';
+    self.creditBusy = true;
+
+    AdminService.runCampaign(
+      parseFloat(self.campaignForm.amount),
+      parseInt(self.campaignForm.tutorLimit, 10),
+      self.campaignForm.reason
+    ).then(function (res) {
+      self.creditBusy = false;
+      self.campaignResult = res.data;
+      self.loadCommission();
+    }).catch(function (err) {
+      self.creditBusy = false;
+      self.creditError = (err.data && err.data.message) || 'Could not run the campaign. Please try again.';
+    });
+  };
+
+  // Wallet credit for a parent, outside a refund — goodwill, compensation, or settling a
+  // dispute in their favour. Same non-withdrawable, 6-month-expiry rules as a refund credit.
+  self.walletForm = { parentUserId: null, amount: 50, reason: '' };
+  self.walletBusy = false;
+  self.walletError = '';
+  self.walletSuccess = '';
+
+  self.loadParents = function () {
+    return AdminService.getAllParents().then(function (res) { self.allParents = res.data; })
+      .catch(function () { self.allParents = []; });
+  };
+
+  self.grantWalletCredit = function () {
+    if (self.walletBusy) return;
+    self.walletError = '';
+    self.walletSuccess = '';
+
+    var amount = parseFloat(self.walletForm.amount);
+    if (!self.walletForm.parentUserId) { self.walletError = 'Choose a parent.'; return; }
+    if (isNaN(amount) || amount <= 0) { self.walletError = 'Enter an amount greater than zero.'; return; }
+
+    self.walletBusy = true;
+    AdminService.grantWalletCredit(self.walletForm.parentUserId, amount, self.walletForm.reason)
+      .then(function (res) {
+        self.walletBusy = false;
+        self.walletSuccess = 'Added ' + amount.toFixed(2) + ' to their wallet, expiring ' +
+          (res.data.expiresAt || '').substring(0, 10) + '.';
+        self.walletForm.reason = '';
+        self.loadParents();
+      }).catch(function (err) {
+        self.walletBusy = false;
+        self.walletError = (err.data && err.data.message) || 'Could not add the credit. Please try again.';
+      });
+  };
+
+  // A signed correction to a tutor's withdrawable balance. Negative claws money back.
+  self.adjustForm = { tutorId: null, amount: 0, reason: '' };
+  self.adjustBusy = false;
+  self.adjustError = '';
+  self.adjustSuccess = '';
+
+  self.submitAdjustment = function () {
+    if (self.adjustBusy) return;
+    self.adjustError = '';
+    self.adjustSuccess = '';
+
+    var amount = parseFloat(self.adjustForm.amount);
+    if (!self.adjustForm.tutorId) { self.adjustError = 'Choose a tutor.'; return; }
+    if (isNaN(amount) || amount === 0) { self.adjustError = 'Enter a non-zero amount.'; return; }
+    if (!self.adjustForm.reason) { self.adjustError = 'State a reason — adjustments are audited.'; return; }
+
+    self.adjustBusy = true;
+    AdminService.adjustLedger(self.adjustForm.tutorId, amount, self.adjustForm.reason)
+      .then(function (res) {
+        self.adjustBusy = false;
+        self.adjustSuccess = 'Applied. New withdrawable balance: ' + (res.data.withdrawable || 0).toFixed(2);
+        self.adjustForm.amount = 0;
+        self.adjustForm.reason = '';
+      }).catch(function (err) {
+        self.adjustBusy = false;
+        self.adjustError = (err.data && err.data.message) || 'Could not apply the adjustment. Please try again.';
+      });
+  };
+
+  // ── Payout Batches (Admin → Payout Batches) ─────────────────────────
+  // cutoff → batch → approve → bank transfer. A batch moves as a whole, so a month is
+  // never half-paid.
+  self.batches = [];
+  self.activeBatch = null;
+  self.batchBusy = false;
+  self.batchError = '';
+  self.cutoffResult = null;
+  self.cutoffPeriod = new Date().toISOString().substring(0, 7);
+
+  self.loadBatches = function () {
+    AdminService.getPayoutBatches().then(function (res) { self.batches = res.data; })
+      .catch(function () { /* page still renders empty */ });
+  };
+
+  self.openBatch = function (batch) {
+    AdminService.getPayoutBatch(batch.id).then(function (res) { self.activeBatch = res.data; })
+      .catch(function (err) {
+        self.batchError = (err.data && err.data.message) || 'Could not open that batch.';
+      });
+  };
+
+  self.closeBatch = function () { self.activeBatch = null; };
+
+  self.runCutoff = function () {
+    if (self.batchBusy) return;
+    self.batchError = '';
+    self.cutoffResult = null;
+    self.batchBusy = true;
+
+    AdminService.runCutoff(self.cutoffPeriod).then(function (res) {
+      self.batchBusy = false;
+      self.cutoffResult = res.data;
+      self.loadBatches();
+      if (res.data.batchId) self.openBatch({ id: res.data.batchId });
+    }).catch(function (err) {
+      self.batchBusy = false;
+      self.batchError = (err.data && err.data.message) || 'Could not run the cutoff. Please try again.';
+    });
+  };
+
+  function batchAction(promise) {
+    self.batchBusy = true;
+    self.batchError = '';
+    return promise.then(function (res) {
+      self.batchBusy = false;
+      self.activeBatch = res.data;
+      self.loadBatches();
+    }).catch(function (err) {
+      self.batchBusy = false;
+      self.batchError = (err.data && err.data.message) || 'That action could not be completed.';
+    });
+  }
+
+  self.approveBatch = function (batch) {
+    if (self.batchBusy) return;
+    batchAction(AdminService.approvePayoutBatch(batch.id, batch._notes));
+  };
+
+  // The point real money leaves the platform — worth one deliberate confirmation.
+  self.transferBatch = function (batch) {
+    if (self.batchBusy) return;
+    if (!confirm('Confirm the bank transfer for ' + batch.batchNumber + ' (' +
+                 batch.totalAmount.toFixed(2) + ' to ' + batch.tutorCount +
+                 ' tutors)? This debits every tutor ledger in the batch.')) return;
+    batchAction(AdminService.transferPayoutBatch(batch.id, batch._notes));
+  };
+
+  self.cancelBatch = function (batch) {
+    if (self.batchBusy) return;
+    if (!confirm('Cancel ' + batch.batchNumber + '? Its payables are released back to Pending.')) return;
+    batchAction(AdminService.cancelPayoutBatch(batch.id, batch._notes));
   };
 
   // Reschedule Rejections queue (Admin → Reschedule Rejections) — see
@@ -250,7 +487,13 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     self.loadRescheduleQueue();
     self.loadPaymentGateway();
     self.loadCommission();
+    self.loadBatches();
+    AdminService.getAllTutors().then(function (res) { self.allTutors = res.data; })
+      .catch(function () { self.allTutors = []; });
+    self.loadParents();
   }
+  self.allTutors = [];
+  self.allParents = [];
   init();
 
   // Kept for compatibility — no longer called from vetting.html (superseded by

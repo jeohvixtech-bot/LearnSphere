@@ -56,6 +56,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('parent') }
     })
+    .when('/parent/wallet', {
+      templateUrl: 'views/parent/wallet.html',
+      controller: 'ParentCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('parent') }
+    })
     .when('/parent/chat', {
       templateUrl: 'views/parent/chat.html',
       controller: 'ParentCtrl',
@@ -76,6 +82,12 @@ angular.module('learnSphereApp', ['ngRoute'])
     })
     .when('/tutor/overview', {
       templateUrl: 'views/tutor/overview.html',
+      controller: 'TutorCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('tutor') }
+    })
+    .when('/tutor/wallet', {
+      templateUrl: 'views/tutor/wallet.html',
       controller: 'TutorCtrl',
       controllerAs: 'vm',
       resolve: { auth: authGuard('tutor') }
@@ -124,6 +136,18 @@ angular.module('learnSphereApp', ['ngRoute'])
     })
     .when('/admin/commission', {
       templateUrl: 'views/admin/commission.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
+    .when('/admin/promotional-credit', {
+      templateUrl: 'views/admin/promotional-credit.html',
+      controller: 'AdminCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
+    .when('/admin/payouts', {
+      templateUrl: 'views/admin/payouts.html',
       controller: 'AdminCtrl',
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
