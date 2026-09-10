@@ -129,8 +129,15 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
     // 1. Confirmed / completed preset-group bookings
     self.bookings.forEach(function (b) {
-      if (!b.presetGroupId || b.tutorId !== self.tutor.id) return;
+      if (b.bookingType !== 'tutor-preset' || b.tutorId !== self.tutor.id) return;
       if (b.status !== 'confirmed' && b.status !== 'countered' && b.status !== 'completed') return;
+      // presetGroupId is only resolvable through the newer BookingPresetSlots
+      // join table — a booking made via the older single-slot PresetSlotId
+      // reference (predating that table) comes back with presetGroupId null,
+      // even though it's a perfectly real, confirmed class. Falling back to
+      // the booking's own id as the grouping key means it still gets a bar
+      // instead of silently having no calendar indicator at all; it just
+      // doesn't merge with sibling occurrences the way a resolvable group can.
 
       var dates = [];
       (b.classes || []).forEach(function (c) {
@@ -147,7 +154,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
       dates.forEach(function (dateStr) {
         var dayNum = new Date(dateStr + 'T00:00:00').getDate();
-        var key    = b.presetGroupId + '_' + dayNum;
+        var key    = (b.presetGroupId || ('booking-' + b.id)) + '_' + dayNum;
         var colour;
 
         if (isPastDate(dateStr)) {
@@ -253,6 +260,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   }
 
   self._recomputeReportView = function () {
+    self._clearGroupedByDayCache && self._clearGroupedByDayCache();
     recomputeReportDots();
     recomputeCalBars();
     recomputeReportSelectedDayStudents();
@@ -337,7 +345,36 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   // Daily Summary tab index (into sortedSelectedCalDays)
   self.dailySummaryTabIndex = 0;
-  self.selectDailySummaryTab = function (idx) { self.dailySummaryTabIndex = idx; };
+
+  // The Daily Summary panel used to capture the active day via
+  // ng-init="currentDay = ..." on its container div — ng-init only ever runs
+  // once, so it froze on whichever day was selected when the panel first
+  // opened and never updated again on tab switches.
+  //
+  // The fix is NOT to call a function from the template instead — that traps
+  // the exact $rootScope:infdig bug already documented and avoided elsewhere
+  // in this codebase (see parent.controller.js's computeTutorPresetSummary
+  // comment): sortedSelectedCalDays() builds a brand-new array every call
+  // (.slice().sort()), and this getter is referenced 5 times across the
+  // template, so every digest re-ran it repeatedly, each call returning a
+  // different array reference for $watch to compare against — a watched
+  // expression that never settles never lets the digest converge, so Angular
+  // aborts entirely after 10 rounds, taking every OTHER binding on the page
+  // down with it (which is why the tab's ng-class never got a chance to
+  // apply, among other broken things).
+  //
+  // Instead: a plain cached property, explicitly refreshed at the few points
+  // the selection actually changes (selectDailySummaryTab, the days-length
+  // watch below, jumpToCalendarDate) — stable between digests like ng-init's
+  // value was, but actually kept in sync this time.
+  self.currentSummaryDay = null;
+  self._refreshCurrentSummaryDay = function () {
+    self.currentSummaryDay = self.sortedSelectedCalDays()[self.dailySummaryTabIndex];
+  };
+  self.selectDailySummaryTab = function (idx) {
+    self.dailySummaryTabIndex = idx;
+    self._refreshCurrentSummaryDay();
+  };
 
   // Format a calendar day number to full label e.g. "Tuesday, 8 Sep 2026"
   self.dailySummaryTabLabel = function (dayNum) {
@@ -375,11 +412,13 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.reportSelectedDay    = dateStr;
     self._recomputeReportView && self._recomputeReportView();
     self.dailySummaryTabIndex = 0;
+    self._refreshCurrentSummaryDay();
     self.activePanel          = 'daily';
   };
 
   $scope.$watch(function () { return self.selectedCalDays.length; }, function () {
     self.dailySummaryTabIndex = 0;
+    self._refreshCurrentSummaryDay();
   });
 
   function init() {
@@ -1162,7 +1201,19 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // shows once with every enrolled student listed, instead of once per student.
   // Flow A bookings (no presetGroupId) come back as a single-student "group" of
   // their own, so the template can render both flows through one ng-repeat.
+  //
+  // Memoized per dayNum (cleared in _recomputeReportView whenever bookings/
+  // tutor data actually changes) — this is called repeatedly across the Daily
+  // Summary panel and the tab badges in the SAME digest (badge count, ng-if
+  // empty-check, ng-repeat), and it builds brand-new group objects every call.
+  // A watched expression that returns different object references each time
+  // it's evaluated never lets Angular's digest converge — same bug class as
+  // computeTutorPresetSummary in parent.controller.js — and once it hits 10
+  // rounds Angular aborts the WHOLE digest ($rootScope:infdig), which is why
+  // ng-class never got a chance to apply the active-tab highlight either.
+  var _groupedByDayCache = {};
   self.groupedBookingsOnDay = function (dayNum) {
+    if (_groupedByDayCache.hasOwnProperty(dayNum)) return _groupedByDayCache[dayNum];
     var bookings = self.bookingsOnDay(dayNum);
     var groups = {};
     var ordered = [];
@@ -1221,8 +1272,10 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }
     });
 
+    _groupedByDayCache[dayNum] = ordered;
     return ordered;
   };
+  self._clearGroupedByDayCache = function () { _groupedByDayCache = {}; };
 
   // ── Video conference link (Online confirmed bookings) ───────────────────
   self.videoLink = {}; // { [bookingId]: { editing, inputValue, saving, error } }
@@ -1926,6 +1979,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       TutorService.getByUser(user.userId).then(function (res) {
         self.tutor = res.data;
         rebuildSetupClassModesList();
+        // Without this, the new class's calendar bar didn't appear until the
+        // next 15s background poll (_pollInterval below) happened to refresh
+        // bookings and trigger a recompute on its own — self.tutor.timetable
+        // just updated above, but nothing had told recomputeCalBars to re-run
+        // against it yet.
+        self._recomputeReportView();
       });
     }).catch(function (err) {
       self.setupClassSaving = false;

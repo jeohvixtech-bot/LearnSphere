@@ -39,7 +39,10 @@ public class SlotPropertyTests
         db.Users.Add(tutorUser);
         db.SaveChanges();
 
-        var tutor = new Tutor { UserId = tutorUser.Id };
+        // IsVerified/IsOnline must be true — BookingsController.Create rejects a
+        // booking against an unverified/offline tutor before it ever reaches the
+        // slot-ownership check these properties exist to exercise.
+        var tutor = new Tutor { UserId = tutorUser.Id, IsVerified = true, IsOnline = true };
         db.Tutors.Add(tutor);
         db.SaveChanges();
 
@@ -171,7 +174,9 @@ public class SlotPropertyTests
                 TotalPrice   = 50m,
                 Classes      = new List<BookingClassDto>
                 {
-                    new BookingClassDto { Date = "2025-09-01", Time = "10:00" }
+                    // Must be a parseable time RANGE — Create's overlap check fails
+                    // closed (treats it as a conflict) on anything it can't parse.
+                    new BookingClassDto { Date = "2025-09-01", Time = "10:00 AM - 11:00 AM" }
                 }
             };
 
@@ -250,7 +255,9 @@ public class SlotPropertyTests
                 TotalPrice    = 75m,
                 Classes       = new List<BookingClassDto>
                 {
-                    new BookingClassDto { Date = "2025-09-15", Time = "14:00" }
+                    // Must be a parseable time RANGE — Create's overlap check fails
+                    // closed (treats it as a conflict) on anything it can't parse.
+                    new BookingClassDto { Date = "2025-09-15", Time = "2:00 PM - 3:00 PM" }
                 }
             };
 

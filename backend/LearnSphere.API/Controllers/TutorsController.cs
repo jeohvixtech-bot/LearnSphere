@@ -1027,22 +1027,31 @@ public class TutorsController : ControllerBase
             if (hasConflict)
                 return BadRequest(new { message = "You already have a confirmed class at that date and time." });
 
-            // Must land later than the earliest OTHER class still active in the same
-            // recurring series (same Setup Class submission) — moving one occurrence
-            // to before the series' current first class would scramble the sequence.
-            // Only applies when there's another slot in the group to compare against.
+            // Must land later than the closest sibling that comes BEFORE this
+            // occurrence's own original date in the same recurring series (same
+            // Setup Class submission) — prevents this reschedule from jumping
+            // backward past an earlier class and scrambling the sequence. A sibling
+            // that was already later than this slot is not a lower bound at all —
+            // e.g. rescheduling the series' first class (1 Oct) to a couple of days
+            // later (2 Oct) is fine even if the next occurrence is 8 Oct, since 2 Oct
+            // is still before it; the old check compared against EVERY other
+            // sibling regardless of direction, so it wrongly rejected exactly this
+            // case ("must be later than 8 Oct" when moving forward from 1 Oct).
             if (!string.IsNullOrEmpty(slot.PresetGroupId))
             {
-                var earliestSiblingDate = await _context.TutorTimeSlots
+                var siblingDays = await _context.TutorTimeSlots
                     .Where(s => s.PresetGroupId == slot.PresetGroupId && s.Id != slot.Id)
-                    .OrderBy(s => s.Day)
                     .Select(s => s.Day)
-                    .FirstOrDefaultAsync();
-                if (!string.IsNullOrEmpty(earliestSiblingDate)
-                    && DateTime.TryParse(earliestSiblingDate, out var earliestDate)
-                    && proposedDateParsed.Date <= earliestDate.Date)
+                    .ToListAsync();
+                var precedingSiblingDate = siblingDays
+                    .Where(d => string.Compare(d, slot.Day, StringComparison.Ordinal) < 0)
+                    .OrderByDescending(d => d, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (precedingSiblingDate != null
+                    && DateTime.TryParse(precedingSiblingDate, out var precedingDate)
+                    && proposedDateParsed.Date <= precedingDate.Date)
                 {
-                    return BadRequest(new { message = $"The new date must be later than {earliestSiblingDate}, the earliest class still in this series." });
+                    return BadRequest(new { message = $"The new date must be later than {precedingSiblingDate}, the previous class still in this series." });
                 }
             }
         }

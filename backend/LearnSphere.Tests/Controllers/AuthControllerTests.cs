@@ -1,12 +1,15 @@
 using System.Text.Json;
+using FakeItEasy;
 using LearnSphere.API.Controllers;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
 using LearnSphere.API.Services;
 using LearnSphere.Tests.Helpers;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace LearnSphere.Tests.Controllers;
 
@@ -33,12 +36,15 @@ public class AuthControllerTests
     /// <summary>
     /// Creates a controller wired to the real AuthService and an isolated in-memory DB.
     /// The <paramref name="db"/> out-parameter lets tests inspect DB state afterwards.
+    /// Login/Register (what's actually exercised below) don't touch IEmailService,
+    /// IWebHostEnvironment, or the logger — those only come into play on the
+    /// forgot-password path — so bare fakes are enough to satisfy the constructors.
     /// </summary>
     private static (AuthController controller, AppDbContext db) BuildSut()
     {
         var db      = TestDbContextFactory.Create();
-        var service = new AuthService(db, BuildConfig());
-        var ctrl    = new AuthController(service);
+        var service = new AuthService(db, BuildConfig(), A.Fake<IEmailService>());
+        var ctrl    = new AuthController(service, A.Fake<IWebHostEnvironment>(), A.Fake<ILogger<AuthController>>());
         return (ctrl, db);
     }
 

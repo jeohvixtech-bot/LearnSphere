@@ -3889,7 +3889,15 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
   font-size: 12px; font-weight: 500; color: var(--color-text-muted);
   border-bottom: 2px solid transparent; cursor: pointer; text-align: center;
 }
-.ov-date-tab--active { color: var(--color-accent-700); border-bottom-color: var(--color-accent); background: var(--color-bg); }
+/* var(--color-bg) here used to be nearly indistinguishable from the tab bar's
+   own var(--color-surface) background (#f3f2f2 vs #eae9e9 — a few RGB units
+   apart), so the active tab didn't visibly stand out. Solid accent fill (not
+   just a pale tint) so it's unmistakable at a glance. */
+.ov-date-tab--active {
+  color: #fff; background: var(--color-accent); border-bottom-color: var(--color-accent-700);
+  font-weight: 700; border-radius: 8px 8px 0 0;
+}
+.ov-date-tab--active .ov-date-tab-label { color: #fff; }
 .ov-date-tab-label { font-size: 12px; }
 .ov-tab-badge { font-size: 9px; padding: 1px 5px; border-radius: 100px; margin-top: 2px; }
 .ov-tab-badge--ok   { background: #dcfce7; color: #15803d; border: 0.5px solid #86efac; }

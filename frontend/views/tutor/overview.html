@@ -871,15 +871,15 @@
       </div>
 
       <div class="ov-modal-body">
-        <div ng-init="currentDay = vm.sortedSelectedCalDays()[vm.dailySummaryTabIndex]">
+        <div>
 
-          <div class="ov-modal-empty" ng-if="!vm.groupedBookingsOnDay(currentDay).length">
+          <div class="ov-modal-empty" ng-if="!vm.groupedBookingsOnDay(vm.currentSummaryDay).length">
             <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
-            <p>No classes scheduled for {{ vm.dailySummaryTabLabel(currentDay) }}</p>
+            <p>No classes scheduled for {{ vm.dailySummaryTabLabel(vm.currentSummaryDay) }}</p>
           </div>
 
           <div class="ov-ds-group"
-            ng-repeat="group in vm.groupedBookingsOnDay(currentDay) track by $index">
+            ng-repeat="group in vm.groupedBookingsOnDay(vm.currentSummaryDay) track by $index">
             <div class="ov-ds-group-hd">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <span class="ov-ds-num">{{ $index + 1 }}</span>
@@ -1025,14 +1025,14 @@
           </div>
 
           <!-- Published preset slots — unbooked, grey outline cards -->
-          <div ng-if="vm.publishedSlotsOnDay(currentDay).length">
+          <div ng-if="vm.publishedSlotsOnDay(vm.currentSummaryDay).length">
 
             <p class="ov-section-label" style="margin-top:12px;">
               Published slots — open for booking
             </p>
 
             <div class="ov-slot-card"
-              ng-repeat="slot in vm.publishedSlotsOnDay(currentDay) track by slot.id">
+              ng-repeat="slot in vm.publishedSlotsOnDay(vm.currentSummaryDay) track by slot.id">
               <div class="ov-slot-card-hd">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                   <span class="bs-tag" style="background:var(--color-surface);

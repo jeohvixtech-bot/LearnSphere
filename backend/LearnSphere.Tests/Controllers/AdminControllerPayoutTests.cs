@@ -1,5 +1,7 @@
+using FakeItEasy;
 using LearnSphere.API.Controllers;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using LearnSphere.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,11 +19,13 @@ public class AdminControllerPayoutTests
     /// <summary>
     /// Creates a controller wired to an isolated in-memory DB.
     /// The <paramref name="db"/> out-parameter lets tests inspect DB state afterwards.
+    /// ApprovePayout doesn't touch IPresetCancellationService, so a bare fake
+    /// (no configured behavior) is enough to satisfy the constructor.
     /// </summary>
     private static (AdminController controller, LearnSphere.API.Data.AppDbContext db) BuildSut()
     {
         var db   = TestDbContextFactory.Create();
-        var ctrl = new AdminController(db);
+        var ctrl = new AdminController(db, A.Fake<IPresetCancellationService>());
         return (ctrl, db);
     }
 

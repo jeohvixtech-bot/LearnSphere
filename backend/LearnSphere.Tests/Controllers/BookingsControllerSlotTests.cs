@@ -45,7 +45,11 @@ public class BookingsControllerSlotTests
             TotalPrice   = 50m,
             Classes      = new List<BookingClassDto>
             {
-                new() { Date = "2026-08-01", Time = "10:00" }
+                // Must be a parseable time RANGE ("H:MM AM/PM - H:MM AM/PM") — Create's
+                // overlap check (HasOverlappingClasses) fails closed (treats it as a
+                // conflict) on anything it can't parse, so a bare clock time here
+                // rejected the booking before ever reaching slot validation.
+                new() { Date = "2026-08-01", Time = "10:00 AM - 11:00 AM" }
             }
         };
 
@@ -62,7 +66,10 @@ public class BookingsControllerSlotTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        var tutor = new Tutor { UserId = user.Id };
+        // IsVerified/IsOnline must be true — BookingsController.Create rejects a
+        // booking against an unverified/offline tutor before it ever reaches the
+        // slot-ownership check this test exists to exercise.
+        var tutor = new Tutor { UserId = user.Id, IsVerified = true, IsOnline = true };
         db.Tutors.Add(tutor);
 
         var parent = new User { Email = "p@p.com", PasswordHash = "x", Role = "parent", Name = "Parent", CreatedAt = DateTime.UtcNow };
@@ -95,8 +102,11 @@ public class BookingsControllerSlotTests
         db.Users.AddRange(userA, userB);
         await db.SaveChangesAsync();
 
-        var tutorA = new Tutor { UserId = userA.Id };
-        var tutorB = new Tutor { UserId = userB.Id };
+        // IsVerified/IsOnline must be true — BookingsController.Create rejects a
+        // booking against an unverified/offline tutor before it ever reaches the
+        // slot-ownership check this test exists to exercise.
+        var tutorA = new Tutor { UserId = userA.Id, IsVerified = true, IsOnline = true };
+        var tutorB = new Tutor { UserId = userB.Id, IsVerified = true, IsOnline = true };
         db.Tutors.AddRange(tutorA, tutorB);
         await db.SaveChangesAsync();
 
@@ -134,7 +144,10 @@ public class BookingsControllerSlotTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        var tutor = new Tutor { UserId = user.Id };
+        // IsVerified/IsOnline must be true — BookingsController.Create rejects a
+        // booking against an unverified/offline tutor before it ever reaches the
+        // slot-ownership check this test exists to exercise.
+        var tutor = new Tutor { UserId = user.Id, IsVerified = true, IsOnline = true };
         db.Tutors.Add(tutor);
 
         var parent = new User { Email = "p@p.com", PasswordHash = "x", Role = "parent", Name = "Parent", CreatedAt = DateTime.UtcNow };
