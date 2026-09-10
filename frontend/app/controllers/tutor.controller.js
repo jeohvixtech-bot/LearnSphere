@@ -2339,28 +2339,34 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     { type: 'postgrad', label: "Master's / PhD" }
   ];
 
-  // Count of mandatory slots filled: identity photo, ID number, profile photo,
-  // and at least one academic level — each reviewed independently by admin.
-  self.mandatoryUploadedCount = function () {
+  // Count of mandatory DOCUMENT (file) slots filled: identity photo, profile
+  // photo, and at least one academic level — each reviewed independently by
+  // admin. The ID number is tracked separately (see hasIdentityNumber below)
+  // since it was never actually a file upload.
+  self.mandatoryDocsUploadedCount = function () {
     var docs = self.tutor.documents || [];
     var count = 0;
     if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; })) count++;
-    // ID number has no separate save step anymore — a typed, not-yet-saved value
-    // counts too, since "Submit for verification" saves it as part of submitting.
-    if ((self.verif.idNumber || '').trim() || docs.some(function (d) { return d.documentType === 'identity_id' && d.idNumber; })) count++;
     if (docs.some(function (d) { return d.documentType === 'profile_photo' && d.fileUrl; })) count++;
     if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })) count++;
     return count;
   };
 
-  self.mandatoryTotal = 4;
+  self.mandatoryDocsTotal = 3;
+
+  // ID number has no separate save step — a typed, not-yet-saved value counts
+  // too, since "Submit for verification" saves it as part of submitting.
+  self.hasIdentityNumber = function () {
+    var docs = self.tutor.documents || [];
+    return !!((self.verif.idNumber || '').trim() || docs.some(function (d) { return d.documentType === 'identity_id' && d.idNumber; }));
+  };
 
   self.verifProgress = function () {
-    return Math.round((self.mandatoryUploadedCount() / self.mandatoryTotal) * 100) + '%';
+    return Math.round(((self.mandatoryDocsUploadedCount() + (self.hasIdentityNumber() ? 1 : 0)) / 4) * 100) + '%';
   };
 
   self.canSubmitVerification = function () {
-    if (self.mandatoryUploadedCount() < self.mandatoryTotal) return false;
+    if (self.mandatoryDocsUploadedCount() < self.mandatoryDocsTotal || !self.hasIdentityNumber()) return false;
     if (self.idNumberFormatError()) return false;
     // Disabled while under review, unless every rejected document already has a
     // fresh replacement ready — i.e. first-time setup, or a genuine fix-and-

@@ -2,6 +2,27 @@
 
 angular.module('learnSphereApp')
 .directive('fpDate', function () {
+  // Shared by $render (below) and the minDateFrom watch — parses a Date
+  // object or any of the string formats this directive/the rest of the app
+  // hands around (DD-MM-YYYY, D/MM/YYYY, YYYY-MM-DD) into a Date, or null.
+  function parseFlexibleDate(v) {
+    if (!v) return null;
+    if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+    var s = String(v).trim();
+    var d;
+    var dmyh = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dmyh) { d = new Date(+dmyh[3], +dmyh[2] - 1, +dmyh[1]); }
+    else {
+      var slsh = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (slsh) { d = new Date(+slsh[3], +slsh[2] - 1, +slsh[1]); }
+      else {
+        var ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (ymd) { d = new Date(+ymd[1], +ymd[2] - 1, +ymd[3]); }
+      }
+    }
+    return d && !isNaN(d.getTime()) ? d : null;
+  }
+
   return {
     restrict: 'A',
     require: 'ngModel',
@@ -15,30 +36,39 @@ angular.module('learnSphereApp')
             ngModel.$setViewValue(dateStr || '');
             if (attrs.ngChange) scope.$eval(attrs.ngChange);
           });
+        },
+        // Starting view only, not a hard bound — jumps the calendar to the
+        // linked field's month when opened, but navigating to a later month
+        // and picking a date there is still fine (minDate is the real bound).
+        onOpen: function () {
+          if (!attrs.minDateFrom) return;
+          var linked = parseFlexibleDate(scope.$eval(attrs.minDateFrom));
+          if (linked) fp.jumpToDate(linked);
         }
       });
 
       ngModel.$render = function () {
-        var v = ngModel.$viewValue;
-        if (!v) { fp.setDate('', false); return; }
-        var d;
-        if (v instanceof Date) {
-          d = v;
-        } else {
-          var s = String(v).trim();
-          var dmyh = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-          if (dmyh) { d = new Date(+dmyh[3], +dmyh[2] - 1, +dmyh[1]); }
-          else {
-            var slsh = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-            if (slsh) { d = new Date(+slsh[3], +slsh[2] - 1, +slsh[1]); }
-            else {
-              var ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-              if (ymd) { d = new Date(+ymd[1], +ymd[2] - 1, +ymd[3]); }
-            }
-          }
-        }
-        fp.setDate(d && !isNaN(d.getTime()) ? d : '', false);
+        var d = parseFlexibleDate(ngModel.$viewValue);
+        fp.setDate(d || '', false);
       };
+
+      // e.g. fp-date min-date-from="vm.blockForm.startDate" on the end-date
+      // field — its minDate tracks the currently-selected start date instead
+      // of the fixed 'today' the start field itself keeps.
+      if (attrs.minDateFrom) {
+        scope.$watch(attrs.minDateFrom, function (newVal, oldVal) {
+          var linked = parseFlexibleDate(newVal);
+          fp.set('minDate', linked || 'today');
+
+          if (newVal === oldVal) return; // initial $watch firing — not a real change yet
+          var currentEnd = parseFlexibleDate(ngModel.$viewValue);
+          if (linked && currentEnd && currentEnd < linked) {
+            ngModel.$setViewValue('');
+            ngModel.$render();
+            if (attrs.ngChange) scope.$eval(attrs.ngChange);
+          }
+        });
+      }
 
       scope.$on('$destroy', function () { fp.destroy(); });
     }

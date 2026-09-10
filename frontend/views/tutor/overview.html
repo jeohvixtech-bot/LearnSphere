@@ -340,7 +340,7 @@
           <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
             <label>End Date <span style="color:var(--color-accent-2);">*</span></label>
             <input class="bs-input" type="text" ng-model="vm.blockForm.endDate" ng-change="vm.clearBlockConflicts()"
-              placeholder="DD-MM-YYYY" fp-date />
+              placeholder="DD-MM-YYYY" fp-date min-date-from="vm.blockForm.startDate" />
           </div>
           <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
             ng-click="vm.confirmBlock()"
@@ -1441,7 +1441,8 @@
               <p class="verif-subtitle bs-text-muted">Complete all required documents to unlock subject offerings.</p>
             </div>
             <div class="verif-progress-wrap">
-              <span class="verif-progress-label bs-text-muted">{{ vm.mandatoryUploadedCount() }} of {{ vm.mandatoryTotal }} required docs uploaded</span>
+              <span class="verif-progress-label bs-text-muted">{{ vm.mandatoryDocsUploadedCount() }} of {{ vm.mandatoryDocsTotal }} documents uploaded</span><br/>
+              <span class="verif-progress-label bs-text-muted">Identity number: {{ vm.hasIdentityNumber() ? 'Provided' : 'Missing' }}</span>
               <div class="verif-progress-bar">
                 <div class="verif-progress-fill" ng-style="{'width': vm.verifProgress()}"></div>
               </div>
@@ -1856,11 +1857,12 @@
 
           <!-- Submit -->
           <div class="verif-submit-row">
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.mandatoryUploadedCount() < vm.mandatoryTotal">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && (vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal || !vm.hasIdentityNumber())">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
-              {{ vm.mandatoryTotal - vm.mandatoryUploadedCount() }} required document(s) still missing
+              <span ng-if="vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal">{{ vm.mandatoryDocsTotal - vm.mandatoryDocsUploadedCount() }} required document(s) still missing<span ng-if="!vm.hasIdentityNumber()">, identity number not provided</span></span>
+              <span ng-if="vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && !vm.hasIdentityNumber()">Identity number not provided</span>
             </p>
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.mandatoryUploadedCount() >= vm.mandatoryTotal">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && vm.hasIdentityNumber()">
               <i class="ti ti-clock" aria-hidden="true"></i>
               Verification under review — re-upload any rejected document to resubmit
             </p>

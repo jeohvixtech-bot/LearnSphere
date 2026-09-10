@@ -276,7 +276,9 @@ public class BookingsController : ControllerBase
         var slots = await _context.TutorTimeSlots.Where(s => slotIds.Contains(s.Id)).ToListAsync();
         if (slots.Count != slotIds.Count)
             return NotFound(new { message = "One or more of these classes no longer exist." });
-        if (slots.Any(s => s.Status != "Available" || s.IsFull))
+        if (slots.Any(s => s.IsFull))
+            return BadRequest(new { message = "This class is now fully occupied." });
+        if (slots.Any(s => s.Status != "Available"))
             return BadRequest(new { message = "One or more of these classes are no longer available." });
         if (slots.Select(s => s.TutorId).Distinct().Count() > 1)
             return BadRequest(new { message = "These classes belong to different tutors." });

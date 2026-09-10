@@ -270,6 +270,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     }).catch(function (err) {
       self.presetBookingBusy = false;
       self.presetBookingError = (err.data && err.data.message) || 'Booking failed. Please try again.';
+      // A different parent may have just filled this group out from under this
+      // one — refresh the same way the success path does, so the now-stale,
+      // fully-booked group drops out of this parent's own catalog view right
+      // away instead of leaving them able to hit the same dead end again.
+      TutorService.getAll({ includePresetSlots: true }).then(function (res2) {
+        self.tutors = res2.data;
+        self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
+      });
     });
   };
   self.minExperience = 0;
@@ -969,6 +977,15 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }
     });
 
+    // Booking a preset group is all-or-nothing (see BookingsController.cs —
+    // BookPreset rejects the whole request if any slot in the group is full),
+    // so a group with even one full occurrence can never actually be booked.
+    // Dropped entirely rather than shown disabled — every card/row downstream
+    // assumes what it's given is bookable.
+    groupList = groupList.filter(function (g) {
+      return !g.slots.some(function (s) { return s.isFull; });
+    });
+
     var subjectsWithSlots = groupList.map(function (g) { return g.subject; });
     var subjectsWithoutSlots = (t.offerings || []).filter(function (o) {
       return subjectsWithSlots.indexOf(o.subject) < 0;
@@ -979,7 +996,10 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
     return {
       openSlots: slots.filter(function (s) { return !s.isFull; }),
-      hasAny: slots.length > 0,
+      // Only counts groups that survived the full-group filter above — a tutor
+      // whose only preset group(s) are now completely full has nothing left to
+      // actually book, same as having none at all (see filteredTutors()).
+      hasAny: groupList.length > 0,
       groups: groupList,
       subjectsWithoutSlots: subjectsWithoutSlots
     };

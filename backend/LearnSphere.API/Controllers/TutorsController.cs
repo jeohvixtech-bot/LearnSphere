@@ -1751,6 +1751,22 @@ public class TutorsController : ControllerBase
         // Otherwise VerificationStatus stays "pending" — no separate terminal
         // "rejected" status; the tutor loops via re-upload until everything's approved.
 
+        // In-app bell notification alongside the email below — a tutor who doesn't
+        // check email (or whose email lands in spam) otherwise has no indication
+        // their documents were reviewed at all. Kept as a short prompt to check the
+        // app; the email carries the full itemized approve/reject detail.
+        _context.Notifications.Add(new Notification
+        {
+            UserId = tutor.UserId,
+            Title = fullyApproved ? "Profile Verified" : "Document Review Update",
+            Message = fullyApproved
+                ? "Your profile is now fully verified — you can set up subject offerings and start receiving bookings."
+                : "Your document review needs attention — see what's pending.",
+            Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+            Type = "system",
+            IsRead = false
+        });
+
         await _context.SaveChangesAsync();
 
         var sections = new List<string>();
