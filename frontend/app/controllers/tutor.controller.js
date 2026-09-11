@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
+.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', '$document', 'AuthService', 'TutorService',
   'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService', 'RemarkService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService) {
+function ($scope, $location, $timeout, $interval, $q, $document, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -1188,6 +1188,19 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   self.resetCalDaySelection = function () { self.selectedCalDays = []; };
 
+  // Clicking empty space inside a calendar "reset zone" (the card's own
+  // padding ring, or the gap around the stats row / nav row — see the
+  // reset-zone directive in filters.js) clears the selection, same as the
+  // explicit Reset button. Checking target === currentTarget is the standard
+  // "click backdrop, not children" guard — same pattern as ov-modal-backdrop
+  // elsewhere in this file — so clicking a day cell or button inside the zone
+  // (whose click already bubbles up through this handler) never resets.
+  self.onCalendarAreaClick = function ($event) {
+    if ($event.target === $event.currentTarget) {
+      self.resetCalDaySelection();
+    }
+  };
+
   self.bookingsOnDay = function (dayNum) {
     if (!self.tutor || !dayNum) return [];
     var s = calDayStr(dayNum);
@@ -1857,6 +1870,25 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     ranges.push(makeSlotRange(lo, hi));
     self.setupClassSlots[d.dateStr] = ranges;
   };
+
+  // Safety net: previously the grid wrapper's ng-mouseleave set _slotDrag =
+  // null directly whenever the cursor left its bounds mid-drag (e.g. a fast
+  // or slightly diagonal drag between adjacent cells briefly crossing outside
+  // the wrapper) — silently ABANDONING the drag with no commit and no
+  // feedback. If the cursor then re-entered and released over a different
+  // cell, that became a brand-new single-cell click, splitting one intended
+  // continuous drag into two separate 30-min classes instead of one combined
+  // class. Fixed by making mouseup (wherever it lands, even outside the
+  // wrapper) the sole authority on ending a drag — this document-level
+  // listener is only a fallback for drags that overshoot the grid entirely;
+  // endSlotDrag() is a no-op if _slotDrag is already null, so it's harmless
+  // for it to also fire on top of the wrapper's own ng-mouseup.
+  function _onDocumentMouseUp() {
+    if (!self._slotDrag) return;
+    $scope.$apply(function () { self.endSlotDrag(); });
+  }
+  $document.on('mouseup', _onDocumentMouseUp);
+  $scope.$on('$destroy', function () { $document.off('mouseup', _onDocumentMouseUp); });
 
   self.setupClassTotalSlots = function () {
     return Object.keys(self.setupClassSlots).reduce(function (sum, k) {

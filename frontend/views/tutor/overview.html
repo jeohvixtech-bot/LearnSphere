@@ -248,13 +248,15 @@
     </div>
 
     <!-- Calendar (Monthly View) -->
-    <div class="bs-card bs-elev-sm" ng-if="!vm.counterBooking">
+    <div class="bs-card bs-elev-sm reset-zone" reset-zone ng-if="!vm.counterBooking" ng-click="vm.onCalendarAreaClick($event)">
+      <span class="reset-tip">Reset</span>
       <div>
         <span class="bs-tag bs-tag-accent">TUTOR SCHEDULER</span>
         <h3 style="margin-top:var(--space-2);"><i class="ti ti-calendar" aria-hidden="true"></i> Calendar &amp; Class Coordinator</h3>
       </div>
 
-      <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+      <div class="reset-zone" reset-zone ng-click="vm.onCalendarAreaClick($event)" style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+        <span class="reset-tip">Reset</span>
         <div style="flex:1; min-width:200px; background:var(--color-accent-2-100); border-radius:var(--radius-md); padding:var(--space-3);">
           <small class="bs-text-muted">Pending Confirmation</small>
           <div style="font-family:var(--font-heading); font-weight:600; font-size:19px;">{{ vm.pendingRequests().length }} Session(s)</div>
@@ -268,10 +270,9 @@
         </div>
       </div>
 
-      <div style="display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-        <button class="bs-btn bs-btn-secondary" ng-click="vm.prevMonth()">‹ Prev</button>
+      <div class="reset-zone" reset-zone ng-click="vm.onCalendarAreaClick($event)" style="display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+        <span class="reset-tip">Reset</span>
         <span style="font-weight:600; min-width:120px; text-align:center;"><i class="ti ti-calendar" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ vm.calYear }}</span>
-        <button class="bs-btn bs-btn-secondary" ng-click="vm.nextMonth()">Next ›</button>
         <button class="bs-btn bs-btn-primary" ng-click="vm.openSetupClass()" ng-disabled="vm.selectedCalDays.length === 0">
           <i class="ti ti-calendar-plus"></i> Setup class
         </button>
@@ -281,8 +282,15 @@
       </div>
       <p class="bs-text-muted" style="margin:0;">{{ vm.selectedCalDays.length }} of 5 dates selected</p>
 
-      <div class="bs-cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
-      <div class="bs-cal-grid">
+      <div class="bs-cal-grid-wrap">
+        <button type="button" class="bs-cal-arrow bs-cal-arrow--left" ng-click="vm.prevMonth()" aria-label="Previous month">
+          <i class="ti ti-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="bs-cal-arrow bs-cal-arrow--right" ng-click="vm.nextMonth()" aria-label="Next month">
+          <i class="ti ti-chevron-right" aria-hidden="true"></i>
+        </button>
+        <div class="bs-cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+        <div class="bs-cal-grid">
         <span class="bs-cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
         <button type="button" class="bs-cal-day"
           ng-repeat="d in vm.calDaysArray() track by $index"
@@ -320,6 +328,7 @@
           </span>
 
         </button>
+        </div>
       </div>
 
       <!-- Day detail: published slots moved to Daily Summary modal -->
@@ -335,7 +344,7 @@
           <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
             <label>Start Date <span style="color:var(--color-accent-2);">*</span></label>
             <input class="bs-input" type="text" ng-model="vm.blockForm.startDate" ng-change="vm.clearBlockConflicts()"
-              placeholder="DD-MM-YYYY" fp-date />
+              placeholder="DD-MM-YYYY" fp-date view-month-from="vm.calYear + '-' + vm.calMonth" />
           </div>
           <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
             <label>End Date <span style="color:var(--color-accent-2);">*</span></label>
@@ -440,7 +449,7 @@
             Your profile is currently being verified by our operations team. You can still set up classes now — they just won't be visible to parents until verification is complete.
           </p>
 
-          <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()" ng-mouseleave="vm._slotDrag = null">
+          <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()">
             <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
               <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
                 <span class="setup-legend-swatch setup-legend--confirmed"></span> Confirmed booking
@@ -587,7 +596,7 @@
 
           <div ng-if="vm.cancelSlotForm.mode === 'reschedule'">
             <p class="bs-text-muted" style="font-size:13px;margin-bottom:10px">
-              Each affected family will be asked to accept the new date or decline for a refund. No penalty to you unless a family declines.
+              Moves this class to the new date immediately for every affected family — they'll be notified, no action needed on their end. If a family can't make the new time, they can cancel their own booking or report an issue for a refund.
             </p>
             <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
               <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
@@ -619,7 +628,7 @@
           <div style="display:flex; gap:8px;">
             <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeCancelSlotModal()">Back</button>
             <button type="button" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);" ng-click="vm.submitCancelSlot()" ng-disabled="vm.cancelSlotBusy">
-              {{ vm.cancelSlotBusy ? 'Cancelling...' : (vm.cancelSlotForm.mode === 'reschedule' ? 'Send Reschedule Proposal' : 'Cancel Outright') }}
+              {{ vm.cancelSlotBusy ? 'Saving...' : (vm.cancelSlotForm.mode === 'reschedule' ? 'Reschedule Class' : 'Cancel Outright') }}
             </button>
           </div>
         </div>
@@ -875,7 +884,7 @@
 
           <div class="ov-modal-empty" ng-if="!vm.groupedBookingsOnDay(vm.currentSummaryDay).length">
             <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
-            <p>No classes scheduled for {{ vm.dailySummaryTabLabel(vm.currentSummaryDay) }}</p>
+            <p>No confirmed classes scheduled for {{ vm.dailySummaryTabLabel(vm.currentSummaryDay) }}</p>
           </div>
 
           <div class="ov-ds-group"

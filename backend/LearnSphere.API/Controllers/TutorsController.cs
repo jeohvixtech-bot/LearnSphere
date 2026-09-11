@@ -1080,11 +1080,15 @@ public class TutorsController : ControllerBase
             .Where(b => affectedBookingIds.Contains(b.Id) && (b.Status == "confirmed" || b.Status == "pending"))
             .ToListAsync();
 
-        // Nobody's booked this slot yet — no family to notify or ask for a decision,
-        // so a reschedule just moves it directly instead of going through the
-        // propose/accept dance (which only makes sense once someone has actually
-        // booked it).
-        if (isReschedule && affectedBookings.Count == 0)
+        // Reschedule — with or without existing bookings — moves immediately for
+        // every affected family, no pending PresetCancellationDecision/accept-
+        // reject step. A parent who can't make the new time uses the existing
+        // booking-cancel or issue-report flow instead, same as they would for
+        // any other date conflict; this endpoint only ever informs them after
+        // the fact, never blocks on their response. (Cancel-outright below is
+        // unchanged — that still needs the refund/tutor-penalty resolution
+        // PresetCancellationDecision exists for.)
+        if (isReschedule)
         {
             var movedSlot = new TutorTimeSlot
             {
@@ -1100,17 +1104,45 @@ public class TutorsController : ControllerBase
                 Country = slot.Country,
                 ClassSize = slot.ClassSize,
                 MaxStudents = slot.MaxStudents,
-                ConfirmedCount = 0,
-                IsFull = false,
+                ConfirmedCount = slot.ConfirmedCount,
+                IsFull = slot.IsFull,
                 PricePerLesson = slot.PricePerLesson,
                 PresetGroupId = slot.PresetGroupId
             };
             _context.TutorTimeSlots.Add(movedSlot);
+
+            foreach (var booking in affectedBookings)
+            {
+                var classToMove = booking.Classes.FirstOrDefault(c => c.Date == slot.Day && c.Time.StartsWith(slot.Time));
+                if (classToMove != null)
+                {
+                    classToMove.Date = dto.ProposedDate!;
+                    classToMove.Time = $"{dto.ProposedTime} - {dto.ProposedEndTime}";
+                }
+                var presetSlotLink = booking.PresetSlots.FirstOrDefault(ps => ps.TutorTimeSlotId == slotId);
+                if (presetSlotLink != null) presetSlotLink.TutorTimeSlot = movedSlot;
+
+                if (booking.Student?.ParentUser != null)
+                {
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = booking.Student.ParentUser.Id,
+                        Title = "Class Rescheduled by Tutor",
+                        Message = $"{tutor.User.Name} moved your {booking.Subject} class for {booking.Student.Name} from {slot.Day} to {dto.ProposedDate}.",
+                        Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+                        Type = "booking",
+                        IsRead = false
+                    });
+                }
+            }
+
             _context.TutorTimeSlots.Remove(slot);
             await _context.SaveChangesAsync();
-            return Ok(new { resolvedBookings = 0, affectedBookings = 0, pendingDecision = false, moved = true });
+            return Ok(new { resolvedBookings = 0, affectedBookings = affectedBookings.Count, pendingDecision = false, moved = true });
         }
 
+        // Cancel outright, no replacement offered — unchanged: resolves immediately
+        // toward a parent credit and a tutor penalty for every affected booking.
         var resolvedCount = 0;
         foreach (var booking in affectedBookings)
         {
@@ -1119,7 +1151,7 @@ public class TutorsController : ControllerBase
             var presetSlotLink = booking.PresetSlots.FirstOrDefault(ps => ps.TutorTimeSlotId == slotId);
             if (presetSlotLink != null) _context.BookingPresetSlots.Remove(presetSlotLink);
             // Reflect the removal immediately so ResolveTowardCreditAsync's
-            // remaining-session count (for Path B, below) is accurate.
+            // remaining-session count (below) is accurate.
             if (classToRemove != null) booking.Classes.Remove(classToRemove);
 
             var decision = new PresetCancellationDecision
@@ -1129,29 +1161,21 @@ public class TutorsController : ControllerBase
                 OriginalTime = slot.Time,
                 OriginalEndTime = slot.EndTime ?? string.Empty,
                 PricePerLesson = slot.PricePerLesson,
-                ProposedDate = isReschedule ? dto!.ProposedDate : null,
-                ProposedTime = isReschedule ? dto!.ProposedTime : null,
-                ProposedEndTime = isReschedule ? dto!.ProposedEndTime : null,
-                Status = isReschedule ? "pending" : "resolved"
+                Status = "resolved"
             };
             _context.PresetCancellationDecisions.Add(decision);
 
-            if (!isReschedule)
-            {
-                await _cancellationService.ResolveTowardCreditAsync(decision, booking,
-                    $"Tutor cancelled {booking.Subject} on {slot.Day} with no reschedule offered.");
-                resolvedCount++;
-            }
+            await _cancellationService.ResolveTowardCreditAsync(decision, booking,
+                $"Tutor cancelled {booking.Subject} on {slot.Day} with no reschedule offered.");
+            resolvedCount++;
 
             if (booking.Student?.ParentUser != null)
             {
                 _context.Notifications.Add(new Notification
                 {
                     UserId = booking.Student.ParentUser.Id,
-                    Title = isReschedule ? "Class Rescheduled by Tutor — Action Needed" : "Class Cancelled by Tutor",
-                    Message = isReschedule
-                        ? $"{tutor.User.Name} needs to move your {booking.Subject} class on {slot.Day} to a new date. Check your dashboard to accept or decline."
-                        : $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled with no reschedule offered — you'll receive a credit.",
+                    Title = "Class Cancelled by Tutor",
+                    Message = $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled with no reschedule offered — you'll receive a credit.",
                     Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                     Type = "booking",
                     IsRead = false
@@ -1161,7 +1185,7 @@ public class TutorsController : ControllerBase
 
         _context.TutorTimeSlots.Remove(slot);
         await _context.SaveChangesAsync();
-        return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = isReschedule });
+        return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = false });
     }
 
     // A tutor-declared "I'm unavailable" date range — previously only ever kept

@@ -70,7 +70,66 @@ angular.module('learnSphereApp')
         });
       }
 
+      // e.g. fp-date view-month-from="vm.calYear + '-' + vm.calMonth" on the
+      // block-range Start Date field — its calendar view tracks whichever
+      // month the main calendar grid is currently showing (Prev/Next), not
+      // just on open but live for as long as this field exists, since a
+      // watch re-fires on every digest where the expression's value changed.
+      // jumpToDate only ever changes what's DISPLAYED, never a bound — it's
+      // harmless (and a no-op re-render) to call while the picker is closed.
+      if (attrs.viewMonthFrom) {
+        scope.$watch(attrs.viewMonthFrom, function (val) {
+          if (!val) return;
+          var parts = String(val).split('-');
+          var year = parseInt(parts[0], 10), month = parseInt(parts[1], 10);
+          if (!isNaN(year) && !isNaN(month)) fp.jumpToDate(new Date(year, month, 1));
+        });
+      }
+
       scope.$on('$destroy', function () { fp.destroy(); });
+    }
+  };
+})
+// Shows a zone's .reset-tip child only once the cursor has stopped moving —
+// like a native tooltip, not a cursor-attached label. Every mousemove hides
+// it and restarts the show-delay; only a genuine pause reveals it at that
+// resting position. Visibility is the "reset-tip--visible" class (toggled
+// here); main.css just supplies the fade transition, no :hover involved.
+.directive('resetZone', function () {
+  var SHOW_DELAY = 350;
+  return {
+    restrict: 'A',
+    link: function (scope, element) {
+      var tip = element[0].querySelector('.reset-tip');
+      if (!tip) return;
+      var showTimer = null;
+
+      function hide() {
+        if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+        tip.classList.remove('reset-tip--visible');
+      }
+
+      element.on('mousemove', function (e) {
+        hide();
+        // mousemove bubbles from any child (buttons, day cells, the whole
+        // bs-cal-grid-wrap) up to this zone's own listener — without this
+        // check the tip would show/follow while hovering exactly the
+        // children clicking here already never resets (onCalendarAreaClick
+        // in tutor.controller.js checks the same target === currentTarget).
+        // Only the zone's own exposed background schedules a show.
+        if (e.target !== element[0]) return;
+        var rect = element[0].getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+        showTimer = setTimeout(function () {
+          tip.style.left = x + 'px';
+          tip.style.top = y + 'px';
+          tip.classList.add('reset-tip--visible');
+        }, SHOW_DELAY);
+      });
+
+      element.on('mouseleave', hide);
+      scope.$on('$destroy', hide);
     }
   };
 })

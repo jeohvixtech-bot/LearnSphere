@@ -3622,6 +3622,36 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
    the tutor calendar's extra states, which the simple parent calendar doesn't
    have: holidays and self-blocked ranges get a de-emphasized neutral treatment
    so they don't compete with the two real accent colors.) — */
+/* Click-to-reset zones (card padding ring, stats-row gap, nav-row gap) — see
+   onCalendarAreaClick in tutor.controller.js. Visibility is driven entirely
+   by the resetZone directive in filters.js (shown only once the cursor has
+   paused, like a native tooltip — not on hover, which would show/follow it
+   continuously while moving) via the reset-tip--visible class; this is just
+   the fade transition. */
+.reset-zone { position: relative; cursor: pointer; }
+.reset-tip {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -130%);
+  background: var(--color-text); color: var(--color-bg);
+  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+  white-space: nowrap; pointer-events: none; opacity: 0;
+  transition: opacity .12s ease; z-index: 20;
+}
+.reset-tip--visible { opacity: 0.2; }
+
+/* Prev/Next month as full-height overlay arrows on the day-grid's own edges,
+   replacing the old text buttons in the nav row above (still ‹ Prev / Next ›
+   in behavior — see vm.prevMonth()/vm.nextMonth() — just relocated). */
+.bs-cal-grid-wrap { position: relative; padding: 0 34px; }
+.bs-cal-arrow {
+  position: absolute; top: 0; bottom: 0; width: 34px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,103,134,0.18); color: #004961; border: none; cursor: pointer;
+  font-size: 18px; transition: background .15s ease, color .15s ease;
+}
+.bs-cal-arrow:hover { background: #006786; color: #e9f8ff; }
+.bs-cal-arrow--left { left: 0; border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.bs-cal-arrow--right { right: 0; border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+
 .bs-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; font-weight: 600; color: var(--color-neutral-600); margin-bottom: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-divider); }
 .bs-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .bs-cal-day-empty { display: block; min-height: 42px; }
@@ -3826,7 +3856,7 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
 .ov-modal {
   position: fixed; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 100; width: 1000px; max-height: 85vh;
+  z-index: 100; width: 70vw; max-height: 85vh;
   display: flex; flex-direction: column;
   background: var(--color-bg);
   border: 0.5px solid var(--color-divider-strong, #cbd5e1);
