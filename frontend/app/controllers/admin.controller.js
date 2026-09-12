@@ -130,7 +130,10 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
 
   function init() {
     AdminService.getStats().then(function (res) { self.stats = res.data; });
-    AdminService.getUnverifiedTutors().then(function (res) { self.unverifiedTutors = res.data; });
+    AdminService.getUnverifiedTutors().then(function (res) {
+      self.unverifiedTutors = res.data;
+      refreshGroupedDocs(self.unverifiedTutors);
+    });
     AdminService.getDisputes().then(function (res) { self.disputes = res.data; });
     AdminService.getRemarkDisputes().then(function (res) { self.remarkDisputes = res.data; });
     AdminService.getArchivedDisputes().then(function (res) { self.archivedDisputes = res.data; });
@@ -197,6 +200,79 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     return (tutor.documents || []).some(function (d) { return d.replacesDocumentId === doc.id; });
   }
 
+  // Fixed slot order so a given doc type always lands in the same spot in the
+  // queue, matching the tutor-side verification form's own section order,
+  // regardless of which type happened to be uploaded/re-uploaded most recently.
+  var VETTING_DOC_TYPE_ORDER = ['identity_photo', 'profile_photo', 'o_level', 'a_level', 'degree', 'postgrad',
+    'identity_id', 'nie_cert', 'intro_video', 'specialist_cert'];
+
+  function docTypeOrderIndex(type) {
+    var i = VETTING_DOC_TYPE_ORDER.indexOf(type);
+    return i === -1 ? VETTING_DOC_TYPE_ORDER.length : i;
+  }
+
+  // Groups every document with its full re-upload chain (root upload ->
+  // replacement -> replacement...) into one "slot" instead of a flat list
+  // scattered in whatever order the backend happens to return. The root (the
+  // very first upload for that slot) always anchors the group at index 0 even
+  // once rejected/superseded; later attempts stack below it in the order they
+  // were made — ids increase monotonically on insert, so sorting a chain by id
+  // is equivalent to sorting it by time, no separate timestamp needed.
+  //
+  // IMPORTANT: this returns a brand-new array of brand-new {root, chain}
+  // objects every call. It must never be called directly from an
+  // ng-repeat/ng-if expression — the collection-watch would see a different
+  // object at every index on every digest round and never converge, hitting
+  // $rootScope:infdig (same bug class as currentSummaryDay/groupedBookingsOnDay
+  // on the tutor side). Call it once via _refreshGroupedDocs below and bind the
+  // template to the cached t._groupedDocs property instead.
+  function buildGroupedDocs(tutor) {
+    var docs = tutor.documents || [];
+    var byId = {};
+    docs.forEach(function (d) { byId[d.id] = d; });
+
+    function rootOf(doc) {
+      var current = doc;
+      while (current.replacesDocumentId && byId[current.replacesDocumentId]) {
+        current = byId[current.replacesDocumentId];
+      }
+      return current;
+    }
+
+    var groups = {};
+    docs.forEach(function (d) {
+      var root = rootOf(d);
+      if (!groups[root.id]) groups[root.id] = { root: root, chain: [] };
+      groups[root.id].chain.push(d);
+    });
+
+    return Object.keys(groups).map(function (rootId) {
+      var g = groups[rootId];
+      g.chain.sort(function (a, b) { return a.id - b.id; });
+      // Labels the group's box header can rely on instead of repeating the doc
+      // type on every row — "Original upload" for the root, "Re-upload attempt
+      // N" for each one after it, in the order they were made.
+      g.chain.forEach(function (d, i) {
+        d.attemptLabel = i === 0 ? 'Original upload' : ('Re-upload attempt ' + i);
+      });
+      return g;
+    }).sort(function (a, b) {
+      var typeDiff = docTypeOrderIndex(a.root.documentType) - docTypeOrderIndex(b.root.documentType);
+      if (typeDiff !== 0) return typeDiff;
+      var sortDiff = (a.root.sortOrder || 0) - (b.root.sortOrder || 0);
+      if (sortDiff !== 0) return sortDiff;
+      return a.root.id - b.root.id;
+    });
+  }
+
+  // Recomputes and caches _groupedDocs on one tutor (or every tutor in a list)
+  // — call this once whenever a tutor's documents array actually changes, not
+  // from the template. The template reads the cached array directly.
+  function refreshGroupedDocs(tutorOrList) {
+    var list = Array.isArray(tutorOrList) ? tutorOrList : [tutorOrList];
+    list.forEach(function (t) { t._groupedDocs = buildGroupedDocs(t); });
+  }
+
   // identity_id has no file at all (just idType/idNumber), so the usual
   // fileUrl/externalUrl check alone would never recognize it as submitted —
   // mirrors TutorsController.HasContent.
@@ -257,7 +333,10 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
         AdminService.getStats().then(function (r) { self.stats = r.data; });
         // Re-fetch — dual-row archiving/discarding happens server-side, easier to
         // reflect the fresh state than reconcile it locally.
-        AdminService.getUnverifiedTutors().then(function (r) { self.unverifiedTutors = r.data; });
+        AdminService.getUnverifiedTutors().then(function (r) {
+          self.unverifiedTutors = r.data;
+          refreshGroupedDocs(self.unverifiedTutors);
+        });
       })
       .catch(function (err) {
         tutor.confirmError = err.data && err.data.message
@@ -275,6 +354,7 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
         var idx = tutor.documents.indexOf(doc);
         if (idx > -1) tutor.documents.splice(idx, 1);
         delete self.docReview[doc.id];
+        refreshGroupedDocs(tutor);
         self.systemLogs.unshift('Removed document from tutor: ' + tutor.name + ' (Just now)');
       })
       .catch(function (err) {

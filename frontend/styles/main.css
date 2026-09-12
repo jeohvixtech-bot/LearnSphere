@@ -2696,7 +2696,30 @@ a { text-decoration: none; color: inherit; }
   background: #fff;
 }
 
-.vetting-doc-list { display: flex; flex-direction: column; gap: 0; }
+.vetting-doc-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* One boxed group per document "slot" — the original upload plus every later
+   re-upload attempt in its chain (see admin.controller.js groupedDocs). The
+   box itself is what signals "these rows are one slot's history", so rows
+   inside need no extra indent/connector styling of their own. */
+.vetting-doc-group {
+  border: 0.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #fbfcfd;
+}
+.bs-scope .vetting-doc-group { border-color: var(--color-accent-300); background: var(--color-surface); }
+
+.vetting-doc-group-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 12px 0 4px;
+}
+.vetting-doc-group-count { text-transform: none; font-weight: 500; letter-spacing: 0; }
+.bs-scope .vetting-doc-group-header { color: var(--color-accent-700); }
 
 .vetting-doc-row {
   display: flex;
@@ -2704,10 +2727,21 @@ a { text-decoration: none; color: inherit; }
   justify-content: space-between;
   gap: 16px;
   padding: 12px 0;
-  border-bottom: 0.5px solid #f1f5f9;
+  border-top: 0.5px solid #eef2f7;
   flex-wrap: wrap;
 }
-.vetting-doc-row:last-child { border-bottom: none; }
+.vetting-doc-group-header + .vetting-doc-row { border-top: none; }
+.bs-scope .vetting-doc-row { border-top-color: var(--color-accent-100); }
+
+/* Re-upload attempt rows shifted right within the group box; min-width:1px on
+   the info block lets its text wrap into the now-narrower space instead of
+   forcing the row wider than the 90% it's allotted. */
+.vetting-doc-row--reupload {
+  margin-left: 10%;
+  width: 90%;
+  box-sizing: border-box;
+}
+.vetting-doc-row--reupload .vetting-doc-info { min-width: 1px; }
 
 .vetting-doc-info { flex: 1; min-width: 200px; }
 .vetting-doc-type-label {
@@ -2917,6 +2951,20 @@ a { text-decoration: none; color: inherit; }
 .bs-scope .verif-reupload-btn { color: var(--color-accent-2-700); }
 .bs-scope .verif-reupload-btn { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
 
+/* Picked but not yet sent to the server — held client-side until Submit. */
+.verif-staged-ready {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px;
+  background: #eff6ff;
+  border: 0.5px solid #bfdbfe;
+  border-radius: 8px;
+}
+.verif-staged-ready i { font-size: 16px; color: #2563eb; }
+.verif-staged-ready .verif-filename { color: #1d4ed8; }
+.bs-scope .verif-staged-ready { background: var(--color-accent-100); border-color: var(--color-accent-300); }
+.bs-scope .verif-staged-ready i { color: var(--color-accent-700); }
+.bs-scope .verif-staged-ready .verif-filename { color: var(--color-accent-800); }
+
 .verif-or-divider {
   display: flex; align-items: center; gap: 8px; margin: 8px 0;
 }
@@ -3036,9 +3084,15 @@ a { text-decoration: none; color: inherit; }
   color: #92400e;
   border: 0.5px solid #fde68a;
 }
+.verif-doc-status-badge.badge-staged {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 0.5px solid #bfdbfe;
+}
 .bs-scope .verif-doc-status-badge.badge-approved { background: var(--color-accent-100); color: var(--color-accent-800); border-color: var(--color-accent-300); }
 .bs-scope .verif-doc-status-badge.badge-rejected { background: var(--color-accent-2-100); color: var(--color-accent-2-800); border-color: var(--color-accent-2-300); }
 .bs-scope .verif-doc-status-badge.badge-pending-sm { background: var(--color-neutral-100); color: var(--color-neutral-700); border-color: var(--color-neutral-300); }
+.bs-scope .verif-doc-status-badge.badge-staged { background: var(--color-accent-100); color: var(--color-accent-800); border-color: var(--color-accent-300); }
 
 /* ── Max reached notice ─────────────────────────────────────── */
 .verif-max-notice {

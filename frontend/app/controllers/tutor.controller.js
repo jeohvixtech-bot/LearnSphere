@@ -2326,9 +2326,16 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     idType: 'NRIC',
     idNumber: '',
     introVideoLink: '',
-    uploadingMap: {},   // { documentType: true/false }
-    errorMap: {}        // { documentType: 'error message' }
+    errorMap: {},       // { documentType: 'error message' }
+    // Files picked but not yet sent anywhere — every doc type now works this
+    // way, same as idNumber/introVideoLink always did. Nothing touches the
+    // server until "Submit for verification" is clicked; see submitVerification
+    // below, which uploads+saves every staged item before calling the actual
+    // submit endpoint. { _stagedId, file, docType, fileName, fileSizeBytes,
+    // previewUrl, replacesDocumentId (set only when fixing a rejected doc) }
+    stagedList: []
   };
+  self.verifSubmitting = false;
 
   // Shape-only validation (no checksum) — mirrors TutorsController.SaveDocument's
   // server-side patterns. Passport intentionally has no pattern: admin relies on
@@ -2384,7 +2391,18 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   };
 
   self.getDocCount = function (type) {
-    return self.getDocs(type).length;
+    return self.getDocs(type).length + self.getStagedNew(type).length;
+  };
+
+  // New (non-replacement) staged picks for a type — counts toward the mandatory
+  // check and the multi-upload /3 cap the same as an already-saved document.
+  self.getStagedNew = function (type) {
+    return (self.verif.stagedList || []).filter(function (s) { return s.docType === type && !s.replacesDocumentId; });
+  };
+
+  // The staged fix (if any) for a specific rejected document row.
+  self.getStagedReplacement = function (docId) {
+    return (self.verif.stagedList || []).find(function (s) { return s.replacesDocumentId === docId; });
   };
 
   self.isDocTypeFull = function (type) {
@@ -2437,9 +2455,10 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   self.mandatoryDocsUploadedCount = function () {
     var docs = self.tutor.documents || [];
     var count = 0;
-    if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; })) count++;
-    if (docs.some(function (d) { return d.documentType === 'profile_photo' && d.fileUrl; })) count++;
-    if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })) count++;
+    if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; }) || self.getStagedNew('identity_photo').length) count++;
+    if (docs.some(function (d) { return d.documentType === 'profile_photo' && d.fileUrl; }) || self.getStagedNew('profile_photo').length) count++;
+    if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })
+        || ACADEMIC_LEVEL_TYPES.some(function (t) { return self.getStagedNew(t).length; })) count++;
     return count;
   };
 
@@ -2456,6 +2475,30 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     return Math.round(((self.mandatoryDocsUploadedCount() + (self.hasIdentityNumber() ? 1 : 0)) / 4) * 100) + '%';
   };
 
+  // The ID number field stays populated after every submit (re-synced from the
+  // saved doc in _refreshTutor so the form reflects what's on file) — so "has a
+  // value" alone can't mean "needs saving." True only when it's missing,
+  // rejected, or the typed type/number genuinely differs from what's on file.
+  // Shared by canSubmitVerification/hasPendingVerificationChanges (gating) and
+  // submitVerification (deciding whether to actually resend it).
+  self._idNumberChanged = function () {
+    var existingIdDoc = self.getDocSingle('identity_id');
+    return !existingIdDoc || existingIdDoc.status === 'rejected'
+      || existingIdDoc.idType !== self.verif.idType
+      || (existingIdDoc.idNumber || '') !== (self.verif.idNumber || '').trim();
+  };
+
+  // Once already verified, the Submit button should only be clickable if
+  // there's actually something new to send — otherwise clicking it is a no-op
+  // that shouldn't drag the profile back into review (see submit-verification
+  // backend endpoint, which independently enforces the same no-op).
+  self.hasPendingVerificationChanges = function () {
+    if ((self.verif.stagedList || []).length > 0) return true;
+    if (self.canEditIntroVideo() && (self.verif.introVideoLink || '').trim()) return true;
+    if (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged()) return true;
+    return false;
+  };
+
   self.canSubmitVerification = function () {
     if (self.mandatoryDocsUploadedCount() < self.mandatoryDocsTotal || !self.hasIdentityNumber()) return false;
     if (self.idNumberFormatError()) return false;
@@ -2463,6 +2506,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     // fresh replacement ready — i.e. first-time setup, or a genuine fix-and-
     // resubmit round, not "just sitting under review with nothing changed yet."
     if (self.tutor.verificationStatus === 'pending' && !self.canResubmitAfterRejection()) return false;
+    if (self.tutor.verificationStatus === 'approved' && !self.hasPendingVerificationChanges()) return false;
     return true;
   };
 
@@ -2488,7 +2532,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // ID type/number is reviewed independently from the identity photo — its own
   // document row, own status, own reject/re-fix loop. No separate save button —
   // the typed value is saved as part of clicking "Submit for verification" (see
-  // submitVerification), same as saveIntroVideoLink's link-only pattern otherwise.
+  // submitVerification), same as every other document type now.
   self.canEditIdNumber = function () {
     if (!self.isVerifLocked()) return true;
     var d = self.getDocSingle('identity_id');
@@ -2504,70 +2548,66 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     return !!d && d.status === 'rejected';
   };
 
-  self.uploadVerifDoc = function (file, docType) {
-    if (!file) return;
-    self.verif.uploadingMap[docType] = true;
-    self.verif.errorMap[docType] = null;
+  var _stagedIdSeq = 0;
+  function makePreviewUrl(file) {
+    return (window.URL && window.URL.createObjectURL) ? URL.createObjectURL(file) : null;
+  }
 
-    TutorService.uploadDocument(file, docType).then(function (res) {
-      return TutorService.saveDocument(self.tutor.id, {
-        documentType: docType,
-        fileUrl: res.data.url,
-        fileName: res.data.fileName,
-        fileSizeBytes: res.data.fileSizeBytes
+  // Both of these are invoked from a raw onchange="" attribute on the file
+  // input (angular.element(this).scope().vm.stageVerifDoc(...)) — a native DOM
+  // callback, not an ng-* directive, so it runs OUTSIDE Angular's digest cycle.
+  // The old immediate-upload versions never needed $apply because their $http
+  // call always ended in a promise resolution that Angular auto-wraps in a
+  // digest; staging is pure synchronous JS with no such promise, so without an
+  // explicit $apply here the scope mutation below is invisible to the view
+  // (staged badge never appears, Submit's ng-disabled never re-evaluates).
+
+  // Picks a brand-new file for a slot — held client-side only (see
+  // verif.stagedList above); nothing is sent to the server until Submit.
+  self.stageVerifDoc = function (file, docType) {
+    if (!file) return;
+    $scope.$apply(function () {
+      self.verif.errorMap[docType] = null;
+      self.verif.stagedList.push({
+        _stagedId: ++_stagedIdSeq,
+        file: file,
+        docType: docType,
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        previewUrl: makePreviewUrl(file),
+        replacesDocumentId: null
       });
-    }).then(function () {
-      return self._refreshTutor();
-    }).catch(function (err) {
-      self.verif.errorMap[docType] = err.data && err.data.message
-        ? err.data.message : 'Upload failed. Please try again.';
-    }).finally(function () {
-      self.verif.uploadingMap[docType] = false;
     });
   };
 
-  // Replaces a rejected document — does NOT touch the old row (it stays exactly
-  // as rejected, still visible to admin as "current" until this is resolved).
-  // The new upload is a separate row, linked via replacesDocumentId. See
-  // TutorsController.SaveDocument's dual-row re-upload handling.
-  self.reuploadVerifDoc = function (file, docType, docId) {
+  // Picks a fix for a specific rejected document — same staged-until-submit
+  // handling, just tagged with replacesDocumentId so submitVerification sends
+  // it as a replacement (dual-row on the backend) instead of a new upload.
+  // Re-picking before submitting swaps out any earlier staged fix for the same doc.
+  self.stageReuploadVerifDoc = function (file, docType, docId) {
     if (!file || !docId) return;
-    self.verif.uploadingMap[docType] = true;
-    self.verif.errorMap[docType] = null;
-
-    TutorService.uploadDocument(file, docType)
-      .then(function (res) {
-        return TutorService.saveDocument(self.tutor.id, {
-          documentType: docType,
-          fileUrl: res.data.url,
-          fileName: res.data.fileName,
-          fileSizeBytes: res.data.fileSizeBytes,
-          replacesDocumentId: parseInt(docId)
-        });
-      })
-      .then(function () {
-        return self._refreshTutor();
-      })
-      .catch(function (err) {
-        self.verif.errorMap[docType] = err.data && err.data.message
-          ? err.data.message : 'Re-upload failed. Please try again.';
-      })
-      .finally(function () {
-        self.verif.uploadingMap[docType] = false;
+    docId = parseInt(docId);
+    $scope.$apply(function () {
+      self.verif.errorMap[docType] = null;
+      self.unstageVerifDoc(self.getStagedReplacement(docId) ? self.getStagedReplacement(docId)._stagedId : null);
+      self.verif.stagedList.push({
+        _stagedId: ++_stagedIdSeq,
+        file: file,
+        docType: docType,
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        previewUrl: makePreviewUrl(file),
+        replacesDocumentId: docId
       });
+    });
   };
 
-  // Saves an intro video link (no file upload)
-  self.saveIntroVideoLink = function () {
-    if (!self.verif.introVideoLink) return;
-    TutorService.saveDocument(self.tutor.id, {
-      documentType: 'intro_video',
-      externalUrl: self.verif.introVideoLink
-    }).then(function () {
-      self.verif.introVideoLink = '';
-      return self._refreshTutor();
-    }).catch(function () {
-      self.verif.errorMap['intro_video'] = 'Failed to save link.';
+  self.unstageVerifDoc = function (stagedId) {
+    if (!stagedId) return;
+    self.verif.stagedList = self.verif.stagedList.filter(function (s) {
+      if (s._stagedId !== stagedId) return true;
+      if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
+      return false;
     });
   };
 
@@ -2584,58 +2624,84 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // True once every currently-rejected document has a fresh replacement uploaded
   // (a new pending row pointing back at it) — i.e. genuinely ready to go back to
   // admin, not just sitting under review with nothing changed yet.
+  // Nothing is saved anywhere until Submit is clicked (see stagedList above), so
+  // "fixed and ready" just means a staged replacement/value exists for every
+  // currently-rejected row — no more comparing timestamps against an
+  // already-persisted replacement row.
   self.canResubmitAfterRejection = function () {
     var docs = self.tutor.documents || [];
-    var lastSubmittedAt = self.tutor.lastSubmittedAt ? new Date(self.tutor.lastSubmittedAt) : null;
-    var rejected = docs.filter(function (d) { return d.status === 'rejected'; });
+    var rejected = docs.filter(function (d) { return d.status === 'rejected' && !isSuperseded(d); });
     if (!rejected.length) return false;
     return rejected.every(function (d) {
-      var replacement = docs.find(function (r) { return r.replacesDocumentId === d.id; });
-      if (replacement) {
-        // A replacement that's already been submitted (uploaded before the last
-        // submit) isn't a NEW fix — it's already with admin, so it doesn't count
-        // toward re-enabling the button again.
-        if (!lastSubmittedAt) return true;
-        return new Date(replacement.uploadedAt) > lastSubmittedAt;
-      }
-      // ID number has no separate save step — a freshly typed value (about to be
-      // saved by submitVerification itself) counts as "fixed and ready" too.
-      if (d.documentType === 'identity_id' && self.canEditIdNumber() && (self.verif.idNumber || '').trim()) return true;
-      return false;
+      if (d.documentType === 'identity_id') return self.canEditIdNumber() && !!(self.verif.idNumber || '').trim();
+      if (d.documentType === 'intro_video') return self.canEditIntroVideo() && !!(self.verif.introVideoLink || '').trim();
+      return !!self.getStagedReplacement(d.id);
     });
   };
 
+  // Uploads+saves every staged file in order (not in parallel), so a failure
+  // stops the chain right where it happened and errorMap points at the exact
+  // doc that failed, instead of an ambiguous "something in the batch broke."
+  function _flushStagedDocs(items) {
+    return items.reduce(function (chain, item) {
+      return chain.then(function () {
+        return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
+          return TutorService.saveDocument(self.tutor.id, {
+            documentType: item.docType,
+            fileUrl: res.data.url,
+            fileName: res.data.fileName,
+            fileSizeBytes: res.data.fileSizeBytes,
+            replacesDocumentId: item.replacesDocumentId || undefined
+          });
+        }).catch(function (err) {
+          self.verif.errorMap[item.docType] = err.data && err.data.message
+            ? err.data.message : ('Failed to upload ' + item.fileName + '. Please try again.');
+          return $q.reject(err);
+        });
+      });
+    }, $q.when());
+  }
+
+  function _clearStagedDocs() {
+    (self.verif.stagedList || []).forEach(function (s) { if (s.previewUrl) URL.revokeObjectURL(s.previewUrl); });
+    self.verif.stagedList = [];
+  }
+
+  // Every doc type is staged client-side only (see verif.stagedList) — this is
+  // the single point where anything actually reaches the server: upload+save
+  // every staged file, save the ID number/intro video link if they're editable
+  // and filled in, then call the real submit-verification endpoint. Same button
+  // for a first-time submit and a fix-and-resubmit round (see canSubmitVerification).
   self.submitVerification = function () {
-    // Button is disabled in every case this would otherwise block (see
-    // canSubmitVerification) — nothing more to check here.
     if (!self.canSubmitVerification()) return;
     if (!confirm('You won\'t be able to change these documents until admin reviews them — submit for verification?')) return;
     self.verifSubmitError = '';
+    self.verifSubmitting = true;
 
-    var finishSubmit = function () {
-      TutorService.submitVerification(self.tutor.id).then(function () {
-        return self._refreshTutor();
-      }).then(function () {
-        self.verifSubmitSuccess = true;
-        $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
-      }).catch(function (err) {
-        self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Submission failed.';
-      });
-    };
+    var staged = (self.verif.stagedList || []).slice();
 
-    // ID number has no separate save button — save it here as part of submitting,
-    // same as every other document was already saved individually beforehand.
-    if (self.canEditIdNumber() && (self.verif.idNumber || '').trim()) {
-      TutorService.saveDocument(self.tutor.id, {
-        documentType: 'identity_id',
-        idType: self.verif.idType,
-        idNumber: self.verif.idNumber
-      }).then(finishSubmit).catch(function (err) {
-        self.verifSubmitError = err.data && err.data.message ? err.data.message : 'Failed to save ID number.';
-      });
-    } else {
-      finishSubmit();
-    }
+    _flushStagedDocs(staged).then(function () {
+      var idPromise = (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged())
+        ? TutorService.saveDocument(self.tutor.id, { documentType: 'identity_id', idType: self.verif.idType, idNumber: self.verif.idNumber })
+        : $q.when();
+      var videoPromise = (self.canEditIntroVideo() && (self.verif.introVideoLink || '').trim())
+        ? TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: self.verif.introVideoLink })
+        : $q.when();
+      return $q.all([idPromise, videoPromise]);
+    }).then(function () {
+      return TutorService.submitVerification(self.tutor.id);
+    }).then(function () {
+      _clearStagedDocs();
+      self.verif.introVideoLink = '';
+      return self._refreshTutor();
+    }).then(function () {
+      self.verifSubmitSuccess = true;
+      $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
+    }).catch(function (err) {
+      self.verifSubmitError = err && err.data && err.data.message ? err.data.message : 'Submission failed. Please try again.';
+    }).finally(function () {
+      self.verifSubmitting = false;
+    });
   };
 
   // Triggers a hidden file input from a custom "Browse" button

@@ -1533,29 +1533,45 @@
                 <span class="verif-filename">{{ vm.getDocSingle('identity_photo').fileName }}</span>
                 <span class="verif-filesize">{{ vm.formatFileSize(vm.getDocSingle('identity_photo').fileSizeBytes) }}</span>
                 <input type="file" id="reupload_identity" accept="image/jpeg,image/png"
+                  data-doc-id="{{ vm.getDocSingle('identity_photo').id }}"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'identity_photo')" />
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'identity_photo', this.getAttribute('data-doc-id'))" />
                 <button type="button" class="verif-reupload-btn"
-                  ng-if="vm.getDocSingle('identity_photo').status === 'rejected'"
+                  ng-if="vm.getDocSingle('identity_photo').status === 'rejected' || (vm.getDocSingle('identity_photo').status === 'approved' && !vm.isVerifLocked())"
                   ng-click="vm.triggerVerifUpload('reupload_identity')">Re-upload</button>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
                   ng-click="vm.removeVerifDoc(vm.getDocSingle('identity_photo').id)">Remove</button>
               </div>
 
-              <div ng-if="!vm.getDocSingle('identity_photo') && vm.canUploadNew()" class="verif-upload-box">
+              <div ng-if="vm.getDocSingle('identity_photo') && vm.getStagedReplacement(vm.getDocSingle('identity_photo').id)" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(vm.getDocSingle('identity_photo').id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(vm.getDocSingle('identity_photo').id)._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('identity_photo') && vm.getStagedNew('identity_photo')[0]" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedNew('identity_photo')[0].fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getStagedNew('identity_photo')[0].fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedNew('identity_photo')[0]._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('identity_photo') && !vm.getStagedNew('identity_photo')[0] && vm.canUploadNew()" class="verif-upload-box">
                 <input type="file" id="upload_identity_photo" accept="image/jpeg,image/png"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'identity_photo')" />
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0], 'identity_photo')" />
                 <i class="ti ti-camera" aria-hidden="true"></i>
                 <div class="verif-upload-box-text">
-                  <p ng-if="!vm.verif.uploadingMap['identity_photo']">Upload selfie with ID</p>
-                  <p ng-if="vm.verif.uploadingMap['identity_photo']" class="text-muted">Uploading...</p>
+                  <p>Upload selfie with ID</p>
                   <span>JPG, PNG · 100 KB – 5 MB</span>
                 </div>
                 <button type="button" class="verif-browse-btn"
-                  ng-click="vm.triggerVerifUpload('upload_identity_photo')"
-                  ng-disabled="vm.verif.uploadingMap['identity_photo']">Browse</button>
+                  ng-click="vm.triggerVerifUpload('upload_identity_photo')">Browse</button>
               </div>
               <p class="field-error" ng-if="vm.verif.errorMap['identity_photo']">{{ vm.verif.errorMap['identity_photo'] }}</p>
             </div>
@@ -1564,7 +1580,7 @@
           <!-- ── 1b. Profile photo — the public-facing photo shown to parents, only
                goes live once admin approves it (see ApplyVerificationDecisions). ── -->
           <div class="verif-card">
-            <p class="verif-card-title"><i class="ti ti-user-circle" aria-hidden="true"></i> Profile photo</p>
+            <p class="verif-card-title"><i class="ti ti-user-circle" aria-hidden="true"></i> Profile photo <span class="text-danger">*</span></p>
             <div class="form-group">
               <p class="text-muted" style="font-size:13px; margin-bottom:6px;">Shown to parents on your public profile once approved. A clear photo of your face.</p>
 
@@ -1580,29 +1596,45 @@
                     'badge-pending-sm': vm.getDocSingle('profile_photo').status === 'pending'
                   }">{{ vm.getDocSingle('profile_photo').status }}</span>
                 <input type="file" id="reupload_profile_photo" accept="image/jpeg,image/png"
+                  data-doc-id="{{ vm.getDocSingle('profile_photo').id }}"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'profile_photo')" />
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'profile_photo', this.getAttribute('data-doc-id'))" />
                 <button type="button" class="verif-reupload-btn"
-                  ng-if="vm.getDocSingle('profile_photo').status === 'rejected'"
+                  ng-if="vm.getDocSingle('profile_photo').status === 'rejected' || (vm.getDocSingle('profile_photo').status === 'approved' && !vm.isVerifLocked())"
                   ng-click="vm.triggerVerifUpload('reupload_profile_photo')">Re-upload</button>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
                   ng-click="vm.removeVerifDoc(vm.getDocSingle('profile_photo').id)">Remove</button>
               </div>
 
-              <div ng-if="!vm.getDocSingle('profile_photo') && vm.canUploadNew()" class="verif-upload-box">
+              <div ng-if="vm.getDocSingle('profile_photo') && vm.getStagedReplacement(vm.getDocSingle('profile_photo').id)" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(vm.getDocSingle('profile_photo').id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(vm.getDocSingle('profile_photo').id)._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('profile_photo') && vm.getStagedNew('profile_photo')[0]" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedNew('profile_photo')[0].fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getStagedNew('profile_photo')[0].fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedNew('profile_photo')[0]._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('profile_photo') && !vm.getStagedNew('profile_photo')[0] && vm.canUploadNew()" class="verif-upload-box">
                 <input type="file" id="upload_profile_photo" accept="image/jpeg,image/png"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], 'profile_photo')" />
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0], 'profile_photo')" />
                 <i class="ti ti-camera" aria-hidden="true"></i>
                 <div class="verif-upload-box-text">
-                  <p ng-if="!vm.verif.uploadingMap['profile_photo']">Upload profile photo</p>
-                  <p ng-if="vm.verif.uploadingMap['profile_photo']" class="text-muted">Uploading...</p>
+                  <p>Upload profile photo</p>
                   <span>JPG, PNG · 100 KB – 5 MB</span>
                 </div>
                 <button type="button" class="verif-browse-btn"
-                  ng-click="vm.triggerVerifUpload('upload_profile_photo')"
-                  ng-disabled="vm.verif.uploadingMap['profile_photo']">Browse</button>
+                  ng-click="vm.triggerVerifUpload('upload_profile_photo')">Browse</button>
               </div>
               <p class="field-error" ng-if="vm.verif.errorMap['profile_photo']">{{ vm.verif.errorMap['profile_photo'] }}</p>
             </div>
@@ -1635,7 +1667,7 @@
                   data-doc-type="{{ ql.type }}" data-doc-id="{{ doc.id }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.reuploadVerifDoc(this.files[0], this.getAttribute('data-doc-type'), this.getAttribute('data-doc-id'))" />
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], this.getAttribute('data-doc-type'), this.getAttribute('data-doc-id'))" />
                 <button type="button" class="verif-reupload-btn"
                   ng-if="doc.status === 'rejected'"
                   ng-click="vm.triggerVerifUpload('reupload_' + ql.type + '_' + doc.id)">
@@ -1646,25 +1678,45 @@
                   ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
               </div>
 
+              <!-- Staged fix for a rejected row above, not sent until Submit -->
+              <div class="verif-staged-ready"
+                ng-repeat="doc in vm.getDocs(ql.type) track by doc.id"
+                ng-if="vm.getStagedReplacement(doc.id)">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
+              </div>
+
+              <!-- Newly staged additions for this type, not sent until Submit -->
+              <div class="verif-staged-ready"
+                ng-repeat="staged in vm.getStagedNew(ql.type) track by staged._stagedId">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ staged.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
+              </div>
+
               <!-- Add another — only shown under limit of 3, and while unlocked -->
               <div class="verif-upload-box" ng-if="!vm.isDocTypeFull(ql.type) && vm.canUploadNew()">
                 <input type="file" id="upload_{{ ql.type }}_{{ vm.getDocCount(ql.type) }}"
                   data-doc-type="{{ ql.type }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0], this.getAttribute('data-doc-type'))" />
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0], this.getAttribute('data-doc-type'))" />
                 <i class="ti ti-upload" aria-hidden="true"></i>
                 <div class="verif-upload-box-text">
-                  <p ng-if="!vm.verif.uploadingMap[ql.type]">
+                  <p>
                     {{ vm.getDocCount(ql.type) === 0 ? 'Upload certificate' : 'Add another certificate' }}
                     <span class="verif-upload-count">({{ vm.getDocCount(ql.type) }}/3)</span>
                   </p>
-                  <p ng-if="vm.verif.uploadingMap[ql.type]" class="text-muted">Uploading...</p>
                   <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
                 </div>
                 <button type="button" class="verif-browse-btn"
-                  ng-click="vm.triggerVerifUpload('upload_' + ql.type + '_' + vm.getDocCount(ql.type))"
-                  ng-disabled="vm.verif.uploadingMap[ql.type]">Browse</button>
+                  ng-click="vm.triggerVerifUpload('upload_' + ql.type + '_' + vm.getDocCount(ql.type))">Browse</button>
               </div>
 
               <!-- Max reached notice -->
@@ -1705,7 +1757,7 @@
                   data-doc-id="{{ doc.id }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.reuploadVerifDoc(this.files[0], 'nie_cert', this.getAttribute('data-doc-id'))" />
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'nie_cert', this.getAttribute('data-doc-id'))" />
                 <button type="button" class="verif-reupload-btn"
                   ng-if="doc.status === 'rejected'"
                   ng-click="vm.triggerVerifUpload('reupload_nie_cert_' + doc.id)">
@@ -1716,23 +1768,41 @@
                   ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
               </div>
 
+              <div class="verif-staged-ready"
+                ng-repeat="doc in vm.getDocs('nie_cert') track by doc.id"
+                ng-if="vm.getStagedReplacement(doc.id)">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
+              </div>
+
+              <div class="verif-staged-ready"
+                ng-repeat="staged in vm.getStagedNew('nie_cert') track by staged._stagedId">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ staged.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
+              </div>
+
               <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('nie_cert') && vm.canUploadNew()">
                 <input type="file" id="upload_nie_cert_{{ vm.getDocCount('nie_cert') }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0],'nie_cert')" />
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0],'nie_cert')" />
                 <i class="ti ti-upload" aria-hidden="true"></i>
                 <div class="verif-upload-box-text">
-                  <p ng-if="!vm.verif.uploadingMap['nie_cert']">
+                  <p>
                     {{ vm.getDocCount('nie_cert') === 0 ? 'Upload certificate' : 'Add another certificate' }}
                     <span class="verif-upload-count">({{ vm.getDocCount('nie_cert') }}/3)</span>
                   </p>
-                  <p ng-if="vm.verif.uploadingMap['nie_cert']" class="text-muted">Uploading...</p>
                   <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
                 </div>
                 <button type="button" class="verif-browse-btn"
-                  ng-click="vm.triggerVerifUpload('upload_nie_cert_' + vm.getDocCount('nie_cert'))"
-                  ng-disabled="vm.verif.uploadingMap['nie_cert']">Browse</button>
+                  ng-click="vm.triggerVerifUpload('upload_nie_cert_' + vm.getDocCount('nie_cert'))">Browse</button>
               </div>
 
               <p class="verif-max-notice" ng-if="vm.isDocTypeFull('nie_cert') && vm.canUploadNew()">
@@ -1779,10 +1849,10 @@
                 <div class="verif-link-row">
                   <input type="url" ng-model="vm.verif.introVideoLink"
                     placeholder="YouTube, Google Drive, or any public video URL" />
-                  <button type="button" class="btn-outline sm"
-                    ng-click="vm.saveIntroVideoLink()"
-                    ng-disabled="!vm.verif.introVideoLink">Save link</button>
                 </div>
+                <p class="text-muted" style="font-size:12px; margin-top:6px" ng-if="vm.verif.introVideoLink">
+                  <i class="ti ti-info-circle" aria-hidden="true"></i> Saved when you submit for verification below.
+                </p>
               </div>
 
               <p class="verif-max-notice" ng-if="!vm.getDocSingle('intro_video') && !vm.canEditIntroVideo()">
@@ -1814,7 +1884,7 @@
                 data-doc-id="{{ doc.id }}"
                 accept="image/jpeg,image/png,application/pdf"
                 style="display:none"
-                onchange="angular.element(this).scope().vm.reuploadVerifDoc(this.files[0], 'specialist_cert', this.getAttribute('data-doc-id'))" />
+                onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'specialist_cert', this.getAttribute('data-doc-id'))" />
               <button type="button" class="verif-reupload-btn"
                 ng-if="doc.status === 'rejected'"
                 ng-click="vm.triggerVerifUpload('reupload_specialist_cert_' + doc.id)">
@@ -1825,24 +1895,42 @@
                 ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
             </div>
 
+            <div class="verif-staged-ready"
+              ng-repeat="doc in vm.getDocs('specialist_cert') track by doc.id"
+              ng-if="vm.getStagedReplacement(doc.id)">
+              <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+              <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
+              <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+              <button type="button" class="verif-remove-btn"
+                ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
+            </div>
+
+            <div class="verif-staged-ready"
+              ng-repeat="staged in vm.getStagedNew('specialist_cert') track by staged._stagedId">
+              <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+              <span class="verif-filename">{{ staged.fileName }}</span>
+              <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
+              <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+              <button type="button" class="verif-remove-btn"
+                ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
+            </div>
+
             <div class="form-group">
               <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('specialist_cert') && vm.canUploadNew()">
                 <input type="file" id="upload_specialist_cert_{{ vm.getDocCount('specialist_cert') }}"
                   accept="image/jpeg,image/png,application/pdf"
                   style="display:none"
-                  onchange="angular.element(this).scope().vm.uploadVerifDoc(this.files[0],'specialist_cert')" />
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0],'specialist_cert')" />
                 <i class="ti ti-upload" aria-hidden="true"></i>
                 <div class="verif-upload-box-text">
-                  <p ng-if="!vm.verif.uploadingMap['specialist_cert']">
+                  <p>
                     {{ vm.getDocCount('specialist_cert') === 0 ? 'Upload certificate' : 'Add another certificate' }}
                     <span class="verif-upload-count">({{ vm.getDocCount('specialist_cert') }}/3)</span>
                   </p>
-                  <p ng-if="vm.verif.uploadingMap['specialist_cert']" class="text-muted">Uploading...</p>
                   <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
                 </div>
                 <button type="button" class="verif-browse-btn"
-                  ng-click="vm.triggerVerifUpload('upload_specialist_cert_' + vm.getDocCount('specialist_cert'))"
-                  ng-disabled="vm.verif.uploadingMap['specialist_cert']">Browse</button>
+                  ng-click="vm.triggerVerifUpload('upload_specialist_cert_' + vm.getDocCount('specialist_cert'))">Browse</button>
               </div>
 
               <p class="verif-max-notice" ng-if="vm.isDocTypeFull('specialist_cert') && vm.canUploadNew()">
@@ -1871,15 +1959,19 @@
               <span ng-if="vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal">{{ vm.mandatoryDocsTotal - vm.mandatoryDocsUploadedCount() }} required document(s) still missing<span ng-if="!vm.hasIdentityNumber()">, identity number not provided</span></span>
               <span ng-if="vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && !vm.hasIdentityNumber()">Identity number not provided</span>
             </p>
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && vm.hasIdentityNumber()">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'pending'">
               <i class="ti ti-clock" aria-hidden="true"></i>
               Verification under review — re-upload any rejected document to resubmit
             </p>
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'approved'">
+              <i class="ti ti-circle-check" aria-hidden="true"></i>
+              Your profile is already verified — nothing new to submit
+            </p>
             <button type="button" class="btn-primary"
               ng-click="vm.submitVerification()"
-              ng-disabled="!vm.canSubmitVerification()">
+              ng-disabled="!vm.canSubmitVerification() || vm.verifSubmitting">
               <i class="ti ti-send" style="font-size:14px; margin-right:5px;" aria-hidden="true"></i>
-              Submit for verification
+              {{ vm.verifSubmitting ? 'Submitting...' : 'Submit for verification' }}
             </button>
           </div>
 

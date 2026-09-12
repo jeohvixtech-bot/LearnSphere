@@ -69,12 +69,17 @@
 
             <!-- Document review list -->
             <div class="vetting-doc-list">
-              <div class="vetting-doc-row" ng-repeat="doc in t.documents track by doc.id">
+              <div class="vetting-doc-group" ng-repeat="grp in t._groupedDocs track by grp.root.id">
+              <div class="vetting-doc-group-header">
+                {{ vm.docTypeLabel(grp.root.documentType) }}
+                <span ng-if="grp.chain.length > 1" class="vetting-doc-group-count">· {{ grp.chain.length }} attempts</span>
+              </div>
+              <div class="vetting-doc-row" ng-class="{'vetting-doc-row--reupload': !$first}" ng-repeat="doc in grp.chain track by doc.id">
 
                 <!-- Doc info -->
                 <div class="vetting-doc-info">
                   <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                    <span class="vetting-doc-type-label">{{ vm.docTypeLabel(doc.documentType) }}</span>
+                    <span class="vetting-doc-type-label">{{ doc.attemptLabel }}</span>
                     <span class="label-tag" style="font-size:11px;"
                       ng-class="{
                         'amber': doc.status === 'pending',
@@ -123,12 +128,6 @@
                   <p class="vetting-prev-note" ng-if="doc.adminNote && doc.status === 'rejected'">
                     <i class="ti ti-message" style="font-size:13px;" aria-hidden="true"></i>
                     Previous note: "{{ doc.adminNote }}"
-                  </p>
-
-                  <!-- Replacement indicator — this doc is a fresh re-upload fixing a
-                       previously rejected one (shown just above, same slot) -->
-                  <p class="text-muted" style="font-size:12px; margin:4px 0 0;" ng-if="doc.replacesDocumentId">
-                    <i class="ti ti-arrow-back-up" aria-hidden="true"></i> Replacement for the rejected upload above
                   </p>
                 </div>
 
@@ -191,6 +190,7 @@
                   </p>
                 </div>
 
+              </div>
               </div>
             </div>
 

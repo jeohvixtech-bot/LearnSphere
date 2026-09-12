@@ -1458,11 +1458,15 @@ public class TutorsController : ControllerBase
             if (tutor.VerificationStatus == "pending" && existing != null && existing.Status != "rejected")
                 return BadRequest(new { message = "This document is locked while your verification is under review." });
 
-            if (existing != null && existing.Status == "rejected")
+            if (existing != null && (existing.Status == "rejected" || existing.Status == "approved"))
             {
-                // Dual-row: old rejected row stays exactly as-is (still visible as
-                // "current" until this new one is resolved) — a fresh row carries the
-                // re-upload.
+                // Dual-row: the previously-decided row (rejected OR already approved)
+                // stays exactly as-is for admin's audit trail — a fresh row carries
+                // the edit/re-upload, linked back via ReplacesDocumentId. Editing an
+                // approved doc (e.g. the tutor correcting their ID number after
+                // verification) is just as worth preserving history for as fixing a
+                // rejection — only a doc that's never been decided on yet (still
+                // "pending") has nothing to preserve, see the plain upsert below.
                 _context.TutorDocuments.Add(new TutorDocument
                 {
                     TutorId = id,
@@ -1479,8 +1483,8 @@ public class TutorsController : ControllerBase
             }
             else if (existing != null)
             {
-                // Not yet submitted for review — plain upsert-in-place is fine (no
-                // rejected row to preserve, nothing to replace).
+                // Still "pending" (uploaded but never yet reviewed) — plain upsert-
+                // in-place is fine, nothing decided on this row to preserve.
                 existing.FileUrl = fileUrl;
                 existing.ExternalUrl = dto.ExternalUrl;
                 existing.FileName = fileName;
@@ -1650,6 +1654,16 @@ public class TutorsController : ControllerBase
             tutor.LastSubmittedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return Ok(new { message = "Verification resubmitted. Admin will review within 1-3 business days." });
+        }
+
+        // Already verified and nothing is actually awaiting review (no doc was
+        // freshly staged+saved since approval) — a stray extra click on Submit
+        // shouldn't drag an already-approved profile back into a review queue
+        // for no reason. A genuine re-upload after approval creates a new
+        // "pending" row (see SaveDocument), which is what flips this to false.
+        if (tutor.VerificationStatus == "approved" && !docs.Any(d => d.Status == "pending"))
+        {
+            return Ok(new { message = "Nothing new to submit — your profile is already verified." });
         }
 
         bool hasIdentityPhoto = docs.Any(d => d.DocumentType == "identity_photo" && HasContent(d));
