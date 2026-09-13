@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,8 +15,18 @@ namespace LearnSphere.API.Controllers;
 public class InvoicesController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IHitPayService _hitPay;
+    private readonly ITutorLedgerService _ledger;
+    private readonly IParentWalletService _wallet;
 
-    public InvoicesController(AppDbContext context) => _context = context;
+    public InvoicesController(AppDbContext context, IHitPayService hitPay,
+        ITutorLedgerService ledger, IParentWalletService wallet)
+    {
+        _context = context;
+        _hitPay = hitPay;
+        _ledger = ledger;
+        _wallet = wallet;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetMine()
@@ -47,10 +58,27 @@ public class InvoicesController : ControllerBase
             .FirstOrDefaultAsync(i => i.Id == id);
 
         if (invoice == null) return NotFound();
+
+        // Only the parent who owes this invoice may settle it, and an admin may do so on
+        // their behalf. Without this, any signed-in account could mark ANY invoice paid
+        // simply by knowing its id — including a tutor settling their own students' bills.
+        var callerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var callerRole = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        if (callerRole != "admin" && invoice.Booking?.Student?.ParentUserId != callerId)
+            return Forbid();
+
         if (invoice.Status != "Unpaid")
             return BadRequest(new { message = $"This invoice is {invoice.Status.ToLower()} and can no longer be paid." });
         if (invoice.Booking.Status == "cancelled")
             return BadRequest(new { message = "This booking has been cancelled and its invoice can no longer be paid." });
+
+        // This endpoint marks an invoice Paid without any money changing hands — the
+        // original pre-gateway behavior, which only remains as the local-development path.
+        // Once a real gateway is armed it must be the ONLY way to reach Paid, otherwise
+        // anyone who can call this endpoint could settle their own invoice for free.
+        var setting = await _hitPay.GetSettingsAsync();
+        if (setting.IsEnabled && !string.IsNullOrWhiteSpace(setting.ApiKey))
+            return BadRequest(new { message = "Payments must go through the payment gateway. Please start the checkout instead." });
 
         invoice.Status = "Paid";
 
@@ -66,11 +94,25 @@ public class InvoicesController : ControllerBase
         });
 
         await _context.SaveChangesAsync();
+
+        // The tutor has earned this — append it to their ledger.
+        await _ledger.ReconcileTutorAsync(invoice.Booking.TutorId);
+
         return Ok(MapToDto(invoice));
     }
 
+    // Refunds a paid invoice. The operational flow's DEFAULT outcome is wallet credit —
+    // the money stays inside LearnSphere as non-withdrawable value the parent can spend on
+    // any future invoice. Passing outcome "bank" instead records the refund without
+    // granting credit, because the cash is being returned outside the system by an admin.
+    //
+    // Admin only. A refund reverses a tutor's earnings and mints spendable wallet credit,
+    // so leaving it open to any signed-in caller would let a parent refund their own paid
+    // invoice and award themselves the credit. The flow puts every refund behind an admin
+    // review for exactly this reason.
     [HttpPost("{id}/refund")]
-    public async Task<IActionResult> Refund(int id)
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> Refund(int id, [FromBody] RefundInvoiceDto? dto = null)
     {
         var invoice = await _context.Invoices
             .Include(i => i.Booking).ThenInclude(b => b.Student)
@@ -79,24 +121,46 @@ public class InvoicesController : ControllerBase
         if (invoice == null) return NotFound();
         if (invoice.Status != "Paid") return BadRequest(new { message = "Only paid invoices can be refunded." });
 
+        var toBank = string.Equals(dto?.Outcome, "bank", StringComparison.OrdinalIgnoreCase);
+
+        // Refunding removes the earning from the tutor's balance. Note this can leave the
+        // balance negative if they already withdrew against it — the ledger records that
+        // honestly rather than clamping it to zero and losing the debt.
         invoice.Status = "Refunded";
         invoice.Booking.Status = "cancelled";
 
-        // Notify parent
+        await _context.SaveChangesAsync();
+
+        // Wallet credit covers everything the parent put in — cash and any credit they had
+        // already spent on this invoice — so a refund never quietly consumes value they
+        // were previously given. A bank refund skips this: the cash is going back to them
+        // outside the system, and granting credit as well would pay them twice.
+        decimal credited = 0m;
+        if (!toBank)
+        {
+            credited = await _wallet.RefundInvoiceToWalletAsync(
+                invoice, $"Refund for invoice {invoice.InvoiceNumber}");
+        }
+
         if (invoice.Booking.Student != null)
         {
             _context.Notifications.Add(new Notification
             {
                 UserId = invoice.Booking.Student.ParentUserId,
                 Title = "Refund Processed",
-                Message = $"Invoice {invoice.InvoiceNumber} has been refunded.",
+                Message = credited > 0m
+                    ? $"Invoice {invoice.InvoiceNumber} was refunded as {credited:F2} wallet credit, valid for 6 months."
+                    : $"Invoice {invoice.InvoiceNumber} has been refunded to your bank.",
                 Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                 Type = "payment",
                 IsRead = false
             });
+            await _context.SaveChangesAsync();
         }
 
-        await _context.SaveChangesAsync();
+        // Reverses the earning entry written when this invoice was paid.
+        await _ledger.ReconcileTutorAsync(invoice.Booking.TutorId);
+
         return Ok(MapToDto(invoice));
     }
 
@@ -109,6 +173,12 @@ public class InvoicesController : ControllerBase
         Date = i.Date,
         Amount = i.Amount,
         Status = i.Status,
-        Subject = i.Subject
+        Subject = i.Subject,
+        BaseAmount = i.BaseAmount,
+        MarkupAmount = i.MarkupAmount,
+        MarkupPercent = i.MarkupPercent,
+        WalletCreditApplied = i.WalletCreditApplied,
+        CashDue = i.CashDue,
+        IsFirstMatch = i.IsFirstMatch
     };
 }

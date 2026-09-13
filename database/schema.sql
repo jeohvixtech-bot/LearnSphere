@@ -290,6 +290,12 @@ CREATE TABLE IF NOT EXISTS BookingClasses (
     Date       LONGTEXT    NOT NULL,
     Time       LONGTEXT    NOT NULL,
     Status     VARCHAR(20) NOT NULL DEFAULT 'scheduled', -- scheduled | completed — flips lazily once Date is in the past, see BookingsController.GetAll
+    -- Whether this individual session actually happened. A tutor is only paid for a session
+    -- that is both Delivered and covered by a paid invoice, so this gates real money leaving
+    -- the platform. A booking-level status is too coarse: a month's sessions are paid for
+    -- together but delivered one at a time.
+    DeliveryStatus VARCHAR(20)  NOT NULL DEFAULT 'Scheduled', -- Scheduled | Delivered | Cancelled
+    DeliveredAt    DATETIME(6)  NULL,
     CONSTRAINT FK_BookingClasses_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
@@ -439,6 +445,17 @@ CREATE TABLE IF NOT EXISTS Invoices (
     Status          LONGTEXT        NOT NULL DEFAULT 'Unpaid', -- Paid | Unpaid | Refunded | Cancelled
     Subject         LONGTEXT        NULL,
     InvoiceNumber   LONGTEXT        NOT NULL,
+    -- Fee breakdown. Amount is what the parent is billed = BaseAmount + MarkupAmount.
+    -- BaseAmount is the tutor's price, and the only figure a tutor is ever paid from.
+    -- MarkupPercent is stored per invoice so a later rate change never restates an old bill.
+    BaseAmount          DECIMAL(10,2) NOT NULL DEFAULT 0,
+    MarkupAmount        DECIMAL(10,2) NOT NULL DEFAULT 0,
+    MarkupPercent       DECIMAL(5,2)  NOT NULL DEFAULT 0,
+    -- True when this invoice covers a match's FIRST tuition period. Decided once, at
+    -- creation, and never recomputed.
+    IsFirstMatch        TINYINT(1)    NOT NULL DEFAULT 0,
+    -- How much of Amount was settled from the parent's wallet rather than in cash.
+    WalletCreditApplied DECIMAL(10,2) NOT NULL DEFAULT 0,
     CONSTRAINT FK_Invoices_Bookings FOREIGN KEY (BookingId) REFERENCES Bookings(Id) ON DELETE CASCADE
 );
 
@@ -573,4 +590,163 @@ CREATE TABLE IF NOT EXISTS ScoringWeightages (
     Percent    INT           NOT NULL DEFAULT 0,
     SortOrder  INT           NOT NULL DEFAULT 0,
     UNIQUE KEY UQ_ScoringWeightages_Key (`Key`)
+);
+
+-- ============================================================
+-- PaymentGatewaySettings  (singleton row, Id = 1 — HitPay credentials managed
+-- from Admin -> Payment Gateway. Held in the database rather than appsettings
+-- so a key can be rotated without a redeploy; ApiKey/Salt are never returned
+-- to a client, only a masked hint.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PaymentGatewaySettings (
+    Id           INT AUTO_INCREMENT PRIMARY KEY,
+    Provider     VARCHAR(40)   NOT NULL DEFAULT 'hitpay',
+    IsEnabled    TINYINT(1)    NOT NULL DEFAULT 0,
+    Mode         VARCHAR(20)   NOT NULL DEFAULT 'sandbox', -- sandbox | live
+    ApiKey       VARCHAR(500)  NOT NULL DEFAULT '',
+    Salt         VARCHAR(500)  NOT NULL DEFAULT '',
+    Currency     VARCHAR(10)   NOT NULL DEFAULT 'SGD',
+    ReturnUrl    VARCHAR(500)  NOT NULL DEFAULT '',
+    ApiBaseUrl   VARCHAR(500)  NULL,
+    ReturnOrigin VARCHAR(500)  NULL,
+    UpdatedAt    DATETIME(6)   NULL
+);
+
+-- ============================================================
+-- PaymentTransactions  (one row per checkout attempt against an invoice)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PaymentTransactions (
+    Id               INT AUTO_INCREMENT PRIMARY KEY,
+    InvoiceId        INT           NOT NULL,
+    PaymentRequestId VARCHAR(100)  NOT NULL DEFAULT '',
+    Amount           DECIMAL(10,2) NOT NULL DEFAULT 0,
+    Status           VARCHAR(40)   NOT NULL DEFAULT '',
+    ReturnOrigin     VARCHAR(500)  NULL,
+    CreatedAt        DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY IX_PaymentTransactions_PaymentRequestId (PaymentRequestId),
+    CONSTRAINT FK_PaymentTransactions_Invoices FOREIGN KEY (InvoiceId) REFERENCES Invoices(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- CommissionSettings  (singleton row, Id = 1 — every platform fee rate,
+-- managed from Admin -> Platform Fees. Three rates that do NOT work alike:
+--   MarkupPercent               added ON TOP of the base price; the PARENT pays it
+--   FirstMatchCommissionPercent taken OUT of the base price once, on a match's first
+--                               tuition period; the TUTOR pays it, and promotional
+--                               credit exists to offset exactly this charge
+--   RatePercent                 recurring per-invoice cut of everything else; 0 in the
+--                               launch model, where markup is the recurring revenue
+-- The two EffectiveFrom columns are what stop a rate change billing history retroactively.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS CommissionSettings (
+    Id                          INT AUTO_INCREMENT PRIMARY KEY,
+    RatePercent                 DECIMAL(5,2) NOT NULL DEFAULT 0,
+    EffectiveFrom               DATETIME(6)  NULL,
+    MarkupPercent               DECIMAL(5,2) NOT NULL DEFAULT 15,
+    FirstMatchCommissionPercent DECIMAL(5,2) NOT NULL DEFAULT 100,
+    FirstMatchEffectiveFrom     DATETIME(6)  NULL,
+    UpdatedAt                   DATETIME(6)  NULL,
+    UpdatedByUserId             INT          NULL
+);
+
+-- ============================================================
+-- TutorLedgerEntries  (append-only money ledger for a tutor — nothing here is
+-- ever updated or deleted, and a reversal is a NEW opposing entry. Two funds
+-- that must never be summed together for the purpose of paying someone:
+-- 'withdrawable' is real money, 'credit' is promotional credit that offsets
+-- first-match commission but can never be cashed out. SourceEntryId links a
+-- consumption or expiry back to the grant it draws down, which is what makes
+-- oldest-first spending and per-grant expiry work while staying append-only.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorLedgerEntries (
+    Id              INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId         INT           NOT NULL,
+    Fund            VARCHAR(20)   NOT NULL DEFAULT 'withdrawable', -- withdrawable | credit
+    Type            VARCHAR(40)   NOT NULL DEFAULT '',
+    Amount          DECIMAL(10,2) NOT NULL DEFAULT 0,  -- signed: + credits the tutor
+    InvoiceId       INT           NULL,
+    PayoutId        INT           NULL,
+    PenaltyId       INT           NULL,
+    BookingId       INT           NULL,
+    SourceEntryId   INT           NULL,
+    Reason          VARCHAR(500)  NOT NULL DEFAULT '',
+    ExpiresAt       DATETIME(6)   NULL,
+    RatePercent     DECIMAL(5,2)  NULL,
+    CreatedByUserId INT           NULL,
+    CreatedAt       DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY IX_TutorLedgerEntries_TutorId   (TutorId),
+    KEY IX_TutorLedgerEntries_InvoiceId (InvoiceId),
+    KEY IX_TutorLedgerEntries_PayoutId  (PayoutId),
+    KEY IX_TutorLedgerEntries_PenaltyId (PenaltyId),
+    CONSTRAINT FK_TutorLedgerEntries_Tutors FOREIGN KEY (TutorId) REFERENCES Tutors(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- ParentWalletEntries  (append-only wallet ledger for a parent, on the same
+-- rules as TutorLedgerEntries. Wallet credit can pay any LearnSphere invoice
+-- but can never be withdrawn to a bank; a refund the parent wants in cash is a
+-- Direct Bank Refund and never touches this table. Credit expires 6 months
+-- from the date it was granted.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ParentWalletEntries (
+    Id              INT AUTO_INCREMENT PRIMARY KEY,
+    ParentUserId    INT           NOT NULL,
+    Type            VARCHAR(40)   NOT NULL DEFAULT '', -- refund_credit | adjustment | payment_usage | expiry
+    Amount          DECIMAL(10,2) NOT NULL DEFAULT 0,  -- signed: + adds credit
+    InvoiceId       INT           NULL,
+    SourceEntryId   INT           NULL,
+    Reason          VARCHAR(500)  NOT NULL DEFAULT '',
+    ExpiresAt       DATETIME(6)   NULL,
+    CreatedByUserId INT           NULL,
+    CreatedAt       DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    KEY IX_ParentWalletEntries_ParentUserId  (ParentUserId),
+    KEY IX_ParentWalletEntries_InvoiceId     (InvoiceId),
+    KEY IX_ParentWalletEntries_SourceEntryId (SourceEntryId),
+    CONSTRAINT FK_ParentWalletEntries_Users FOREIGN KEY (ParentUserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- PayoutBatches  (every tutor's payable for one period, grouped into a single
+-- unit an admin approves once and finance transfers once, so "has September
+-- been paid?" has exactly one answer. One batch per period.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS PayoutBatches (
+    Id                  INT AUTO_INCREMENT PRIMARY KEY,
+    BatchNumber         VARCHAR(40)   NOT NULL DEFAULT '',
+    Period              VARCHAR(7)    NOT NULL DEFAULT '',   -- yyyy-MM
+    TotalAmount         DECIMAL(12,2) NOT NULL DEFAULT 0,
+    TutorCount          INT           NOT NULL DEFAULT 0,
+    Status              VARCHAR(20)   NOT NULL DEFAULT 'Pending', -- Pending | Approved | Paid | Cancelled
+    CreatedAt           DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ApprovedAt          DATETIME(6)   NULL,
+    ApprovedByUserId    INT           NULL,
+    TransferredAt       DATETIME(6)   NULL,
+    TransferredByUserId INT           NULL,
+    Notes               VARCHAR(1000) NULL,
+    UNIQUE KEY UQ_PayoutBatch_Period (Period)
+);
+
+-- ============================================================
+-- TutorPayables  (what one tutor is owed for one billing period, worked out at
+-- the month-end cutoff. Derived, never hand-entered: it counts only sessions
+-- that were BOTH delivered and paid for, and never exceeds the tutor's ledger
+-- balance — so a first tuition period pays nothing unless promotional credit
+-- offset its commission. One row per tutor per period.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS TutorPayables (
+    Id            INT AUTO_INCREMENT PRIMARY KEY,
+    TutorId       INT           NOT NULL,
+    Period        VARCHAR(7)    NOT NULL DEFAULT '',  -- yyyy-MM
+    PeriodStart   VARCHAR(10)   NOT NULL DEFAULT '',
+    PeriodEnd     VARCHAR(10)   NOT NULL DEFAULT '',
+    Amount        DECIMAL(10,2) NOT NULL DEFAULT 0,
+    SessionCount  INT           NOT NULL DEFAULT 0,
+    Status        VARCHAR(20)   NOT NULL DEFAULT 'Pending', -- Pending | Batched | Paid | Cancelled
+    PayoutBatchId INT           NULL,
+    PayoutId      INT           NULL,
+    CreatedAt     DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY UQ_TutorPayable_Tutor_Period (TutorId, Period),
+    KEY IX_TutorPayables_PayoutBatchId (PayoutBatchId),
+    CONSTRAINT FK_TutorPayables_Tutors        FOREIGN KEY (TutorId)       REFERENCES Tutors(Id)        ON DELETE CASCADE,
+    CONSTRAINT FK_TutorPayables_PayoutBatches FOREIGN KEY (PayoutBatchId) REFERENCES PayoutBatches(Id) ON DELETE SET NULL
 );

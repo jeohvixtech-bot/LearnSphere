@@ -26,6 +26,9 @@
       <a href="#!/parent/billing" class="bs-sidebar-link">
         <i class="ti ti-credit-card" aria-hidden="true"></i> Billing &amp; Invoices
       </a>
+      <a href="#!/parent/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Credit
+      </a>
       <a href="#!/parent/chat" class="bs-sidebar-link">
         <i class="ti ti-message" aria-hidden="true"></i> Direct Messages
       </a>
@@ -310,7 +313,7 @@
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.presetBookingReceipt.mode }}</strong></div>
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Booking</span><strong>#{{ vm.presetBookingReceipt.booking.bookingNumber }} · {{ vm.presetBookingReceipt.booking.classes.length }} class(es)</strong></div>
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Payment</span><strong style="color:var(--color-accent-700);">✓ Paid</strong></div>
-          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--color-divider); padding-top:6px;"><span class="bs-text-muted">Total</span><strong>${{ vm.presetBookingReceipt.total }}.00</strong></div>
+          <div style="display:flex; justify-content:space-between; border-top:1px solid var(--color-divider); padding-top:6px;"><span class="bs-text-muted">Total</span><strong>{{ vm.billedTotal(vm.presetBookingReceipt.total) | currency:'$' }}</strong></div>
         </div>
         <p class="bs-text-muted" style="margin:0;">Redirecting to your sessions...</p>
       </div>
@@ -449,44 +452,23 @@
           </div>
         </div>
 
-        <!-- Price breakdown -->
-        <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); font-weight:600; margin-top:var(--space-3); margin-bottom:6px;">
-          Price breakdown
-        </div>
-        <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:10px 12px; display:flex; flex-direction:column; gap:3px; font-size:14px;">
-          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
-            <span>Price per lesson</span>
-            <span>{{ vm.currencySymbol() }}{{ vm.selectedPresetGroup.pricePerLesson | number:2 }}</span>
+        <!-- The parent is billed the tutor's price plus the platform markup, so that is
+             what is quoted here — see ParentCtrl.billedTotal. -->
+        <div style="display:flex; flex-direction:column; gap:4px; margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-divider);">
+          <div style="display:flex; justify-content:space-between; font-size:13px;" ng-if="vm.markupPercent > 0">
+            <span class="bs-text-muted">Tuition for {{ vm.bookingForm.sessions.length }} class(es)</span>
+            <span>{{ vm.selectedPresetGroup.pricePerLesson * vm.bookingForm.sessions.length | currency:'$' }}</span>
           </div>
-          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
-            <span>× {{ vm.selectedPresetGroup.slots.length }} classes</span>
-            <span style="font-weight:500; color:var(--color-text);">{{ vm.currencySymbol() }}{{ vm.presetSubtotal() | number:2 }}</span>
+          <div style="display:flex; justify-content:space-between; font-size:13px;" ng-if="vm.markupPercent > 0">
+            <span class="bs-text-muted">Platform fee ({{ vm.markupPercent }}%)</span>
+            <span>{{ vm.markupOn(vm.selectedPresetGroup.pricePerLesson * vm.bookingForm.sessions.length) | currency:'$' }}</span>
           </div>
-          <div style="border-top:1px dashed var(--color-divider); margin:6px 0;"></div>
-          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
-            <span>Subtotal</span>
-            <span>{{ vm.currencySymbol() }}{{ vm.presetSubtotal() | number:2 }}</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
-            <span style="display:flex; align-items:center; gap:5px;">
-              {{ vm.taxLabel() }}
-              <span style="font-size:11px; background:var(--color-bg-alt,#f1f5f9); border:0.5px solid var(--color-divider); border-radius:4px; padding:1px 5px; color:var(--color-text-muted);">
-                {{ vm.selectedPresetGroup.country || 'SG' }}
-              </span>
-            </span>
-            <span>{{ vm.currencySymbol() }}{{ vm.presetTaxAmount() | number:2 }}</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; color:var(--color-text-secondary);">
-            <span style="display:flex; align-items:center; gap:5px;">
-              Payment portal fee (2%)
-              <span style="font-size:11px; background:var(--color-bg-alt,#f1f5f9); border:0.5px solid var(--color-divider); border-radius:4px; padding:1px 5px; color:var(--color-text-muted);">HiPay</span>
-            </span>
-            <span>{{ vm.currencySymbol() }}{{ vm.presetPortalFee() | number:2 }}</span>
-          </div>
-          <div style="border-top:1px solid var(--color-divider); margin:6px 0;"></div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:15px; font-weight:600; color:var(--color-text);">Total payable</span>
-            <strong style="font-family:var(--font-heading); font-size:20px; color:var(--color-accent-700);">{{ vm.currencySymbol() }}{{ vm.presetTotal() | number:2 }}</strong>
+            <span ng-if="!vm.markupPercent">Total for {{ vm.bookingForm.sessions.length }} class(es)</span>
+            <span ng-if="vm.markupPercent > 0">Total</span>
+            <strong style="font-family:var(--font-heading); font-size:18px;">
+              {{ vm.billedTotal(vm.selectedPresetGroup.pricePerLesson * vm.bookingForm.sessions.length) | currency:'$' }}
+            </strong>
           </div>
         </div>
 

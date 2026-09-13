@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'RemarkService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, RemarkService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'RemarkService', 'PaymentService', 'WalletService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, RemarkService, PaymentService, WalletService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -224,20 +224,29 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       studentId: self.bookingForm.studentId
     }).then(function (res) {
       var createdBooking = res.data;
-      // The button says "Confirm Payment" — actually pay the invoice immediately
-      // here rather than just creating it Unpaid, unlike the tutor-approval
-      // request flow (submitBooking) which genuinely can't charge until the
-      // tutor accepts. Otherwise "Pay Invoice" would still show as outstanding
-      // in Sessions & Activity right after a parent thinks they've just paid.
+      // The button says "Confirm Payment", so the invoice has to be settled here rather
+      // than left Unpaid — unlike the tutor-approval request flow (submitBooking), which
+      // genuinely can't charge until the tutor accepts. With a gateway armed that means
+      // handing the parent off to HitPay's checkout; the booking itself is already
+      // confirmed either way, and its invoice simply stays Unpaid until payment clears.
       return InvoiceService.getAll().then(function (r) {
         self.invoices = r.data;
         var inv = self.invoices.find(function (i) { return i.bookingId === createdBooking.id; });
-        return inv ? InvoiceService.pay(inv.id) : $q.when();
-      }).then(function () {
-        return InvoiceService.getAll();
-      }).then(function (r2) {
-        self.invoices = r2.data;
-        return createdBooking;
+        if (!inv) return $q.when(createdBooking);
+
+        return PaymentService.getConfig().then(function (cfg) {
+          if (!cfg.gatewayEnabled) {
+            return InvoiceService.pay(inv.id)
+              .then(function () { return InvoiceService.getAll(); })
+              .then(function (r2) { self.invoices = r2.data; return createdBooking; });
+          }
+          return PaymentService.startCheckout(inv.id).then(function (checkout) {
+            // Navigating away to HitPay — returning a never-resolving promise keeps the
+            // success/receipt branch below from flashing on screen mid-redirect.
+            PaymentService.redirectToCheckout(checkout.checkoutUrl);
+            return $q.defer().promise;
+          });
+        });
       });
     }).then(function (createdBooking) {
       self.presetBookingBusy = false;
@@ -653,7 +662,95 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   };
 
   // Load data
+  // ── Platform markup ─────────────────────────────────────────────────
+  // A tutor's price is not what the parent pays: the platform adds a markup on top, and
+  // the invoice raised at booking time carries the marked-up total. Booking screens quote
+  // the figure below rather than the tutor's price, because a confirmation dialog that
+  // says one number and charges another is how trust in a payment flow is lost.
+  //
+  // Read from the payment config because at quoting time no invoice exists yet to read it
+  // from. Defaults to 0, so if the config never loads the parent sees the tutor's price
+  // rather than a wrong marked-up guess.
+  self.markupPercent = 0;
+
+  self.markupOn = function (base) {
+    var b = parseFloat(base) || 0;
+    return Math.round(b * (self.markupPercent / 100) * 100) / 100;
+  };
+
+  // What the parent will actually be billed for a given tutor-side price.
+  self.billedTotal = function (base) {
+    var b = parseFloat(base) || 0;
+    return Math.round((b + b * (self.markupPercent / 100)) * 100) / 100;
+  };
+
+  // ── Wallet (Parent → Wallet) ────────────────────────────────────────
+  // Non-withdrawable credit that can settle any LearnSphere invoice. Refunds land here by
+  // default, and it expires 6 months after it is granted — which is why the balance card
+  // warns about what is about to lapse rather than only showing a total.
+  self.wallet = null;
+  self.walletStatement = [];
+  self.walletError = '';
+  self.walletBusy = false;
+  self.walletSuccess = '';
+
+  var WALLET_LABELS = {
+    refund_credit: 'Refund credited',
+    adjustment: 'Adjustment',
+    payment_usage: 'Applied to invoice',
+    expiry: 'Credit expired'
+  };
+
+  self.walletLabel = function (type) { return WALLET_LABELS[type] || type; };
+
+  self.loadWallet = function () {
+    return WalletService.getBalance().then(function (res) {
+      self.wallet = res.data;
+    }).catch(function () { self.walletError = 'Wallet unavailable'; });
+  };
+
+  self.loadWalletStatement = function () {
+    return WalletService.getStatement().then(function (res) {
+      self.walletStatement = res.data;
+    }).catch(function () { self.walletStatement = []; });
+  };
+
+  // Invoices this parent could still spend credit on.
+  self.payableInvoices = function () {
+    return (self.invoices || []).filter(function (i) { return i.status === 'Unpaid'; });
+  };
+
+  // Spends credit against one invoice. If credit covers the bill outright the invoice is
+  // settled here and needs no card at all; a partial application just reduces what is left
+  // to pay at checkout.
+  self.applyWalletCredit = function (invoice) {
+    if (self.walletBusy) return;
+    self.walletError = '';
+    self.walletSuccess = '';
+    self.walletBusy = true;
+
+    WalletService.apply(invoice.id, 0).then(function (res) {
+      self.walletBusy = false;
+      self.walletSuccess = res.data.settled
+        ? 'Invoice ' + invoice.invoiceNumber + ' settled in full using ' +
+          res.data.applied.toFixed(2) + ' of credit.'
+        : res.data.applied.toFixed(2) + ' applied. ' + res.data.cashDue.toFixed(2) + ' still to pay by card.';
+
+      self.loadWallet();
+      self.loadWalletStatement();
+      InvoiceService.getAll().then(function (r) { self.invoices = r.data; });
+    }).catch(function (err) {
+      self.walletBusy = false;
+      self.walletError = (err.data && err.data.message) || 'Could not apply your credit. Please try again.';
+    });
+  };
+
   function init() {
+    self.loadWallet();
+    self.loadWalletStatement();
+    PaymentService.getConfig().then(function (cfg) {
+      self.markupPercent = cfg.markupPercent || 0;
+    });
     // Consumed synchronously up front (PendingMatchService is a plain in-memory
     // store, no async needed) so both loads below — which run in parallel with no
     // guaranteed order — can agree on the same values regardless of which
@@ -733,6 +830,9 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }
     });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    // Runs on every parent route, since HitPay's return lands on Sessions but a parent
+    // may navigate elsewhere before the banner is dismissed.
+    handlePaymentReturn();
     ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
     TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
 
@@ -1893,11 +1993,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // Tutors page) rather than charging immediately on click.
   self.openPaySummary = function (b) { self.payingBooking = b; };
 
+  // The summary panel stays open until the payment resolves one way or the other — with a
+  // gateway armed this click leads to a redirect, and closing the panel first would leave
+  // the parent staring at the plain list with no indication anything is happening.
   self.confirmPayInvoice = function () {
     if (!self.payingBooking) return;
     var inv = self.getInvoiceForBooking(self.payingBooking.id);
-    self.payingBooking = null;
-    if (inv) self.payInvoice(inv.id);
+    if (!inv) { self.payingBooking = null; return; }
+    self.payInvoice(inv.id);
   };
 
   self.invoicesTab = 'active';
@@ -1914,18 +2017,101 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     return self.invoicesTab === 'cancelled' ? self.cancelledInvoices() : self.nonCancelledInvoices();
   };
 
+  // Payment routing. With a gateway armed the parent leaves for HitPay's hosted checkout
+  // and the invoice only becomes Paid once HitPay confirms it (on return, or via the
+  // webhook). With no gateway configured this falls back to the original mark-as-paid
+  // call, which is what keeps local development working before any key is entered — the
+  // backend independently refuses that endpoint whenever a gateway really is armed, so
+  // the fallback can't be used to bypass a live gateway.
+  self.payBusy = false;
+  self.payError = '';
+
   self.payInvoice = function (invoiceId) {
-    InvoiceService.pay(invoiceId).then(function () {
+    if (self.payBusy) return;
+    self.payBusy = true;
+    self.payError = '';
+
+    PaymentService.getConfig().then(function (cfg) {
+      if (!cfg.gatewayEnabled) return legacyPay(invoiceId);
+
+      return PaymentService.startCheckout(invoiceId).then(function (checkout) {
+        // Leaving the app entirely — payBusy intentionally stays true so the button
+        // can't be clicked twice while the browser navigates away.
+        PaymentService.redirectToCheckout(checkout.checkoutUrl);
+      });
+    }).catch(function (err) {
+      self.payBusy = false;
+      self.payingBooking = null;
+      self.payError = (err.data && err.data.message) || 'Could not start this payment. Please try again.';
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+      $timeout(function () { self.payError = ''; }, 6000);
+    });
+  };
+
+  function legacyPay(invoiceId) {
+    return InvoiceService.pay(invoiceId).then(function () {
+      self.payBusy = false;
+      self.payingBooking = null;
       self.paySuccess = true;
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
       $timeout(function () {
         self.paySuccess = false;
       }, 2500);
-    }).catch(function (err) {
-      alert((err.data && err.data.message) || 'Could not process this payment. Please try again.');
+    });
+  }
+
+  // ── Returning from HitPay ───────────────────────────────────────────
+  // The API's return endpoint verifies the payment server-side and then redirects here
+  // with ?payment=success|failed|cancelled|pending. The status is re-confirmed against
+  // the server rather than trusted from the URL, since anyone can type a query string.
+  self.paymentResult = null;
+  self.paymentResultChecking = false;
+
+  function handlePaymentReturn() {
+    var params = $location.search();
+    if (!params || !params.payment) return;
+
+    var invoiceId = parseInt(params.invoiceId, 10);
+    var outcome = params.payment;
+    var invoiceNumber = params.invoice || '';
+
+    // Clear the query string straight away so a refresh doesn't replay this banner.
+    $location.search('payment', null);
+    $location.search('invoice', null);
+    $location.search('invoiceId', null);
+
+    if (outcome === 'unknown' || !invoiceId) {
+      self.paymentResult = {
+        state: 'failed', invoiceNumber: invoiceNumber,
+        message: 'We could not identify that payment. If you were charged, contact support with your invoice number.'
+      };
+      return;
+    }
+
+    self.paymentResult = { state: outcome, invoiceNumber: invoiceNumber, invoiceId: invoiceId, message: null };
+    // Confirm against the server — the redirect only reports what it saw at that moment,
+    // and a webhook may have landed since.
+    self.recheckPayment(invoiceId);
+  }
+
+  self.recheckPayment = function (invoiceId) {
+    self.paymentResultChecking = true;
+    PaymentService.getStatus(invoiceId).then(function (status) {
+      self.paymentResultChecking = false;
+      self.paymentResult = {
+        state: status.paid ? 'success' : (status.paymentStatus === 'pending' ? 'pending' : 'failed'),
+        invoiceNumber: status.invoiceNumber,
+        invoiceId: status.invoiceId,
+        message: status.message
+      };
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    }).catch(function () {
+      self.paymentResultChecking = false;
     });
   };
+
+  self.dismissPaymentResult = function () { self.paymentResult = null; };
 
   // Report an issue
   self.startReportIssue = function (bookingId) {

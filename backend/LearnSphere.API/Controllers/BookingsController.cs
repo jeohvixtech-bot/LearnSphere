@@ -15,8 +15,16 @@ namespace LearnSphere.API.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IPlatformFeeService _fees;
+    private readonly IParentWalletService _wallet;
 
-    public BookingsController(AppDbContext context) => _context = context;
+    public BookingsController(AppDbContext context, IPlatformFeeService fees,
+        IParentWalletService wallet)
+    {
+        _context = context;
+        _fees = fees;
+        _wallet = wallet;
+    }
 
     // Parses "04:00 PM - 05:00 PM" into (startMinutes, endMinutes) since midnight. Returns
     // null if the string doesn't contain two recognizable times.
@@ -344,9 +352,8 @@ public class BookingsController : ControllerBase
             first.Level    ?? string.Empty,
             booking.Id);
 
-        // TODO: apply first-class fee logic when pricing rules are finalised.
-        // isFirstClassPreset == true  → first lesson, charge first-class rate
-        // isFirstClassPreset == false → recurring, charge recurring rate
+        // isFirstClassPreset decides whether this invoice opens a match, and therefore
+        // whether first-match commission applies — it is handed to ApplyPricingAsync below.
 
         foreach (var slot in slots)
         {
@@ -360,10 +367,13 @@ public class BookingsController : ControllerBase
         {
             BookingId = booking.Id,
             Date = first.Day,
-            Amount = booking.TotalPrice,
             Status = "Unpaid",
             Subject = booking.Subject
         };
+
+        // booking.TotalPrice is the TUTOR's price. The parent is billed that plus the
+        // platform markup, which ApplyPricingAsync works out and writes onto the invoice.
+        await _fees.ApplyPricingAsync(newInvoice, booking.TotalPrice, isFirstClassPreset);
         _context.Invoices.Add(newInvoice);
 
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == first.TutorId);
@@ -584,10 +594,12 @@ public class BookingsController : ControllerBase
                 {
                     BookingId = id,
                     Date = booking.Classes.OrderBy(c => c.Date).FirstOrDefault()?.Date ?? DateTime.Now.ToString("yyyy-MM-dd"),
-                    Amount = booking.TotalPrice,
                     Status = "Unpaid",
                     Subject = booking.Subject
                 };
+                // Amount is left unset here on purpose: pricing needs to know whether this
+                // booking opens a new match, which is only established further down once
+                // the subject/level have been resolved. See the ApplyPricingAsync call.
                 _context.Invoices.Add(newInvoice);
             }
 
@@ -652,9 +664,11 @@ public class BookingsController : ControllerBase
                 trackedCountry, trackedSubject, trackedLevel,
                 booking.Id);
 
-            // TODO: apply first-class fee logic when pricing rules are finalised.
-            // isFirstClass == true  → first lesson, charge first-class rate
-            // isFirstClass == false → recurring, charge recurring rate
+            // Now that we know whether this opens a match, the invoice can be priced:
+            // booking.TotalPrice is the tutor's price, the parent is billed that plus the
+            // platform markup, and a first match carries the one-time commission.
+            if (newInvoice != null)
+                await _fees.ApplyPricingAsync(newInvoice, booking.TotalPrice, isFirstClass);
         }
 
         await _context.SaveChangesAsync();
@@ -731,6 +745,13 @@ public class BookingsController : ControllerBase
         if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
         {
             booking.Invoice.Status = "Cancelled";
+
+            // If the parent had already put wallet credit against this bill, voiding it
+            // would otherwise swallow that credit: the invoice is dead, no cash was ever
+            // taken, and the value they spent would simply be gone.
+            await _wallet.RefundInvoiceToWalletAsync(
+                booking.Invoice,
+                $"Booking {booking.BookingNumber} cancelled - credit returned");
         }
 
         // Tutor already responded (countered) or accepted (confirmed) — let them know it's off.
@@ -1005,7 +1026,12 @@ public class BookingsController : ControllerBase
         IsFirstClass = false, // populated by GET /bookings — see GetAll
         VideoConferenceLink = b.VideoConferenceLink,
         VideoLinkReminderStatus = b.VideoLinkReminderStatus,
-        Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Id = c.Id, Date = c.Date, Time = c.Time, Status = c.Status }).ToList() ?? new(),
+        Classes = b.Classes?.OrderBy(c => c.Date)
+            .Select(c => new BookingClassDto
+            {
+                Id = c.Id, Date = c.Date, Time = c.Time,
+                Status = c.Status, DeliveryStatus = c.DeliveryStatus
+            }).ToList() ?? new(),
         CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {
             Message = pendingProposal.Message,
@@ -1036,5 +1062,55 @@ public class BookingsController : ControllerBase
             Resolved = b.IssueReport.Resolved
         }
         };
+    }
+
+    // Marks one session taught, or not. This is the gate on paying a tutor: the monthly
+    // cutoff only counts sessions that are BOTH Delivered and on a paid invoice, so a
+    // lesson that never happened can never turn into a bank transfer.
+    //
+    // The tutor who owns the booking may set it, and so may an admin resolving a dispute.
+    [HttpPut("{bookingId}/sessions/{classId}/delivery")]
+    public async Task<IActionResult> UpdateSessionDelivery(
+        int bookingId, int classId, [FromBody] UpdateSessionDeliveryDto dto)
+    {
+        var allowed = new[]
+        {
+            SessionDeliveryStatus.Scheduled,
+            SessionDeliveryStatus.Delivered,
+            SessionDeliveryStatus.Cancelled
+        };
+
+        if (!allowed.Contains(dto.DeliveryStatus))
+            return BadRequest(new { message = $"Delivery status must be one of: {string.Join(", ", allowed)}." });
+
+        var session = await _context.BookingClasses
+            .Include(c => c.Booking)
+            .FirstOrDefaultAsync(c => c.Id == classId && c.BookingId == bookingId);
+
+        if (session == null) return NotFound(new { message = "Session not found." });
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+
+        if (role == "tutor")
+        {
+            var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.UserId == userId);
+            if (tutor == null || session.Booking.TutorId != tutor.Id) return Forbid();
+        }
+        else if (role != "admin")
+        {
+            // A parent cannot declare their own lesson delivered — that would let the
+            // payment gate be opened by the party who benefits from disputing it.
+            return Forbid();
+        }
+
+        session.DeliveryStatus = dto.DeliveryStatus;
+        session.DeliveredAt = dto.DeliveryStatus == SessionDeliveryStatus.Delivered
+            ? DateTime.UtcNow
+            : null;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { session.Id, session.Date, session.Time, session.DeliveryStatus, session.DeliveredAt });
     }
 }

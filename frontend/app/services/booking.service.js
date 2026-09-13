@@ -52,4 +52,15 @@ angular.module('learnSphereApp')
     return $http.patch(API_URL + '/bookings/' + bookingId + '/video-link',
       { videoConferenceLink: link }, h());
   };
+
+  // Marks one session taught, or not. Only a Delivered session on a paid invoice counts
+  // toward a tutor's monthly payout, so this is the gate on money leaving the platform.
+  // Tutor (their own booking) or admin only — a parent cannot set it.
+  self.setSessionDelivery = function (bookingId, classId, deliveryStatus) {
+    return $http.put(
+      API_URL + '/bookings/' + bookingId + '/sessions/' + classId + '/delivery',
+      { deliveryStatus: deliveryStatus },
+      h()
+    );
+  };
 }]);

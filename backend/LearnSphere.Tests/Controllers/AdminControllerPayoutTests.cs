@@ -25,7 +25,7 @@ public class AdminControllerPayoutTests
     private static (AdminController controller, LearnSphere.API.Data.AppDbContext db) BuildSut()
     {
         var db   = TestDbContextFactory.Create();
-        var ctrl = new AdminController(db, A.Fake<IPresetCancellationService>());
+        var ctrl = TestControllerFactory.Admin(db);
         return (ctrl, db);
     }
 

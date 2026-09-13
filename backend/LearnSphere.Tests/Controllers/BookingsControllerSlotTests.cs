@@ -23,7 +23,7 @@ public class BookingsControllerSlotTests
     private static (BookingsController controller, LearnSphere.API.Data.AppDbContext db) BuildSut()
     {
         var db   = TestDbContextFactory.Create();
-        var ctrl = new BookingsController(db);
+        var ctrl = TestControllerFactory.Bookings(db);
         return (ctrl, db);
     }
 

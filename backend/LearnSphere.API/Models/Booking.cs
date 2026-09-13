@@ -44,7 +44,32 @@ public class BookingClass
     public Booking Booking { get; set; } = null!;
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+    // Two statuses, deliberately, because they answer different questions and are set by
+    // different things. Keeping one and dropping the other breaks a feature either way.
+
+    // Has the session's date passed? Flips automatically on read, and is what unlocks a
+    // parent's class remark for that specific session (see ClassRemarksController).
     public string Status { get; set; } = "scheduled"; // scheduled | completed
+
+    // Did the session actually happen? Set by the tutor or an admin, never by elapsed
+    // time alone. A tutor is only ever paid for a session that is BOTH delivered and
+    // covered by a paid invoice, so this is the gate on real money leaving the platform —
+    // a booking-level status is too coarse, because a month's four sessions are paid for
+    // together but delivered one at a time.
+    //
+    // Scheduled → not yet taught
+    // Delivered → taught; counts toward the tutor's payable at the period cutoff
+    // Cancelled → will not be taught; never counts
+    public string DeliveryStatus { get; set; } = SessionDeliveryStatus.Scheduled;
+
+    public DateTime? DeliveredAt { get; set; }
+}
+
+public static class SessionDeliveryStatus
+{
+    public const string Scheduled = "Scheduled";
+    public const string Delivered = "Delivered";
+    public const string Cancelled = "Cancelled";
 }
 
 // One row per TutorTimeSlot consumed by a (possibly multi-session) preset-class

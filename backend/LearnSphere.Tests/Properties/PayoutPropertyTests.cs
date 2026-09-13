@@ -72,9 +72,8 @@ public class PayoutPropertyTests
             db.Payouts.Add(payout);
             db.SaveChanges();
 
-            // Build the AdminController (no auth claims needed — controller just uses db).
-            // ApprovePayout doesn't touch IPresetCancellationService, so a bare fake is enough.
-            var controller = new AdminController(db, A.Fake<IPresetCancellationService>());
+            // Build the AdminController (no auth claims needed — controller just uses db)
+            var controller = TestControllerFactory.Admin(db);
 
             // Act — PATCH /api/admin/payouts/{id}/approve
             var result = controller.ApprovePayout(payout.Id)

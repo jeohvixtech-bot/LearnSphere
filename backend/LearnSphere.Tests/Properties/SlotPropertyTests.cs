@@ -87,9 +87,7 @@ public class SlotPropertyTests
     private static BookingsController BuildController(
         LearnSphere.API.Data.AppDbContext db, User parentUser)
     {
-        return new BookingsController(db)
-        {
-            ControllerContext = new ControllerContext
+        return TestControllerFactory.Bookings(db).WithControllerContext(new ControllerContext
             {
                 HttpContext = new DefaultHttpContext
                 {
@@ -102,8 +100,7 @@ public class SlotPropertyTests
                         },
                         authenticationType: "Test"))
                 }
-            }
-        };
+            });
     }
 
     // ── Property 7 ──────────────────────────────────────────────────────────
