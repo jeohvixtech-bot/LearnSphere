@@ -1,6 +1,38 @@
 # LearnSphere – Tutor Matching Platform
 
-**Stack:** AngularJS 1.x Frontend · ASP.NET Core 8 Web API · MySQL + Entity Framework Core
+**Stack:** AngularJS 1.x Frontend · ASP.NET Core 9 Web API · MySQL + Entity Framework Core
+
+---
+
+## Quick start
+
+Three processes. Run each from the repo root, in this order.
+
+```bash
+# 1. MySQL (Docker). First run also loads database/seed, so the app comes up populated.
+docker compose up -d
+
+# 2. API  ->  http://localhost:5000   (Swagger is at the ROOT, not /swagger)
+cd backend/LearnSphere.API && dotnet run --launch-profile http
+
+# 3. Frontend  ->  http://localhost:3000
+node static-server.cjs
+```
+
+**Serve the frontend with `node static-server.cjs`.** It serves `frontend/`, which is the
+application. Nothing else at the repo root is a way to start it — if the page you get has
+`<div id="root">` in its source rather than `ng-app="learnSphereApp"`, you are running
+something else.
+
+Already have a database? You do not need `database/seed`. The API upgrades its own schema
+on startup, so `git pull` and a restart is enough. Verify with:
+
+```bash
+docker exec -i learnsphere-mysql   mysql -ulearnsphere -p'LearnSphere2026!' LearnSphere < database/check-schema.sql
+```
+
+`database/check-data.sql` does the same for the data, and is the quickest way to see why
+two machines differ.
 
 ---
 
@@ -73,7 +105,7 @@ Edit `backend/LearnSphere.API/appsettings.json`:
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=3306;Database=learnsphere_db;User=root;Password=YOUR_PASSWORD;"
+    "DefaultConnection": "Server=localhost;Port=3306;Database=LearnSphere;User=learnsphere;Password=YOUR_PASSWORD;"
   },
   "Jwt": {
     "Key": "LearnSphere_SuperSecret_JWT_Key_2026_CHANGE_IN_PRODUCTION",
@@ -95,7 +127,8 @@ The API starts at `http://localhost:5000`. On first run the app **auto-creates t
 
 ### 3. Swagger UI
 
-Open `http://localhost:5000/swagger` to explore all API endpoints.
+Open `http://localhost:5000/` to explore all API endpoints. Swagger is served at the
+**root**, not `/swagger` — `RoutePrefix` is set to an empty string in `Program.cs`.
 
 ---
 

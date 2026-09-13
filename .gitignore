@@ -17,3 +17,12 @@ backend/**/appsettings.Development.json
 # User-uploaded documents (may contain PII — ID photos, certificates)
 backend/**/wwwroot/uploads/documents/
 backend/**/wwwroot/uploads/profiles/
+
+# Published output. A `dotnet publish` into the source tree was committed three levels
+# deep once already; ignoring it stops that recurring.
+publish/
+*-publish.zip
+
+# A second copy of the project lives here on one machine. It carries its own .git, so
+# committing it would create an embedded repository that clones cannot fetch.
+/LearnSphere/
