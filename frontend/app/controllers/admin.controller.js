@@ -286,6 +286,21 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     });
   }
 
+  // Header progress pill + footer "N still need a decision" line share this:
+  // total = every current (non-superseded) doc; decided = ones already
+  // approved/rejected for real, plus any still-pending one that already has a
+  // staged (not yet confirmed) decision this round. total-decided is exactly
+  // what canConfirmTutor is waiting on.
+  self.vettingProgress = function (tutor) {
+    var docs = (tutor.documents || []).filter(function (d) { return !isSuperseded(tutor, d); });
+    var decided = docs.filter(function (d) {
+      if (d.status !== 'pending') return true;
+      var rev = self.docReview[d.id];
+      return !!(rev && rev.staged);
+    }).length;
+    return { decided: decided, total: docs.length };
+  };
+
   // Validates and stages a single document's decision locally — no backend call.
   self.stageDocReview = function (doc) {
     var review = self.getDocReview(doc.id);

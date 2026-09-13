@@ -46,4 +46,15 @@ public class NotificationsController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok();
     }
+
+    [HttpPatch("{id}/mark-read")]
+    public async Task<IActionResult> MarkRead(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var notification = await _context.Notifications.FirstOrDefaultAsync(n => n.Id == id);
+        if (notification == null || notification.UserId != userId) return NotFound();
+        notification.IsRead = true;
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
 }

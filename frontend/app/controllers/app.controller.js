@@ -44,6 +44,34 @@ function ($scope, $location, AuthService, NotificationService) {
     });
   };
 
+  // Same redirect for both roles under a given type collapses to one entry;
+  // student is grouped with parent since it uses the same parent-side routes
+  // (see change-password.controller.js's role branch, same grouping there).
+  var NOTIFICATION_ROUTES = {
+    booking: { parent: '/parent/sessions', tutor: '/tutor/overview' },
+    payment: { parent: '/parent/billing', tutor: '/tutor/overview' },
+    message: { parent: '/parent/chat', tutor: '/tutor/chat' },
+    system: { parent: '/parent/dashboard', tutor: '/tutor/overview' }
+  };
+
+  self.onNotificationClick = function (n) {
+    // Navigation shouldn't wait on (or be blocked by) the mark-read network
+    // call — fire it and reconcile local unread state independently once it
+    // resolves, same bookkeeping markAllRead's success handler already does.
+    var wasUnread = !n.isRead;
+    NotificationService.markRead(n.id).then(function () {
+      n.isRead = true;
+      if (wasUnread) self.unreadCount = Math.max(0, self.unreadCount - 1);
+    });
+
+    self.notifDrawerOpen = false;
+
+    var role = self.currentUser && self.currentUser.role;
+    var roleKey = (role === 'tutor') ? 'tutor' : 'parent';
+    var routes = NOTIFICATION_ROUTES[n.type];
+    $location.path(routes ? routes[roleKey] : (roleKey === 'tutor' ? '/tutor/overview' : '/parent/dashboard'));
+  };
+
   // Watch for route changes to refresh user state and notifications
   $scope.$on('$routeChangeSuccess', function () {
     self.currentUser = AuthService.getCurrentUser();

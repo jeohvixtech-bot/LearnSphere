@@ -5,12 +5,15 @@
       <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
-      <a href="#!/admin/vetting" class="nav-item active">🛡️ Tutor Vetting Base</a>
-      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
-      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
-      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
-      <a href="#!/admin/archive" class="nav-item">🗄️ Archive</a>
+      <a href="#!/admin/overview" class="nav-item"><i class="ti ti-chart-bar" aria-hidden="true"></i> Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item active">
+        <i class="ti ti-shield-check" aria-hidden="true"></i> Tutor Vetting Base
+        <span class="nav-item-badge" ng-if="vm.unverifiedTutors.length">{{ vm.unverifiedTutors.length }}</span>
+      </a>
+      <a href="#!/admin/disputes" class="nav-item"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item"><i class="ti ti-ruler-2" aria-hidden="true"></i> Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item"><i class="ti ti-refresh" aria-hidden="true"></i> Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item"><i class="ti ti-archive" aria-hidden="true"></i> Archive</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -33,7 +36,7 @@
         <div class="vetting-item" ng-repeat="t in vm.unverifiedTutors">
 
           <!-- ── Tutor header row ── -->
-          <div class="vetting-header-row" ng-click="vm.toggleVettingExpand(t.id)">
+          <div class="vetting-header-row" ng-class="{'vetting-header-row--expanded': vm.expandedTutorId === t.id}" ng-click="vm.toggleVettingExpand(t.id)">
             <div class="vetting-info">
               <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="avatar" alt="{{ t.name }}" />
               <div ng-if="!t.imageUrl" class="avatar avatar-fallback">{{ t.name[0] }}</div>
@@ -48,9 +51,13 @@
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:10px;">
-              <span class="label-tag amber" ng-if="t.verificationStatus === 'pending'">
-                <i class="ti ti-clock" aria-hidden="true"></i> Pending review
-              </span>
+              <div class="vetting-progress-mini" ng-if="t.verificationStatus === 'pending'">
+                <span class="vetting-progress-mini-text">{{ vm.vettingProgress(t).decided }} of {{ vm.vettingProgress(t).total }} decided</span>
+                <div class="vetting-progress-mini-bar">
+                  <div class="vetting-progress-mini-fill"
+                    ng-style="{width: (vm.vettingProgress(t).total ? (vm.vettingProgress(t).decided / vm.vettingProgress(t).total * 100) : 0) + '%'}"></div>
+                </div>
+              </div>
               <span class="label-tag red" ng-if="t.verificationStatus === 'rejected'">
                 <i class="ti ti-x" aria-hidden="true"></i> Rejected
               </span>
@@ -74,47 +81,48 @@
                 {{ vm.docTypeLabel(grp.root.documentType) }}
                 <span ng-if="grp.chain.length > 1" class="vetting-doc-group-count">· {{ grp.chain.length }} attempts</span>
               </div>
-              <div class="vetting-doc-row" ng-class="{'vetting-doc-row--reupload': !$first}" ng-repeat="doc in grp.chain track by doc.id">
+              <div class="vetting-doc-row"
+                ng-class="{
+                  'vetting-doc-row--history': !$last,
+                  'vetting-doc-row--needs-decision': $last && doc.status === 'pending' && !vm.getDocReview(doc.id).staged,
+                  'vetting-doc-row--decided': $last && (doc.status === 'approved' || (doc.status === 'pending' && vm.getDocReview(doc.id).staged))
+                }"
+                ng-repeat="doc in grp.chain track by doc.id">
 
                 <!-- Doc info -->
                 <div class="vetting-doc-info">
-                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                    <span class="vetting-doc-type-label">{{ doc.attemptLabel }}</span>
-                    <span class="label-tag" style="font-size:11px;"
-                      ng-class="{
-                        'amber': doc.status === 'pending',
-                        'indigo': doc.status === 'approved',
-                        'red': doc.status === 'rejected'
-                      }">
-                      <i class="ti"
-                        ng-class="{
-                          'ti-clock': doc.status === 'pending',
-                          'ti-check': doc.status === 'approved',
-                          'ti-x': doc.status === 'rejected'
-                        }" aria-hidden="true"></i>
-                      {{ doc.status }}
-                    </span>
+                  <!-- Metadata caption: which attempt this is + its status, both
+                       de-emphasized so the actual document (below) is the part
+                       that visually dominates the row, not this label. -->
+                  <div class="vetting-doc-caption">
+                    {{ doc.attemptLabel }}
+                    <span class="vetting-doc-caption-dot">·</span>
+                    <span ng-class="{
+                        'vetting-doc-caption-status--pending': doc.status === 'pending',
+                        'vetting-doc-caption-status--approved': doc.status === 'approved',
+                        'vetting-doc-caption-status--rejected': doc.status === 'rejected'
+                      }">{{ doc.status }}</span>
                   </div>
 
                   <!-- File link or external URL -->
                   <div ng-if="doc.fileUrl">
                     <a ng-href="{{ doc.fileUrl }}" target="_blank" class="vetting-doc-link">
-                      <i class="ti ti-external-link" style="font-size:13px;" aria-hidden="true"></i>
+                      <i class="ti ti-file-text" aria-hidden="true"></i>
                       {{ doc.fileName || 'View document' }}
-                      <span ng-if="doc.fileSizeBytes" class="text-muted" style="font-size:12px;">
+                      <span ng-if="doc.fileSizeBytes" class="text-muted" style="font-size:12px; font-weight:400;">
                         ({{ vm.formatFileSize(doc.fileSizeBytes) }})
                       </span>
                     </a>
                   </div>
                   <div ng-if="doc.externalUrl && !doc.fileUrl">
                     <a ng-href="{{ doc.externalUrl }}" target="_blank" class="vetting-doc-link">
-                      <i class="ti ti-external-link" style="font-size:13px;" aria-hidden="true"></i>
+                      <i class="ti ti-external-link" aria-hidden="true"></i>
                       {{ doc.externalUrl }}
                     </a>
                   </div>
                   <!-- identity_id has no file — just the typed ID type/number -->
                   <div ng-if="doc.documentType === 'identity_id'" class="vetting-doc-link">
-                    <i class="ti ti-id-badge-2" style="font-size:13px;" aria-hidden="true"></i>
+                    <i class="ti ti-id-badge-2" aria-hidden="true"></i>
                     {{ doc.idType }}: {{ doc.idNumber }}
                   </div>
 
@@ -134,6 +142,11 @@
                 <!-- Review controls — staged locally, nothing hits the backend until
                      "Confirm & Verify" applies everything in one batch. -->
                 <div class="vetting-doc-controls" ng-init="rev = vm.getDocReview(doc.id)">
+
+                  <!-- Nothing left to decide on this one — already approved -->
+                  <div class="vetting-approved-line" ng-if="doc.status === 'approved'">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i> Approved
+                  </div>
 
                   <!-- Approve / Reject toggle -->
                   <div class="vetting-action-btns" ng-if="!rev.staged && doc.status === 'pending'">
@@ -204,6 +217,10 @@
             <div class="vetting-action-footer">
               <div>
                 <p class="field-error" ng-if="t.confirmError">{{ t.confirmError }}</p>
+                <p class="vetting-footer-hint" ng-if="!t.confirmError && !vm.canConfirmTutor(t) && !t.confirming && (vm.vettingProgress(t).total - vm.vettingProgress(t).decided) > 0">
+                  <i class="ti ti-info-circle" aria-hidden="true"></i>
+                  {{ vm.vettingProgress(t).total - vm.vettingProgress(t).decided }} document(s) still need a decision
+                </p>
               </div>
               <div style="display:flex; gap:10px; align-items:center;">
                 <button type="button" class="btn-success"

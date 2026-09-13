@@ -2452,14 +2452,25 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // photo, and at least one academic level — each reviewed independently by
   // admin. The ID number is tracked separately (see hasIdentityNumber below)
   // since it was never actually a file upload.
-  self.mandatoryDocsUploadedCount = function () {
+  // Backs both the "N of 3 documents uploaded" count and its hover checklist
+  // (see mandatoryDocsChecklist) — one source of truth for what "done" means
+  // for each of the 3 mandatory slots, so the two can't drift apart.
+  self.mandatoryDocsChecklist = function () {
     var docs = self.tutor.documents || [];
-    var count = 0;
-    if (docs.some(function (d) { return d.documentType === 'identity_photo' && d.fileUrl; }) || self.getStagedNew('identity_photo').length) count++;
-    if (docs.some(function (d) { return d.documentType === 'profile_photo' && d.fileUrl; }) || self.getStagedNew('profile_photo').length) count++;
-    if (docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })
-        || ACADEMIC_LEVEL_TYPES.some(function (t) { return self.getStagedNew(t).length; })) count++;
-    return count;
+    function hasType(type) {
+      return docs.some(function (d) { return d.documentType === type && d.fileUrl; }) || self.getStagedNew(type).length > 0;
+    }
+    var academicDone = docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })
+      || ACADEMIC_LEVEL_TYPES.some(function (t) { return self.getStagedNew(t).length > 0; });
+    return [
+      { label: 'Identity photo', done: hasType('identity_photo') },
+      { label: 'Profile photo', done: hasType('profile_photo') },
+      { label: 'Academic qualification', done: academicDone }
+    ];
+  };
+
+  self.mandatoryDocsUploadedCount = function () {
+    return self.mandatoryDocsChecklist().filter(function (item) { return item.done; }).length;
   };
 
   self.mandatoryDocsTotal = 3;

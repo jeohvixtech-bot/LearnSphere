@@ -46,7 +46,8 @@
           <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="app.toggleNotifDrawer()">✕</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:2px;">
-          <div ng-repeat="n in app.notifications" style="display:flex; gap:10px; padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
+          <div ng-repeat="n in app.notifications" ng-click="app.onNotificationClick(n)"
+            style="display:flex; gap:10px; padding:var(--space-2) 0; border-top:1px solid var(--color-divider); cursor:pointer;"
             ng-style="!n.isRead ? {background:'var(--color-accent-100)'} : {}">
             <span style="width:8px; height:8px; border-radius:50%; background:var(--color-accent); flex-shrink:0; margin-top:6px;" ng-if="!n.isRead"></span>
             <div>

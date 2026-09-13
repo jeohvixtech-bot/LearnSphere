@@ -129,10 +129,22 @@ a { text-decoration: none; color: inherit; }
 .avatar-circle.dark { background: #334155; color: #e2e8f0; }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
-.nav-item { display: block; padding: 9px 12px; border-radius: 10px; font-size: 15px; font-weight: 600; color: #475569; transition: background .15s; cursor: pointer; }
+.nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 10px; font-size: 15px; font-weight: 600; color: #475569; transition: background .15s; cursor: pointer; }
+.nav-item i { font-size: 16px; flex-shrink: 0; }
 .nav-item:hover { background: #f8fafc; color: #1e293b; }
 .nav-item.active { background: linear-gradient(135deg, #059669, #0d9488); color: #fff; box-shadow: 0 2px 8px rgba(5,150,105,0.28); }
 .sidebar-indigo .nav-item.active { background: linear-gradient(135deg, #0d9488, #059669); }
+
+.nav-item-badge {
+  margin-left: auto;
+  background: #fbbf24;
+  color: #451a03;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 100px;
+  flex-shrink: 0;
+}
 
 .status-live { font-size: 14px; color: #94a3b8; font-weight: 500; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
 .dot-green { color: #16a34a; }
@@ -2689,6 +2701,13 @@ a { text-decoration: none; color: inherit; }
   transition: background .12s;
 }
 .vetting-header-row:hover { background: #f1f5f9; }
+.vetting-header-row--expanded,
+.vetting-header-row--expanded:hover { background: #fffbeb; border-bottom: 0.5px solid #fef3c7; }
+
+.vetting-progress-mini { display: flex; flex-direction: column; gap: 3px; min-width: 110px; }
+.vetting-progress-mini-text { font-size: 12px; font-weight: 600; color: #64748b; }
+.vetting-progress-mini-bar { width: 110px; height: 5px; border-radius: 100px; background: #fde68a; overflow: hidden; }
+.vetting-progress-mini-fill { height: 100%; background: #f59e0b; border-radius: 100px; transition: width .15s ease; }
 
 .vetting-review-panel {
   border-top: 0.5px solid #e2e8f0;
@@ -2703,8 +2722,8 @@ a { text-decoration: none; color: inherit; }
    box itself is what signals "these rows are one slot's history", so rows
    inside need no extra indent/connector styling of their own. */
 .vetting-doc-group {
-  border: 0.5px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
   padding: 0 14px;
   background: #fbfcfd;
 }
@@ -2733,32 +2752,66 @@ a { text-decoration: none; color: inherit; }
 .vetting-doc-group-header + .vetting-doc-row { border-top: none; }
 .bs-scope .vetting-doc-row { border-top-color: var(--color-accent-100); }
 
-/* Re-upload attempt rows shifted right within the group box; min-width:1px on
-   the info block lets its text wrap into the now-narrower space instead of
-   forcing the row wider than the 90% it's allotted. */
-.vetting-doc-row--reupload {
+/* Older, superseded attempts in a re-upload chain — shifted right and
+   dimmed/struck-through as de-emphasized history, so they don't compete
+   visually with the current attempt (the last row in the chain) that
+   actually needs attention. min-width:1px on the info block lets its text
+   wrap into the now-narrower space instead of forcing the row wider than
+   the 90% it's allotted. Its own status badge (already color-coded
+   approved/rejected/pending) is just shrunk, not relabeled — an approved
+   doc that was later edited also lands here, and it was never rejected. */
+.vetting-doc-row--history {
   margin-left: 10%;
   width: 90%;
   box-sizing: border-box;
+  opacity: 0.55;
 }
-.vetting-doc-row--reupload .vetting-doc-info { min-width: 1px; }
+.vetting-doc-row--history .vetting-doc-info { min-width: 1px; }
+.vetting-doc-row--history .vetting-doc-link { text-decoration: line-through; }
+
+/* The current (last) attempt in a chain — accented so its state is obvious
+   without reading the text badge: amber while awaiting a decision this
+   round, green once resolved (staged this round, or already approved). */
+.vetting-doc-row--needs-decision { border-left: 4px solid #f59e0b; padding-left: 12px; }
+.vetting-doc-row--decided { border-left: 4px solid #22c55e; padding-left: 12px; }
+
+.vetting-approved-line {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: #15803d;
+}
+.vetting-approved-line i { font-size: 16px; }
 
 .vetting-doc-info { flex: 1; min-width: 200px; }
-.vetting-doc-type-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
+
+/* Metadata caption ("Original upload · pending") — deliberately small/muted
+   so it reads as a label, not the document itself; the filename link below
+   is what should actually draw the eye (see .vetting-doc-link). Status is
+   folded into this same line instead of a separate colored badge element,
+   still color-coded via the status spans so it's not pure decoration loss. */
+.vetting-doc-caption {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #94a3b8;
+  margin-bottom: 4px;
 }
+.vetting-doc-caption-dot { margin: 0 3px; }
+.vetting-doc-caption-status--pending { color: #b45309; }
+.vetting-doc-caption-status--approved { color: #0f766e; }
+.vetting-doc-caption-status--rejected { color: #b91c1c; }
 
 .vetting-doc-link {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: #059669;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
   text-decoration: none;
-  margin-top: 4px;
+  margin-top: 2px;
 }
+.vetting-doc-link i { font-size: 15px; color: #64748b; }
 .vetting-doc-link:hover { text-decoration: underline; }
 
 .vetting-prev-note {
@@ -2778,34 +2831,36 @@ a { text-decoration: none; color: inherit; }
   flex-shrink: 0;
 }
 
-.vetting-action-btns { display: flex; gap: 6px; }
+/* Joined segmented control — one shared container/border, a single divider
+   between the two halves, no gap — rather than two independent buttons. */
+.vetting-action-btns {
+  display: flex;
+  border: 0.5px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
 
-.vetting-approve-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 12px; font-size: 13px; font-weight: 600;
-  border: 0.5px solid #e2e8f0; border-radius: 8px;
+.vetting-approve-btn,
+.vetting-reject-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  flex: 1;
+  padding: 6px 14px; font-size: 13px; font-weight: 600;
+  border: none;
   background: #fff; color: #64748b;
   cursor: pointer; transition: all .12s;
 }
+.vetting-approve-btn { border-right: 0.5px solid #e2e8f0; }
+
 .vetting-approve-btn:hover,
 .vetting-approve-btn.active {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #15803d;
+  background: #22c55e;
+  color: #fff;
 }
 
-.vetting-reject-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 12px; font-size: 13px; font-weight: 600;
-  border: 0.5px solid #e2e8f0; border-radius: 8px;
-  background: #fff; color: #64748b;
-  cursor: pointer; transition: all .12s;
-}
 .vetting-reject-btn:hover,
 .vetting-reject-btn.active {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #b91c1c;
+  background: #ef4444;
+  color: #fff;
 }
 
 .vetting-reject-reason { display: flex; flex-direction: column; gap: 4px; }
@@ -2828,10 +2883,21 @@ a { text-decoration: none; color: inherit; }
   align-items: center;
   justify-content: space-between;
   padding-top: 14px;
+  padding-bottom: 4px;
   margin-top: 12px;
   border-top: 0.5px solid #e2e8f0;
   flex-wrap: wrap;
   gap: 10px;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  z-index: 2;
+}
+
+.vetting-footer-hint {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 13px; color: #b45309;
+  margin: 0;
 }
 
 /* ---- Verification section ---- */
@@ -2850,6 +2916,46 @@ a { text-decoration: none; color: inherit; }
 
 .verif-progress-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .verif-progress-label { font-size: 13px; color: #94a3b8; }
+
+/* Hover checklist for "N of 3 documents uploaded" — plain CSS :hover popup
+   since it's anchored to a small, fixed piece of text (not a cursor-tracking
+   area), unlike the calendar's stop-and-show reset tooltip. */
+.verif-doc-checklist-trigger {
+  position: relative;
+  cursor: help;
+  border-bottom: 1px dotted #94a3b8;
+}
+.verif-doc-checklist-tip {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 6px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity .15s ease, transform .15s ease;
+  pointer-events: none;
+  z-index: 20;
+  text-align: left;
+}
+.verif-doc-checklist-trigger:hover .verif-doc-checklist-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.verif-doc-checklist-item { display: flex; align-items: center; gap: 6px; }
+.verif-doc-checklist-item i { font-size: 12px; color: #f87171; }
+.verif-doc-checklist-item--done i { color: #4ade80; }
 .verif-progress-bar {
   width: 140px; height: 6px;
   background: #f1f5f9; border-radius: 100px;

@@ -1450,7 +1450,14 @@
               <p class="verif-subtitle bs-text-muted">Complete all required documents to unlock subject offerings.</p>
             </div>
             <div class="verif-progress-wrap">
-              <span class="verif-progress-label bs-text-muted">{{ vm.mandatoryDocsUploadedCount() }} of {{ vm.mandatoryDocsTotal }} documents uploaded</span><br/>
+              <span class="verif-progress-label bs-text-muted verif-doc-checklist-trigger">
+                {{ vm.mandatoryDocsUploadedCount() }} of {{ vm.mandatoryDocsTotal }} documents uploaded
+                <span class="verif-doc-checklist-tip">
+                  <span class="verif-doc-checklist-item" ng-repeat="item in vm.mandatoryDocsChecklist()" ng-class="{'verif-doc-checklist-item--done': item.done}">
+                    <i class="ti" ng-class="item.done ? 'ti-check' : 'ti-x'" aria-hidden="true"></i> {{ item.label }}
+                  </span>
+                </span>
+              </span><br/>
               <span class="verif-progress-label bs-text-muted">Identity number: {{ vm.hasIdentityNumber() ? 'Provided' : 'Missing' }}</span>
               <div class="verif-progress-bar">
                 <div class="verif-progress-fill" ng-style="{'width': vm.verifProgress()}"></div>
