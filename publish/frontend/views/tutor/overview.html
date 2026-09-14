@@ -1,0 +1,2112 @@
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+  <div class="sidebar-col">
+    <aside class="sidebar" style="width:220px; flex-shrink:0; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
+        <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
+        <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Tutor Dashboard</small></div>
+      </div>
+      <nav style="display:flex; flex-direction:column; gap:2px;">
+        <a href="#!/tutor/overview" class="bs-sidebar-link active">
+          <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
+        </a>
+      <a href="#!/tutor/wallet" class="bs-sidebar-link">
+        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Earnings
+      </a>
+        <a href="#!/tutor/chat" class="bs-sidebar-link">
+          <i class="ti ti-message" aria-hidden="true"></i> Direct messages
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Calendar Legend -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.activeTab === 'overview'">
+      <div style="font-size:14px; font-weight:600; color:var(--color-text); margin-bottom:var(--space-2);">
+        <i class="ti ti-book-2" aria-hidden="true"></i>
+        Calendar legend
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px 16px;">
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch selected"></span> Selected Day</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch paid"></span> Paid Session</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch unpaid"></span> Unpaid Session</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch holiday"></span> MY Public Holiday</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch holiday-sg"></span> SG Public Holiday</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch holiday-both"></span> Public Holiday (MY &amp; SG)</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch blocked">🚫</span> Blocked by You</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch past"></span> Past Date</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch published"></span> Your Published Slots</div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <p style="font-size:12px;font-weight:600;color:var(--color-text-muted);
+                   text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px;">
+          Class status bar
+        </p>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+
+          <!-- Red — link missing -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--red"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Online class — video link missing
+          </div>
+
+          <!-- Amber — report pending -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--amber"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Past class — report pending
+          </div>
+
+          <!-- Green — all done -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--green"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Past class — all reports submitted
+          </div>
+
+          <!-- Blue — future confirmed -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blue"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+            </div>
+            Future confirmed class
+          </div>
+
+          <!-- Grey — published, no students -->
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+            <div class="leg-cell">
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--blank"></div>
+              <div class="leg-bar leg-bar--grey"></div>
+            </div>
+            Published slot — no students yet
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="dashboard-main">
+
+    <!-- Tab Bar -->
+    <div class="bs-seg">
+      <button type="button" class="bs-seg-opt" ng-click="vm.activeTab = 'overview'"
+        ng-style="{background: vm.activeTab === 'overview' ? 'var(--color-accent)' : 'transparent', color: vm.activeTab === 'overview' ? 'var(--color-bg)' : 'inherit'}">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
+      </button>
+      <button type="button" class="bs-seg-opt" ng-click="vm.activeTab = 'profile'"
+        ng-style="{background: vm.activeTab === 'profile' ? 'var(--color-accent)' : 'transparent', color: vm.activeTab === 'profile' ? 'var(--color-bg)' : 'inherit'}">
+        <i class="ti ti-edit" aria-hidden="true"></i> Edit profile
+      </button>
+    </div>
+
+    <!-- ===== OVERVIEW TAB ===== -->
+    <div ng-if="vm.activeTab === 'overview'">
+
+    <!-- Tutor Stats Banner -->
+    <div class="bs-card bs-elev-sm" style="flex-direction:row; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-4);" ng-if="vm.tutor">
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <img ng-if="vm.tutor.imageUrl" ng-src="{{ vm.tutor.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ vm.tutor.name }}" />
+        <div ng-if="!vm.tutor.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:22px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ vm.tutor.name[0] }}</div>
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <h3 style="margin:0;">{{ vm.tutor.name }}</h3>
+            <button type="button" class="bs-btn" ng-click="vm.toggleOnlineStatus()"
+              ng-style="vm.tutor.isOnline ? {background:'#dcfce7', color:'#15803d', border:'1px solid #bbf7d0'} : {background:'#fee2e2', color:'#b91c1c', border:'1px solid #fecaca'}"
+              title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
+              {{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
+            </button>
+            <span ng-if="vm.tutor.tier === 'Gold'" class="bs-tag" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">
+              <i class="ti ti-trophy" style="font-size:13px;" aria-hidden="true"></i> Gold teacher
+            </span>
+            <span ng-if="vm.tutor.tier === 'Silver'" class="bs-tag" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
+              <i class="ti ti-medal" style="font-size:13px;" aria-hidden="true"></i> Silver teacher
+            </span>
+            <span ng-if="vm.tutor.tier === 'Bronze'" class="bs-tag" style="background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
+              <i class="ti ti-award" style="font-size:13px;" aria-hidden="true"></i> Bronze teacher
+            </span>
+            <span class="bs-tag bs-tag-accent" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">
+              <i class="ti ti-check" style="font-size:12px;" aria-hidden="true"></i> Verified
+            </span>
+            <span class="bs-tag bs-tag-neutral" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">
+              <i class="ti ti-clock" style="font-size:12px;" aria-hidden="true"></i> Pending
+            </span>
+          </div>
+          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.tutor.experienceYears }} Years Active MOE Teacher</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:var(--space-6);">
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ vm.tutor.score | number:1 }}</div>
+          <div class="bs-text-muted" style="font-size:12px; text-transform:uppercase;">Score</div>
+        </div>
+        <!-- Real figure from the tutor ledger. Credit is only surfaced once there is any,
+             so the panel doesn't show an always-zero bucket before that feature lands. -->
+        <div style="text-align:center;">
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;"
+            ng-class="{'text-danger': vm.balance.withdrawable < 0}">
+            <span ng-if="vm.balance">{{ vm.balance.withdrawable | currency:'$' }}</span>
+            <span ng-if="!vm.balance && !vm.balanceError" class="bs-text-muted">…</span>
+            <span ng-if="vm.balanceError" class="bs-text-muted" style="font-size:14px;">—</span>
+          </div>
+          <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Ready balance</div>
+          <div class="bs-text-muted" style="font-size:11px;" ng-if="vm.balance && vm.balance.credit > 0">
+            + {{ vm.balance.credit | currency:'$' }} credit
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Booking Requests -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.pendingRequests().length">
+      <div class="bs-card-title"><i class="ti ti-clock" aria-hidden="true"></i> Parents booking requests ({{ vm.pendingRequests().length }})</div>
+      <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);" ng-repeat="b in vm.pendingRequests()">
+          <div>
+            <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
+            <span class="bs-text-muted" style="font-size:13px;">#{{ b.bookingNumber }}</span>
+            <div style="font-weight:600; margin-top:2px;">{{ b.studentName }}</div>
+            <p class="bs-text-muted" style="margin:2px 0 0; font-size:14px;" ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
+            <em ng-if="b.message" style="font-size:14px;">"{{ b.message }}"</em>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="bs-btn bs-btn-secondary" ng-click="vm.startCounter(b)">Counter Propose Time</button>
+            <button class="bs-btn bs-btn-primary" ng-click="vm.confirmBooking(b)">Confirm Class</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Counter Proposal Form -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.counterBooking">
+      <button class="bs-btn bs-btn-ghost" style="align-self:flex-start;" ng-click="vm.cancelCounter()">← Cancel</button>
+      <div ng-if="vm.counterSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
+        ✓ Counter-proposal dispatched. Waiting for parent approval.
+      </div>
+      <div ng-if="!vm.counterSuccess">
+        <span class="bs-tag bs-tag-accent">Time Rescheduling</span>
+        <h3 style="margin-top:var(--space-2);">Counter Propose Booking Slot</h3>
+        <p class="bs-text-muted">For: {{ vm.counterBooking.subject }} · {{ vm.counterBooking.studentName }}</p>
+        <form ng-submit="vm.submitCounter()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+            <div style="display:grid; grid-template-columns:30px 1fr 1fr 1fr; gap:var(--space-2); font-size:12px; text-transform:uppercase; opacity:0.6;">
+              <span>#</span>
+              <span>Parent Requested</span>
+              <span>Your Proposed Date <span style="color:var(--color-accent-2);">*</span></span>
+              <span>Your Proposed Time <span style="color:var(--color-accent-2);">*</span></span>
+            </div>
+            <div style="display:grid; grid-template-columns:30px 1fr 1fr 1fr; gap:var(--space-2); align-items:start; padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
+              ng-repeat="c in vm.counterForm.classes track by $index"
+              ng-style="vm.isProposedDateBlocked(c.originalDate) ? {background:'var(--color-accent-2-100)'} : {}">
+              <span class="bs-text-muted">{{ $index + 1 }}</span>
+              <span>
+                <strong>{{ c.originalDate | dmy }}</strong>
+                <span class="bs-tag bs-tag-accent-2" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
+                <small class="bs-text-muted">{{ c.originalTime | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
+              </span>
+              <div class="bs-field" style="margin:0;">
+                <input class="bs-input" type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
+                  ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+                <span ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)" style="color:var(--color-accent-2-700); font-size:13px;">
+                  ⚠️ This date is in a blocked period
+                </span>
+              </div>
+              <div class="bs-field" style="margin:0;">
+                <input class="bs-input" type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+                  ng-change="vm.onCounterStartTimeChange(c)"
+                  ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+                <small class="bs-text-muted" style="font-size:12px;display:block">→ {{ (vm.counterEndTime(c) || '—') | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
+              </div>
+              <span ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)" style="grid-column:1/-1; color:var(--color-accent-2-700); font-size:13px;">
+                ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
+              </span>
+            </div>
+          </div>
+          <p ng-if="vm.hasDuplicateCounter()" style="color:var(--color-accent-2-700); font-size:14px; margin:0;">
+            ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+          </p>
+          <p ng-if="vm.hasInvalidCounter()" style="color:var(--color-accent-2-700); font-size:14px; margin:0;">
+            ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+          </p>
+          <div class="bs-field" style="margin:0;">
+            <label>Explanation to Parent</label>
+            <textarea class="bs-input" ng-model="vm.counterForm.message" rows="2" placeholder="e.g. I am unavailable on those dates due to..."></textarea>
+            <div ng-if="vm.hasProfaneCounterMessage()" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">Please remove inappropriate language before submitting.</div>
+          </div>
+          <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="vm.hasInvalidCounter() || vm.hasTooSoonCounter() || vm.hasDuplicateCounter() || vm.hasProfaneCounterMessage()">Dispatch Counter Proposal</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Calendar (Monthly View) -->
+    <div class="bs-card bs-elev-sm reset-zone" reset-zone ng-if="!vm.counterBooking" ng-click="vm.onCalendarAreaClick($event)">
+      <span class="reset-tip">Reset</span>
+      <div>
+        <span class="bs-tag bs-tag-accent">TUTOR SCHEDULER</span>
+        <h3 style="margin-top:var(--space-2);"><i class="ti ti-calendar" aria-hidden="true"></i> Calendar &amp; Class Coordinator</h3>
+      </div>
+
+      <div class="reset-zone" reset-zone ng-click="vm.onCalendarAreaClick($event)" style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+        <span class="reset-tip">Reset</span>
+        <div style="flex:1; min-width:200px; background:var(--color-accent-2-100); border-radius:var(--radius-md); padding:var(--space-3);">
+          <small class="bs-text-muted">Pending Confirmation</small>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:19px;">{{ vm.pendingRequests().length }} Session(s)</div>
+          <span ng-if="vm.pendingRequests().length" class="bs-tag bs-tag-accent-2" style="margin-top:4px;"><i class="ti ti-clock" aria-hidden="true"></i> Action required</span>
+          <span ng-if="!vm.pendingRequests().length" class="bs-tag bs-tag-accent" style="margin-top:4px;"><i class="ti ti-check" aria-hidden="true"></i> All clear</span>
+        </div>
+        <div style="flex:1; min-width:200px; background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);">
+          <small class="bs-text-muted" ng-if="vm.selectedCalDays[0]">Sessions on {{ vm.calMonthName() }} {{ vm.selectedCalDays[0] }}</small>
+          <small class="bs-text-muted" ng-if="!vm.selectedCalDays[0]">Select a day</small>
+          <div style="font-family:var(--font-heading); font-weight:600; font-size:19px;">{{ vm.confirmedOnDay(vm.selectedCalDays[0]).length }} Lesson(s)</div>
+        </div>
+      </div>
+
+      <div class="reset-zone" reset-zone ng-click="vm.onCalendarAreaClick($event)" style="display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+        <span class="reset-tip">Reset</span>
+        <span style="font-weight:600; min-width:120px; text-align:center;"><i class="ti ti-calendar" aria-hidden="true"></i> {{ vm.calMonthName() }} {{ vm.calYear }}</span>
+        <button class="bs-btn bs-btn-primary" ng-click="vm.openSetupClass()" ng-disabled="vm.selectedCalDays.length === 0">
+          <i class="ti ti-calendar-plus"></i> Setup class
+        </button>
+        <button class="bs-btn bs-btn-secondary" ng-click="vm.resetCalDaySelection()" ng-disabled="vm.selectedCalDays.length === 0">
+          <i class="ti ti-x"></i> Reset
+        </button>
+      </div>
+      <p class="bs-text-muted" style="margin:0;">{{ vm.selectedCalDays.length }} of 5 dates selected</p>
+
+      <div class="bs-cal-grid-wrap">
+        <button type="button" class="bs-cal-arrow bs-cal-arrow--left" ng-click="vm.prevMonth()" aria-label="Previous month">
+          <i class="ti ti-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="bs-cal-arrow bs-cal-arrow--right" ng-click="vm.nextMonth()" aria-label="Next month">
+          <i class="ti ti-chevron-right" aria-hidden="true"></i>
+        </button>
+        <div class="bs-cal-weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+        <div class="bs-cal-grid">
+        <span class="bs-cal-day-empty" ng-repeat="_ in vm.calOffsetArray() track by $index"></span>
+        <button type="button" class="bs-cal-day"
+          ng-repeat="d in vm.calDaysArray() track by $index"
+          ng-click="vm.onCalDayClick(d)"
+          ng-class="{
+            'selected':            vm.isCalDaySelected(d),
+            'report-day-selected': vm.isPastDay(d) && vm.isReportSelectedDay(d),
+            'past-day':            vm.isPastDay(d),
+            'blocked':             !vm.isPastDay(d) && vm.isBlocked(d),
+            'public-holiday-sg':   !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isSgHoliday(d),
+            'public-holiday':      !vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)
+          }">
+
+          <!-- Left status bar -->
+          <div class="cal-status-bar" ng-if="vm.calBarsForDay(d).length">
+            <div class="cal-status-seg"
+              ng-repeat="seg in vm.calBarsForDay(d) track by seg.colour"
+              ng-class="'cal-seg--' + seg.colour">{{ seg.count }}</div>
+          </div>
+          <!-- Ghost bar — keeps date centered when no bar -->
+          <div class="cal-status-bar-ghost" ng-if="!vm.calBarsForDay(d).length"></div>
+
+          <!-- Cell content: date number stacked above holiday name -->
+          <div class="cal-cell-body">
+            <span class="day-num">{{ d }}</span>
+            <span class="day-holiday-name"
+              ng-if="!vm.isPastDay(d) && !vm.isBlocked(d) && vm.isPublicHoliday(d)">
+              {{ vm.holidayName(d) }}
+            </span>
+          </div>
+
+          <!-- Blocked icon -->
+          <span class="day-blocked-icon" ng-if="!vm.isPastDay(d) && vm.isBlocked(d)">
+            <i class="ti ti-ban" aria-hidden="true"></i>
+          </span>
+
+        </button>
+        </div>
+      </div>
+
+      <!-- Day detail: published slots moved to Daily Summary modal -->
+      <!-- Block unavailable date range remains below -->
+
+      <!-- Block Unavailable Dates -->
+      <div style="border-top:1px solid var(--color-divider); padding-top:var(--space-3); margin-top:var(--space-2);">
+        <div style="font-weight:600; display:flex; align-items:center; gap:6px;">
+          <i class="ti ti-ban" aria-hidden="true"></i>
+          Block unavailable date range
+        </div>
+        <div style="display:flex; gap:var(--space-3); flex-wrap:wrap; align-items:flex-end; margin-top:var(--space-2);">
+          <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
+            <label>Start Date <span style="color:var(--color-accent-2);">*</span></label>
+            <input class="bs-input" type="text" ng-model="vm.blockForm.startDate" ng-change="vm.clearBlockConflicts()"
+              placeholder="DD-MM-YYYY" fp-date view-month-from="vm.calYear + '-' + vm.calMonth" />
+          </div>
+          <div class="bs-field" style="margin:0; flex:1; min-width:140px;">
+            <label>End Date <span style="color:var(--color-accent-2);">*</span></label>
+            <input class="bs-input" type="text" ng-model="vm.blockForm.endDate" ng-change="vm.clearBlockConflicts()"
+              placeholder="DD-MM-YYYY" fp-date min-date-from="vm.blockForm.startDate" />
+          </div>
+          <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
+            ng-click="vm.confirmBlock()"
+            ng-disabled="!vm.blockForm.startDate || !vm.blockForm.endDate || vm.blockSubmitting">
+            {{ vm.blockSubmitting ? 'Saving…' : 'Confirm Block' }}
+          </button>
+        </div>
+
+        <!-- Overlap with an existing blocked range -->
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockOverlapError">
+          <strong>⚠️ Already Blocked</strong>
+          <p style="margin:2px 0 0;">{{ vm.blockOverlapError }}</p>
+        </div>
+
+        <!-- Active preset (Flow B) class bookings in the newly-blocked range -->
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockPresetWarning">
+          <strong>⚠️ Active class bookings in this range</strong>
+          <p style="margin:2px 0 0;">{{ vm.blockPresetWarning }}</p>
+        </div>
+
+        <!-- Conflict alert -->
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockConflicts.length">
+          <strong>⚠️ Change of class date required</strong>
+          <p style="margin:2px 0 0;">The selected period overlaps with {{ vm.blockConflicts.length }} confirmed class{{ vm.blockConflicts.length !== 1 ? 'es' : '' }}. Please reschedule before blocking.</p>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="c in vm.blockConflicts">
+              <span class="bs-tag bs-tag-accent">{{ c.subject }}</span>
+              <span>{{ c.student }}</span>
+              <span class="bs-text-muted" style="font-size:13px;">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ c.duration }}h)</span>
+              <button class="bs-btn bs-btn-secondary" style="margin-left:auto;" ng-click="vm.startTutorRescheduleById(c.bookingId)">
+                Reschedule →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Published-but-unbooked preset slots inside the range — nobody's enrolled,
+             so the tutor moves or cancels the slot themselves, no parent involved. -->
+        <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockSlotConflicts.length">
+          <strong>⚠️ Published class{{ vm.blockSlotConflicts.length !== 1 ? 'es' : '' }} in this range</strong>
+          <p style="margin:2px 0 0;">{{ vm.blockSlotConflicts.length }} published slot{{ vm.blockSlotConflicts.length !== 1 ? 's' : '' }} nobody's booked yet {{ vm.blockSlotConflicts.length !== 1 ? 'are' : 'is' }} sitting in this range. Reschedule or cancel {{ vm.blockSlotConflicts.length !== 1 ? 'them' : 'it' }} before blocking.</p>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="slot in vm.blockSlotConflicts">
+              <span class="bs-tag bs-tag-accent">{{ slot.subject }}</span>
+              <span class="bs-text-muted" style="font-size:13px;">{{ slot.day | dmy }} · {{ slot.time | hhmma }}</span>
+              <button class="bs-btn bs-btn-secondary" style="margin-left:auto;" ng-click="vm.openCancelSlotModal(slot)">
+                Reschedule →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:var(--space-2);" ng-if="vm.blockedRanges.length">
+          <div style="display:flex; align-items:center; gap:8px; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="r in vm.blockedRanges track by $index">
+            <span>🚫</span>
+            <span style="flex:1;">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
+            <button class="bs-btn bs-btn-ghost" ng-click="vm.removeBlock($index)">✕ Remove</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Setup Class Modal -->
+    <div class="modal-overlay" ng-if="vm.setupClassOpen">
+      <div class="modal-card setup-class-modal">
+        <div class="modal-header">
+          <div>
+            <h3>Setup class</h3>
+            <p class="bs-text-muted">{{ vm.setupClassSelectedDatesLabel() }}</p>
+          </div>
+          <button type="button" class="modal-close" ng-click="vm.closeSetupClass()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Three distinct states, since "can't publish yet" and "why" differ:
+                 - No offerings/modes yet + not verified ("pending"): profile is
+                   incomplete — blocks the form, asks them to complete it.
+                 - No offerings/modes yet + verified: an edge case (e.g. admin
+                   verified them before/after they cleared their offerings) —
+                   blocks the form, points specifically at adding an offering.
+                 - Has offerings/modes but not verified yet ("under verifying"):
+                   NOT blocking — nothing server-side stops this today, so they
+                   can still prep classes ahead of approval; just an FYI banner
+                   above the still-functional form. -->
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Please complete your tutor profile — including at least one teaching offering (subject, level, and mode) — before you can publish a class.</p>
+            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
+              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
+          </div>
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && vm.tutor.isVerified">
+            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Add at least one teaching offering (subject + level + mode) under Edit Profile before you can publish a class.</p>
+            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
+              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
+          </div>
+          <p class="bs-text-muted" style="margin:0 0 12px" ng-if="vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+            Your profile is currently being verified by our operations team. You can still set up classes now — they just won't be visible to parents until verification is complete.
+          </p>
+
+          <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()">
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--confirmed"></span> Confirmed booking
+              </span>
+              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--preset"></span> Published preset slot
+              </span>
+              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--selected"></span> Your new selection
+              </span>
+            </div>
+            <p class="bs-text-muted" style="margin:0 0 8px;font-size:12px;">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              Click a single slot, or click-and-drag to combine slots into one class.
+              Coloured blocks are existing classes and cannot be selected.
+            </p>
+            <table class="setup-grid">
+              <thead>
+                <tr>
+                  <th class="setup-grid-timecol"></th>
+                  <th ng-repeat="dateStr in vm.setupClassSelectedDates()">{{ dateStr | dmy }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="slot in vm.setupClassGridSlots">
+                  <td class="setup-grid-timecol">{{ vm.setupClassGridSlotLabel(slot) }}</td>
+                  <td ng-repeat="dateStr in vm.setupClassSelectedDates()"
+                    ng-if="!vm.setupSlotInBlock(dateStr, slot) || vm.setupSlotIsBlockStart(dateStr, slot)"
+                    ng-attr-rowspan="{{ vm.setupSlotIsBlockStart(dateStr, slot) ? vm.setupBlockRowspan(dateStr, slot) : undefined }}"
+                    ng-class="{
+                      'setup-grid-cell':    !vm.setupSlotInBlock(dateStr, slot) && !vm.isSetupSlotSelected(dateStr, slot),
+                      'setup-cell-selected': vm.isSetupSlotSelected(dateStr, slot),
+                      'setup-cell-dragging': !vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotDragPreview(dateStr, slot),
+                      'setup-cell-block':   !!vm.setupSlotInBlock(dateStr, slot)
+                    }"
+                    ng-mousedown="!vm.isSetupSlotBooked(dateStr, slot) && !vm.setupSlotInBlock(dateStr, slot) && vm.startSlotDrag(dateStr, slot, $event)"
+                    ng-mouseenter="vm.dragOverSlot(dateStr, slot)">
+
+                    <span ng-if="!vm.setupSlotInBlock(dateStr, slot) && vm.isSetupSlotSelected(dateStr, slot)">
+                      <i class="ti ti-check" aria-hidden="true"></i>
+                      <span ng-if="vm.setupSlotRangeLabel(dateStr, slot)">{{ vm.setupSlotRangeLabel(dateStr, slot) }}</span>
+                    </span>
+
+                    <div class="setup-block setup-block--confirmed"
+                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'confirmed'">
+                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
+                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
+                    </div>
+
+                    <div class="setup-block setup-block--preset"
+                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'preset'">
+                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
+                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
+                    </div>
+
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="setup-inputs-panel" ng-if="vm.tutorHasOfferings()">
+            <div class="setup-inputs-row-4">
+              <div class="bs-field">
+                <label>Teaching Mode</label>
+                <select class="bs-input" ng-model="vm.setupClassForm.mode" ng-change="vm.onModeChange()">
+                  <option value="">— Mode —</option>
+                  <option ng-repeat="m in vm.setupClassModesList" value="{{ m }}">{{ m }}</option>
+                </select>
+              </div>
+              <div class="bs-field">
+                <label>Subject</label>
+                <select class="bs-input" ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()" ng-disabled="!vm.setupClassForm.mode">
+                  <option value="">{{ vm.setupClassForm.mode ? '— Subject —' : 'Select mode first' }}</option>
+                  <option ng-repeat="o in vm.setupClassUniqueSubjectsList" value="{{ o.subject }}">{{ o.key }}</option>
+                </select>
+              </div>
+              <div class="bs-field">
+                <label>Class Size</label>
+                <div class="segmented-toggle">
+                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-one'}"
+                    ng-click="vm.setupClassForm.classSize = 'one-to-one'; vm.onClassSizeChange()">Personal Class</button>
+                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-many'}"
+                    ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">Group Class</button>
+                </div>
+              </div>
+              <div class="bs-field">
+                <label>Max Students</label>
+                <input class="bs-input" type="number" ng-model="vm.setupClassForm.maxStudents"
+                  ng-disabled="vm.setupClassForm.classSize === 'one-to-one'"
+                  min="2" max="30" />
+                <span class="bs-text-muted" style="font-size:12px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for Personal Class</span>
+              </div>
+            </div>
+
+            <div class="bs-field">
+              <label>Price per lesson (RM / SGD based on country)</label>
+              <input class="bs-input" type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
+            </div>
+
+            <p ng-if="vm.setupClassError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.setupClassError }}</p>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <div style="display:flex; align-items:center; gap:14px; font-size:13px; flex-wrap:wrap;">
+            <span><span class="legend-dot selected"></span> Selected</span>
+            <span><span class="legend-dot booked"></span> Booked</span>
+            <span class="bs-text-muted">{{ vm.setupClassTotalSlots() }} class(es) selected across {{ vm.setupClassSelectedDates().length }} date(s)</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeSetupClass()">Cancel</button>
+            <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.submitSetupClass()"
+              ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings() || !vm.setupClassFormValid()">
+              {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cancel Published Class Modal -->
+    <div class="modal-overlay" ng-if="vm.cancelSlotModal">
+      <div class="modal-card" style="max-width:480px">
+        <div class="modal-header">
+          <div>
+            <h3>Cancel class</h3>
+            <p class="bs-text-muted">{{ vm.cancelSlotModal.subject }}<span ng-if="vm.cancelSlotModal.level"> · {{ vm.cancelSlotModal.level }}</span> — {{ vm.cancelSlotModal.day | dmy }} at {{ vm.cancelSlotModal.time | hhmma }}</p>
+          </div>
+          <button type="button" class="modal-close" ng-click="vm.closeCancelSlotModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="bs-text-muted" ng-if="vm.cancelSlotModal.confirmedCount > 0" style="margin-bottom:14px">
+            {{ vm.cancelSlotModal.confirmedCount }} student{{ vm.cancelSlotModal.confirmedCount === 1 ? '' : 's' }} currently booked into this class.
+          </p>
+
+          <div class="segmented-toggle" style="margin-bottom:14px">
+            <button type="button" ng-class="{active: vm.cancelSlotForm.mode === 'reschedule'}"
+              ng-click="vm.cancelSlotForm.mode = 'reschedule'">Propose new date</button>
+            <button type="button" ng-class="{active: vm.cancelSlotForm.mode === 'straight'}"
+              ng-click="vm.cancelSlotForm.mode = 'straight'">Cancel outright</button>
+          </div>
+
+          <div ng-if="vm.cancelSlotForm.mode === 'reschedule'">
+            <p class="bs-text-muted" style="font-size:13px;margin-bottom:10px">
+              Moves this class to the new date immediately for every affected family — they'll be notified, no action needed on their end. If a family can't make the new time, they can cancel their own booking or report an issue for a refund.
+            </p>
+            <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>New Date <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="vm.cancelSlotForm.proposedDate" placeholder="DD-MM-YYYY" fp-date />
+              </div>
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>Start Time <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="vm.cancelSlotForm.proposedTime" placeholder="04:00 PM" />
+              </div>
+              <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+                <label>End Time <span style="color:var(--color-accent-2);">*</span></label>
+                <input class="bs-input" type="text" ng-model="vm.cancelSlotForm.proposedEndTime" placeholder="05:00 PM" />
+              </div>
+            </div>
+          </div>
+
+          <div ng-if="vm.cancelSlotForm.mode === 'straight'">
+            <p style="color:var(--color-accent-2-700); font-size:13px;">
+              <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+              Every affected family is credited immediately with no reschedule offered. You'll be charged a 20% penalty on top of losing that revenue, and this counts as a dispute against your AI Speed Match score this month.
+            </p>
+          </div>
+
+          <p ng-if="vm.cancelSlotError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.cancelSlotError }}</p>
+        </div>
+
+        <div class="modal-footer">
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeCancelSlotModal()">Back</button>
+            <button type="button" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);" ng-click="vm.submitCancelSlot()" ng-disabled="vm.cancelSlotBusy">
+              {{ vm.cancelSlotBusy ? 'Saving...' : (vm.cancelSlotForm.mode === 'reschedule' ? 'Reschedule Class' : 'Cancel Outright') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reschedule Success -->
+    <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
+      ✓ Reschedule proposal sent. The parent will be notified to confirm the new dates.
+    </div>
+
+    <!-- Accept Counter Success -->
+    <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
+      ✓ Reschedule accepted. The booking has been updated.
+    </div>
+
+    <!-- Reschedule Form -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.rescheduleBooking && !vm.rescheduleSuccess">
+      <div style="display:flex; align-items:flex-start; gap:var(--space-3);">
+        <div>
+          <h3 style="margin:0;">Propose Reschedule</h3>
+          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.rescheduleBooking.subject }} · Child: {{ vm.rescheduleBooking.studentName }}</p>
+        </div>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelTutorReschedule()">✕ Cancel</button>
+      </div>
+      <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isTutorBookingConflicted(vm.rescheduleBooking)">
+        ⚠️ Some class dates overlap with your blocked period. Propose new dates for the parent to confirm.
+      </p>
+      <p style="font-size:14px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isTutorBookingConflicted(vm.rescheduleBooking)">
+        Enter the new proposed dates below. The parent will receive a notification to accept.
+      </p>
+      <form ng-submit="vm.submitTutorReschedule()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+        <div ng-repeat="c in vm.rescheduleForm.classes track by $index" style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);"
+          ng-style="vm.isOriginalDateBlocked(c.originalDate) ? {outline:'1px solid var(--color-accent-2)'} : {}">
+          <div style="display:flex;align-items:center;gap:8px; font-size:13px; font-weight:600; margin-bottom:6px;">
+            Class {{ $index + 1 }}
+            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
+          </div>
+          <div class="bs-text-muted" style="font-size:13px; margin-bottom:6px;">
+            Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
+          </div>
+          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+            <div class="bs-field" style="flex:1; min-width:140px; margin:0;">
+              <label>New Date <span style="color:var(--color-accent-2);">*</span></label>
+              <input class="bs-input" type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
+                ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+              <span ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)" style="color:var(--color-accent-2-700); font-size:13px;">
+                ⚠️ This date is also in a blocked period
+              </span>
+            </div>
+            <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+              <label>New Start Time <span style="color:var(--color-accent-2);">*</span></label>
+              <input class="bs-input" type="text" ng-model="c.proposedStartTime" placeholder="04:00 PM"
+                ng-change="vm.onTutorRescheduleStartTimeChange(c)"
+                ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
+            </div>
+            <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
+              <label>New End Time ({{ vm.rescheduleBooking.durationHours }}h)</label>
+              <input class="bs-input" type="text" value="{{ vm.rescheduleEndTime(c) | hhmma }}" readonly disabled placeholder="Auto-calculated" />
+            </div>
+          </div>
+          <span ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)" style="color:var(--color-accent-2-700); font-size:13px;">
+            ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
+          </span>
+        </div>
+        <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateTutorReschedule()">
+          ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+        </p>
+        <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidTutorReschedule()">
+          ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+        </p>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelTutorReschedule()">Cancel</button>
+          <button type="submit" class="bs-btn bs-btn-primary" ng-disabled="vm.hasInvalidTutorReschedule() || vm.hasTooSoonTutorReschedule() || vm.hasDurationMismatchTutorReschedule() || vm.hasDuplicateTutorReschedule()">Send Reschedule Proposal →</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── 2×2 PANEL GRID ───────────────────────────────────────────── -->
+    <div class="ov-panel-grid">
+
+      <!-- Panel 1: Confirmed Classes -->
+      <div class="ov-panel" ng-click="vm.openPanel('confirmed')">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'confirmed'}">
+          <i class="ti ti-checkbox ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Confirmed Classes</span>
+          <span class="ov-panel-badge ov-panel-badge--ok"
+            ng-if="vm.confirmedClassesThisMonth().length">
+            {{ vm.confirmedClassesThisMonth().length }} this month
+          </span>
+          <span class="ov-panel-badge ov-panel-badge--muted"
+            ng-if="!vm.confirmedClassesThisMonth().length">None this month</span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <!-- Panel 2: Daily Summary — disabled until date selected -->
+      <div class="ov-panel"
+        ng-click="vm.sortedSelectedCalDays().length && vm.openPanel('daily')"
+        ng-class="{'ov-panel--disabled': !vm.sortedSelectedCalDays().length}">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'daily'}">
+          <i class="ti ti-calendar-event ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Daily Summary</span>
+          <span class="ov-panel-badge ov-panel-badge--ok"
+            ng-if="vm.sortedSelectedCalDays().length">
+            {{ vm.sortedSelectedCalDays().length }} date{{ vm.sortedSelectedCalDays().length === 1 ? '' : 's' }} selected
+          </span>
+          <span class="ov-panel-badge ov-panel-badge--muted"
+            ng-if="!vm.sortedSelectedCalDays().length">Select a date</span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <!-- Panel 3: Class Reports -->
+      <div class="ov-panel" ng-click="vm.openPanel('reports')">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'reports'}">
+          <i class="ti ti-file-text ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Class Reports</span>
+          <span class="ov-panel-badge ov-panel-badge--warn"
+            ng-if="vm.totalPendingReports() > 0">
+            {{ vm.totalPendingReports() }} pending
+          </span>
+          <span class="ov-panel-badge ov-panel-badge--ok"
+            ng-if="vm.totalPendingReports() === 0">All up to date</span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
+      </div>
+
+      <!-- Panel 4: Coming soon -->
+      <div class="ov-panel ov-panel--empty">
+        <div class="ov-panel-hd">
+          <i class="ti ti-dots ov-panel-icon" style="color:var(--color-text-muted);" aria-hidden="true"></i>
+          <span class="ov-panel-title" style="color:var(--color-text-muted);">Coming soon</span>
+        </div>
+      </div>
+
+      <!-- Panel 5: Bulletin board -->
+      <div class="ov-panel" ng-click="vm.openPanel('bulletin')">
+        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'bulletin'}">
+          <i class="ti ti-message-2 ov-panel-icon" aria-hidden="true"></i>
+          <span class="ov-panel-title">Bulletin board</span>
+          <span class="ov-panel-badge ov-panel-badge--warn" ng-if="vm.bulletinPendingCount() > 0">
+            {{ vm.bulletinPendingCount() }} dispute{{ vm.bulletinPendingCount() === 1 ? '' : 's' }} pending
+          </span>
+          <span class="ov-panel-badge ov-panel-badge--ok" ng-if="vm.bulletinPendingCount() === 0">
+            {{ vm.bulletinPublishedCount() }} published
+          </span>
+          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── MODAL BACKDROP ───────────────────────────────────────────── -->
+    <div class="ov-modal-backdrop" ng-if="vm.activePanel" ng-click="vm.closePanel()"></div>
+
+    <!-- ── MODAL 1: Confirmed Classes ───────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'confirmed'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-checkbox" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Confirmed Classes</strong>
+          <div class="ov-modal-sub">
+            {{ vm.calMonthName() }} {{ vm.calYear }}
+            · {{ vm.confirmedClassesThisMonth().length }} booking{{ vm.confirmedClassesThisMonth().length === 1 ? '' : 's' }}
+          </div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="ov-modal-body">
+
+        <div class="ov-modal-empty" ng-if="!vm.confirmedClassesThisMonth().length">
+          <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+          <p>No confirmed classes for {{ vm.calMonthName() }} {{ vm.calYear }}</p>
+        </div>
+
+        <div class="ov-cc-row"
+          ng-repeat="row in vm.confirmedClassesThisMonth() track by row.key">
+          <div class="ov-cc-row-top">
+            <span class="bs-tag bs-tag-accent">{{ row.subject }}</span>
+            <span class="ov-cc-date">{{ vm.formatDateShort(row.date) }} · {{ row.time }}</span>
+          </div>
+          <div class="ov-cc-row-bot">
+            <span class="ov-sdot"
+              ng-repeat="s in row.students | limitTo:4" title="{{ s.studentName }}">
+              {{ s.studentName[0] }}
+            </span>
+            <span class="ov-sdot ov-sdot--ov" ng-if="row.students.length > 4">
+              +{{ row.students.length - 4 }}
+            </span>
+            <!-- Online: link set -->
+            <span class="ov-link-badge ov-link-badge--ok"
+              ng-if="row.mode === 'Online' && row.videoConferenceLink">
+              <i class="ti ti-video" style="font-size:11px;" aria-hidden="true"></i> Link set
+            </span>
+            <!-- Online: link missing — clickable, jumps to date -->
+            <button class="ov-link-badge ov-link-badge--warn"
+              ng-if="row.mode === 'Online' && !row.videoConferenceLink"
+              ng-click="vm.jumpToCalendarDate(row.date); $event.stopPropagation()">
+              <i class="ti ti-alert-circle" style="font-size:11px;" aria-hidden="true"></i>
+              No link — add now
+            </button>
+            <!-- Non-online -->
+            <span class="ov-link-badge ov-link-badge--muted" ng-if="row.mode !== 'Online'">
+              <i class="ti ti-home" style="font-size:11px;" aria-hidden="true"></i> {{ row.mode }}
+            </span>
+          </div>
+        </div>
+
+      </div>
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+      </div>
+    </div>
+
+    <!-- ── MODAL 2: Daily Summary ────────────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'daily'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-calendar-event" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Daily Summary</strong>
+          <div class="ov-modal-sub">
+            {{ vm.sortedSelectedCalDays().length }} date{{ vm.sortedSelectedCalDays().length === 1 ? '' : 's' }} selected · click a tab to switch
+          </div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <!-- Date tabs -->
+      <div class="ov-date-tabs">
+        <div class="ov-date-tab"
+          ng-repeat="d in vm.sortedSelectedCalDays() track by $index"
+          ng-class="{'ov-date-tab--active': vm.dailySummaryTabIndex === $index}"
+          ng-click="vm.selectDailySummaryTab($index)">
+          <span class="ov-date-tab-label">{{ vm.dailySummaryTabLabel(d) }}</span>
+          <span class="ov-tab-badge ov-tab-badge--ok"
+            ng-if="vm.dailySummaryTabStatus(d) === 'ok'">
+            {{ vm.groupedBookingsOnDay(d).length }} class{{ vm.groupedBookingsOnDay(d).length === 1 ? '' : 'es' }}
+          </span>
+          <span class="ov-tab-badge ov-tab-badge--warn"
+            ng-if="vm.dailySummaryTabStatus(d) === 'warn'">no link</span>
+          <span class="ov-tab-badge ov-tab-badge--muted"
+            ng-if="vm.dailySummaryTabStatus(d) === 'empty'">no classes</span>
+        </div>
+      </div>
+
+      <div class="ov-modal-body">
+        <div>
+
+          <div class="ov-modal-empty" ng-if="!vm.groupedBookingsOnDay(vm.currentSummaryDay).length">
+            <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+            <p>No confirmed classes scheduled for {{ vm.dailySummaryTabLabel(vm.currentSummaryDay) }}</p>
+          </div>
+
+          <div class="ov-ds-group"
+            ng-repeat="group in vm.groupedBookingsOnDay(vm.currentSummaryDay) track by $index">
+            <div class="ov-ds-group-hd">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span class="ov-ds-num">{{ $index + 1 }}</span>
+                <span class="bs-tag bs-tag-accent">{{ group.subject }}</span>
+                <span class="ov-chip-muted" ng-if="group.isGroup">
+                  <i class="ti ti-users" style="font-size:11px;" aria-hidden="true"></i>
+                  Group · {{ group.students.length }} students
+                </span>
+                <span class="ov-chip-muted" ng-if="!group.isGroup">1-to-1</span>
+                <span class="ov-chip-soon" ng-if="group.isStartingSoon">
+                  <i class="ti ti-radio" style="font-size:11px;" aria-hidden="true"></i> Starting soon
+                </span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="ov-ds-meta">{{ group.time }} · {{ group.durationHours }}h · {{ group.mode }}</span>
+                <button class="bs-btn bs-btn-secondary" style="font-size:12px;padding:4px 10px;"
+                  ng-if="!group.isGroup" ng-click="vm.startTutorRescheduleById(group.bookings[0].id)">
+                  Reschedule
+                </button>
+              </div>
+            </div>
+
+            <div class="ov-ds-group-body">
+              <!-- Student dots -->
+              <div class="ov-dots-row">
+                <span class="ov-sdot-lg"
+                  ng-repeat="s in group.students | limitTo:8" title="{{ s.studentName }}">
+                  {{ s.studentName[0] }}
+                </span>
+                <span class="ov-sdot-lg ov-sdot--ov" ng-if="group.students.length > 8">
+                  +{{ group.students.length - 8 }}
+                </span>
+              </div>
+
+              <!-- Expand student list -->
+              <button class="ov-expand-btn"
+                ng-click="group._expanded = !group._expanded">
+                <i class="ti" ng-class="group._expanded ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true"></i>
+                {{ group._expanded ? 'Hide' : 'View all ' + group.students.length + ' students' }}
+              </button>
+              <div class="ov-student-list" ng-if="group._expanded">
+                <div class="ov-s-row" ng-repeat="s in group.students track by s.studentId" style="display:flex;align-items:center;gap:8px;">
+                  <span class="ov-sdot-lg">{{ s.studentName[0] }}</span>
+                  <span class="ov-sname">{{ s.studentName }}</span>
+                  <button class="bs-btn bs-btn-secondary" style="font-size:12px;padding:4px 10px;margin-left:auto;"
+                    ng-click="vm.startTutorRescheduleById(s.bookingId)">
+                    Reschedule
+                  </button>
+                </div>
+              </div>
+
+              <!-- Video link — online only -->
+              <div class="ov-link-section" ng-if="group.mode === 'Online'">
+                <p class="ov-section-label">Video conference link</p>
+
+                <!-- No link, input closed -->
+                <div ng-if="!group.videoConferenceLink && !vm.groupVideoLinkState(group)">
+                  <div class="ov-link-missing">
+                    <i class="ti ti-alert-circle" aria-hidden="true"></i>
+                    No link set — required before this online class
+                  </div>
+                  <button class="bs-btn bs-btn-secondary" style="margin-top:6px;font-size:13px;"
+                    ng-click="vm.openGroupVideoLinkInput(group)">
+                    <i class="ti ti-link" aria-hidden="true"></i> Add video conference link
+                  </button>
+                </div>
+
+                <!-- Input open -->
+                <div class="ov-link-input-wrap"
+                  ng-if="vm.groupVideoLinkState(group) && vm.groupVideoLinkState(group).editing">
+                  <div style="display:flex;gap:6px;align-items:flex-start;">
+                    <textarea ng-model="vm.groupVideoLinkState(group).inputValue"
+                      placeholder="Paste Zoom, Google Meet, Teams or any video link..."
+                      rows="2"
+                      style="flex:1;font-size:13px;resize:none;border:0.5px solid var(--color-accent-300);
+                             border-radius:var(--radius);padding:7px 10px;line-height:1.5;
+                             word-break:break-all;box-sizing:border-box;"></textarea>
+                    <button class="bs-btn bs-btn-primary"
+                      style="flex-shrink:0;margin-top:1px;font-size:13px;"
+                      ng-click="vm.saveGroupVideoLink(group)"
+                      ng-disabled="vm.groupVideoLinkState(group).saving">
+                      <i class="ti ti-check" aria-hidden="true"></i>
+                      {{ vm.groupVideoLinkState(group).saving ? 'Saving...' : 'Save' }}
+                    </button>
+                  </div>
+                  <p class="ov-link-note">
+                    <i class="ti ti-info-circle" aria-hidden="true"></i>
+                    Free conferencing platforms may have time limits.
+                    This link applies to all {{ group.students.length }} students.
+                  </p>
+                  <p style="color:var(--color-accent-2-700);font-size:13px;margin:4px 0 0;"
+                    ng-if="vm.groupVideoLinkState(group).error">
+                    {{ vm.groupVideoLinkState(group).error }}
+                  </p>
+                  <button class="bs-btn" style="font-size:13px;margin-top:6px;"
+                    ng-click="vm.cancelGroupVideoLinkInput(group)">Cancel</button>
+                </div>
+
+                <!-- Link set -->
+                <div ng-if="group.videoConferenceLink && !vm.groupVideoLinkState(group)">
+                  <div class="ov-link-box"
+                    ng-class="{'ov-link-box--active': vm.isGroupJoinEnabled(group)}">
+                    {{ group.videoConferenceLink }}
+                  </div>
+                  <div class="ov-link-note">
+                    <i class="ti ti-info-circle" aria-hidden="true"></i>
+                    This link applies to all {{ group.students.length }} students
+                  </div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+                    <a class="bs-btn bs-btn-primary"
+                      ng-if="vm.isGroupJoinEnabled(group)"
+                      ng-href="{{ group.videoConferenceLink }}" target="_blank"
+                      style="font-size:13px;text-decoration:none;background:#059669;">
+                      <i class="ti ti-video" aria-hidden="true"></i> Join class
+                    </a>
+                    <button class="bs-btn bs-btn-secondary"
+                      ng-if="vm.isGroupJoinEnabled(group)"
+                      style="font-size:13px;"
+                      ng-click="vm.copyVideoLink(group.videoConferenceLink)">
+                      <i class="ti ti-copy" aria-hidden="true"></i> Copy link
+                    </button>
+                    <span class="ov-join-disabled" ng-if="!vm.isGroupJoinEnabled(group)">
+                      <i class="ti ti-video" aria-hidden="true"></i>
+                      Join class — available 10 min before
+                    </span>
+                    <button class="bs-btn" style="font-size:13px;"
+                      ng-click="vm.openGroupVideoLinkInput(group)">
+                      <i class="ti ti-edit" aria-hidden="true"></i> Edit link
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Non-online -->
+              <div ng-if="group.mode !== 'Online'"
+                style="border-top:0.5px solid var(--color-divider);padding-top:8px;
+                       margin-top:8px;font-size:13px;color:var(--color-text-muted);
+                       display:flex;align-items:center;gap:5px;">
+                <i class="ti ti-home" aria-hidden="true"></i>
+                {{ group.mode }} — no video link required
+              </div>
+            </div>
+          </div>
+
+          <!-- Published preset slots — unbooked, grey outline cards -->
+          <div ng-if="vm.publishedSlotsOnDay(vm.currentSummaryDay).length">
+
+            <p class="ov-section-label" style="margin-top:12px;">
+              Published slots — open for booking
+            </p>
+
+            <div class="ov-slot-card"
+              ng-repeat="slot in vm.publishedSlotsOnDay(vm.currentSummaryDay) track by slot.id">
+              <div class="ov-slot-card-hd">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span class="bs-tag" style="background:var(--color-surface);
+                    border:0.5px solid var(--color-divider);
+                    color:var(--color-text-muted);font-size:12px;">
+                    {{ slot.subject }}<span ng-if="slot.level"> · {{ slot.level }}</span>
+                  </span>
+                  <span class="ov-chip-muted">
+                    {{ slot.classSize === 'one-to-one' ? '1-to-1' : (slot.confirmedCount + '/' + slot.maxStudents + ' filled') }}
+                  </span>
+                  <span class="ov-chip-muted" ng-if="slot.isFull"
+                    style="color:#b91c1c;background:#fef2f2;border-color:#fca5a5;">
+                    Full
+                  </span>
+                </div>
+                <span class="ov-ds-meta">
+                  {{ slot.time | hhmma }} – {{ slot.endTime | hhmma }} · {{ slot.mode }} · ${{ slot.pricePerLesson }}/lesson
+                </span>
+              </div>
+              <div class="ov-slot-card-body">
+                <p style="font-size:13px;color:var(--color-text-muted);margin:0;"
+                  ng-if="!slot.isFull">
+                  <i class="ti ti-clock" style="font-size:13px;" aria-hidden="true"></i>
+                  Open for booking — not yet claimed by a parent
+                </p>
+                <p style="font-size:13px;color:#b91c1c;margin:0;" ng-if="slot.isFull">
+                  <i class="ti ti-lock" style="font-size:13px;" aria-hidden="true"></i>
+                  Full — no more bookings accepted
+                </p>
+                <button class="bs-btn bs-btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:8px;"
+                  ng-click="vm.openCancelSlotModal(slot)">
+                  Reschedule / Cancel
+                </button>
+              </div>
+            </div>
+
+          </div>
+          <!-- end published slots -->
+
+        </div>
+      </div>
+
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+        <div style="display:flex;gap:6px;">
+          <button class="bs-btn"
+            ng-if="vm.dailySummaryTabIndex > 0"
+            ng-click="vm.selectDailySummaryTab(vm.dailySummaryTabIndex - 1)">
+            <i class="ti ti-chevron-left" aria-hidden="true"></i> Prev date
+          </button>
+          <button class="bs-btn bs-btn-secondary"
+            ng-if="vm.dailySummaryTabIndex < vm.sortedSelectedCalDays().length - 1"
+            ng-click="vm.selectDailySummaryTab(vm.dailySummaryTabIndex + 1)">
+            Next date <i class="ti ti-chevron-right" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL 3: Class Reports ─────────────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'reports'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-file-text" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Class Reports</strong>
+          <div class="ov-modal-sub" ng-if="vm.reportSelectedDay">
+            {{ vm.formatSessionDate(vm.reportSelectedDay) }} · {{ vm.reportSelectedDayStudents.length }} student(s)
+          </div>
+          <div class="ov-modal-sub" ng-if="!vm.reportSelectedDay">
+            Select a completed date on the calendar first
+          </div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="ov-modal-body">
+
+        <div class="ov-modal-empty" ng-if="!vm.reportSelectedDay">
+          <i class="ti ti-calendar-event" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+          <p>Click a completed class date on the calendar, then open this panel.</p>
+        </div>
+
+        <div ng-if="vm.reportSelectedDay">
+          <div class="ov-modal-empty" ng-if="!vm.reportSelectedDayStudents.length">
+            <i class="ti ti-calendar-off" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+            <p>No completed classes on this date.</p>
+          </div>
+
+          <!-- Pending -->
+          <p class="ov-section-label" ng-if="vm.pendingReportsList().length">Pending reports</p>
+          <div ng-repeat="s in vm.pendingReportsList() track by s.studentId">
+            <div class="ov-report-row">
+              <div>
+                <div class="ov-report-name">{{ s.studentName }}</div>
+                <div class="ov-report-meta">{{ s.booking.subject }} · {{ vm.reportSelectedDay }}</div>
+              </div>
+              <button ng-if="!vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]"
+                class="bs-btn bs-btn-secondary" style="font-size:12px;font-weight:500;"
+                ng-click="vm.openReportForm(s.studentId, s.sessionDate, s.booking)">
+                <i class="ti ti-edit" aria-hidden="true"></i> Fill report
+              </button>
+            </div>
+
+            <!-- Success flash -->
+            <span ng-if="vm.reportSuccess[vm._reportKey(s.studentId, s.sessionDate)]"
+              style="color:var(--color-accent-700); font-size:13px;">
+              <i class="ti ti-circle-check" aria-hidden="true"></i>
+              Report submitted!
+            </span>
+
+            <!-- Assessment form — same fields/functions as before, just ported
+                 into this modal instead of the old inline card. -->
+            <div class="report-form-wrap"
+              ng-if="vm.reportOpen[vm._reportKey(s.studentId, s.sessionDate)]">
+
+              <div class="report-form-header">
+                <div>
+                  <strong style="font-size:14px;">{{ s.studentName }}</strong>
+                  <span class="bs-text-muted" style="font-size:13px; margin-left:8px;">
+                    {{ vm.formatSessionDate(s.sessionDate) }}
+                  </span>
+                </div>
+                <button class="bs-btn bs-btn-ghost bs-btn-icon"
+                  ng-click="vm.closeReportForm(s.studentId, s.sessionDate)">
+                  <i class="ti ti-x" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <!-- Attendance -->
+              <div class="bs-field">
+                <label>Attendance</label>
+                <div class="chip-row">
+                  <button type="button" class="chip-btn"
+                    ng-class="{'active-green': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'present'}"
+                    ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'present'">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i> Present
+                  </button>
+                  <button type="button" class="chip-btn"
+                    ng-class="{'active-amber': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'late'}"
+                    ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'late'">
+                    <i class="ti ti-clock" aria-hidden="true"></i> Late
+                  </button>
+                  <button type="button" class="chip-btn"
+                    ng-class="{'active-red': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'}"
+                    ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance = 'absent'">
+                    <i class="ti ti-circle-x" aria-hidden="true"></i> Absent
+                  </button>
+                </div>
+                <p class="bs-text-muted" style="font-size:12px; margin-top:4px;">Other fields will be disabled if absent.</p>
+              </div>
+
+              <!-- Remaining fields — disabled when absent -->
+              <div ng-class="{'report-fields-disabled': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'}">
+
+                <!-- Engagement -->
+                <div class="bs-field">
+                  <label>Engagement</label>
+                  <div class="star-rating-row">
+                    <button type="button" class="star-btn"
+                      ng-repeat="n in [1,2,3,4,5]"
+                      ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement = n"
+                      ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'">
+                      <i class="ti ti-star"
+                        ng-style="{'color': n <= vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '22px'}"
+                        aria-hidden="true"></i>
+                    </button>
+                    <span class="bs-text-muted" style="font-size:13px; margin-left:6px;">
+                      {{ vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].engagement || 0 }} / 5
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Understanding -->
+                <div class="bs-field">
+                  <label>Understanding</label>
+                  <div class="chip-row">
+                    <button type="button" class="chip-btn"
+                      ng-repeat="u in ['excellent','good','needs_improvement','struggling']"
+                      ng-class="{'active': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].understanding === u}"
+                      ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'"
+                      ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].understanding = u">
+                      {{ u === 'needs_improvement' ? 'Needs improvement' : (u | capitalize) }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Homework -->
+                <div class="bs-field">
+                  <label>Homework completion</label>
+                  <div class="chip-row">
+                    <button type="button" class="chip-btn"
+                      ng-repeat="h in ['completed','incomplete','no_homework_given']"
+                      ng-class="{'active-green': vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].homeworkCompletion === h}"
+                      ng-disabled="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].attendance === 'absent'"
+                      ng-click="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].homeworkCompletion = h">
+                      {{ h === 'no_homework_given' ? 'No homework given' : (h | capitalize) }}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Remarks — always enabled -->
+              <div class="bs-field">
+                <label>Tutor remarks <span class="bs-text-muted" style="font-weight:400;">(optional)</span></label>
+                <textarea class="bs-input" rows="2"
+                  ng-model="vm.reportForm[vm._reportKey(s.studentId, s.sessionDate)].remarks"
+                  placeholder="Personalised note for this student's parent..."></textarea>
+              </div>
+
+              <p ng-if="vm.reportError[vm._reportKey(s.studentId, s.sessionDate)]" style="color:var(--color-accent-2-700); font-size:14px;">
+                {{ vm.reportError[vm._reportKey(s.studentId, s.sessionDate)] }}
+              </p>
+
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button type="button" class="bs-btn bs-btn-secondary"
+                  ng-click="vm.closeReportForm(s.studentId, s.sessionDate)">Cancel</button>
+                <button type="button" class="bs-btn bs-btn-primary"
+                  ng-click="vm.confirmSubmitReport(s.studentId, s.sessionDate)"
+                  ng-disabled="vm.reportSubmitting[vm._reportKey(s.studentId, s.sessionDate)]">
+                  <i class="ti ti-send" aria-hidden="true"></i>
+                  Submit report
+                </button>
+              </div>
+
+              <!-- Confirmation modal -->
+              <div class="bs-dialog-backdrop"
+                ng-if="vm.reportConfirm[vm._reportKey(s.studentId, s.sessionDate)]">
+                <div class="bs-dialog" style="width:min(380px,100%);">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <i class="ti ti-alert-circle"
+                      style="font-size:20px; color:var(--color-accent-2);" aria-hidden="true"></i>
+                    <strong>Submit lesson report?</strong>
+                  </div>
+                  <p class="bs-text-muted" style="font-size:14px; margin:0;">
+                    Once submitted, this report cannot be edited. The parent will be notified.
+                  </p>
+                  <div class="bs-dialog-actions">
+                    <button type="button" class="bs-btn bs-btn-secondary"
+                      ng-click="vm.cancelConfirmReport(s.studentId, s.sessionDate)">Cancel</button>
+                    <button type="button" class="bs-btn bs-btn-primary"
+                      ng-click="vm.submitReport(s.studentId, s.sessionDate)"
+                      ng-disabled="vm.reportSubmitting[vm._reportKey(s.studentId, s.sessionDate)]">
+                      Confirm and submit
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <!-- end assessment form -->
+          </div>
+
+          <!-- Submitted -->
+          <p class="ov-section-label" style="margin-top:14px;"
+            ng-if="vm.submittedReportsList().length">Submitted</p>
+          <div class="ov-report-row"
+            ng-repeat="s in vm.submittedReportsList() track by s.studentId">
+            <div>
+              <div class="ov-report-name" style="color:var(--color-text-secondary);">
+                {{ s.studentName }}
+              </div>
+              <div class="ov-report-meta">{{ s.booking.subject }} · {{ vm.reportSelectedDay }}</div>
+            </div>
+            <span class="bs-tag" style="font-size:12px;background:var(--color-accent-50);
+                  color:var(--color-accent-700);border:0.5px solid var(--color-accent-200);">
+              <i class="ti ti-check" aria-hidden="true"></i> Submitted
+            </span>
+          </div>
+
+          <!-- Submitted reports log — grouped by preset group, across all dates -->
+          <div ng-if="vm.reportGroups.length" style="margin-top:16px;">
+            <h5 style="font-size:13px; text-transform:uppercase; letter-spacing:0.05em;">Submitted reports (all sessions)</h5>
+
+            <div class="report-log-group"
+              ng-repeat="group in vm.reportGroups track by group.presetGroupId">
+
+              <div class="report-log-date-group"
+                ng-repeat="report in group.reports track by $index">
+                <div class="report-log-row">
+                  <i class="ti ti-file-check"
+                    style="font-size:15px; color:var(--color-accent); flex-shrink:0;" aria-hidden="true"></i>
+                  <div style="flex:1;">
+                    <strong style="font-size:14px;">{{ report.studentName }}</strong>
+                    <span class="bs-text-muted" style="font-size:13px; margin-left:6px;">
+                      {{ vm.formatSessionDate(report.sessionDate) }}
+                    </span>
+                  </div>
+                  <span class="bs-tag bs-tag-accent">Submitted</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+      </div>
+    </div>
+
+    <!-- ── MODAL 4: Bulletin Board ───────────────────────────────────── -->
+    <div class="ov-modal" ng-if="vm.activePanel === 'bulletin'" ng-click="$event.stopPropagation()">
+      <div class="ov-modal-hd">
+        <i class="ti ti-message-2" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <strong>Bulletin board</strong>
+          <div class="ov-modal-sub">{{ vm.bulletinRemarks.length }} remark{{ vm.bulletinRemarks.length === 1 ? '' : 's' }} total</div>
+        </div>
+        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="ov-modal-body">
+
+        <div class="ov-modal-empty" ng-if="!vm.bulletinRemarks.length">
+          <i class="ti ti-message-2" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
+          <p>No remarks yet — they'll show up here once parents leave one on a completed class.</p>
+        </div>
+
+        <div class="ov-ds-group" ng-repeat="r in vm.bulletinRemarks track by r.id"
+          ng-style="r.status === 'hidden' ? {opacity: 0.55} : {}">
+          <div class="ov-ds-group-hd">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <i class="ti ti-star" ng-repeat="n in [1,2,3,4,5]"
+                ng-style="{'color': n <= r.rating ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '14px'}"
+                aria-hidden="true"></i>
+              <span class="ov-chip-muted">{{ r.parentDisplayName }}</span>
+              <span class="bs-tag bs-tag-accent" ng-if="r.status === 'published'" style="font-size:11px;">Published</span>
+              <span class="bs-tag bs-tag-accent-2" ng-if="r.status === 'dispute_requested'" style="font-size:11px;">Dispute requested</span>
+              <span class="bs-tag bs-tag-neutral" ng-if="r.status === 'hidden'" style="font-size:11px;">Hidden by admin</span>
+            </div>
+            <span class="ov-ds-meta">{{ r.subject }} · {{ r.classDate | dmy }}</span>
+          </div>
+          <div class="ov-ds-group-body">
+            <p style="margin:0 0 8px;font-size:14px;">{{ r.text }}</p>
+
+            <button type="button" class="bs-btn bs-btn-secondary" style="font-size:13px;"
+              ng-if="r.status === 'published' && vm.bulletinDisputeFormFor !== r"
+              ng-click="vm.openBulletinDisputeForm(r)">
+              <i class="ti ti-flag" aria-hidden="true"></i> Request hide
+            </button>
+            <p class="bs-text-muted" style="font-size:13px;margin:0;" ng-if="r.status === 'dispute_requested'">
+              <i class="ti ti-clock" aria-hidden="true"></i> Awaiting admin review
+            </p>
+
+            <div ng-if="vm.bulletinDisputeFormFor === r" style="background:var(--color-surface-alt); border:0.5px solid var(--color-divider); border-radius:var(--radius); padding:10px; margin-top:6px;">
+              <label style="font-size:13px;font-weight:600;">Why should this be hidden?</label>
+              <textarea class="bs-input" rows="2" ng-model="vm.bulletinDisputeReason" placeholder="Explain the issue with this remark..." style="margin-top:4px;"></textarea>
+              <p ng-if="vm.bulletinDisputeError" style="color:var(--color-accent-2-700); font-size:13px; margin:4px 0 0;">{{ vm.bulletinDisputeError }}</p>
+              <div style="display:flex; gap:6px; margin-top:6px;">
+                <button type="button" class="bs-btn bs-btn-secondary" style="font-size:13px;" ng-click="vm.cancelBulletinDisputeForm()">Cancel</button>
+                <button type="button" class="bs-btn bs-btn-primary" style="font-size:13px;" ng-click="vm.submitBulletinDispute()">Submit request</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="ov-modal-footer">
+        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+      </div>
+    </div>
+
+    </div><!-- end overview tab -->
+
+    <!-- ===== EDIT PROFILE TAB ===== -->
+    <div ng-if="vm.activeTab === 'profile'" class="bs-card bs-elev-sm" style="max-width:640px;">
+      <span class="bs-tag bs-tag-accent">TUTOR PROFILE MANAGEMENT</span>
+      <h3 style="margin:0 0 16px;">Edit Profile Details</h3>
+
+      <!-- Sub-tab switcher -->
+      <div class="prof-subtabs">
+        <button type="button" class="prof-subtab"
+          ng-class="{'prof-subtab--active': vm.profileTab === 'verification'}"
+          ng-click="vm.profileTab = 'verification'">
+          <i class="ti ti-shield-check" aria-hidden="true"></i>
+          Verification
+        </button>
+        <button type="button" class="prof-subtab"
+          ng-class="{'prof-subtab--active': vm.profileTab === 'offerings'}"
+          ng-click="vm.profileTab = 'offerings'">
+          <i class="ti ti-book" aria-hidden="true"></i>
+          Offerings
+        </button>
+      </div>
+
+      <form ng-submit="vm.saveProfile()" class="profile-form">
+
+        <!-- ══ VERIFICATION SUB-TAB ══ -->
+        <div ng-if="vm.profileTab === 'verification'">
+        <!-- ══════════════════════════════════════════════
+             VERIFICATION SECTION
+             ══════════════════════════════════════════════ -->
+        <div class="verif-section">
+
+          <!-- Header + progress -->
+          <div class="verif-header">
+            <div>
+              <p class="verif-title">
+                <i class="ti ti-shield-check" aria-hidden="true"></i>
+                Profile verification
+              </p>
+              <p class="verif-subtitle bs-text-muted">Complete all required documents to unlock subject offerings.</p>
+            </div>
+            <div class="verif-progress-wrap">
+              <span class="verif-progress-label bs-text-muted verif-doc-checklist-trigger">
+                {{ vm.mandatoryDocsUploadedCount() }} of {{ vm.mandatoryDocsTotal }} documents uploaded
+                <span class="verif-doc-checklist-tip">
+                  <span class="verif-doc-checklist-item" ng-repeat="item in vm.mandatoryDocsChecklist()" ng-class="{'verif-doc-checklist-item--done': item.done}">
+                    <i class="ti" ng-class="item.done ? 'ti-check' : 'ti-x'" aria-hidden="true"></i> {{ item.label }}
+                  </span>
+                </span>
+              </span><br/>
+              <span class="verif-progress-label bs-text-muted">Identity number: {{ vm.hasIdentityNumber() ? 'Provided' : 'Missing' }}</span>
+              <div class="verif-progress-bar">
+                <div class="verif-progress-fill" ng-style="{'width': vm.verifProgress()}"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status banners -->
+          <div class="verif-banner verif-banner--success" ng-if="vm.tutor.verificationStatus === 'approved'">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            <div><p>Profile verified</p><small>Your profile is verified. Subject offerings are unlocked.</small></div>
+          </div>
+
+          <div class="verif-banner verif-banner--warning" ng-if="vm.tutor.verificationStatus === 'pending'">
+            <i class="ti ti-clock" aria-hidden="true"></i>
+            <div><p>Under review</p><small>Admin will review your documents within 1–3 business days.</small></div>
+          </div>
+
+          <div class="verif-banner verif-banner--danger" ng-if="vm.hasRejectedDoc()">
+            <i class="ti ti-alert-circle" aria-hidden="true"></i>
+            <div>
+              <p>{{ vm.rejectedDocNote().type | verifDocLabel }} rejected</p>
+              <small>Admin note: "{{ vm.rejectedDocNote().note }}" — Please re-upload to resubmit.</small>
+            </div>
+          </div>
+
+          <div style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.verifSubmitSuccess">
+            <i class="ti ti-circle-check" aria-hidden="true"></i>
+            Submitted for verification. We'll notify you within 1–3 business days.
+          </div>
+          <div ng-if="vm.verifSubmitError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.verifSubmitError }}</div>
+
+          <!-- ── 1. Identity ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-id" aria-hidden="true"></i> Identity verification</p>
+
+            <!-- ID number/type — reviewed independently from the photo below,
+                 own status and own reject/re-fix loop. -->
+            <div class="form-row">
+              <div class="form-group">
+                <label>ID type <span class="text-danger">*</span></label>
+                <select ng-model="vm.verif.idType" ng-disabled="!vm.canEditIdNumber()">
+                  <option value="NRIC">NRIC (Singapore)</option>
+                  <option value="WorkPassSG">Work Pass (Singapore)</option>
+                  <option value="MyKad">MyKad (Malaysia)</option>
+                  <option value="Passport">Passport</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ID number <span class="text-danger">*</span></label>
+                <input type="text" ng-model="vm.verif.idNumber" ng-disabled="!vm.canEditIdNumber()" placeholder="e.g. S1234567A" />
+                <p class="field-error" ng-if="vm.idNumberFormatError()">{{ vm.idNumberFormatError() }}</p>
+              </div>
+            </div>
+
+            <div ng-if="vm.getDocSingle('identity_id')" class="verif-upload-done"
+              ng-class="{'verif-upload-done--rejected': vm.getDocSingle('identity_id').status === 'rejected'}">
+              <i class="ti ti-file-check" aria-hidden="true"></i>
+              <span class="verif-filename">{{ vm.getDocSingle('identity_id').idType }}: {{ vm.getDocSingle('identity_id').idNumber }}</span>
+              <span class="verif-doc-status-badge"
+                ng-class="{
+                  'badge-approved': vm.getDocSingle('identity_id').status === 'approved',
+                  'badge-rejected': vm.getDocSingle('identity_id').status === 'rejected',
+                  'badge-pending-sm': vm.getDocSingle('identity_id').status === 'pending'
+                }">{{ vm.getDocSingle('identity_id').status }}</span>
+            </div>
+
+            <p class="text-muted" style="font-size:12px; margin-top:6px" ng-if="vm.canEditIdNumber() && vm.verif.idNumber">
+              <i class="ti ti-info-circle" aria-hidden="true"></i> Saved when you submit for verification below.
+            </p>
+            <p class="field-error" ng-if="vm.verif.errorMap['identity_id']">{{ vm.verif.errorMap['identity_id'] }}</p>
+
+            <div class="form-group">
+              <label>Photo holding your {{ vm.verif.idType }} <span class="text-danger">*</span></label>
+              <p class="text-muted" style="font-size:13px; margin-bottom:6px;">Take a selfie holding your ID clearly visible next to your face.</p>
+
+              <div ng-if="vm.getDocSingle('identity_photo')" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDocSingle('identity_photo').status === 'rejected'}">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getDocSingle('identity_photo').fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getDocSingle('identity_photo').fileSizeBytes) }}</span>
+                <input type="file" id="reupload_identity" accept="image/jpeg,image/png"
+                  data-doc-id="{{ vm.getDocSingle('identity_photo').id }}"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'identity_photo', this.getAttribute('data-doc-id'))" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="vm.getDocSingle('identity_photo').status === 'rejected' || (vm.getDocSingle('identity_photo').status === 'approved' && !vm.isVerifLocked())"
+                  ng-click="vm.triggerVerifUpload('reupload_identity')">Re-upload</button>
+                <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('identity_photo').id)">Remove</button>
+              </div>
+
+              <div ng-if="vm.getDocSingle('identity_photo') && vm.getStagedReplacement(vm.getDocSingle('identity_photo').id)" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(vm.getDocSingle('identity_photo').id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(vm.getDocSingle('identity_photo').id)._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('identity_photo') && vm.getStagedNew('identity_photo')[0]" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedNew('identity_photo')[0].fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getStagedNew('identity_photo')[0].fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedNew('identity_photo')[0]._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('identity_photo') && !vm.getStagedNew('identity_photo')[0] && vm.canUploadNew()" class="verif-upload-box">
+                <input type="file" id="upload_identity_photo" accept="image/jpeg,image/png"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0], 'identity_photo')" />
+                <i class="ti ti-camera" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p>Upload selfie with ID</p>
+                  <span>JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_identity_photo')">Browse</button>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap['identity_photo']">{{ vm.verif.errorMap['identity_photo'] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 1b. Profile photo — the public-facing photo shown to parents, only
+               goes live once admin approves it (see ApplyVerificationDecisions). ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-user-circle" aria-hidden="true"></i> Profile photo <span class="text-danger">*</span></p>
+            <div class="form-group">
+              <p class="text-muted" style="font-size:13px; margin-bottom:6px;">Shown to parents on your public profile once approved. A clear photo of your face.</p>
+
+              <div ng-if="vm.getDocSingle('profile_photo')" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDocSingle('profile_photo').status === 'rejected'}">
+                <img ng-if="vm.getDocSingle('profile_photo').fileUrl" ng-src="{{ vm.getDocSingle('profile_photo').fileUrl }}"
+                  class="preview-avatar" alt="Preview" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />
+                <span class="verif-filename">{{ vm.getDocSingle('profile_photo').fileName }}</span>
+                <span class="verif-doc-status-badge"
+                  ng-class="{
+                    'badge-approved': vm.getDocSingle('profile_photo').status === 'approved',
+                    'badge-rejected': vm.getDocSingle('profile_photo').status === 'rejected',
+                    'badge-pending-sm': vm.getDocSingle('profile_photo').status === 'pending'
+                  }">{{ vm.getDocSingle('profile_photo').status }}</span>
+                <input type="file" id="reupload_profile_photo" accept="image/jpeg,image/png"
+                  data-doc-id="{{ vm.getDocSingle('profile_photo').id }}"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'profile_photo', this.getAttribute('data-doc-id'))" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="vm.getDocSingle('profile_photo').status === 'rejected' || (vm.getDocSingle('profile_photo').status === 'approved' && !vm.isVerifLocked())"
+                  ng-click="vm.triggerVerifUpload('reupload_profile_photo')">Re-upload</button>
+                <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('profile_photo').id)">Remove</button>
+              </div>
+
+              <div ng-if="vm.getDocSingle('profile_photo') && vm.getStagedReplacement(vm.getDocSingle('profile_photo').id)" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(vm.getDocSingle('profile_photo').id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(vm.getDocSingle('profile_photo').id)._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('profile_photo') && vm.getStagedNew('profile_photo')[0]" class="verif-staged-ready">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedNew('profile_photo')[0].fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(vm.getStagedNew('profile_photo')[0].fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedNew('profile_photo')[0]._stagedId)">Remove</button>
+              </div>
+
+              <div ng-if="!vm.getDocSingle('profile_photo') && !vm.getStagedNew('profile_photo')[0] && vm.canUploadNew()" class="verif-upload-box">
+                <input type="file" id="upload_profile_photo" accept="image/jpeg,image/png"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0], 'profile_photo')" />
+                <i class="ti ti-camera" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p>Upload profile photo</p>
+                  <span>JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_profile_photo')">Browse</button>
+              </div>
+              <p class="field-error" ng-if="vm.verif.errorMap['profile_photo']">{{ vm.verif.errorMap['profile_photo'] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 2. Academic qualifications ── -->
+          <div class="verif-card">
+            <p class="verif-card-title">
+              <i class="ti ti-school" aria-hidden="true"></i> Academic qualifications <span class="text-danger">*</span>
+              <span class="verif-card-subtitle">Upload at least one level</span>
+            </p>
+
+            <div class="form-group" ng-repeat="ql in vm.academicLevels">
+              <label>{{ ql.label }}</label>
+
+              <!-- Existing uploads for this type -->
+              <div class="verif-upload-done"
+                ng-repeat="doc in vm.getDocs(ql.type) track by doc.id"
+                ng-class="{'verif-upload-done--rejected': doc.status === 'rejected'}">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ doc.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(doc.fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge"
+                  ng-class="{
+                    'badge-approved': doc.status === 'approved',
+                    'badge-rejected': doc.status === 'rejected',
+                    'badge-pending-sm': doc.status === 'pending'
+                  }">{{ doc.status }}</span>
+                <input type="file" id="reupload_{{ ql.type }}_{{ doc.id }}"
+                  data-doc-type="{{ ql.type }}" data-doc-id="{{ doc.id }}"
+                  accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], this.getAttribute('data-doc-type'), this.getAttribute('data-doc-id'))" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="doc.status === 'rejected'"
+                  ng-click="vm.triggerVerifUpload('reupload_' + ql.type + '_' + doc.id)">
+                  Re-upload
+                </button>
+                <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
+                  ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
+              </div>
+
+              <!-- Staged fix for a rejected row above, not sent until Submit -->
+              <div class="verif-staged-ready"
+                ng-repeat="doc in vm.getDocs(ql.type) track by doc.id"
+                ng-if="vm.getStagedReplacement(doc.id)">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
+              </div>
+
+              <!-- Newly staged additions for this type, not sent until Submit -->
+              <div class="verif-staged-ready"
+                ng-repeat="staged in vm.getStagedNew(ql.type) track by staged._stagedId">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ staged.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
+              </div>
+
+              <!-- Add another — only shown under limit of 3, and while unlocked -->
+              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull(ql.type) && vm.canUploadNew()">
+                <input type="file" id="upload_{{ ql.type }}_{{ vm.getDocCount(ql.type) }}"
+                  data-doc-type="{{ ql.type }}"
+                  accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0], this.getAttribute('data-doc-type'))" />
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p>
+                    {{ vm.getDocCount(ql.type) === 0 ? 'Upload certificate' : 'Add another certificate' }}
+                    <span class="verif-upload-count">({{ vm.getDocCount(ql.type) }}/3)</span>
+                  </p>
+                  <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_' + ql.type + '_' + vm.getDocCount(ql.type))">Browse</button>
+              </div>
+
+              <!-- Max reached notice -->
+              <p class="verif-max-notice" ng-if="vm.isDocTypeFull(ql.type) && vm.canUploadNew()">
+                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                Maximum 3 attachments. Remove one to replace it.
+              </p>
+              <p class="verif-max-notice" ng-if="!vm.canUploadNew() && !vm.isDocTypeFull(ql.type)">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
+              </p>
+
+              <p class="field-error" ng-if="vm.verif.errorMap[ql.type]">{{ vm.verif.errorMap[ql.type] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 3. Teaching credentials ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-certificate" aria-hidden="true"></i> Teaching credentials</p>
+
+            <div class="form-group">
+              <label>NIE / DPLI / MOE teaching certificate <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+              <p class="text-muted" style="font-size:13px; margin-bottom:6px;">Unlocks the NIE Trained badge on your profile.</p>
+
+              <div class="verif-upload-done"
+                ng-repeat="doc in vm.getDocs('nie_cert') track by doc.id"
+                ng-class="{'verif-upload-done--rejected': doc.status === 'rejected'}">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">{{ doc.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(doc.fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge"
+                  ng-class="{
+                    'badge-approved': doc.status === 'approved',
+                    'badge-rejected': doc.status === 'rejected',
+                    'badge-pending-sm': doc.status === 'pending'
+                  }">{{ doc.status }}</span>
+                <input type="file" id="reupload_nie_cert_{{ doc.id }}"
+                  data-doc-id="{{ doc.id }}"
+                  accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'nie_cert', this.getAttribute('data-doc-id'))" />
+                <button type="button" class="verif-reupload-btn"
+                  ng-if="doc.status === 'rejected'"
+                  ng-click="vm.triggerVerifUpload('reupload_nie_cert_' + doc.id)">
+                  Re-upload
+                </button>
+                <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
+                  ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
+              </div>
+
+              <div class="verif-staged-ready"
+                ng-repeat="doc in vm.getDocs('nie_cert') track by doc.id"
+                ng-if="vm.getStagedReplacement(doc.id)">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
+              </div>
+
+              <div class="verif-staged-ready"
+                ng-repeat="staged in vm.getStagedNew('nie_cert') track by staged._stagedId">
+                <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+                <span class="verif-filename">{{ staged.fileName }}</span>
+                <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
+                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
+              </div>
+
+              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('nie_cert') && vm.canUploadNew()">
+                <input type="file" id="upload_nie_cert_{{ vm.getDocCount('nie_cert') }}"
+                  accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0],'nie_cert')" />
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p>
+                    {{ vm.getDocCount('nie_cert') === 0 ? 'Upload certificate' : 'Add another certificate' }}
+                    <span class="verif-upload-count">({{ vm.getDocCount('nie_cert') }}/3)</span>
+                  </p>
+                  <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_nie_cert_' + vm.getDocCount('nie_cert'))">Browse</button>
+              </div>
+
+              <p class="verif-max-notice" ng-if="vm.isDocTypeFull('nie_cert') && vm.canUploadNew()">
+                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                Maximum 3 attachments. Remove one to replace it.
+              </p>
+              <p class="verif-max-notice" ng-if="!vm.canUploadNew() && !vm.isDocTypeFull('nie_cert')">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
+              </p>
+
+              <p class="field-error" ng-if="vm.verif.errorMap['nie_cert']">{{ vm.verif.errorMap['nie_cert'] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 4. Intro video ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-video" aria-hidden="true"></i> Introduction video <span class="verif-card-subtitle">(optional)</span></p>
+
+            <div class="form-group">
+              <p class="text-muted" style="font-size:13px; margin-bottom:8px;">A 1–3 min self-introduction showing your teaching style. Significantly improves booking rate.</p>
+
+              <div ng-if="vm.getDocSingle('intro_video')" class="verif-upload-done"
+                ng-class="{'verif-upload-done--rejected': vm.getDocSingle('intro_video').status === 'rejected'}">
+                <i class="ti ti-file-check" aria-hidden="true"></i>
+                <span class="verif-filename">
+                  {{ vm.getDocSingle('intro_video').fileName || vm.getDocSingle('intro_video').externalUrl }}
+                </span>
+                <span class="verif-filesize" ng-if="vm.getDocSingle('intro_video').fileSizeBytes">
+                  {{ vm.formatFileSize(vm.getDocSingle('intro_video').fileSizeBytes) }}
+                </span>
+                <span class="verif-doc-status-badge"
+                  ng-class="{
+                    'badge-approved': vm.getDocSingle('intro_video').status === 'approved',
+                    'badge-rejected': vm.getDocSingle('intro_video').status === 'rejected',
+                    'badge-pending-sm': vm.getDocSingle('intro_video').status === 'pending'
+                  }">{{ vm.getDocSingle('intro_video').status }}</span>
+                <button type="button" class="verif-remove-btn"
+                  ng-if="!vm.isVerifLocked()"
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('intro_video').id)">Remove</button>
+              </div>
+
+              <div ng-if="vm.canEditIntroVideo()">
+                <div class="verif-link-row">
+                  <input type="url" ng-model="vm.verif.introVideoLink"
+                    placeholder="YouTube, Google Drive, or any public video URL" />
+                </div>
+                <p class="text-muted" style="font-size:12px; margin-top:6px" ng-if="vm.verif.introVideoLink">
+                  <i class="ti ti-info-circle" aria-hidden="true"></i> Saved when you submit for verification below.
+                </p>
+              </div>
+
+              <p class="verif-max-notice" ng-if="!vm.getDocSingle('intro_video') && !vm.canEditIntroVideo()">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
+              </p>
+              <p class="field-error" ng-if="vm.verif.errorMap['intro_video']">{{ vm.verif.errorMap['intro_video'] }}</p>
+            </div>
+          </div>
+
+          <!-- ── 5. Specialist certificates ── -->
+          <div class="verif-card">
+            <p class="verif-card-title"><i class="ti ti-award" aria-hidden="true"></i> Specialist certificates <span class="verif-card-subtitle">(optional)</span></p>
+            <p class="text-muted" style="font-size:13px; margin-bottom:12px;">IGCSE examiner, TESOL, ACCA, or any specialist cert. Each may unlock a specialist badge.</p>
+
+            <div class="verif-upload-done"
+              ng-repeat="doc in vm.getDocs('specialist_cert') track by doc.id"
+              ng-class="{'verif-upload-done--rejected': doc.status === 'rejected'}">
+              <i class="ti ti-file-check" aria-hidden="true"></i>
+              <span class="verif-filename">{{ doc.fileName }}</span>
+              <span class="verif-filesize">{{ vm.formatFileSize(doc.fileSizeBytes) }}</span>
+              <span class="verif-doc-status-badge"
+                ng-class="{
+                  'badge-approved': doc.status === 'approved',
+                  'badge-rejected': doc.status === 'rejected',
+                  'badge-pending-sm': doc.status === 'pending'
+                }">{{ doc.status }}</span>
+              <input type="file" id="reupload_specialist_cert_{{ doc.id }}"
+                data-doc-id="{{ doc.id }}"
+                accept="image/jpeg,image/png,application/pdf"
+                style="display:none"
+                onchange="angular.element(this).scope().vm.stageReuploadVerifDoc(this.files[0], 'specialist_cert', this.getAttribute('data-doc-id'))" />
+              <button type="button" class="verif-reupload-btn"
+                ng-if="doc.status === 'rejected'"
+                ng-click="vm.triggerVerifUpload('reupload_specialist_cert_' + doc.id)">
+                Re-upload
+              </button>
+              <button type="button" class="verif-remove-btn"
+                ng-if="!vm.isVerifLocked()"
+                ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
+            </div>
+
+            <div class="verif-staged-ready"
+              ng-repeat="doc in vm.getDocs('specialist_cert') track by doc.id"
+              ng-if="vm.getStagedReplacement(doc.id)">
+              <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+              <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
+              <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+              <button type="button" class="verif-remove-btn"
+                ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
+            </div>
+
+            <div class="verif-staged-ready"
+              ng-repeat="staged in vm.getStagedNew('specialist_cert') track by staged._stagedId">
+              <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+              <span class="verif-filename">{{ staged.fileName }}</span>
+              <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
+              <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+              <button type="button" class="verif-remove-btn"
+                ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
+            </div>
+
+            <div class="form-group">
+              <div class="verif-upload-box" ng-if="!vm.isDocTypeFull('specialist_cert') && vm.canUploadNew()">
+                <input type="file" id="upload_specialist_cert_{{ vm.getDocCount('specialist_cert') }}"
+                  accept="image/jpeg,image/png,application/pdf"
+                  style="display:none"
+                  onchange="angular.element(this).scope().vm.stageVerifDoc(this.files[0],'specialist_cert')" />
+                <i class="ti ti-upload" aria-hidden="true"></i>
+                <div class="verif-upload-box-text">
+                  <p>
+                    {{ vm.getDocCount('specialist_cert') === 0 ? 'Upload certificate' : 'Add another certificate' }}
+                    <span class="verif-upload-count">({{ vm.getDocCount('specialist_cert') }}/3)</span>
+                  </p>
+                  <span>PDF, JPG, PNG · 100 KB – 5 MB</span>
+                </div>
+                <button type="button" class="verif-browse-btn"
+                  ng-click="vm.triggerVerifUpload('upload_specialist_cert_' + vm.getDocCount('specialist_cert'))">Browse</button>
+              </div>
+
+              <p class="verif-max-notice" ng-if="vm.isDocTypeFull('specialist_cert') && vm.canUploadNew()">
+                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                Maximum 3 attachments. Remove one to replace it.
+              </p>
+              <p class="verif-max-notice" ng-if="!vm.canUploadNew() && !vm.isDocTypeFull('specialist_cert')">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                Locked while your verification is under review.
+              </p>
+
+              <p class="field-error" ng-if="vm.verif.errorMap['specialist_cert']">{{ vm.verif.errorMap['specialist_cert'] }}</p>
+            </div>
+          </div>
+
+          <!-- Privacy note -->
+          <div class="verif-privacy-note">
+            <i class="ti ti-lock" aria-hidden="true"></i>
+            <p>All documents are stored securely and only reviewed by LearnSphere admin. Subject offerings will be unlocked once all required documents are uploaded and verified. Review takes 1–3 business days.</p>
+          </div>
+
+          <!-- Submit -->
+          <div class="verif-submit-row">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && (vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal || !vm.hasIdentityNumber())">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              <span ng-if="vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal">{{ vm.mandatoryDocsTotal - vm.mandatoryDocsUploadedCount() }} required document(s) still missing<span ng-if="!vm.hasIdentityNumber()">, identity number not provided</span></span>
+              <span ng-if="vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && !vm.hasIdentityNumber()">Identity number not provided</span>
+            </p>
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'pending'">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              Verification under review — re-upload any rejected document to resubmit
+            </p>
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'approved'">
+              <i class="ti ti-circle-check" aria-hidden="true"></i>
+              Your profile is already verified — nothing new to submit
+            </p>
+            <button type="button" class="btn-primary"
+              ng-click="vm.submitVerification()"
+              ng-disabled="!vm.canSubmitVerification() || vm.verifSubmitting">
+              <i class="ti ti-send" style="font-size:14px; margin-right:5px;" aria-hidden="true"></i>
+              {{ vm.verifSubmitting ? 'Submitting...' : 'Submit for verification' }}
+            </button>
+          </div>
+
+        </div>
+</div><!-- end verification sub-tab -->
+
+<!-- ══ OFFERINGS SUB-TAB ══ -->
+<div ng-if="vm.profileTab === 'offerings'">
+        <h3 style="margin:0 0 4px;">Subject Offerings</h3>
+        <p class="bs-text-muted" style="margin:0 0 16px;font-size:14px;">
+          Add the subjects, levels, and teaching modes you offer.
+          Offerings are only visible to parents after your profile is verified.
+        </p>
+
+        <div ng-if="vm.tutor.verificationStatus !== 'not_submitted'">
+
+        <div class="bs-field">
+          <label>Bio</label>
+          <textarea class="bs-input" ng-model="vm.profileForm.bio" rows="3" placeholder="Tell parents about your teaching style..."></textarea>
+        </div>
+
+        <!-- Teaching Offerings -->
+        <div class="bs-field">
+          <label>Teaching Offerings</label>
+          <p class="bs-text-muted" style="font-size:13px;">Select a country, subject and teaching mode(s), then qualification, then click Add Offering — it's added for every mode you select below.</p>
+          <div class="offering-builder">
+            <div class="bs-field">
+              <label>Country</label>
+              <div class="radio-row">
+                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Singapore" ng-click="vm.newOffering.selectedOption = null" /> Singapore 🇸🇬</label>
+                <label class="radio-option"><input type="radio" ng-model="vm.newOffering.country" value="Malaysia" ng-click="vm.newOffering.selectedOption = null" /> Malaysia 🇲🇾</label>
+              </div>
+            </div>
+            <div class="bs-field">
+              <label>Subject</label>
+              <select class="bs-input" ng-model="vm.newOffering.selectedOption"
+                ng-disabled="!vm.newOffering.country"
+                ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.newOffering.country]">
+                <option value="">{{ vm.newOffering.country ? '— Select subject —' : '— Select a country first —' }}</option>
+              </select>
+            </div>
+
+            <!-- Teaching Modes (drag-and-drop dual pool) — the tutor's overall offered
+                 modes. Whatever ends up in "Offered" is what Add Offering below fans
+                 the combo out across, so this is the single source of truth for mode. -->
+            <div class="bs-field">
+              <label>Teaching Modes Offered <span style="color:var(--color-accent-2);">*</span></label>
+              <div class="mode-pool-container">
+                <div class="mode-pool">
+                  <div class="mode-pool-header">
+                    <span>Available</span>
+                    <span class="mode-pool-badge">{{ vm.modesLeft.length }}</span>
+                  </div>
+                  <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onModeDropToLeft(item)">
+                    <div class="mode-pool-item" ng-repeat="m in vm.modesLeft" dnd-draggable="m">
+                      <span class="mode-drag-handle">⠿</span>
+                      <i class="ti" ng-class="m.icon"></i>
+                      <span class="mode-item-text">
+                        <span class="mode-item-name">{{ m.mode }}</span>
+                        <span class="mode-item-desc">{{ m.description }}</span>
+                      </span>
+                    </div>
+                    <div class="mode-pool-empty" ng-if="!vm.modesLeft.length">All modes offered</div>
+                  </div>
+                </div>
+                <div class="mode-pool mode-pool-accent">
+                  <div class="mode-pool-header mode-pool-header-accent">
+                    <span>Offered</span>
+                    <span class="mode-pool-badge mode-pool-badge-accent">{{ vm.modesRight.length }}</span>
+                  </div>
+                  <div class="mode-pool-body mode-pool-dropzone" dnd-dropzone dnd-drop="vm.onModeDropToRight(item)">
+                    <div class="mode-pool-item" ng-repeat="m in vm.modesRight" dnd-draggable="m">
+                      <span class="mode-drag-handle">⠿</span>
+                      <i class="ti" ng-class="m.icon"></i>
+                      <span class="mode-item-text">
+                        <span class="mode-item-name">{{ m.mode }}</span>
+                        <span class="mode-item-desc">{{ m.description }}</span>
+                      </span>
+                      <button type="button" class="mode-item-remove" ng-click="vm.removeMode(m)">&times;</button>
+                    </div>
+                    <div class="mode-pool-empty" ng-if="!vm.modesRight.length">Drag modes here</div>
+                  </div>
+                </div>
+              </div>
+              <p ng-if="vm.modesError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:8px;">{{ vm.modesError }}</p>
+            </div>
+
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.addOffering()">
+              <i class="ti ti-plus" aria-hidden="true"></i> Add offering
+            </button>
+            <p ng-if="vm.offeringLockedError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.offeringLockedError }}</p>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-2);" ng-if="vm.profileForm.offerings.length">
+            <span class="bs-tag bs-tag-accent" style="gap:6px;" ng-repeat="o in vm.profileForm.offerings">
+              {{ o.country }} · {{ o.subject }} · {{ o.level }} · {{ o.mode }}
+              <button type="button" style="background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1; padding:0;" ng-click="vm.removeOffering($index)">×</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="bs-field">
+          <label>Years of Experience</label>
+          <input class="bs-input" type="number" ng-model="vm.profileForm.experienceYears" min="0" />
+        </div>
+
+        <button type="submit" class="bs-btn bs-btn-primary bs-btn-block">Save Profile</button>
+
+        </div><!-- end verificationStatus !== 'not_submitted' -->
+
+        <div ng-if="vm.profileSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">✓ Profile updated successfully.</div>
+        <div ng-if="vm.profileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">{{ vm.profileError }}</div>
+</div><!-- end offerings sub-tab -->
+      </form>
+    </div><!-- end profile tab -->
+
+  </main>
+</div>
