@@ -1,0 +1,5 @@
+"HitPay": {
+    "ApiKey": "test_e95c35d0a94bade01a329538f8c616fc80e3d8b9bb85320e3428b9cc5e6344e7",
+    "Salt": "pbcZUCrVvs2Tdk05O263UJrGB0XzuQa0Tw3hZYYbQkSIcepELEi8iT8S54bZfKQ1",
+    "BaseUrl": "https://api.sandbox.hit-pay.com",
+    "WebhookUrl": "https://basement-extremely-amino-dat.trycloudflare.com/api/payments/webhook",
