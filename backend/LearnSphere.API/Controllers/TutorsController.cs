@@ -182,7 +182,7 @@ public class TutorsController : ControllerBase
     // point scales, just scoped to one tutor's own activeness/dispute counts
     // instead of the bulk GroupBy-all-tutors query, so it's cheap to call from a
     // single-tutor endpoint (GetByUser) without an N+1 query per tutor in a list.
-    private async Task<(double Score, string Tier)> ComputeTutorTierAsync(Tutor t)
+    private async Task<(double Score, string Tier, double ScoreMax)> ComputeTutorTierAsync(Tutor t)
     {
         var weightages = await _context.ScoringWeightages.ToListAsync();
         int PctOf(string key) => weightages.FirstOrDefault(w => w.Key == key)?.Percent ?? 0;
@@ -215,8 +215,20 @@ public class TutorsController : ControllerBase
         var score = (ratingPoints * ratingPct + activenessPoints * activenessPct +
                      disputePoints * disputesPct + experiencePoints * experiencePct) / 100.0;
 
-        return (Math.Round(score, 2), ScoreToTier(score));
+        // Best-case points per category, read from the same functions above rather
+        // than hardcoded — so this stays correct automatically if the point tables
+        // themselves are ever retuned (e.g. disputes' best case has moved between
+        // +2 and 0 already), not just when weightages change.
+        var maxScore = (MaxRatingPoints * ratingPct + MaxActivenessPoints * activenessPct +
+                         MaxDisputePoints * disputesPct + MaxExperiencePoints * experiencePct) / 100.0;
+
+        return (Math.Round(score, 2), ScoreToTier(score), Math.Round(maxScore, 2));
     }
+
+    private static int MaxRatingPoints => RatingToPoints(5.0);
+    private static int MaxActivenessPoints => ActivenessToPoints(16);
+    private static int MaxDisputePoints => new[] { DisputesToPoints(0), DisputesToPoints(1), DisputesToPoints(2) }.Max();
+    private static int MaxExperiencePoints => ExperienceToPoints(16);
 
     // Thresholds are calibrated against the formula's real achievable range given
     // typical weightages (roughly -1.6 to 5.65, NOT 0-100 — points cap at 10/5/2/5
@@ -261,7 +273,7 @@ public class TutorsController : ControllerBase
     {
         if (disputesThisMonth >= 2) return -10;
         if (disputesThisMonth == 1) return -5;
-        return 2;
+        return 0;
     }
 
     private static int ExperienceToPoints(int years)
@@ -433,7 +445,7 @@ public class TutorsController : ControllerBase
         var syllabusMap = await LoadSyllabusMapAsync(
             tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
         var dto = MapToDto(tutor, syllabusMap);
-        (dto.Score, dto.Tier) = await ComputeTutorTierAsync(tutor);
+        (dto.Score, dto.Tier, dto.ScoreMax) = await ComputeTutorTierAsync(tutor);
         return Ok(dto);
     }
 

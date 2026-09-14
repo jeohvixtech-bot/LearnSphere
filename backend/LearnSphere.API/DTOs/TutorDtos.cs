@@ -43,6 +43,11 @@ public class TutorDto
     // (see TutorsController.ComputeTutorTierAsync). Defaults reflect "not computed"
     // for every other endpoint that maps a Tutor to this DTO.
     public double Score { get; set; }
+    // The real ceiling for Score given today's admin-set weightages/point tables —
+    // NOT a fixed constant, shifts whenever Scoring Config changes (see
+    // TutorsController.ComputeTutorTierAsync). Same "only GetByUser populates
+    // this" caveat as Score.
+    public double ScoreMax { get; set; }
     public string Tier { get; set; } = "Normal";
     public string VerificationStatus { get; set; } = string.Empty;
     public bool OfferingsUnlocked { get; set; }

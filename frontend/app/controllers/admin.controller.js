@@ -53,7 +53,7 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   self.disputesScale = [
     { range: '>= 2 disputes', points: -10 },
     { range: '1 dispute', points: -5 },
-    { range: '0 disputes', points: 2 }
+    { range: '0 disputes', points: 0 }
   ];
   self.experienceScale = [
     { range: '> 15 years', points: 5 },
