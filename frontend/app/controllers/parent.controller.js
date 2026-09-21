@@ -116,10 +116,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
   self.personalizeTab = 'form';
   self.personalizeSaveSuccess = false;
+  self.personalizeError = '';
   self.personalizeApplications = JSON.parse(localStorage.getItem('ls_personalize_apps') || '[]');
 
   self.savePersonalizeApplication = function () {
     var opt = self.personalize.selectedSubjectOption;
+    self.personalizeError = ProfanityFilterService.validate(self.personalize.subjectOther)
+      || ProfanityFilterService.validate(self.personalize.description);
+    if (self.personalizeError) return;
     var subjectLabel = opt ? (opt.subject === 'Other' ? ('Other: ' + (self.personalize.subjectOther || '')) : opt.label) : '';
     self.personalizeApplications.unshift({
       id: Date.now(),
@@ -1549,6 +1553,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     self.newEditStudentSubjectCombo = { country: '', selectedOption: null };
     self.editStudentNameError = '';
     self.editStudentGoalError = '';
+    self.editSchoolError = '';
     rebuildPreferredPools(s.preferredModes);
   };
 
@@ -1641,6 +1646,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   };
 
   self.editStudentGoalError = '';
+  self.editSchoolError = '';
 
   self.saveEditStudent = function () {
     if (!self.editingStudent || !self.editStudentForm.name.trim()) return;
@@ -1648,6 +1654,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     if (self.editStudentNameError) return;
     self.editStudentGoalError = ProfanityFilterService.validate(self.editStudentForm.learningGoal);
     if (self.editStudentGoalError) return;
+    self.editSchoolError = ProfanityFilterService.validate(self.editStudentForm.school);
+    if (self.editSchoolError) return;
     self.preferredModesError = '';
     if (!self.preferredRight.length) {
       self.preferredModesError = 'Please select at least one preferred teaching mode.';
@@ -1860,7 +1868,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         self.schoolError = 'Please enter your institution\'s name.';
         return;
       }
-      self.schoolError = null;
+      self.schoolError = ProfanityFilterService.validate(otherName);
+      if (self.schoolError) return;
       save(otherName);
       return;
     }

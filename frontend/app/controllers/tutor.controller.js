@@ -334,6 +334,8 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
       self.bulletinDisputeError = 'Please explain why you\'re requesting this remark be hidden.';
       return;
     }
+    self.bulletinDisputeError = ProfanityFilterService.validate(self.bulletinDisputeReason);
+    if (self.bulletinDisputeError) return;
     var remark = self.bulletinDisputeFormFor;
     RemarkService.dispute(remark.id, self.bulletinDisputeReason.trim()).then(function () {
       remark.status = 'dispute_requested';
@@ -646,6 +648,11 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
         self.reportError[key] = 'Please select homework completion.';
         return;
       }
+    }
+    var remarksError = ProfanityFilterService.validate(form.remarks);
+    if (remarksError) {
+      self.reportError[key] = remarksError;
+      return;
     }
 
     self.reportError[key]   = null;
@@ -2650,6 +2657,30 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     });
   };
 
+  // Pulls a real message out of whatever shape the failure came back in — a
+  // JSON {message}, ASP.NET's default ProblemDetails ({title}/{errors}) for
+  // errors that never reach our own BadRequest calls (e.g. an expired-token
+  // 401, or model-binding rejection), or no body at all (network drop,
+  // request-size limit). Falls back to the generic text + status code rather
+  // than silently swallowing the failure like the plain err.data.message
+  // check used to.
+  function _extractErrorMessage(err, fallback) {
+    if (err.status === 0) return 'Could not reach the server. Check your connection and try again.';
+    if (err.status === 401) return 'Your session has expired. Please log in again.';
+    if (err.status === 413) return 'File is too large for the server to accept.';
+    var data = err.data;
+    if (data && typeof data === 'object') {
+      if (data.message) return data.message;
+      if (data.title) return data.title; // ASP.NET Core ProblemDetails
+      if (data.errors) {
+        var firstField = Object.keys(data.errors)[0];
+        var firstMsg = firstField && data.errors[firstField] && data.errors[firstField][0];
+        if (firstMsg) return firstMsg;
+      }
+    }
+    return fallback + (err.status ? ' (server returned status ' + err.status + ')' : '');
+  }
+
   // Uploads+saves every staged file in order (not in parallel), so a failure
   // stops the chain right where it happened and errorMap points at the exact
   // doc that failed, instead of an ambiguous "something in the batch broke."
@@ -2665,8 +2696,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
             replacesDocumentId: item.replacesDocumentId || undefined
           });
         }).catch(function (err) {
-          self.verif.errorMap[item.docType] = err.data && err.data.message
-            ? err.data.message : ('Failed to upload ' + item.fileName + '. Please try again.');
+          self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
           return $q.reject(err);
         });
       });

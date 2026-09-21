@@ -16,13 +16,16 @@
 <body>
 
   <!-- App Shell: Header + Route View -->
-  <div ng-controller="AppCtrl as app">
+  <div ng-controller="AppCtrl as app" ng-class="{'mobile-nav-open': app.mobileNavOpen}">
 
     <!-- Main Header -->
     <header class="bs-nav bs-scope" ng-if="app.isLoggedIn()" style="border-bottom:1px solid var(--color-divider); position:sticky; top:0; background:var(--color-bg); z-index:30;">
+      <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon mobile-nav-toggle" aria-label="Toggle navigation menu" ng-click="app.toggleMobileNav()">
+        <i class="ti ti-menu-2" aria-hidden="true"></i>
+      </button>
       <span class="bs-nav-brand">LearnSphere</span>
       <div style="display:flex; align-items:center; gap:var(--space-3); margin-left:auto;">
-        <span style="font-size:13px;">
+        <span class="bs-nav-user-label" style="font-size:13px;">
           <strong>{{ app.currentUser.name }}</strong>
           <span class="bs-tag bs-tag-neutral" style="margin-left:6px; text-transform:capitalize;">{{ app.currentUser.role }}</span>
         </span>
@@ -34,13 +37,16 @@
 
         <div style="width:32px; height:32px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ app.currentUser.name[0] }}</div>
 
-        <button type="button" class="bs-btn bs-btn-secondary" ng-click="app.logout()">Sign Out</button>
+        <button type="button" class="bs-btn bs-btn-secondary bs-nav-signout" ng-click="app.logout()">Sign Out</button>
       </div>
     </header>
 
+    <!-- Mobile nav backdrop (closes the off-canvas sidebar) -->
+    <div class="mobile-nav-overlay" ng-if="app.mobileNavOpen" ng-click="app.closeMobileNav()"></div>
+
     <!-- Notifications Drawer -->
     <div class="bs-dialog-backdrop bs-scope" ng-if="app.notifDrawerOpen" ng-click="app.toggleNotifDrawer()" style="justify-items:end; align-items:stretch; padding:0;">
-      <aside class="bs-card" ng-click="$event.stopPropagation()" style="width:340px; height:100%; border-radius:0; box-shadow:var(--shadow-lg); overflow-y:auto;">
+      <aside class="bs-card" ng-click="$event.stopPropagation()" style="width:min(340px, 92vw); height:100%; border-radius:0; box-shadow:var(--shadow-lg); overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span class="bs-card-title">Notifications Registry</span>
           <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="app.toggleNotifDrawer()">✕</button>

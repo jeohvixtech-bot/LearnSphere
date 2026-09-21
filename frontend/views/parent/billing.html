@@ -105,7 +105,7 @@
           <p class="bs-text-muted" style="margin:0;" ng-if="vm.invoicesTab === 'cancelled'">No cancelled invoices.</p>
         </div>
 
-        <div class="bs-card bs-elev-sm" style="padding:0; margin-top:var(--space-2);" ng-if="vm.visibleInvoices().length">
+        <div class="bs-card bs-elev-sm" style="padding:0; margin-top:var(--space-2); overflow-x:auto;" ng-if="vm.visibleInvoices().length">
           <table class="bs-table">
             <thead>
               <tr><th>Invoice</th><th>Subject</th><th>Date</th><th>Amount</th><th>Status</th></tr>
