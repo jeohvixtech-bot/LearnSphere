@@ -5,7 +5,6 @@
     <div class="bs-nav-brand">LearnSphere</div>
     <div style="display:flex; gap:var(--space-3); align-items:center; margin-left:auto;">
       <a href="#!/login" class="bs-btn bs-btn-ghost">Log in</a>
-      <a href="#!/login" class="bs-btn bs-btn-primary">Get started</a>
     </div>
   </div>
 
@@ -19,8 +18,8 @@
           <h1 style="max-width:11ch;">Learning that fits your family's life</h1>
           <p style="font-size:18px; max-width:46ch; opacity:0.85;">Browse verified NIE-trained tutors across Singapore &amp; Malaysia, book instantly, and keep every lesson, message and invoice in one place.</p>
           <div style="display:flex; gap:var(--space-3); margin-top:var(--space-4); flex-wrap:wrap;">
-            <a href="#!/login" class="bs-btn bs-btn-primary">I'm a parent</a>
-            <a href="#!/login" class="bs-btn bs-btn-secondary">I'm a tutor</a>
+            <a href="#!/login?mode=register&amp;role=parent" class="bs-btn bs-btn-primary">I'm a New Parent</a>
+            <a href="#!/login?mode=register&amp;role=tutor" class="bs-btn bs-btn-secondary">I'm a New Tutor</a>
           </div>
         </div>
         <div style="flex:1 1 360px; min-width:280px;">
@@ -57,8 +56,6 @@
           <div class="bs-card bs-elev-sm"
             ng-repeat="t in vm.tutors"
             ng-click="vm.goToLogin(t)"
-            ng-mouseenter="vm.pauseScroll()"
-            ng-mouseleave="vm.resumeScroll()"
             style="cursor:pointer">
             <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius-lg);" alt="{{ t.name }}" />
             <div ng-if="!t.imageUrl" class="bs-halftone" style="width:100%; height:120px; border-radius:var(--radius-lg); background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:40px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>

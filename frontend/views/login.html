@@ -78,7 +78,7 @@
       <div class="bs-field">
         <label>Password</label>
         <div style="position:relative;">
-          <input class="bs-input" ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" style="padding-right:38px;" />
+          <input class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" style="padding-right:38px;" />
           <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; right:2px; top:1px;" ng-click="auth.showRegisterPassword = !auth.showRegisterPassword" tabindex="-1">
             <i class="ti" ng-class="auth.showRegisterPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
           </button>
@@ -87,7 +87,7 @@
       <div class="bs-field">
         <label>Confirm Password</label>
         <div style="position:relative;">
-          <input class="bs-input" ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" style="padding-right:38px;" />
+          <input class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" style="padding-right:38px;" />
           <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; right:2px; top:1px;" ng-click="auth.showRegisterConfirmPassword = !auth.showRegisterConfirmPassword" tabindex="-1">
             <i class="ti" ng-class="auth.showRegisterConfirmPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
           </button>

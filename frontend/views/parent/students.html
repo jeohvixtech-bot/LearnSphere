@@ -255,6 +255,7 @@
                 <div class="bs-field" style="flex:1; min-width:160px; margin:0;">
                   <label>School</label>
                   <input class="bs-input" type="text" ng-model="vm.editStudentForm.school" placeholder="School name" />
+                  <div ng-if="vm.editSchoolError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ vm.editSchoolError }}</div>
                 </div>
               </div>
               <div class="bs-field" style="margin:0;">

@@ -14,12 +14,26 @@ angular.module('learnSphereApp')
   self.mode = 'login';  // login | register
   self.loginData  = { email: 'sarah.tan@example.com', password: 'Parent@123' };
   self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
+
+  // Welcome page's "I'm a New Parent" / "I'm a New Tutor" buttons link here with
+  // ?mode=register&role=... so a visitor lands straight on the right tab/role
+  // instead of the default Sign In. Still just pre-filling — both stay editable.
+  var params = $location.search();
+  if (params.mode === 'register') self.mode = 'register';
+  if (params.role === 'parent' || params.role === 'tutor') self.registerData.role = params.role;
   self.showTerms = false;
   self.errorMsg = '';
   self.nameError = '';
   self.loading = false;
   self.showRegisterPassword = false;
   self.showRegisterConfirmPassword = false;
+
+  // Populated by AuthService's cross-tab takeover handler when this tab got
+  // logged out because the same account signed in elsewhere — one-time read.
+  if (AuthService.kickedOutMessage) {
+    self.errorMsg = AuthService.kickedOutMessage;
+    AuthService.kickedOutMessage = '';
+  }
 
   // Forgot password
   self.showForgotPassword = false;

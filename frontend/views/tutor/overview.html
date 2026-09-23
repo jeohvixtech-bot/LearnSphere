@@ -158,7 +158,7 @@
         </div>
       </div>
       <div style="display:flex; gap:var(--space-6);">
-        <div style="text-align:center;">
+        <div style="text-align:center;" title="Full: {{ vm.tutor.scoreMax | number:0 }}">
           <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ vm.tutor.score | number:1 }}</div>
           <div class="bs-text-muted" style="font-size:12px; text-transform:uppercase;">Score</div>
         </div>
@@ -1501,7 +1501,6 @@
             <i class="ti ti-circle-check" aria-hidden="true"></i>
             Submitted for verification. We'll notify you within 1–3 business days.
           </div>
-          <div ng-if="vm.verifSubmitError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.verifSubmitError }}</div>
 
           <!-- ── 1. Identity ── -->
           <div class="verif-card">
@@ -1993,6 +1992,10 @@
               <i class="ti ti-send" style="font-size:14px; margin-right:5px;" aria-hidden="true"></i>
               {{ vm.verifSubmitting ? 'Submitting...' : 'Submit for verification' }}
             </button>
+            <div id="verifSubmitErrorBanner" class="verif-banner verif-banner--danger verif-banner--attn" ng-if="vm.verifSubmitError">
+              <i class="ti ti-alert-circle" aria-hidden="true"></i>
+              <div><p>{{ vm.verifSubmitError }}</p></div>
+            </div>
           </div>
 
         </div>

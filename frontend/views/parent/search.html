@@ -420,10 +420,15 @@
             <h4 style="margin-bottom:3px;">Booking Summary</h4>
             <p class="bs-text-muted" style="margin:0; font-size:13px;">Review your order before proceeding to payment</p>
           </div>
-          <span style="display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; padding:2px 8px; border-radius:100px; background:var(--color-accent-50); color:var(--color-accent-700); border:0.5px solid var(--color-accent-200); white-space:nowrap; flex-shrink:0;">
-            <i class="ti ti-bolt" style="font-size:11px;" aria-hidden="true"></i>
-            Instant confirm
-          </span>
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; padding:2px 8px; border-radius:100px; background:var(--color-accent-50); color:var(--color-accent-700); border:0.5px solid var(--color-accent-200); white-space:nowrap;">
+              <i class="ti ti-bolt" style="font-size:11px;" aria-hidden="true"></i>
+              Instant confirm
+            </span>
+            <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="vm.clearSelectedTutor()" title="Back to tutor catalog">
+              ✕
+            </button>
+          </div>
         </div>
 
         <!-- Class info -->
@@ -489,12 +494,6 @@
           {{ vm.presetBookingBusy ? 'Processing…' : 'Proceed to payment' }}
         </button>
 
-        <button type="button" class="bs-btn bs-btn-block"
-          style="margin-top:6px;"
-          ng-click="vm.cancelPresetBooking()"
-          ng-disabled="vm.presetBookingBusy">
-          Cancel
-        </button>
 
         <!-- Security note -->
         <div style="display:flex; align-items:center; justify-content:center; gap:5px; margin-top:10px;">

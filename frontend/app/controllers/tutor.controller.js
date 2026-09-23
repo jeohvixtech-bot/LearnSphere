@@ -334,6 +334,8 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
       self.bulletinDisputeError = 'Please explain why you\'re requesting this remark be hidden.';
       return;
     }
+    self.bulletinDisputeError = ProfanityFilterService.validate(self.bulletinDisputeReason);
+    if (self.bulletinDisputeError) return;
     var remark = self.bulletinDisputeFormFor;
     RemarkService.dispute(remark.id, self.bulletinDisputeReason.trim()).then(function () {
       remark.status = 'dispute_requested';
@@ -732,6 +734,11 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
         self.reportError[key] = 'Please select homework completion.';
         return;
       }
+    }
+    var remarksError = ProfanityFilterService.validate(form.remarks);
+    if (remarksError) {
+      self.reportError[key] = remarksError;
+      return;
     }
 
     self.reportError[key]   = null;
@@ -2736,27 +2743,56 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     });
   };
 
-  // Uploads+saves every staged file in order (not in parallel), so a failure
-  // stops the chain right where it happened and errorMap points at the exact
-  // doc that failed, instead of an ambiguous "something in the batch broke."
+  // Pulls a real message out of whatever shape the failure came back in — a
+  // JSON {message}, ASP.NET's default ProblemDetails ({title}/{errors}) for
+  // errors that never reach our own BadRequest calls (e.g. an expired-token
+  // 401, or model-binding rejection), or no body at all (network drop,
+  // request-size limit). Falls back to the generic text + status code rather
+  // than silently swallowing the failure like the plain err.data.message
+  // check used to.
+  function _extractErrorMessage(err, fallback) {
+    if (err.status === 0) return 'Could not reach the server. Check your connection and try again.';
+    if (err.status === 401) return 'Your session has expired. Please log in again.';
+    if (err.status === 413) return 'File is too large for the server to accept.';
+    var data = err.data;
+    if (data && typeof data === 'object') {
+      if (data.message) return data.message;
+      if (data.title) return data.title; // ASP.NET Core ProblemDetails
+      if (data.errors) {
+        var firstField = Object.keys(data.errors)[0];
+        var firstMsg = firstField && data.errors[firstField] && data.errors[firstField][0];
+        if (firstMsg) return firstMsg;
+      }
+    }
+    return fallback + (err.status ? ' (server returned status ' + err.status + ')' : '');
+  }
+
+  // Uploads+saves every staged file in parallel. Each item's failure is
+  // caught locally (errorMap gets that doc's real message) rather than
+  // rejecting the item's own promise, so one bad file doesn't stop the rest
+  // from being attempted — every staged doc's error shows after a single
+  // Submit click instead of one new failure surfacing per resubmit attempt.
+  // Once all have settled, the batch rejects (with a sentinel, not a real
+  // HTTP error) if anything failed, so the ID/video/submit-for-review steps
+  // downstream don't run against a partially-uploaded set.
   function _flushStagedDocs(items) {
-    return items.reduce(function (chain, item) {
-      return chain.then(function () {
-        return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
-          return TutorService.saveDocument(self.tutor.id, {
-            documentType: item.docType,
-            fileUrl: res.data.url,
-            fileName: res.data.fileName,
-            fileSizeBytes: res.data.fileSizeBytes,
-            replacesDocumentId: item.replacesDocumentId || undefined
-          });
-        }).catch(function (err) {
-          self.verif.errorMap[item.docType] = err.data && err.data.message
-            ? err.data.message : ('Failed to upload ' + item.fileName + '. Please try again.');
-          return $q.reject(err);
+    var anyFailed = false;
+    return $q.all(items.map(function (item) {
+      return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
+        return TutorService.saveDocument(self.tutor.id, {
+          documentType: item.docType,
+          fileUrl: res.data.url,
+          fileName: res.data.fileName,
+          fileSizeBytes: res.data.fileSizeBytes,
+          replacesDocumentId: item.replacesDocumentId || undefined
         });
+      }).catch(function (err) {
+        anyFailed = true;
+        self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
       });
-    }, $q.when());
+    })).then(function () {
+      if (anyFailed) return $q.reject({ uploadFailures: true });
+    });
   }
 
   function _clearStagedDocs() {
@@ -2795,7 +2831,21 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
       self.verifSubmitSuccess = true;
       $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
     }).catch(function (err) {
+      if (err && err.uploadFailures) {
+        // Each failing doc already shows its own message inline (verif.errorMap)
+        // — no need for a redundant generic banner. Bring the first one into
+        // view so it isn't missed if it's off-screen on this long form.
+        $timeout(function () {
+          var firstFieldError = document.querySelector('.field-error');
+          if (firstFieldError) firstFieldError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        return;
+      }
       self.verifSubmitError = err && err.data && err.data.message ? err.data.message : 'Submission failed. Please try again.';
+      $timeout(function () {
+        var banner = document.getElementById('verifSubmitErrorBanner');
+        if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }).finally(function () {
       self.verifSubmitting = false;
     });
