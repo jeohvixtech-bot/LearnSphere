@@ -1,4 +1,4 @@
-<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+<div class="dashboard-layout bs-scope lf-scope lf-page" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
       <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
@@ -37,92 +37,86 @@
 
   <main class="dashboard-main">
 
-    <!-- ── Parent Profile Panel ─────────────────────── -->
-    <div class="bs-card bs-elev-sm" ng-if="vm.parentProfile">
+    <!-- ── Account strip (slim — replaces the old full-size profile card) ── -->
+    <div ng-if="vm.parentProfile && !vm.editingParentProfile" style="display:flex; align-items:center; justify-content:space-between; padding-bottom:var(--space-3); border-bottom:1px solid var(--color-divider);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.parentProfile.name[0] }}</div>
+        <div style="font-size:14px;"><strong>{{ vm.parentProfile.name }}</strong> <span class="bs-text-muted">· {{ vm.parentProfile.email }}</span></div>
+      </div>
+      <div style="position:relative;">
+        <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="$event.stopPropagation(); vm.showAccountMenu = !vm.showAccountMenu" title="Account options">
+          <i class="ti ti-dots" aria-hidden="true"></i>
+        </button>
+        <div class="overflow-menu" ng-if="vm.showAccountMenu" ng-click="$event.stopPropagation()">
+          <button type="button" class="overflow-menu-item" ng-click="vm.showAccountMenu = false; vm.startEditParentProfile()">Edit Profile</button>
+          <button type="button" class="overflow-menu-item overflow-menu-item-danger" ng-click="vm.showAccountMenu = false; vm.closeParentProfilePermanently()">Permanently Close Profile</button>
+        </div>
+      </div>
+    </div>
 
-      <!-- View mode -->
-      <div ng-if="!vm.editingParentProfile" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px">
-        <div style="display:flex; align-items:center; gap:14px">
-          <div style="width:48px; height:48px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.parentProfile.name[0] }}</div>
-          <div>
-            <div class="bs-card-title">{{ vm.parentProfile.name }}</div>
-            <div class="bs-text-muted">{{ vm.parentProfile.email }}</div>
-            <span class="bs-tag bs-tag-neutral">Parent Account</span>
+    <!-- ── Account edit mode (unchanged behavior — still gets a full card) ── -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.parentProfile && vm.editingParentProfile">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:40px; height:40px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.parentProfile.name[0] }}</div>
+        <div>
+          <strong>Editing Parent Profile</strong>
+          <p class="bs-text-muted" style="margin:0;">Update your account details below</p>
+        </div>
+        <button type="button" class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelEditParentProfile()">✕ Cancel</button>
+      </div>
+      <div ng-if="vm.parentProfileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);">{{ vm.parentProfileError }}</div>
+      <form ng-submit="vm.saveParentProfile()" style="display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-3);">
+        <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+          <div class="bs-field" style="flex:1; min-width:180px; margin:0;">
+            <label>Full Name <span style="color:var(--color-accent-2);">*</span></label>
+            <input class="bs-input" type="text" ng-model="vm.parentProfileForm.name" required />
           </div>
+          <div class="bs-field" style="flex:1; min-width:180px; margin:0;">
+            <label>Email Address <span style="color:var(--color-accent-2);">*</span></label>
+            <input class="bs-input" type="email" ng-model="vm.parentProfileForm.email" required />
+          </div>
+        </div>
+        <div class="bs-field" style="margin:0;">
+          <label>New Password <span class="bs-text-muted" style="font-weight:400;">(leave blank to keep current)</span></label>
+          <input class="bs-input" type="password" ng-model="vm.parentProfileForm.password" placeholder="••••••••" />
         </div>
         <div style="display:flex; gap:8px;">
-          <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.startEditParentProfile()">Edit Profile</button>
-          <button type="button" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);" ng-click="vm.closeParentProfilePermanently()">Permanently Close Profile</button>
+          <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelEditParentProfile()">Cancel</button>
+          <button type="submit" class="bs-btn bs-btn-primary">Save Changes</button>
         </div>
-      </div>
-
-      <!-- Edit mode -->
-      <div ng-if="vm.editingParentProfile">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div style="width:40px; height:40px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.parentProfile.name[0] }}</div>
-          <div>
-            <strong>Editing Parent Profile</strong>
-            <p class="bs-text-muted" style="margin:0;">Update your account details below</p>
-          </div>
-          <button type="button" class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelEditParentProfile()">✕ Cancel</button>
-        </div>
-        <div ng-if="vm.parentProfileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);">{{ vm.parentProfileError }}</div>
-        <form ng-submit="vm.saveParentProfile()" style="display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-3);">
-          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
-            <div class="bs-field" style="flex:1; min-width:180px; margin:0;">
-              <label>Full Name <span style="color:var(--color-accent-2);">*</span></label>
-              <input class="bs-input" type="text" ng-model="vm.parentProfileForm.name" required />
-            </div>
-            <div class="bs-field" style="flex:1; min-width:180px; margin:0;">
-              <label>Email Address <span style="color:var(--color-accent-2);">*</span></label>
-              <input class="bs-input" type="email" ng-model="vm.parentProfileForm.email" required />
-            </div>
-          </div>
-          <div class="bs-field" style="margin:0;">
-            <label>New Password <span class="bs-text-muted" style="font-weight:400;">(leave blank to keep current)</span></label>
-            <input class="bs-input" type="password" ng-model="vm.parentProfileForm.password" placeholder="••••••••" />
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelEditParentProfile()">Cancel</button>
-            <button type="submit" class="bs-btn bs-btn-primary">Save Changes</button>
-          </div>
-        </form>
-      </div>
+      </form>
     </div>
 
-    <!-- ── Page Hero ──────────────────────────────── -->
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:var(--space-4);">
-      <div>
-        <h1>Children Profiles</h1>
-        <p class="bs-text-muted" style="margin:0;">Manage your children's learning profiles and match them with expert tutors</p>
-      </div>
-      <div style="display:flex; gap:var(--space-6);">
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.activeStudents().length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Active Profiles</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:20px;">SG &amp; MY</div>
-          <div class="bs-text-muted" style="font-size:13px;">Coverage</div>
-        </div>
+    <!-- ── Page Hero (stats tightened into inline text) ── -->
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:var(--space-3);">
+      <h1 style="margin:0;">Children Profiles</h1>
+      <div class="bs-text-muted" style="font-size:13px;">
+        <span style="margin-right:var(--space-4);"><strong style="color:var(--color-text); font-family:var(--font-heading);">{{ vm.activeStudents().length }}</strong> Active Profile{{ vm.activeStudents().length !== 1 ? 's' : '' }}</span>
+        <span>Coverage: SG &amp; MY</span>
       </div>
     </div>
+    <p class="bs-text-muted" style="margin:4px 0 0;">Manage your children's learning profiles and match them with expert tutors</p>
 
-    <!-- ── Main grid: Registry left + Form right ─── -->
-    <div style="display:grid; grid-template-columns:1.3fr 1fr; gap:var(--space-4); align-items:flex-start;">
+    <!-- ── Main grid: Registry left + Form right (form only reserves a column when open) ── -->
+    <div ng-style="{display:'grid', 'grid-template-columns': vm.showAddChildForm ? '1.3fr 1fr' : '1fr', gap:'var(--space-4)', 'align-items':'flex-start'}">
 
       <!-- ── Left: Student Registry ─────────────── -->
       <div>
 
-        <!-- Tab Bar -->
-        <div class="bs-seg">
-          <button type="button" class="bs-seg-opt" ng-click="vm.studentsTab = 'active'"
-            ng-style="{background: vm.studentsTab === 'active' ? 'var(--color-accent)' : 'transparent', color: vm.studentsTab === 'active' ? 'var(--color-bg)' : 'inherit'}">
-            Active ({{ vm.activeStudents().length }})
-          </button>
-          <button type="button" class="bs-seg-opt" ng-click="vm.studentsTab = 'archived'"
-            ng-style="{background: vm.studentsTab === 'archived' ? 'var(--color-accent)' : 'transparent', color: vm.studentsTab === 'archived' ? 'var(--color-bg)' : 'inherit'}">
-            Archived ({{ vm.archivedStudents().length }})
+        <!-- Tab Bar + Add Child toggle -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-2);">
+          <div class="bs-seg">
+            <button type="button" class="bs-seg-opt" ng-click="vm.studentsTab = 'active'"
+              ng-style="{background: vm.studentsTab === 'active' ? 'var(--color-accent)' : 'transparent', color: vm.studentsTab === 'active' ? 'var(--color-bg)' : 'inherit'}">
+              Active ({{ vm.activeStudents().length }})
+            </button>
+            <button type="button" class="bs-seg-opt" ng-click="vm.studentsTab = 'archived'"
+              ng-style="{background: vm.studentsTab === 'archived' ? 'var(--color-accent)' : 'transparent', color: vm.studentsTab === 'archived' ? 'var(--color-bg)' : 'inherit'}">
+              Archived ({{ vm.archivedStudents().length }})
+            </button>
+          </div>
+          <button type="button" class="bs-btn" ng-class="vm.showAddChildForm ? 'bs-btn-secondary' : 'bs-btn-primary'" ng-click="vm.showAddChildForm = !vm.showAddChildForm">
+            <i class="ti" ng-class="vm.showAddChildForm ? 'ti-x' : 'ti-plus'" aria-hidden="true"></i> {{ vm.showAddChildForm ? 'Close Form' : 'Add Child' }}
           </button>
         </div>
 
@@ -139,8 +133,9 @@
         <div style="text-align:center; padding:var(--space-6); background:var(--color-surface); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="!vm.visibleStudents().length">
           <h4 ng-if="vm.studentsTab === 'active'">No Profiles Yet</h4>
           <h4 ng-if="vm.studentsTab === 'archived'">No Archived Profiles</h4>
-          <p class="bs-text-muted" ng-if="vm.studentsTab === 'active'">Add your first child's profile using the form on the right to get started.</p>
+          <p class="bs-text-muted" ng-if="vm.studentsTab === 'active'">Add your first child's profile to get started.</p>
           <p class="bs-text-muted" ng-if="vm.studentsTab === 'archived'">Profiles you archive instead of deleting will show up here.</p>
+          <button type="button" class="bs-btn bs-btn-primary" ng-if="vm.studentsTab === 'active' && !vm.showAddChildForm" ng-click="vm.showAddChildForm = true">+ Add Child</button>
         </div>
 
         <!-- ── Student cards ── -->
@@ -158,9 +153,16 @@
                 <div class="bs-text-muted" style="font-size:13px;">{{ s.school }}</div>
               </div>
               <button type="button" ng-if="!s.isArchived" class="bs-btn bs-btn-secondary" ng-click="$event.stopPropagation(); vm.startEditStudent(s)">Edit</button>
-              <button type="button" ng-if="!s.isArchived" class="bs-btn bs-btn-secondary" ng-click="$event.stopPropagation(); vm.archiveStudent(s)">Archive</button>
-              <button type="button" ng-if="!s.isArchived" class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);" ng-click="$event.stopPropagation(); vm.deleteStudent(s)">Delete</button>
               <button type="button" ng-if="s.isArchived" class="bs-btn bs-btn-secondary" ng-click="$event.stopPropagation(); vm.unarchiveStudent(s)">Restore</button>
+              <div style="position:relative;" ng-if="!s.isArchived">
+                <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="$event.stopPropagation(); vm.openCardMenuId = vm.openCardMenuId === s.id ? null : s.id" title="More options">
+                  <i class="ti ti-dots" aria-hidden="true"></i>
+                </button>
+                <div class="overflow-menu" ng-if="vm.openCardMenuId === s.id" ng-click="$event.stopPropagation()">
+                  <button type="button" class="overflow-menu-item" ng-click="vm.openCardMenuId = null; vm.archiveStudent(s)">Archive</button>
+                  <button type="button" class="overflow-menu-item overflow-menu-item-danger" ng-click="vm.openCardMenuId = null; vm.deleteStudent(s)">Delete</button>
+                </div>
+              </div>
             </div>
 
             <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.deleteBlockedStudentId === s.id" ng-click="$event.stopPropagation()">
@@ -355,8 +357,8 @@
         </div><!-- end ng-repeat -->
       </div><!-- end registry -->
 
-      <!-- ── Right: Add Student Form ────────────── -->
-      <div class="bs-card bs-elev-sm">
+      <!-- ── Right: Add Student Form (collapsed behind the Add Child button) ── -->
+      <div class="bs-card bs-elev-sm" ng-if="vm.showAddChildForm">
         <div style="display:flex; align-items:center; gap:var(--space-3);">
           <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">✚</span>
           <div>
