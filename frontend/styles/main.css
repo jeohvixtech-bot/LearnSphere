@@ -4278,3 +4278,121 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
 .ov-slot-card-body {
   padding: 8px 12px;
 }
+
+/* ============================================================
+   LearnFlow design system — scoped override layer
+   ============================================================
+   Redefines the same CSS custom properties the .bs-scope design system
+   (above) already reads from (--color-*, --font-*, --space-*, --radius-*,
+   --shadow-*), so every existing bs-* component class (bs-card, bs-btn,
+   bs-input, bs-seg, bs-dialog, bs-tag, ...) picks up LearnFlow's palette
+   and type without any markup changes — only the token VALUES change,
+   scoped under .lf-scope so un-migrated pages keep the Broadsheet look.
+
+   Rolled out to frontend/views/login.html only so far. To bring another
+   view onto LearnFlow: add class="lf-scope" to that view's existing
+   .bs-scope root element (and "lf-page" too, if it should also get the
+   soft two-tone backdrop wash below).
+
+   Caveat: this is a token-only reskin, not a rebuild of the bs-* rules
+   themselves — so things the bs-* rules hardcode outside a variable (e.g.
+   .bs-scope's own h1–h6 font-size scale, which is unrelated to LearnFlow's
+   36/28/22/18px scale) won't match the LearnFlow spec exactly. Only the
+   colors, fonts, spacing, radius and shadows travel through the token
+   layer; the size/layout rules underneath are still Broadsheet's.
+
+   Fredoka/Poppins are loaded once via <link> tags in index.html's <head>,
+   not re-imported here — an @import here would double-fetch them. */
+
+.lf-scope {
+  /* — brand — */
+  --color-accent: #f97316;       /* primary: orange */
+  --color-accent-100: #fff7ed;
+  --color-accent-200: #ffedd5;
+  --color-accent-300: #fed7aa;
+  --color-accent-400: #fdba74;
+  --color-accent-500: #fb923c;
+  --color-accent-600: #ea580c;   /* bs-btn-primary:hover */
+  --color-accent-700: #c2410c;   /* bs-btn-primary:active */
+  --color-accent-800: #9a3412;
+  --color-accent-900: #7c2d12;
+
+  /* — error (bs-* has no separate error ramp; --color-accent-2-* IS the
+     error/danger ramp throughout the app, e.g. the login/register error
+     banners in login.html) — */
+  --color-accent-2: #ef4444;
+  --color-accent-2-100: #fef2f2;
+  --color-accent-2-200: #fee2e2;
+  --color-accent-2-300: #fecaca;
+  --color-accent-2-400: #fca5a5;
+  --color-accent-2-500: #f87171;
+  --color-accent-2-600: #dc2626;
+  --color-accent-2-700: #b91c1c;
+  --color-accent-2-800: #991b1b;
+  --color-accent-2-900: #7f1d1d;
+
+  /* — success (new — bs-* has no success concept at all; without this,
+     success states fall back to reusing --color-accent-100/800, which
+     under LearnFlow would read as orange, not green) — */
+  --color-success: #22c55e;
+  --color-success-100: #dcfce7;
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+
+  /* — base — */
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #1f2937;
+  --color-divider: #e5e7eb;
+  /* Quiet neutral fill for a card nested inside another (already-white)
+     card, e.g. login.html's "Demo Credentials" box — bs's own
+     --color-neutral-100 is a warm off-white (#f8f4f4) tuned for the
+     Broadsheet palette, not LearnFlow's cooler gray. */
+  --color-neutral-100: #f9fafb;
+
+  /* — type — */
+  --font-heading: 'Fredoka', system-ui, sans-serif;
+  --font-heading-weight: 600;
+  --font-body: 'Poppins', system-ui, sans-serif;
+
+  /* — spacing (8px base unit; bs-* only defines steps 1,2,3,4,6,8 — those
+     are remapped below, 1:1 with LearnFlow's sp-1..sp-8 scale) — */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 32px;
+  --space-8: 64px;
+
+  /* — radius (bs-*'s Broadsheet values are deliberately near-square —
+     1/2/4px — for its "newspaper" look; LearnFlow wants soft rounding) — */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+  --radius-circle: 50%;
+
+  /* — elevation — */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.10);
+  --shadow-focus: 0 0 0 3px rgba(249, 115, 22, 0.30);
+}
+
+/* bs-input has no focus ring at all (just a border-color swap) — add
+   LearnFlow's focus ring on top of that for .lf-scope inputs specifically,
+   since --shadow-focus isn't a token any existing bs-* rule reads. */
+.lf-scope .bs-input:focus-visible { box-shadow: var(--shadow-focus); }
+
+/* Full-page "warm/encouraging" wash — the brand's two main hues at low
+   opacity, layered under the white Surface Base rather than replacing it.
+   Not part of the original LearnFlow spec; kept as its own class (rather
+   than folded into .lf-scope) so a view can opt into the LearnFlow token
+   set without necessarily getting this particular backdrop treatment. */
+.lf-page {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(249, 115, 22, 0.07), transparent 45%),
+    radial-gradient(circle at 88% 92%, rgba(59, 130, 246, 0.07), transparent 45%),
+    #ffffff;
+}
+
