@@ -68,34 +68,26 @@
 
         <div class="bs-field" style="margin:0;">
           <label>Subject</label>
-          <select class="bs-input" ng-model="vm.selectedSubject"
-            ng-options="opt as opt.label group by opt.examType for opt in vm.subjectCatalog[vm.selectedCountry]">
-            <option value="">All Subjects</option>
-          </select>
+          <filter-picker display="{{ vm.subjectPickerLabel() }}" is-open="vm.openFilterPicker === 'subject'"
+            stack="vm.subjectStack" on-toggle="vm.toggleFilterPicker('subject')" on-close="vm.closeFilterPicker()"></filter-picker>
         </div>
 
         <div class="bs-field" style="margin:0;">
           <label>Mode</label>
-          <select class="bs-input" ng-model="vm.selectedMode">
-            <option value="All">All Modes</option>
-            <option value="Online">Online</option>
-            <option value="Tutor Place">Tutor Place</option>
-            <option value="Tuition Center">Tuition Center</option>
-          </select>
+          <filter-picker display="{{ vm.modePickerLabel() }}" is-open="vm.openFilterPicker === 'mode'"
+            stack="vm.modeStack" on-toggle="vm.toggleFilterPicker('mode')" on-close="vm.closeFilterPicker()"></filter-picker>
         </div>
 
         <div class="bs-field" style="margin:0;">
           <label>Experience</label>
-          <select class="bs-input" ng-model="vm.minExperience"
-            ng-options="e.value as e.label for e in [{value:0,label:'All Experience'},{value:15,label:'> 15 years'},{value:10,label:'> 10 years'},{value:5,label:'> 5 years'},{value:3,label:'> 3 years'},{value:1,label:'> 1 year'}]">
-          </select>
+          <filter-picker display="{{ vm.experiencePickerLabel() }}" is-open="vm.openFilterPicker === 'experience'"
+            stack="vm.experienceStack" on-toggle="vm.toggleFilterPicker('experience')" on-close="vm.closeFilterPicker()"></filter-picker>
         </div>
 
         <div class="bs-field" style="margin:0;">
           <label>Rating</label>
-          <select class="bs-input" ng-model="vm.minRating"
-            ng-options="r.value as r.label for r in [{value:0,label:'All Ratings'},{value:3,label:'3★ & above'},{value:3.5,label:'3.5★ & above'},{value:4,label:'4★ & above'},{value:4.5,label:'4.5★ & above'}]">
-          </select>
+          <filter-picker display="{{ vm.ratingPickerLabel() }}" is-open="vm.openFilterPicker === 'rating'"
+            stack="vm.ratingStack" on-toggle="vm.toggleFilterPicker('rating')" on-close="vm.closeFilterPicker()"></filter-picker>
         </div>
 
         <span class="bs-text-muted" style="font-size:14px; margin-left:auto;">{{ vm.filteredTutors().length }} tutors found</span>

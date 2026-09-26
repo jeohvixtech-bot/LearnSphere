@@ -1560,7 +1560,9 @@
                   ng-click="vm.triggerVerifUpload('reupload_identity')">Re-upload</button>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
-                  ng-click="vm.removeVerifDoc(vm.getDocSingle('identity_photo').id)">Remove</button>
+                  ng-disabled="!!vm.removeVerifDocBlockedReason(vm.getDocSingle('identity_photo'))"
+                  title="{{ vm.removeVerifDocBlockedReason(vm.getDocSingle('identity_photo')) }}"
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('identity_photo'))">Remove</button>
               </div>
 
               <div ng-if="vm.getDocSingle('identity_photo') && vm.getStagedReplacement(vm.getDocSingle('identity_photo').id)" class="verif-staged-ready">
@@ -1623,7 +1625,9 @@
                   ng-click="vm.triggerVerifUpload('reupload_profile_photo')">Re-upload</button>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
-                  ng-click="vm.removeVerifDoc(vm.getDocSingle('profile_photo').id)">Remove</button>
+                  ng-disabled="!!vm.removeVerifDocBlockedReason(vm.getDocSingle('profile_photo'))"
+                  title="{{ vm.removeVerifDocBlockedReason(vm.getDocSingle('profile_photo')) }}"
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('profile_photo'))">Remove</button>
               </div>
 
               <div ng-if="vm.getDocSingle('profile_photo') && vm.getStagedReplacement(vm.getDocSingle('profile_photo').id)" class="verif-staged-ready">
@@ -1694,7 +1698,9 @@
                 </button>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
-                  ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
+                  ng-disabled="!!vm.removeVerifDocBlockedReason(doc)"
+                  title="{{ vm.removeVerifDocBlockedReason(doc) }}"
+                  ng-click="vm.removeVerifDoc(doc)">Remove</button>
               </div>
 
               <!-- Staged fix for a rejected row above, not sent until Submit -->
@@ -1784,7 +1790,7 @@
                 </button>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
-                  ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
+                  ng-click="vm.removeVerifDoc(doc)">Remove</button>
               </div>
 
               <div class="verif-staged-ready"
@@ -1792,8 +1798,14 @@
                 ng-if="vm.getStagedReplacement(doc.id)">
                 <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
                 <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
-                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
+                <button type="button" class="verif-confirm-btn"
+                  ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
+                  ng-click="vm.confirmStagedVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">
+                  {{ vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId ? 'Saving...' : 'Confirm' }}
+                </button>
                 <button type="button" class="verif-remove-btn"
+                  ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
                   ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
               </div>
 
@@ -1802,8 +1814,14 @@
                 <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
                 <span class="verif-filename">{{ staged.fileName }}</span>
                 <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
-                <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+                <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
+                <button type="button" class="verif-confirm-btn"
+                  ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
+                  ng-click="vm.confirmStagedVerifDoc(staged._stagedId)">
+                  {{ vm.verif.confirmingStagedId === staged._stagedId ? 'Saving...' : 'Confirm' }}
+                </button>
                 <button type="button" class="verif-remove-btn"
+                  ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
                   ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
               </div>
 
@@ -1861,17 +1879,19 @@
                   }">{{ vm.getDocSingle('intro_video').status }}</span>
                 <button type="button" class="verif-remove-btn"
                   ng-if="!vm.isVerifLocked()"
-                  ng-click="vm.removeVerifDoc(vm.getDocSingle('intro_video').id)">Remove</button>
+                  ng-click="vm.removeVerifDoc(vm.getDocSingle('intro_video'))">Remove</button>
               </div>
 
               <div ng-if="vm.canEditIntroVideo()">
                 <div class="verif-link-row">
                   <input type="url" ng-model="vm.verif.introVideoLink"
                     placeholder="YouTube, Google Drive, or any public video URL" />
+                  <button type="button" class="verif-confirm-btn"
+                    ng-disabled="!vm.verif.introVideoLink || vm.verif.savingIntroVideo"
+                    ng-click="vm.saveIntroVideoLink()">
+                    {{ vm.verif.savingIntroVideo ? 'Saving...' : 'Save' }}
+                  </button>
                 </div>
-                <p class="text-muted" style="font-size:12px; margin-top:6px" ng-if="vm.verif.introVideoLink">
-                  <i class="ti ti-info-circle" aria-hidden="true"></i> Saved when you submit for verification below.
-                </p>
               </div>
 
               <p class="verif-max-notice" ng-if="!vm.getDocSingle('intro_video') && !vm.canEditIntroVideo()">
@@ -1911,7 +1931,7 @@
               </button>
               <button type="button" class="verif-remove-btn"
                 ng-if="!vm.isVerifLocked()"
-                ng-click="vm.removeVerifDoc(doc.id)">Remove</button>
+                ng-click="vm.removeVerifDoc(doc)">Remove</button>
             </div>
 
             <div class="verif-staged-ready"
@@ -1919,8 +1939,14 @@
               ng-if="vm.getStagedReplacement(doc.id)">
               <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
               <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
-              <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+              <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
+              <button type="button" class="verif-confirm-btn"
+                ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
+                ng-click="vm.confirmStagedVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">
+                {{ vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId ? 'Saving...' : 'Confirm' }}
+              </button>
               <button type="button" class="verif-remove-btn"
+                ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
                 ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
             </div>
 
@@ -1929,8 +1955,14 @@
               <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
               <span class="verif-filename">{{ staged.fileName }}</span>
               <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
-              <span class="verif-doc-status-badge badge-staged">Ready to submit</span>
+              <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
+              <button type="button" class="verif-confirm-btn"
+                ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
+                ng-click="vm.confirmStagedVerifDoc(staged._stagedId)">
+                {{ vm.verif.confirmingStagedId === staged._stagedId ? 'Saving...' : 'Confirm' }}
+              </button>
               <button type="button" class="verif-remove-btn"
+                ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
                 ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
             </div>
 

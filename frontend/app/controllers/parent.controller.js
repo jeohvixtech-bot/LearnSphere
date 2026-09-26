@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'RemarkService', 'PaymentService', 'WalletService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, RemarkService, PaymentService, WalletService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'SubjectCatalogExamTypes', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'RemarkService', 'PaymentService', 'WalletService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, SubjectCatalogExamTypes, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, RemarkService, PaymentService, WalletService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -155,6 +155,230 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.selectedMode = 'All';
   self.minRating = 0;
 
+  // ── Filter popup pickers (Subject/Mode/Experience/Rating) ──────────────
+  // Each <filter-picker> (app/directives/filter-picker.directives.js) is
+  // driven by one of these "stacks" — an array of {title, rows} steps, the
+  // last entry being what's currently on screen. Subject's stack grows as
+  // the user drills down (exam type -> subject -> level, see the three
+  // build* functions below); Mode/Experience/Rating are always a single
+  // step. Only one picker is open at a time, tracked by name rather than
+  // four separate booleans so opening one always closes any other.
+  self.openFilterPicker = null; // 'subject' | 'mode' | 'experience' | 'rating' | null
+  self.subjectStack = [];
+  self.modeStack = [];
+  self.experienceStack = [];
+  self.ratingStack = [];
+
+  // Single source of truth for both the popup rows AND the trigger button's
+  // label text (via *PickerLabel() below) — same option values/text the old
+  // <select><option> markup used, just no longer duplicated in two places.
+  var MODE_OPTIONS = [
+    { value: 'All', title: 'All Modes', icon: 'ti-apps' },
+    { value: 'Online', title: 'Online', icon: 'ti-video' },
+    { value: 'Tutor Place', title: 'Tutor Place', icon: 'ti-home' },
+    { value: 'Tuition Center', title: 'Tuition Center', icon: 'ti-building' }
+  ];
+  var EXPERIENCE_OPTIONS = [
+    { value: 0, title: 'All Experience' },
+    { value: 15, title: '> 15 years' },
+    { value: 10, title: '> 10 years' },
+    { value: 5, title: '> 5 years' },
+    { value: 3, title: '> 3 years' },
+    { value: 1, title: '> 1 year' }
+  ];
+  var RATING_OPTIONS = [
+    { value: 0, title: 'All Ratings' },
+    { value: 3, title: '3★ & above' },
+    { value: 3.5, title: '3.5★ & above' },
+    { value: 4, title: '4★ & above' },
+    { value: 4.5, title: '4.5★ & above' }
+  ];
+
+  // Step 1 icon — grouped by schooling stage (primary/secondary/pre-u) rather
+  // than one icon per exam type, since e.g. PSLE and UPSR are both "primary
+  // school" in their respective countries and should read the same way.
+  function examTypeIcon(examType) {
+    if (examType === 'PSLE' || examType === 'UPSR') return 'ti-school';
+    if (examType === 'N/O-Level' || examType === 'PT3' || examType === 'SPM') return 'ti-certificate';
+    return 'ti-award'; // A-Level, STPM
+  }
+
+  // "Primary 1".."Primary 6" -> "Primary 1 – 6"; falls back to "first – last"
+  // verbatim when the level names don't share a common leading word (e.g.
+  // "Lower Six" / "Upper Six", or a single-level list).
+  function levelRangeLabel(levels) {
+    if (!levels || !levels.length) return '';
+    if (levels.length === 1) return levels[0];
+    var first = levels[0], last = levels[levels.length - 1];
+    var firstParts = first.split(' '), lastParts = last.split(' ');
+    if (firstParts.length > 1 && lastParts.length > 1 &&
+        firstParts.slice(0, -1).join(' ') === lastParts.slice(0, -1).join(' ')) {
+      return firstParts.slice(0, -1).join(' ') + ' ' + firstParts[firstParts.length - 1] + ' – ' + lastParts[lastParts.length - 1];
+    }
+    return first + ' – ' + last;
+  }
+
+  // Step 2's small color-coded icon tile — a nice-to-have visual aid derived
+  // purely from the subject's own name, not a new catalog field. Falls back
+  // to a plain neutral book icon for anything that doesn't match a group.
+  function subjectIconMeta(subject) {
+    var s = subject.toLowerCase();
+    if (/math/.test(s)) return { icon: 'ti-math', bg: '#dcfce7', color: '#15803d' };
+    if (/(science|physics|chemistry|biology)/.test(s)) return { icon: 'ti-flask', bg: '#fce7f3', color: '#be185d' };
+    if (/(english|mother tongue|chinese|malay|tamil|bahasa|literature|language)/.test(s)) return { icon: 'ti-language', bg: '#dbeafe', color: '#1d4ed8' };
+    if (/(history|geography|social studies)/.test(s)) return { icon: 'ti-map', bg: '#fef3c7', color: '#b45309' };
+    if (/(economics|accounting|accounts|business|commerce)/.test(s)) return { icon: 'ti-report-money', bg: '#ede9fe', color: '#6d28d9' };
+    if (/(computing|information technology)/.test(s)) return { icon: 'ti-device-laptop', bg: '#e0f2fe', color: '#0369a1' };
+    if (/(art|music|design)/.test(s)) return { icon: 'ti-palette', bg: '#ffe4e6', color: '#be123c' };
+    return { icon: 'ti-book', bg: 'var(--color-neutral-100)', color: 'var(--color-text)' };
+  }
+
+  // Step 1 — exam type (filtered to the current country, catalog order).
+  self.buildSubjectExamTypeStep = function () {
+    var defs = SubjectCatalogExamTypes[self.selectedCountry] || [];
+    return {
+      title: 'Choose Exam Type',
+      rows: defs.map(function (def) {
+        return {
+          icon: examTypeIcon(def.examType),
+          title: def.examType,
+          subtitle: levelRangeLabel(def.levels),
+          hasChevron: true,
+          selected: !!self.selectedSubject && self.selectedSubject.examType === def.examType,
+          onSelect: function () {
+            self.subjectStack.push(self.buildSubjectNameStep(def.examType));
+          }
+        };
+      })
+    };
+  };
+
+  // Step 2 — every unique subject under the chosen exam type, deduplicated
+  // across levels (the flattened catalog repeats each subject once per
+  // level) down to one row per subject name.
+  self.buildSubjectNameStep = function (examType) {
+    var seen = {};
+    var subjects = [];
+    (self.subjectCatalog[self.selectedCountry] || []).forEach(function (opt) {
+      if (opt.examType !== examType || seen[opt.subject]) return;
+      seen[opt.subject] = true;
+      subjects.push(opt.subject);
+    });
+    return {
+      title: examType,
+      rows: subjects.map(function (subject) {
+        var meta = subjectIconMeta(subject);
+        return {
+          icon: meta.icon,
+          iconBg: meta.bg,
+          iconColor: meta.color,
+          title: subject,
+          hasChevron: true,
+          selected: !!self.selectedSubject && self.selectedSubject.examType === examType && self.selectedSubject.subject === subject,
+          onSelect: function () {
+            self.subjectStack.push(self.buildSubjectLevelStep(examType, subject));
+          }
+        };
+      })
+    };
+  };
+
+  // Step 3 — the specific levels for the chosen exam type. Plain text rows
+  // (no icon — no obvious per-level image/icon, see task notes). Picking a
+  // level applies the filter immediately and closes the popup, same as the
+  // flat <select> this replaced.
+  self.buildSubjectLevelStep = function (examType, subject) {
+    var def = (SubjectCatalogExamTypes[self.selectedCountry] || []).filter(function (d) { return d.examType === examType; })[0];
+    var levels = def ? def.levels : [];
+    return {
+      title: subject,
+      rows: levels.map(function (level) {
+        return {
+          title: level,
+          selected: !!self.selectedSubject && self.selectedSubject.examType === examType &&
+            self.selectedSubject.subject === subject && self.selectedSubject.level === level,
+          onSelect: function () {
+            self.selectedSubject = self.findSubjectCatalogEntry(self.selectedCountry, subject, level);
+            self.closeFilterPicker();
+          }
+        };
+      })
+    };
+  };
+
+  self.buildModeStep = function () {
+    return {
+      title: 'Mode',
+      rows: MODE_OPTIONS.map(function (opt) {
+        return {
+          icon: opt.icon,
+          title: opt.title,
+          selected: self.selectedMode === opt.value,
+          onSelect: function () { self.selectedMode = opt.value; self.closeFilterPicker(); }
+        };
+      })
+    };
+  };
+
+  self.buildExperienceStep = function () {
+    return {
+      title: 'Experience',
+      rows: EXPERIENCE_OPTIONS.map(function (opt) {
+        return {
+          title: opt.title,
+          selected: self.minExperience === opt.value,
+          onSelect: function () { self.minExperience = opt.value; self.closeFilterPicker(); }
+        };
+      })
+    };
+  };
+
+  self.buildRatingStep = function () {
+    return {
+      title: 'Rating',
+      rows: RATING_OPTIONS.map(function (opt) {
+        return {
+          title: opt.title,
+          selected: self.minRating === opt.value,
+          onSelect: function () { self.minRating = opt.value; self.closeFilterPicker(); }
+        };
+      })
+    };
+  };
+
+  // Toggling a picker open always rebuilds its stack from scratch (Subject
+  // resets to Step 1) so row "selected" highlighting reflects whatever the
+  // filters actually are right now, not whatever they were the last time
+  // this picker happened to be open.
+  self.toggleFilterPicker = function (name) {
+    if (self.openFilterPicker === name) { self.closeFilterPicker(); return; }
+    self.openFilterPicker = name;
+    if (name === 'subject') self.subjectStack = [self.buildSubjectExamTypeStep()];
+    else if (name === 'mode') self.modeStack = [self.buildModeStep()];
+    else if (name === 'experience') self.experienceStack = [self.buildExperienceStep()];
+    else if (name === 'rating') self.ratingStack = [self.buildRatingStep()];
+  };
+
+  self.closeFilterPicker = function () {
+    self.openFilterPicker = null;
+  };
+
+  self.subjectPickerLabel = function () {
+    return self.selectedSubject ? self.selectedSubject.label : 'All Subjects';
+  };
+  self.modePickerLabel = function () {
+    var opt = MODE_OPTIONS.filter(function (o) { return o.value === self.selectedMode; })[0];
+    return opt ? opt.title : 'All Modes';
+  };
+  self.experiencePickerLabel = function () {
+    var opt = EXPERIENCE_OPTIONS.filter(function (o) { return o.value === self.minExperience; })[0];
+    return opt ? opt.title : 'All Experience';
+  };
+  self.ratingPickerLabel = function () {
+    var opt = RATING_OPTIONS.filter(function (o) { return o.value === self.minRating; })[0];
+    return opt ? opt.title : 'All Ratings';
+  };
+
   // Flow B — booking a tutor's already-published class (picked via a catalog
   // card's "View & Book" row button, see viewAndBookPreset/selectTutor below)
   // confirms immediately, no per-request tutor approval. State for that flow's
@@ -295,6 +519,11 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.selectSearchCountry = function (c) {
     self.selectedCountry = c;
     self.selectedSubject = null;
+    // An open Subject picker's stack references the OLD country's exam
+    // types/subjects — closing it here is simpler and safer than trying to
+    // rebuild it in place, and toggleFilterPicker rebuilds from scratch on
+    // next open anyway.
+    self.closeFilterPicker();
   };
 
   // Finds the catalog entry matching a given subject+level (used when a tutor card's

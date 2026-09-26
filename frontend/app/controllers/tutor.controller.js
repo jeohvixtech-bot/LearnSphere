@@ -2426,7 +2426,13 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     // below, which uploads+saves every staged item before calling the actual
     // submit endpoint. { _stagedId, file, docType, fileName, fileSizeBytes,
     // previewUrl, replacesDocumentId (set only when fixing a rejected doc) }
-    stagedList: []
+    stagedList: [],
+    // Set while a single optional-type staged doc's "Confirm" button is
+    // mid-flight (see confirmStagedVerifDoc) — lets that one row show a busy
+    // state instead of the whole form looking frozen.
+    confirmingStagedId: null,
+    // Set while saveIntroVideoLink's immediate save is mid-flight.
+    savingIntroVideo: false
   };
   self.verifSubmitting = false;
 
@@ -2530,6 +2536,51 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   };
 
   var ACADEMIC_LEVEL_TYPES = ['o_level', 'a_level', 'degree', 'postgrad'];
+  // identity_photo/profile_photo are single-slot (getDocSingle) — there is
+  // never a second one to fall back on, so removing the only copy always
+  // empties that mandatory requirement. Academic quals are multi-slot and
+  // multi-type instead (see removalBlockedReason below, which checks across
+  // all four ACADEMIC_LEVEL_TYPES combined, not just the one being removed).
+  var SINGLE_SLOT_MANDATORY_TYPES = ['identity_photo', 'profile_photo'];
+  // File-based, non-mandatory types — Remove was already unstaged/immediate
+  // for every type before this; what's new for these two is that a freshly
+  // staged pick can ALSO be committed immediately via a per-item "Confirm"
+  // (see confirmStagedVerifDoc) instead of waiting on the page-wide Submit
+  // button, since neither is required for verification to proceed.
+  var OPTIONAL_FILE_TYPES = ['nie_cert', 'specialist_cert'];
+
+  // Null when removing `doc` is fine; otherwise a user-facing reason it's
+  // blocked. Only mandatory slots can ever be blocked — non-mandatory docs
+  // (including intro_video, which isn't in either list below) are never
+  // "required," so this always returns null for them.
+  function removalBlockedReason(doc) {
+    if (SINGLE_SLOT_MANDATORY_TYPES.indexOf(doc.documentType) >= 0) {
+      return 'Required — upload a replacement before removing this.';
+    }
+    if (ACADEMIC_LEVEL_TYPES.indexOf(doc.documentType) >= 0) {
+      // Same "currently live" definition getDocs/getDocSingle use elsewhere
+      // (fileUrl set, not superseded by a later replacement row) — otherwise
+      // an old, already-replaced academic doc could count as "another" one
+      // and wrongly let this removal through.
+      var stillHasAnother = (self.tutor.documents || []).some(function (d) {
+        return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl && d.id !== doc.id && !isSuperseded(d);
+      });
+      if (!stillHasAnother) return 'This is your only academic qualification on file — upload another before removing it.';
+    }
+    return null;
+  }
+
+  self.canRemoveVerifDoc = function (doc) {
+    return !self.isVerifLocked() && !removalBlockedReason(doc);
+  };
+
+  self.removeVerifDocBlockedReason = function (doc) {
+    return removalBlockedReason(doc);
+  };
+
+  self.isOptionalDocType = function (type) {
+    return OPTIONAL_FILE_TYPES.indexOf(type) >= 0;
+  };
 
   // Static, not rebuilt per digest — ng-repeat over a fresh array literal in the
   // template tears down and rebuilds every row each cycle (same trap documented
@@ -2652,6 +2703,27 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     return !!d && d.status === 'rejected';
   };
 
+  // Intro video is optional and link-only (no file), so unlike a staged
+  // upload there's nothing for the page-wide Submit button to flush later —
+  // this saves it right away instead, the same "non-mandatory fields act
+  // immediately" rule the optional file types follow.
+  self.saveIntroVideoLink = function () {
+    if (!self.canEditIntroVideo() || !(self.verif.introVideoLink || '').trim()) return;
+    self.verif.errorMap.intro_video = null;
+    self.verif.savingIntroVideo = true;
+    TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: self.verif.introVideoLink })
+      .then(function () {
+        self.verif.introVideoLink = '';
+        return self._refreshTutor();
+      })
+      .catch(function (err) {
+        self.verif.errorMap.intro_video = _extractErrorMessage(err, 'Failed to save video link.');
+      })
+      .finally(function () {
+        self.verif.savingIntroVideo = false;
+      });
+  };
+
   var _stagedIdSeq = 0;
   function makePreviewUrl(file) {
     return (window.URL && window.URL.createObjectURL) ? URL.createObjectURL(file) : null;
@@ -2715,9 +2787,9 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     });
   };
 
-  self.removeVerifDoc = function (docId) {
-    if (self.isVerifLocked()) return;
-    TutorService.removeDocument(self.tutor.id, docId)
+  self.removeVerifDoc = function (doc) {
+    if (!self.canRemoveVerifDoc(doc)) return;
+    TutorService.removeDocument(self.tutor.id, doc.id)
       .then(function () { return self._refreshTutor(); })
       .catch(function () { /* Non-fatal */ });
   };
@@ -2767,26 +2839,32 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     return fallback + (err.status ? ' (server returned status ' + err.status + ')' : '');
   }
 
+  // Uploads then saves one staged item. Shared by the batch Submit flow below
+  // and confirmStagedVerifDoc's immediate per-item path for optional types.
+  function _flushOneStagedItem(item) {
+    return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
+      return TutorService.saveDocument(self.tutor.id, {
+        documentType: item.docType,
+        fileUrl: res.data.url,
+        fileName: res.data.fileName,
+        fileSizeBytes: res.data.fileSizeBytes,
+        replacesDocumentId: item.replacesDocumentId || undefined
+      });
+    });
+  }
+
   // Uploads+saves every staged file in parallel. Each item's failure is
   // caught locally (errorMap gets that doc's real message) rather than
   // rejecting the item's own promise, so one bad file doesn't stop the rest
   // from being attempted — every staged doc's error shows after a single
   // Submit click instead of one new failure surfacing per resubmit attempt.
   // Once all have settled, the batch rejects (with a sentinel, not a real
-  // HTTP error) if anything failed, so the ID/video/submit-for-review steps
+  // HTTP error) if anything failed, so the ID/submit-for-review steps
   // downstream don't run against a partially-uploaded set.
   function _flushStagedDocs(items) {
     var anyFailed = false;
     return $q.all(items.map(function (item) {
-      return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
-        return TutorService.saveDocument(self.tutor.id, {
-          documentType: item.docType,
-          fileUrl: res.data.url,
-          fileName: res.data.fileName,
-          fileSizeBytes: res.data.fileSizeBytes,
-          replacesDocumentId: item.replacesDocumentId || undefined
-        });
-      }).catch(function (err) {
+      return _flushOneStagedItem(item).catch(function (err) {
         anyFailed = true;
         self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
       });
@@ -2799,6 +2877,26 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     (self.verif.stagedList || []).forEach(function (s) { if (s.previewUrl) URL.revokeObjectURL(s.previewUrl); });
     self.verif.stagedList = [];
   }
+
+  // Commits ONE staged optional-type doc (nie_cert/specialist_cert) right
+  // away instead of waiting for the page-wide Submit — see isOptionalDocType.
+  // A failed upload stays in stagedList (so the picked file isn't lost) with
+  // its error shown inline; a successful one is un-staged and the tutor
+  // record refreshed so it now shows as a real, saved document.
+  self.confirmStagedVerifDoc = function (stagedId) {
+    var item = (self.verif.stagedList || []).find(function (s) { return s._stagedId === stagedId; });
+    if (!item) return;
+    self.verif.errorMap[item.docType] = null;
+    self.verif.confirmingStagedId = stagedId;
+    _flushOneStagedItem(item).then(function () {
+      self.unstageVerifDoc(stagedId);
+      return self._refreshTutor();
+    }).catch(function (err) {
+      self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
+    }).finally(function () {
+      self.verif.confirmingStagedId = null;
+    });
+  };
 
   // Every doc type is staged client-side only (see verif.stagedList) — this is
   // the single point where anything actually reaches the server: upload+save
@@ -2814,18 +2912,15 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     var staged = (self.verif.stagedList || []).slice();
 
     _flushStagedDocs(staged).then(function () {
-      var idPromise = (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged())
+      // Intro video is no longer part of this flow — it saves immediately via
+      // its own button (saveIntroVideoLink) since it's optional/link-only.
+      return (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged())
         ? TutorService.saveDocument(self.tutor.id, { documentType: 'identity_id', idType: self.verif.idType, idNumber: self.verif.idNumber })
         : $q.when();
-      var videoPromise = (self.canEditIntroVideo() && (self.verif.introVideoLink || '').trim())
-        ? TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: self.verif.introVideoLink })
-        : $q.when();
-      return $q.all([idPromise, videoPromise]);
     }).then(function () {
       return TutorService.submitVerification(self.tutor.id);
     }).then(function () {
       _clearStagedDocs();
-      self.verif.introVideoLink = '';
       return self._refreshTutor();
     }).then(function () {
       self.verifSubmitSuccess = true;

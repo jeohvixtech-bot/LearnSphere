@@ -1,5 +1,11 @@
 <div class="bs-scope lf-scope lf-page" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:var(--space-8) var(--space-6);" ng-click="auth.errorMsg = ''">
 
+  <!-- Back to the public landing page — fixed to the viewport corner, not
+       the card, so it stays put regardless of card height/scroll. -->
+  <a href="#!/welcome" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:fixed; top:var(--space-4); left:var(--space-4); z-index:1;" title="Back to Welcome" ng-click="$event.stopPropagation()">
+    <i class="ti ti-arrow-left" aria-hidden="true"></i>
+  </a>
+
   <!-- bs-elev-md dropped — against .lf-page's own soft gradient wash, a
        heavy card shadow on top competed with it rather than adding
        separation; the 1px divider border here is enough on its own. -->

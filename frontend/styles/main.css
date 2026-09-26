@@ -3027,8 +3027,12 @@ a { text-decoration: none; color: inherit; }
 .verif-banner--warning { background: #fffbeb; border: 0.5px solid #fde68a; color: #92400e; }
 .verif-banner--danger  { background: #fef2f2; border: 0.5px solid #fecaca; color: #b91c1c; }
 .bs-scope .verif-banner--success { background: var(--color-accent-100); border-color: var(--color-accent-300); color: var(--color-accent-800); }
-.bs-scope .verif-banner--warning,
 .bs-scope .verif-banner--danger { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); color: var(--color-accent-2-800); }
+/* --warning intentionally does NOT follow --danger into --color-accent-2 here
+   (bs-scope's own palette has no amber/yellow token to route it through) —
+   it falls through to the base .verif-banner--warning rule above instead, a
+   fixed soft yellow-orange so "Under review" reads as a warning, not an
+   error, regardless of which design-system skin the page is on. */
 
 /* Draws the eye to a banner that just appeared below the fold (e.g. the
    verification submit error, scrolled into view at the same time) — box-
@@ -3099,6 +3103,7 @@ a { text-decoration: none; color: inherit; }
 .verif-upload-done--rejected .verif-filename { color: #b91c1c; }
 .verif-filesize { font-size: 12px; color: #15803d; opacity: .7; flex-shrink: 0; }
 .verif-remove-btn { font-size: 12px; color: #dc2626; background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
+.verif-remove-btn:disabled { opacity: .45; cursor: not-allowed; }
 .verif-reupload-btn {
   font-size: 12px; font-weight: 600;
   color: #dc2626; background: #fef2f2;
@@ -3106,6 +3111,17 @@ a { text-decoration: none; color: inherit; }
   border-radius: 6px; padding: 3px 8px;
   cursor: pointer; flex-shrink: 0;
 }
+/* Commits one staged optional doc (nie_cert/specialist_cert) or the intro
+   video link immediately, instead of waiting on the page-wide Submit button
+   — see confirmStagedVerifDoc/saveIntroVideoLink in tutor.controller.js. */
+.verif-confirm-btn {
+  font-size: 12px; font-weight: 600;
+  color: #15803d; background: #f0fdf4;
+  border: 0.5px solid #bbf7d0;
+  border-radius: 6px; padding: 3px 8px;
+  cursor: pointer; flex-shrink: 0; white-space: nowrap;
+}
+.verif-confirm-btn:disabled { opacity: .45; cursor: not-allowed; }
 .bs-scope .verif-upload-done { background: var(--color-accent-100); border-color: var(--color-accent-300); }
 .bs-scope .verif-upload-done--rejected { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
 .bs-scope .verif-upload-done i { color: var(--color-accent-700); }
@@ -3116,6 +3132,7 @@ a { text-decoration: none; color: inherit; }
 .bs-scope .verif-remove-btn,
 .bs-scope .verif-reupload-btn { color: var(--color-accent-2-700); }
 .bs-scope .verif-reupload-btn { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
+.bs-scope .verif-confirm-btn { color: var(--color-accent-800); background: var(--color-accent-100); border-color: var(--color-accent-300); }
 
 /* Picked but not yet sent to the server — held client-side until Submit. */
 .verif-staged-ready {
@@ -4432,4 +4449,83 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
 .overflow-menu-item:hover { background: var(--color-bg); }
 .overflow-menu-item-danger { color: var(--color-accent-2); }
 .overflow-menu-item-danger:hover { background: var(--color-accent-2-100); }
+
+/* ============================================================
+   Filter picker — styled popup replacing the plain <select> boxes
+   on the tutor search filter bar (Subject/Mode/Experience/Rating).
+   See app/directives/filter-picker.directives.js for the markup/
+   behavior this styles.
+
+   A genuine centered modal, not a panel anchored under the trigger —
+   same positioning technique as .ov-modal-backdrop/.ov-modal in
+   tutor/overview.html: backdrop and card are siblings, both
+   position:fixed covering/centered on the viewport regardless of
+   where the trigger button sits on the page.
+   ============================================================ */
+.filter-picker-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit; font-size: 15px;
+  color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  cursor: pointer; text-align: left;
+}
+.filter-picker-trigger:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.filter-picker-trigger.open { border-color: var(--color-accent); }
+.filter-picker-trigger-label {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.filter-picker-trigger .ti-chevron-down {
+  flex-shrink: 0; opacity: 0.6; font-size: 15px; transition: transform 0.15s ease;
+}
+.filter-picker-trigger.open .ti-chevron-down { transform: rotate(180deg); }
+
+.filter-picker-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(0, 0, 0, 0.45);
+}
+.filter-picker-modal {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100; width: min(420px, 92vw); max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.filter-picker-modal-header {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 12px 14px; border-bottom: 1px solid var(--color-divider);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 16px;
+}
+.filter-picker-modal-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-picker-back, .filter-picker-close {
+  background: none; border: none; cursor: pointer; color: var(--color-text);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: var(--radius-sm); font-size: 16px;
+}
+.filter-picker-back:hover, .filter-picker-close:hover { background: var(--color-bg); }
+
+.filter-picker-row-list { overflow-y: auto; padding: 6px; }
+.filter-picker-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 8px; border: none; border-top: 1px solid var(--color-divider);
+  background: none; border-radius: var(--radius-sm);
+  cursor: pointer; text-align: left; font: inherit; font-size: 15px; color: var(--color-text);
+}
+.filter-picker-row:first-child { border-top: none; }
+.filter-picker-row:hover { background: var(--color-bg); }
+.filter-picker-row.selected { background: var(--color-accent-100); color: var(--color-accent-800); }
+.filter-picker-row-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-sm); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 17px;
+  background: var(--color-accent-100); color: var(--color-accent-700);
+}
+.filter-picker-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.filter-picker-row-title {
+  font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.filter-picker-row-subtitle { font-size: 12px; color: var(--color-text-muted); }
+.filter-picker-row-chevron { flex-shrink: 0; opacity: 0.5; font-size: 14px; }
 

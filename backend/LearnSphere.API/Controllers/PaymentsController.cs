@@ -18,15 +18,18 @@ public class PaymentsController : ControllerBase
     private readonly IHitPayService _hitPay;
     private readonly ITutorLedgerService _ledger;
     private readonly IPlatformFeeService _fees;
+    private readonly IBookingCancellationService _cancellation;
     private readonly ILogger<PaymentsController> _logger;
 
     public PaymentsController(AppDbContext context, IHitPayService hitPay,
-        ITutorLedgerService ledger, IPlatformFeeService fees, ILogger<PaymentsController> logger)
+        ITutorLedgerService ledger, IPlatformFeeService fees,
+        IBookingCancellationService cancellation, ILogger<PaymentsController> logger)
     {
         _context = context;
         _hitPay = hitPay;
         _ledger = ledger;
         _fees = fees;
+        _cancellation = cancellation;
         _logger = logger;
     }
 
@@ -302,6 +305,8 @@ public class PaymentsController : ControllerBase
 
         var transaction = await _context.PaymentTransactions
             .Include(t => t.Invoice).ThenInclude(i => i.Booking).ThenInclude(b => b.Student)
+            .Include(t => t.Invoice).ThenInclude(i => i.Booking).ThenInclude(b => b.Tutor).ThenInclude(t => t.User)
+            .Include(t => t.Invoice).ThenInclude(i => i.Booking).ThenInclude(b => b.CounterProposals)
             .FirstOrDefaultAsync(t => t.Id == tx);
 
         // Prefer the origin this checkout actually began on, so the parent comes back to the
@@ -403,6 +408,8 @@ public class PaymentsController : ControllerBase
 
         var transaction = await _context.PaymentTransactions
             .Include(t => t.Invoice).ThenInclude(i => i.Booking).ThenInclude(b => b.Student)
+            .Include(t => t.Invoice).ThenInclude(i => i.Booking).ThenInclude(b => b.Tutor).ThenInclude(t => t.User)
+            .Include(t => t.Invoice).ThenInclude(i => i.Booking).ThenInclude(b => b.CounterProposals)
             .Where(t => t.PaymentRequestId == paymentRequestId)
             .OrderByDescending(t => t.Id)
             .FirstOrDefaultAsync();
@@ -475,6 +482,18 @@ public class PaymentsController : ControllerBase
                     });
                 }
             }
+        }
+        // Same "only act once" guard as the completed branch above, so a redirect-back
+        // and a later webhook for the same transaction can't both try to cancel it —
+        // whichever gets here first does the work; the other finds Invoice already
+        // Cancelled and does nothing.
+        else if (remote.Status is "failed" or "expired" or "canceled" or "inactive"
+                 && invoice.Status == "Unpaid" && invoice.Booking != null)
+        {
+            await _cancellation.CancelAsync(
+                invoice.Booking,
+                "Booking Cancelled — Payment Failed",
+                "because payment was not completed");
         }
 
         await _context.SaveChangesAsync();
