@@ -90,6 +90,14 @@ public static class LedgerEntryType
     public const string CreditConsumption = "credit_consumption";  // − credit spent offsetting commission
     public const string CreditExpiry = "credit_expiry";            // − unspent remainder of an expired grant
 
+    // Unwinds an offset when the invoice behind it is refunded. Written as a pair, exactly
+    // like the offset itself: the withdrawable credit is taken back and the promotional
+    // credit is returned to the grant it came from. Without these, a refunded first match
+    // left the tutor holding money for a booking that was reversed AND permanently out of
+    // pocket on the credit they had spent on it.
+    public const string CommissionOffsetReversal = "commission_offset_reversal";
+    public const string CreditRestored = "credit_restored";
+
     // The withdrawable-fund counterpart of a credit consumption: the commission the credit
     // just paid off is handed back to the tutor as real money. Consumption and offset are
     // always written as a pair and always for the same amount, so the platform's books
@@ -105,5 +113,6 @@ public static class LedgerEntryType
     public static readonly string[] FirstMatchFamily = { FirstMatchCommission, FirstMatchCommissionReversal };
 
     // Everything that moves the credit fund. Used to total a promotional-credit balance.
-    public static readonly string[] CreditFamily = { CreditGrant, CreditConsumption, CreditExpiry };
+    public static readonly string[] CreditFamily =
+        { CreditGrant, CreditConsumption, CreditExpiry, CreditRestored };
 }
