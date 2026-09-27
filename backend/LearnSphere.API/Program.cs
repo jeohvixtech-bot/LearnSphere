@@ -2838,10 +2838,17 @@ app.UseCors("AllowFrontend");
 
 var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(wwwrootPath);
+
+// Static file serving runs BEFORE authentication, so anything reachable here is public.
+// Profile photos are meant to be — they are shown to parents browsing the catalogue.
+// Verification documents are NOT: they are identity papers, and they are served instead by
+// DocumentsController, which checks the caller is the owning tutor or an admin.
+var profilesPath = Path.Combine(wwwrootPath, "uploads", "profiles");
+Directory.CreateDirectory(profilesPath);
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(wwwrootPath),
-    RequestPath = ""
+    FileProvider = new PhysicalFileProvider(profilesPath),
+    RequestPath = "/uploads/profiles"
 });
 
 app.UseAuthentication();

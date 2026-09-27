@@ -166,6 +166,49 @@ public class PaymentsController : ControllerBase
         if (cashDue <= 0m)
             return BadRequest(new { message = "This invoice is already covered by your wallet credit. Apply it from your wallet to settle the invoice." });
 
+        // A parent who goes back and clicks Pay again used to get a SECOND live payment
+        // request while the first stayed payable, so both links could be paid. The invoice
+        // itself is safe (it only moves Unpaid -> Paid once) but the second capture is real
+        // money that lands nowhere. Reuse the pending request instead of minting another.
+        var pending = await _context.PaymentTransactions
+            .Where(t => t.InvoiceId == invoice.Id && t.Status == "pending"
+                     && t.PaymentRequestId != "" && t.CheckoutUrl != null)
+            .OrderByDescending(t => t.Id)
+            .FirstOrDefaultAsync();
+
+        if (pending != null)
+        {
+            // Only reuse it if HitPay still considers it payable and it is for the amount
+            // now owed — wallet credit applied in between would change that.
+            var stillOpen = false;
+            try
+            {
+                var remote = await _hitPay.GetPaymentRequestAsync(setting, pending.PaymentRequestId);
+                stillOpen = remote != null
+                            && remote.Status != "completed"
+                            && remote.Status != "expired"
+                            && pending.Amount == cashDue;
+            }
+            catch (HitPayException)
+            {
+                // Can't confirm its state, so don't reuse it; a fresh request is the safer
+                // failure here, and the stale one expires at HitPay on its own.
+            }
+
+            if (stillOpen)
+            {
+                return Ok(new CheckoutResponseDto
+                {
+                    CheckoutUrl = pending.CheckoutUrl!,
+                    PaymentRequestId = pending.PaymentRequestId,
+                    InvoiceId = invoice.Id,
+                    InvoiceNumber = invoice.InvoiceNumber,
+                    Amount = pending.Amount,
+                    Currency = setting.Currency
+                });
+            }
+        }
+
         var apiBaseUrl = ResolveApiBaseUrl(setting);
 
         // Persisted before the outbound call so the row's own id can be the redirect

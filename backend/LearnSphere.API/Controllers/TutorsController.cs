@@ -345,6 +345,7 @@ public class TutorsController : ControllerBase
     {
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id);
         if (tutor == null) return NotFound();
+        if (!CallerMayManage(tutor)) return Forbid();
 
         _context.Tutors.Remove(tutor);
         await _context.SaveChangesAsync();
@@ -440,6 +441,19 @@ public class TutorsController : ControllerBase
         return Ok(dto);
     }
 
+    // Does the caller own this tutor profile, or are they an admin?
+    //
+    // Several {id}-addressed endpoints trusted the id in the URL and never compared it to
+    // the caller, which let any signed-in tutor edit, reprice or delete another tutor's
+    // profile. The check is centralised here so a new endpoint has one obvious thing to
+    // call rather than re-deriving it.
+    private bool CallerMayManage(Tutor tutor)
+    {
+        if (User.IsInRole("admin")) return true;
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return tutor.UserId == userId;
+    }
+
     [HttpPut("{id}")]
     [Authorize]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTutorDto dto)
@@ -453,6 +467,7 @@ public class TutorsController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null) return NotFound();
+        if (!CallerMayManage(tutor)) return Forbid();
 
         if (dto.Bio != null)
         {
@@ -958,6 +973,7 @@ public class TutorsController : ControllerBase
     {
         var tutor = await _context.Tutors.FindAsync(id);
         if (tutor == null) return NotFound();
+        if (!CallerMayManage(tutor)) return Forbid();
 
         var slot = new TutorTimeSlot { TutorId = id, Day = dto.Day, Time = dto.Time, Status = "Available" };
         _context.TutorTimeSlots.Add(slot);
