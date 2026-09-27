@@ -156,9 +156,6 @@ request of unknown state; the stale one expires at HitPay on its own.
 
 ---
 
-
----
-
 ## BUG-05 — A refunded booking left the tutor paid, and destroyed their credit
 
 **Severity:** High · **Screen:** Admin → Resolution Disputes (refund path)
