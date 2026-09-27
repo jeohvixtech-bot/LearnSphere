@@ -1466,7 +1466,9 @@
               <span class="verif-progress-label bs-text-muted verif-doc-checklist-trigger">
                 {{ vm.mandatoryDocsUploadedCount() }} of {{ vm.mandatoryDocsTotal }} documents uploaded
                 <span class="verif-doc-checklist-tip">
-                  <span class="verif-doc-checklist-item" ng-repeat="item in vm.mandatoryDocsChecklist()" ng-class="{'verif-doc-checklist-item--done': item.done}">
+                  <!-- track by: the checklist is rebuilt as fresh objects on every call, so without a
+                       stable key ng-repeat never converges and Angular aborts the digest (infdig). -->
+                  <span class="verif-doc-checklist-item" ng-repeat="item in vm.mandatoryDocsChecklist() track by item.label" ng-class="{'verif-doc-checklist-item--done': item.done}">
                     <i class="ti" ng-class="item.done ? 'ti-check' : 'ti-x'" aria-hidden="true"></i> {{ item.label }}
                   </span>
                 </span>

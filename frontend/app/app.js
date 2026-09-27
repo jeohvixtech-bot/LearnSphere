@@ -2,7 +2,18 @@
 
 angular.module('learnSphereApp', ['ngRoute'])
 
-.constant('API_URL', 'http://127.0.0.1:5000/api')
+// Where the API lives, in order of precedence:
+//   1. window.LEARNSPHERE_API_URL — set per environment in config.js (never cached, never bundled)
+//   2. the local dev split (frontend on :3000, API on :5000)
+//   3. same origin + /api — the production shape, with the reverse proxy in front of both
+// Hard-coding 127.0.0.1 here made every deployed copy call the *visitor's* machine.
+.constant('API_URL', (function () {
+  if (window.LEARNSPHERE_API_URL) return String(window.LEARNSPHERE_API_URL).replace(/\/+$/, '');
+  if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname) && window.location.port === '3000') {
+    return 'http://127.0.0.1:5000/api';
+  }
+  return window.location.origin + '/api';
+})())
 
 .config(['$routeProvider', '$locationProvider', function ($routeProvider, $locationProvider) {
   $locationProvider.hashPrefix('!');
@@ -158,7 +169,23 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
     })
-    .otherwise({ redirectTo: '/welcome' });
+    // Unknown address: a signed-in user goes to their own home, not to /welcome —
+    // the landing page deliberately ends the session, so a typo or stale bookmark
+    // used to log people out.
+    .otherwise({ redirectTo: function () { return homeFor(readStoredUser()); } });
+
+  // Mirrors AuthService's storage (that service can't be injected into redirectTo).
+  function readStoredUser() {
+    try { return JSON.parse(sessionStorage.getItem('ls_user')); } catch (e) { return null; }
+  }
+
+  function homeFor(user) {
+    if (!user) return '/welcome';
+    if (user.mustChangePassword) return '/change-password';
+    if (user.role === 'admin') return '/admin/overview';
+    if (user.role === 'tutor') return '/tutor/overview';
+    return '/parent/dashboard';
+  }
 
   function authGuard(requiredRole) {
     return ['$q', '$location', 'AuthService', function ($q, $location, AuthService) {
@@ -172,7 +199,9 @@ angular.module('learnSphereApp', ['ngRoute'])
           deferred.resolve(user);
         }
       } else {
-        $location.path('/welcome');
+        // Signed out → landing page. Signed in but wrong role → their own home,
+        // keeping the session intact.
+        $location.path(homeFor(user));
         deferred.reject('Unauthorized');
       }
       return deferred.promise;
@@ -196,7 +225,15 @@ angular.module('learnSphereApp', ['ngRoute'])
 
 .run(['$rootScope', '$location', '$window', 'AuthService', function ($rootScope, $location, $window, AuthService) {
   $rootScope.$on('$routeChangeError', function () {
-    $location.path('/welcome');
+    // The guard has already pointed $location at the right place; only fall back to
+    // /welcome when it hasn't (e.g. a template failed to load).
+    var user = AuthService.getCurrentUser();
+    var target = $location.path();
+    var home = !user ? '/welcome'
+      : user.mustChangePassword ? '/change-password'
+      : user.role === 'admin' ? '/admin/overview'
+      : user.role === 'tutor' ? '/tutor/overview' : '/parent/dashboard';
+    if (target !== home && target !== '/change-password') $location.path(home);
   });
 
   // A scroll position left over from one page (e.g. a long tutor overview)

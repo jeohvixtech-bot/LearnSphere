@@ -2548,12 +2548,19 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     }
     var academicDone = docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })
       || ACADEMIC_LEVEL_TYPES.some(function (t) { return self.getStagedNew(t).length > 0; });
-    return [
+    var items = [
       { label: 'Identity photo', done: hasType('identity_photo') },
       { label: 'Profile photo', done: hasType('profile_photo') },
       { label: 'Academic qualification', done: academicDone }
     ];
+    // Hand back the SAME array while nothing has changed. ng-repeat watches the
+    // collection every digest; a fresh array of fresh objects on each call read as
+    // "3 items changed" forever and Angular gave up with $rootScope:infdig.
+    var sig = items.map(function (i) { return i.label + ':' + i.done; }).join('|');
+    if (sig !== _checklistCache.sig) _checklistCache = { sig: sig, items: items };
+    return _checklistCache.items;
   };
+  var _checklistCache = { sig: null, items: [] };
 
   self.mandatoryDocsUploadedCount = function () {
     return self.mandatoryDocsChecklist().filter(function (item) { return item.done; }).length;

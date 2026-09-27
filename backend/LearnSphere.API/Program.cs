@@ -38,6 +38,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]!;
+
+// Outside Development the committed appsettings.json values must have been overridden
+// (Jwt__Key, ConnectionStrings__DefaultConnection, AllowedOrigins__0 as environment
+// variables). Refusing to start is deliberate: with the sample key anyone holding the
+// repository can mint an admin token.
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Contains("CHANGE_IN_PRODUCTION") || jwtKey.Length < 32)
+        throw new InvalidOperationException(
+            "Jwt:Key is the sample value from appsettings.json (or shorter than 32 characters). " +
+            "Set the Jwt__Key environment variable to a random secret before running outside Development.");
+
+    var origins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+    if (origins == null || origins.Length == 0 || origins.Contains("*"))
+        Console.Error.WriteLine(
+            "WARNING: AllowedOrigins is \"*\" — any website may call this API with a signed-in user's token. " +
+            "Set AllowedOrigins__0 to the frontend's https origin.");
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -2827,12 +2845,17 @@ if (app.Configuration.GetValue<bool>("BehindReverseProxy"))
     app.UseForwardedHeaders(forwarded);
 }
 
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Swagger only in Development (or with EnableSwagger=true) — the full API surface should
+// not be browsable on the production host.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("EnableSwagger"))
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "LearnSphere API v1");
-    c.RoutePrefix = string.Empty; // Swagger at root: http://localhost:5000/
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "LearnSphere API v1");
+        c.RoutePrefix = string.Empty; // Swagger at root: http://localhost:5000/
+    });
+}
 
 app.UseCors("AllowFrontend");
 

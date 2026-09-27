@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', function ($location, AuthService, PendingMatchService, NameValidationService) {
+.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', 'API_URL', function ($location, AuthService, PendingMatchService, NameValidationService, API_URL) {
   var self = this;
 
   // Redirect if already logged in
@@ -111,7 +111,7 @@ angular.module('learnSphereApp')
       if (err && err.status === 400 && err.data && err.data.message) {
         self.errorMsg = err.data.message;
       } else if (err && err.status === 0) {
-        self.errorMsg = 'Cannot reach server. Is the backend running on http://127.0.0.1:5000?';
+        self.errorMsg = 'Cannot reach the server at ' + API_URL + '. Please try again in a moment.';
       } else if (err && err.status) {
         self.errorMsg = 'Server error ' + err.status + ': ' + (err.data && err.data.message ? err.data.message : JSON.stringify(err.data));
       } else {
