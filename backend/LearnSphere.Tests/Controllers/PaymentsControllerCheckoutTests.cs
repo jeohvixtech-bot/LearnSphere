@@ -48,6 +48,7 @@ public class PaymentsControllerCheckoutTests
             db, hitPay,
             TestControllerFactory.Ledger(db),
             TestControllerFactory.Fees(db),
+            TestControllerFactory.BookingCancellations(db),
             NullLogger<PaymentsController>.Instance);
 
         controller.ControllerContext = new ControllerContext

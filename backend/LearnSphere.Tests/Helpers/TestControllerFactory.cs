@@ -35,6 +35,9 @@ public static class TestControllerFactory
     public static IPresetCancellationService Cancellations(AppDbContext db) =>
         new PresetCancellationService(db, Wallet(db));
 
+    public static IBookingCancellationService BookingCancellations(AppDbContext db) =>
+        new BookingCancellationService(db, Wallet(db));
+
     public static IEmailService Email() =>
         new ConsoleEmailService(NullLogger<ConsoleEmailService>.Instance);
 
@@ -52,7 +55,7 @@ public static class TestControllerFactory
     public static AdminController Admin(AppDbContext db) =>
         new(db, Cancellations(db), HitPay(), Ledger(db), Wallet(db), Batches(db));
 
-    public static BookingsController Bookings(AppDbContext db) => new(db, Fees(db), Wallet(db));
+    public static BookingsController Bookings(AppDbContext db) => new(db, Fees(db), BookingCancellations(db));
 
     public static TutorsController Tutors(AppDbContext db) =>
         new(db, Cancellations(db), Email(), Environment(), Ledger(db));

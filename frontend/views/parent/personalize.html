@@ -122,6 +122,8 @@
           placeholder="Describe your child's learning goals, strengths, areas to improve, preferred teaching style, exam targets, or anything else the tutor should know..."></textarea>
       </div>
 
+      <p ng-if="vm.personalizeError" style="color:var(--color-accent-2-700); font-size:13px;">{{ vm.personalizeError }}</p>
+
       <div style="display:flex;justify-content:flex-end;">
         <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.savePersonalizeApplication()">Save</button>
       </div>

@@ -155,6 +155,41 @@ a { text-decoration: none; color: inherit; }
 .status-toggle-btn:hover { text-decoration: underline; }
 .sidebar-indigo .dot-pending, .sidebar-dark .dot-pending { color: #fbbf24; }
 
+/* ---- Mobile nav (hamburger + off-canvas sidebar drawer) ----
+   Every portal's <aside class="sidebar"> carries inline desktop positioning
+   (width/position/top — see e.g. parent/*.html) that would otherwise beat
+   these rules, so the drawer geometry below is !important. Toggled via
+   AppCtrl.mobileNavOpen (index.html), which stamps .mobile-nav-open on the
+   app-root div; auto-closes on $routeChangeSuccess. */
+.mobile-nav-toggle { display: none; }
+.mobile-nav-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,.45);
+  z-index: 240; animation: ls-fade-in .15s ease;
+}
+@keyframes ls-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 900px) {
+  .mobile-nav-toggle { display: inline-flex; }
+  .bs-nav-user-label { display: none; }
+
+  .sidebar-col { width: 100% !important; position: static !important; }
+  .sidebar, .sidebar-col .sidebar {
+    position: fixed !important; top: 0 !important; left: 0 !important; bottom: 0 !important;
+    width: 280px !important; max-width: 82vw !important; height: 100vh !important;
+    border-radius: 0 !important; margin: 0 !important; overflow-y: auto !important;
+    box-shadow: 4px 0 32px rgba(0,0,0,.28) !important;
+    transform: translateX(-100%); transition: transform .22s ease;
+    z-index: 250;
+  }
+  .mobile-nav-open .sidebar,
+  .mobile-nav-open .sidebar-col .sidebar { transform: translateX(0); }
+}
+
+@media (max-width: 480px) {
+  .bs-nav-signout { padding-left: 10px; padding-right: 10px; font-size: 0; }
+  .bs-nav-signout::before { content: '\21B0'; font-size: 15px; }
+}
+
 /* ---- Cards ---- */
 .card {
   background: #fff;
@@ -548,6 +583,13 @@ a { text-decoration: none; color: inherit; }
 }
 .login-card .form-group input::placeholder { color: #9ca3af; }
 
+/* Registration's Password/Confirm Password fields already have their own
+   show/hide eye button (login.html) — Edge injects its own native reveal
+   icon into type="password" inputs once they have a value, landing right on
+   top of ours. Suppress Edge's so only the app's toggle shows. */
+.bs-input-password-toggle::-ms-reveal,
+.bs-input-password-toggle::-ms-clear { display: none; }
+
 .login-card .btn-primary {
   background: linear-gradient(135deg, #059669 0%, #0ea5e9 100%);
   color: #fff; border: none; border-radius: 14px;
@@ -892,6 +934,7 @@ a { text-decoration: none; color: inherit; }
 .metric-card.green strong { color: #16a34a; }
 .metric-card.purple strong { color: #059669; }
 @media (max-width: 768px) { .metrics-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 420px) { .metrics-grid { grid-template-columns: 1fr; } }
 
 .log-list { display: flex; flex-direction: column; gap: 6px; }
 .log-item { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-family: monospace; color: #475569; }
@@ -933,6 +976,12 @@ a { text-decoration: none; color: inherit; }
 .chat-tutor-item span { font-size: 15px; font-weight: 600; color: #1e293b; }
 .chat-container.flex-1 { flex: 1; min-width: 0; }
 .online-status { font-size: 13px; color: #16a34a; margin-top: 2px; }
+
+@media (max-width: 700px) {
+  .chat-layout { flex-direction: column; }
+  .chat-tutor-list { width: 100%; max-height: 220px; overflow-y: auto; }
+  .chat-container { height: 60vh; }
+}
 .chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: #fafafa; display: flex; flex-direction: column; gap: 12px; }
 .chat-message-wrap { display: flex; }
 .chat-message-wrap.right { justify-content: flex-end; }
@@ -2978,8 +3027,23 @@ a { text-decoration: none; color: inherit; }
 .verif-banner--warning { background: #fffbeb; border: 0.5px solid #fde68a; color: #92400e; }
 .verif-banner--danger  { background: #fef2f2; border: 0.5px solid #fecaca; color: #b91c1c; }
 .bs-scope .verif-banner--success { background: var(--color-accent-100); border-color: var(--color-accent-300); color: var(--color-accent-800); }
-.bs-scope .verif-banner--warning,
 .bs-scope .verif-banner--danger { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); color: var(--color-accent-2-800); }
+/* --warning intentionally does NOT follow --danger into --color-accent-2 here
+   (bs-scope's own palette has no amber/yellow token to route it through) —
+   it falls through to the base .verif-banner--warning rule above instead, a
+   fixed soft yellow-orange so "Under review" reads as a warning, not an
+   error, regardless of which design-system skin the page is on. */
+
+/* Draws the eye to a banner that just appeared below the fold (e.g. the
+   verification submit error, scrolled into view at the same time) — box-
+   shadow pulse rather than a layout-shifting shake so it doesn't jostle
+   whatever the user's cursor/focus is near. */
+.verif-banner--attn { animation: verif-banner-attn 1.1s ease-out 2; }
+@keyframes verif-banner-attn {
+  0%   { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.45); }
+  70%  { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0); }
+}
 
 .verif-card {
   background: #fafafa; border: 0.5px solid #e2e8f0;
@@ -3039,6 +3103,7 @@ a { text-decoration: none; color: inherit; }
 .verif-upload-done--rejected .verif-filename { color: #b91c1c; }
 .verif-filesize { font-size: 12px; color: #15803d; opacity: .7; flex-shrink: 0; }
 .verif-remove-btn { font-size: 12px; color: #dc2626; background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
+.verif-remove-btn:disabled { opacity: .45; cursor: not-allowed; }
 .verif-reupload-btn {
   font-size: 12px; font-weight: 600;
   color: #dc2626; background: #fef2f2;
@@ -3046,6 +3111,17 @@ a { text-decoration: none; color: inherit; }
   border-radius: 6px; padding: 3px 8px;
   cursor: pointer; flex-shrink: 0;
 }
+/* Commits one staged optional doc (nie_cert/specialist_cert) or the intro
+   video link immediately, instead of waiting on the page-wide Submit button
+   — see confirmStagedVerifDoc/saveIntroVideoLink in tutor.controller.js. */
+.verif-confirm-btn {
+  font-size: 12px; font-weight: 600;
+  color: #15803d; background: #f0fdf4;
+  border: 0.5px solid #bbf7d0;
+  border-radius: 6px; padding: 3px 8px;
+  cursor: pointer; flex-shrink: 0; white-space: nowrap;
+}
+.verif-confirm-btn:disabled { opacity: .45; cursor: not-allowed; }
 .bs-scope .verif-upload-done { background: var(--color-accent-100); border-color: var(--color-accent-300); }
 .bs-scope .verif-upload-done--rejected { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
 .bs-scope .verif-upload-done i { color: var(--color-accent-700); }
@@ -3056,6 +3132,7 @@ a { text-decoration: none; color: inherit; }
 .bs-scope .verif-remove-btn,
 .bs-scope .verif-reupload-btn { color: var(--color-accent-2-700); }
 .bs-scope .verif-reupload-btn { background: var(--color-accent-2-100); border-color: var(--color-accent-2-300); }
+.bs-scope .verif-confirm-btn { color: var(--color-accent-800); background: var(--color-accent-100); border-color: var(--color-accent-300); }
 
 /* Picked but not yet sent to the server — held client-side until Submit. */
 .verif-staged-ready {
@@ -3746,7 +3823,10 @@ a.bs-sidebar-link { color: var(--color-text); }
 a.bs-sidebar-link.active { color: var(--color-bg); }
 
 /* — tables — */
-.bs-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+/* min-width keeps columns readable on narrow screens; pair with a wrapper
+   that has overflow-x:auto (see .table-wrap) so the table scrolls instead
+   of crushing its columns or blowing out the page width. */
+.bs-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 560px; }
 .bs-table th {
   text-align: left; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 60%, transparent);
@@ -4215,3 +4295,237 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
 .ov-slot-card-body {
   padding: 8px 12px;
 }
+
+/* ============================================================
+   LearnFlow design system — scoped override layer
+   ============================================================
+   Redefines the same CSS custom properties the .bs-scope design system
+   (above) already reads from (--color-*, --font-*, --space-*, --radius-*,
+   --shadow-*), so every existing bs-* component class (bs-card, bs-btn,
+   bs-input, bs-seg, bs-dialog, bs-tag, ...) picks up LearnFlow's palette
+   and type without any markup changes — only the token VALUES change,
+   scoped under .lf-scope so un-migrated pages keep the Broadsheet look.
+
+   Rolled out to frontend/views/login.html only so far. To bring another
+   view onto LearnFlow: add class="lf-scope" to that view's existing
+   .bs-scope root element (and "lf-page" too, if it should also get the
+   soft two-tone backdrop wash below).
+
+   Caveat: this is a token-only reskin, not a rebuild of the bs-* rules
+   themselves — so things the bs-* rules hardcode outside a variable (e.g.
+   .bs-scope's own h1–h6 font-size scale, which is unrelated to LearnFlow's
+   36/28/22/18px scale) won't match the LearnFlow spec exactly. Only the
+   colors, fonts, spacing, radius and shadows travel through the token
+   layer; the size/layout rules underneath are still Broadsheet's.
+
+   Fredoka/Poppins are loaded once via <link> tags in index.html's <head>,
+   not re-imported here — an @import here would double-fetch them. */
+
+.lf-scope {
+  /* — brand — */
+  --color-accent: #f97316;       /* primary: orange */
+  --color-accent-100: #fff7ed;
+  --color-accent-200: #ffedd5;
+  --color-accent-300: #fed7aa;
+  --color-accent-400: #fdba74;
+  --color-accent-500: #fb923c;
+  --color-accent-600: #ea580c;   /* bs-btn-primary:hover */
+  --color-accent-700: #c2410c;   /* bs-btn-primary:active */
+  --color-accent-800: #9a3412;
+  --color-accent-900: #7c2d12;
+
+  /* — error (bs-* has no separate error ramp; --color-accent-2-* IS the
+     error/danger ramp throughout the app, e.g. the login/register error
+     banners in login.html) — */
+  --color-accent-2: #ef4444;
+  --color-accent-2-100: #fef2f2;
+  --color-accent-2-200: #fee2e2;
+  --color-accent-2-300: #fecaca;
+  --color-accent-2-400: #fca5a5;
+  --color-accent-2-500: #f87171;
+  --color-accent-2-600: #dc2626;
+  --color-accent-2-700: #b91c1c;
+  --color-accent-2-800: #991b1b;
+  --color-accent-2-900: #7f1d1d;
+
+  /* — success (new — bs-* has no success concept at all; without this,
+     success states fall back to reusing --color-accent-100/800, which
+     under LearnFlow would read as orange, not green) — */
+  --color-success: #22c55e;
+  --color-success-100: #dcfce7;
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+
+  /* — base — */
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #1f2937;
+  --color-divider: #e5e7eb;
+  /* Quiet neutral fill for a card nested inside another (already-white)
+     card, e.g. login.html's "Demo Credentials" box — bs's own
+     --color-neutral-100 is a warm off-white (#f8f4f4) tuned for the
+     Broadsheet palette, not LearnFlow's cooler gray. */
+  --color-neutral-100: #f9fafb;
+
+  /* — type — */
+  --font-heading: 'Fredoka', system-ui, sans-serif;
+  --font-heading-weight: 600;
+  --font-body: 'Poppins', system-ui, sans-serif;
+
+  /* — spacing (8px base unit; bs-* only defines steps 1,2,3,4,6,8 — those
+     are remapped below, 1:1 with LearnFlow's sp-1..sp-8 scale) — */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 32px;
+  --space-8: 64px;
+
+  /* — radius (bs-*'s Broadsheet values are deliberately near-square —
+     1/2/4px — for its "newspaper" look; LearnFlow wants soft rounding) — */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+  --radius-circle: 50%;
+
+  /* — elevation — */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.10);
+  --shadow-focus: 0 0 0 3px rgba(249, 115, 22, 0.30);
+}
+
+/* bs-input has no focus ring at all (just a border-color swap) — add
+   LearnFlow's focus ring on top of that for .lf-scope inputs specifically,
+   since --shadow-focus isn't a token any existing bs-* rule reads. */
+.lf-scope .bs-input:focus-visible { box-shadow: var(--shadow-focus); }
+
+/* Full-page "warm/encouraging" wash — the brand's two main hues at low
+   opacity, layered under the white Surface Base rather than replacing it.
+   Not part of the original LearnFlow spec; kept as its own class (rather
+   than folded into .lf-scope) so a view can opt into the LearnFlow token
+   set without necessarily getting this particular backdrop treatment. */
+.lf-page {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(249, 115, 22, 0.07), transparent 45%),
+    radial-gradient(circle at 88% 92%, rgba(59, 130, 246, 0.07), transparent 45%),
+    #ffffff;
+}
+
+/* ============================================================
+   Overflow ("⋯") menu — small popover for secondary actions
+   (archive/delete on a student card, account settings on the
+   parent profile strip) that don't need to sit as always-visible
+   buttons. Token-based, so it renders correctly under either the
+   Broadsheet or LearnFlow (.lf-scope) skin without change.
+   Added for the Children Profiles declutter pass.
+   ============================================================ */
+.overflow-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 180px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.overflow-menu-item {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.overflow-menu-item:hover { background: var(--color-bg); }
+.overflow-menu-item-danger { color: var(--color-accent-2); }
+.overflow-menu-item-danger:hover { background: var(--color-accent-2-100); }
+
+/* ============================================================
+   Filter picker — styled popup replacing the plain <select> boxes
+   on the tutor search filter bar (Subject/Mode/Experience/Rating).
+   See app/directives/filter-picker.directives.js for the markup/
+   behavior this styles.
+
+   A genuine centered modal, not a panel anchored under the trigger —
+   same positioning technique as .ov-modal-backdrop/.ov-modal in
+   tutor/overview.html: backdrop and card are siblings, both
+   position:fixed covering/centered on the viewport regardless of
+   where the trigger button sits on the page.
+   ============================================================ */
+.filter-picker-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit; font-size: 15px;
+  color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  cursor: pointer; text-align: left;
+}
+.filter-picker-trigger:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.filter-picker-trigger.open { border-color: var(--color-accent); }
+.filter-picker-trigger-label {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.filter-picker-trigger .ti-chevron-down {
+  flex-shrink: 0; opacity: 0.6; font-size: 15px; transition: transform 0.15s ease;
+}
+.filter-picker-trigger.open .ti-chevron-down { transform: rotate(180deg); }
+
+.filter-picker-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(0, 0, 0, 0.45);
+}
+.filter-picker-modal {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100; width: min(420px, 92vw); max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.filter-picker-modal-header {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 12px 14px; border-bottom: 1px solid var(--color-divider);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 16px;
+}
+.filter-picker-modal-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-picker-back, .filter-picker-close {
+  background: none; border: none; cursor: pointer; color: var(--color-text);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: var(--radius-sm); font-size: 16px;
+}
+.filter-picker-back:hover, .filter-picker-close:hover { background: var(--color-bg); }
+
+.filter-picker-row-list { overflow-y: auto; padding: 6px; }
+.filter-picker-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 8px; border: none; border-top: 1px solid var(--color-divider);
+  background: none; border-radius: var(--radius-sm);
+  cursor: pointer; text-align: left; font: inherit; font-size: 15px; color: var(--color-text);
+}
+.filter-picker-row:first-child { border-top: none; }
+.filter-picker-row:hover { background: var(--color-bg); }
+.filter-picker-row.selected { background: var(--color-accent-100); color: var(--color-accent-800); }
+.filter-picker-row-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-sm); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 17px;
+  background: var(--color-accent-100); color: var(--color-accent-700);
+}
+.filter-picker-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.filter-picker-row-title {
+  font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.filter-picker-row-subtitle { font-size: 12px; color: var(--color-text-muted); }
+.filter-picker-row-chevron { flex-shrink: 0; opacity: 0.5; font-size: 14px; }
+

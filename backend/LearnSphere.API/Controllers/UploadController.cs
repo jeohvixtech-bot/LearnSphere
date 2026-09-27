@@ -9,8 +9,13 @@ namespace LearnSphere.API.Controllers;
 public class UploadController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<UploadController> _logger;
 
-    public UploadController(IWebHostEnvironment env) => _env = env;
+    public UploadController(IWebHostEnvironment env, ILogger<UploadController> logger)
+    {
+        _env = env;
+        _logger = logger;
+    }
 
     [HttpPost("image")]
     public async Task<IActionResult> UploadImage(IFormFile file)
@@ -23,13 +28,21 @@ public class UploadController : ControllerBase
             return BadRequest(new { message = "Only JPG, PNG, WEBP are allowed." });
 
         var uploadsDir = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads", "profiles");
-        Directory.CreateDirectory(uploadsDir);
 
         var fileName = $"{Guid.NewGuid()}{ext}";
         var filePath = Path.Combine(uploadsDir, fileName);
 
-        await using var stream = new FileStream(filePath, FileMode.Create);
-        await file.CopyToAsync(stream);
+        try
+        {
+            Directory.CreateDirectory(uploadsDir);
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await file.CopyToAsync(stream);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save uploaded image {FileName}", file.FileName);
+            return StatusCode(500, new { message = $"Could not save the file on the server: {ex.Message}" });
+        }
 
         var url = $"{Request.Scheme}://{Request.Host}/uploads/profiles/{fileName}";
         return Ok(new { url });
@@ -68,13 +81,21 @@ public class UploadController : ControllerBase
                 : "File must be between 100 KB and 5 MB." });
 
         var uploadsDir = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads", "documents");
-        Directory.CreateDirectory(uploadsDir);
 
         var fileName = $"{Guid.NewGuid()}{ext}";
         var filePath = Path.Combine(uploadsDir, fileName);
 
-        await using var stream = new FileStream(filePath, FileMode.Create);
-        await file.CopyToAsync(stream);
+        try
+        {
+            Directory.CreateDirectory(uploadsDir);
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await file.CopyToAsync(stream);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save uploaded document {FileName} (type={Type})", file.FileName, type);
+            return StatusCode(500, new { message = $"Could not save the file on the server: {ex.Message}" });
+        }
 
         var url = $"{Request.Scheme}://{Request.Host}/uploads/documents/{fileName}";
         return Ok(new { url, fileName = file.FileName, fileSizeBytes = file.Length });

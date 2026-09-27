@@ -36,6 +36,7 @@ builder.Services.AddAuthorization();
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPresetCancellationService, PresetCancellationService>();
+builder.Services.AddScoped<IBookingCancellationService, BookingCancellationService>();
 
 // HitPay payment gateway. Credentials aren't read from configuration — they live in the
 // PaymentGatewaySettings table, managed from Admin → Payment Gateway — so nothing needs

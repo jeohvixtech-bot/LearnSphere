@@ -9,6 +9,16 @@ function ($scope, $location, AuthService, NotificationService) {
   self.notifications = [];
   self.unreadCount = 0;
 
+  self.mobileNavOpen = false;
+
+  self.toggleMobileNav = function () {
+    self.mobileNavOpen = !self.mobileNavOpen;
+  };
+
+  self.closeMobileNav = function () {
+    self.mobileNavOpen = false;
+  };
+
   self.isLoggedIn = function () {
     return AuthService.isLoggedIn();
   };
@@ -76,5 +86,6 @@ function ($scope, $location, AuthService, NotificationService) {
   $scope.$on('$routeChangeSuccess', function () {
     self.currentUser = AuthService.getCurrentUser();
     self.loadNotifications();
+    self.mobileNavOpen = false;
   });
 }]);
