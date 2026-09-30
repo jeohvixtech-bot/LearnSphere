@@ -3099,6 +3099,21 @@ a { text-decoration: none; color: inherit; }
 }
 .verif-upload-done i { font-size: 16px; color: #16a34a; }
 .verif-upload-done--rejected i { color: #dc2626; }
+/* Admin's rejection reason — sits inside the flex row but forced onto its own
+   line below the filename/badge/buttons via order + full-width basis. */
+.verif-upload-done--rejected { flex-wrap: wrap; }
+.verif-reject-note {
+  order: 99; flex-basis: 100%;
+  display: flex; align-items: flex-start; gap: 6px;
+  margin: 2px 0 0; padding-top: 6px;
+  border-top: 1px dashed #fecaca;
+  font-size: 12.5px; line-height: 1.45; color: #991b1b;
+  overflow-wrap: anywhere;
+}
+.verif-upload-done--rejected .verif-reject-note i { font-size: 14px; margin-top: 1px; }
+.verif-reject-note span { white-space: pre-wrap; }
+/* Wrapping is on for rejected rows, so keep a long filename from pushing the badge/buttons down. */
+.verif-upload-done--rejected .verif-filename { flex: 1 1 0; min-width: 0; }
 .verif-filename { flex: 1; font-size: 14px; color: #15803d; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .verif-upload-done--rejected .verif-filename { color: #b91c1c; }
 .verif-filesize { font-size: 12px; color: #15803d; opacity: .7; flex-shrink: 0; }

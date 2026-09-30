@@ -1513,6 +1513,9 @@
 
             <div ng-if="vm.getDocSingle('identity_id')" class="verif-upload-done"
               ng-class="{'verif-upload-done--rejected': vm.getDocSingle('identity_id').status === 'rejected'}">
+              <p class="verif-reject-note" ng-if="vm.getDocSingle('identity_id').status === 'rejected' && vm.getDocSingle('identity_id').adminNote">
+                <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ vm.getDocSingle('identity_id').adminNote }}</span>
+              </p>
               <i class="ti ti-file-check" aria-hidden="true"></i>
               <span class="verif-filename">{{ vm.getDocSingle('identity_id').idType }}: {{ vm.getDocSingle('identity_id').idNumber }}</span>
               <span class="verif-doc-status-badge"
@@ -1534,6 +1537,9 @@
 
               <div ng-if="vm.getDocSingle('identity_photo')" class="verif-upload-done"
                 ng-class="{'verif-upload-done--rejected': vm.getDocSingle('identity_photo').status === 'rejected'}">
+                <p class="verif-reject-note" ng-if="vm.getDocSingle('identity_photo').status === 'rejected' && vm.getDocSingle('identity_photo').adminNote">
+                  <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ vm.getDocSingle('identity_photo').adminNote }}</span>
+                </p>
                 <i class="ti ti-file-check" aria-hidden="true"></i>
                 <span class="verif-filename">{{ vm.getDocSingle('identity_photo').fileName }}</span>
                 <span class="verif-filesize">{{ vm.formatFileSize(vm.getDocSingle('identity_photo').fileSizeBytes) }}</span>
@@ -1593,6 +1599,9 @@
 
               <div ng-if="vm.getDocSingle('profile_photo')" class="verif-upload-done"
                 ng-class="{'verif-upload-done--rejected': vm.getDocSingle('profile_photo').status === 'rejected'}">
+                <p class="verif-reject-note" ng-if="vm.getDocSingle('profile_photo').status === 'rejected' && vm.getDocSingle('profile_photo').adminNote">
+                  <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ vm.getDocSingle('profile_photo').adminNote }}</span>
+                </p>
                 <img ng-if="vm.getDocSingle('profile_photo').fileUrl" ng-src="{{ vm.getDocSingle('profile_photo').fileUrl }}"
                   class="preview-avatar" alt="Preview" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />
                 <span class="verif-filename">{{ vm.getDocSingle('profile_photo').fileName }}</span>
@@ -1663,6 +1672,9 @@
               <div class="verif-upload-done"
                 ng-repeat="doc in vm.getDocs(ql.type) track by doc.id"
                 ng-class="{'verif-upload-done--rejected': doc.status === 'rejected'}">
+                <p class="verif-reject-note" ng-if="doc.status === 'rejected' && doc.adminNote">
+                  <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ doc.adminNote }}</span>
+                </p>
                 <i class="ti ti-file-check" aria-hidden="true"></i>
                 <span class="verif-filename">{{ doc.fileName }}</span>
                 <span class="verif-filesize">{{ vm.formatFileSize(doc.fileSizeBytes) }}</span>
@@ -1808,6 +1820,9 @@
               <div class="verif-upload-done"
                 ng-repeat="doc in vm.getDocs('nie_cert') track by doc.id"
                 ng-class="{'verif-upload-done--rejected': doc.status === 'rejected'}">
+                <p class="verif-reject-note" ng-if="doc.status === 'rejected' && doc.adminNote">
+                  <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ doc.adminNote }}</span>
+                </p>
                 <i class="ti ti-file-check" aria-hidden="true"></i>
                 <span class="verif-filename">{{ doc.fileName }}</span>
                 <span class="verif-filesize">{{ vm.formatFileSize(doc.fileSizeBytes) }}</span>
@@ -1893,6 +1908,9 @@
 
               <div ng-if="vm.getDocSingle('intro_video')" class="verif-upload-done"
                 ng-class="{'verif-upload-done--rejected': vm.getDocSingle('intro_video').status === 'rejected'}">
+                <p class="verif-reject-note" ng-if="vm.getDocSingle('intro_video').status === 'rejected' && vm.getDocSingle('intro_video').adminNote">
+                  <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ vm.getDocSingle('intro_video').adminNote }}</span>
+                </p>
                 <i class="ti ti-file-check" aria-hidden="true"></i>
                 <span class="verif-filename">
                   {{ vm.getDocSingle('intro_video').fileName || vm.getDocSingle('intro_video').externalUrl }}
@@ -1934,6 +1952,9 @@
             <div class="verif-upload-done"
               ng-repeat="doc in vm.getDocs('specialist_cert') track by doc.id"
               ng-class="{'verif-upload-done--rejected': doc.status === 'rejected'}">
+              <p class="verif-reject-note" ng-if="doc.status === 'rejected' && doc.adminNote">
+                <i class="ti ti-message-report" aria-hidden="true"></i><span><b>Admin note:</b> {{ doc.adminNote }}</span>
+              </p>
               <i class="ti ti-file-check" aria-hidden="true"></i>
               <span class="verif-filename">{{ doc.fileName }}</span>
               <span class="verif-filesize">{{ vm.formatFileSize(doc.fileSizeBytes) }}</span>
