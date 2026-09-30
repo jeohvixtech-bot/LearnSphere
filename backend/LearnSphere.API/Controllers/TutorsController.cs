@@ -449,6 +449,7 @@ public class TutorsController : ControllerBase
             tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
         var dto = MapToDto(tutor, syllabusMap);
         (dto.Score, dto.Tier, dto.ScoreMax) = await ComputeTutorTierAsync(tutor);
+        dto.TestModeEnabled = tutor.TestModeEnabled;
         return Ok(dto);
     }
 
@@ -864,9 +865,11 @@ public class TutorsController : ControllerBase
         }
 
         // Classes can only be scheduled from next month onward — never the current
-        // month, regardless of how many days are left in it.
+        // month, regardless of how many days are left in it. A tutor with
+        // TestModeEnabled (on by default; changed only via SQL) skips the month rule for
+        // end-to-end testing; an unparseable date is still rejected either way.
         var minSetupDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddMonths(1);
-        var earlySlot = dto.Slots.FirstOrDefault(s => !DateTime.TryParse(s.Date, out var d) || d.Date < minSetupDate);
+        var earlySlot = dto.Slots.FirstOrDefault(s => !DateTime.TryParse(s.Date, out var d) || (!tutor.TestModeEnabled && d.Date < minSetupDate));
         if (earlySlot != null)
             return BadRequest(new { message = $"{earlySlot.Date} is not available — classes can only be set up for next month onward." });
 

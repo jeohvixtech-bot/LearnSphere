@@ -13,6 +13,12 @@ public class Tutor
     public string Bio { get; set; } = string.Empty;
     public bool IsVerified { get; set; } = false;
     public bool IsOnline { get; set; } = true; // Offline hides the profile from parent search entirely
+    // Test mode: lets Setup Class skip the "next month onward" date rule and
+    // shows the "Quick-create test class" button, so the booking → payment flow
+    // can be tested end-to-end today. ON by default for every tutor (new ones
+    // too) until switched off. No endpoint or UI changes it — only SQL, e.g.
+    // UPDATE Tutors SET TestModeEnabled = 0;
+    public bool TestModeEnabled { get; set; } = true;
 
     // Document verification (identity, academic, teaching credentials, etc. — see
     // TutorDocument). VerificationStatus is separate from IsVerified: IsVerified is

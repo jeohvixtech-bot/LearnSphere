@@ -49,6 +49,9 @@ public class TutorDto
     // this" caveat as Score.
     public double ScoreMax { get; set; }
     public string Tier { get; set; } = "Normal";
+    // Same "only GetByUser populates this" caveat as Score — never exposed on
+    // public/catalog endpoints. See Tutor.TestModeEnabled.
+    public bool TestModeEnabled { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
     public bool OfferingsUnlocked { get; set; }
     public DateTime? LastSubmittedAt { get; set; }

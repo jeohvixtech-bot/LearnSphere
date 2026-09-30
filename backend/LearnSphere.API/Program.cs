@@ -187,6 +187,13 @@ using (var scope = app.Services.CreateScope())
     // Tutor-controlled online/offline switch — offline hides the profile from parent search/booking entirely
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Tutors` ADD COLUMN `IsOnline` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
+    // Test mode (Setup Class date-rule bypass + quick test class button, see Tutor.TestModeEnabled) —
+    // on by default. SET DEFAULT covers databases where the column was first added with DEFAULT 0;
+    // it only changes the default for new rows, never an existing row's value.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ADD COLUMN `TestModeEnabled` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 1"); } catch { }
     // CounterProposals becomes a per-booking log (was 1-to-1) so every reschedule proposal —
     // by either party — is kept instead of being overwritten by the next one.
     // The old unique index backs a FK, so a replacement non-unique index must exist

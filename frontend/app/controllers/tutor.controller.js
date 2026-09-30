@@ -1728,14 +1728,14 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
 
   self.setupClassSelectedDates = function () {
     return self.selectedCalDays
-      .filter(function (d) { return !self.isPastDay(d); })
+      .filter(function (d) { return self.dateBypassActive() || !self.isPastDay(d); })
       .slice().sort(function (a, b) { return a - b; })
       .map(calDayStr);
   };
 
   self.setupClassSelectedDatesLabel = function () {
     var days = self.selectedCalDays
-      .filter(function (d) { return !self.isPastDay(d); })
+      .filter(function (d) { return self.dateBypassActive() || !self.isPastDay(d); })
       .slice().sort(function (a, b) { return a - b; });
     if (!days.length) return '';
     return days.join(', ') + ' · ' + self.calYear;
@@ -2077,7 +2077,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     var slots = [];
     var earlyDate = null;
     Object.keys(self.setupClassSlots).forEach(function (dateStr) {
-      if (!earlyDate && isBeforeNextMonth(dateStr)) earlyDate = dateStr;
+      if (!earlyDate && !self.dateBypassActive() && isBeforeNextMonth(dateStr)) earlyDate = dateStr;
       (self.setupClassSlots[dateStr] || []).forEach(function (r) {
         slots.push({ date: dateStr, startTime: r.start, endTime: r.end, durationMinutes: r.endMin - r.startMin });
       });
@@ -2115,6 +2115,25 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
       self.setupClassSaving = false;
       self.setupClassError = (err.data && err.data.message) ? err.data.message : 'Failed to save. Please try again.';
     });
+  };
+
+  // ── Test mode: date-rule bypass toggle ─────────────────────────────
+  // Only available when vm.tutor.testModeEnabled (on by default, switched off
+  // via SQL — see Tutor.TestModeEnabled). While ON, Setup Class accepts dates
+  // in the current month and before today; the backend already skips its
+  // "next month onward" check for test-mode tutors. Remembered per browser.
+  var DATE_BYPASS_KEY = 'ls.tutorDateBypass';
+  self.dateBypassOn = false;
+  try { self.dateBypassOn = localStorage.getItem(DATE_BYPASS_KEY) === '1'; } catch (e) { /* storage blocked */ }
+
+  self.dateBypassActive = function () {
+    return !!(self.dateBypassOn && self.tutor && self.tutor.testModeEnabled);
+  };
+
+  self.toggleDateBypass = function () {
+    if (!self.tutor || !self.tutor.testModeEnabled) return;
+    self.dateBypassOn = !self.dateBypassOn;
+    try { localStorage.setItem(DATE_BYPASS_KEY, self.dateBypassOn ? '1' : '0'); } catch (e) { /* storage blocked */ }
   };
 
   self.getInvoice = function (bookingId) {
@@ -2426,15 +2445,13 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     // below, which uploads+saves every staged item before calling the actual
     // submit endpoint. { _stagedId, file, docType, fileName, fileSizeBytes,
     // previewUrl, replacesDocumentId (set only when fixing a rejected doc) }
-    stagedList: [],
-    // Set while a single optional-type staged doc's "Confirm" button is
-    // mid-flight (see confirmStagedVerifDoc) — lets that one row show a busy
-    // state instead of the whole form looking frozen.
-    confirmingStagedId: null,
-    // Set while saveIntroVideoLink's immediate save is mid-flight.
-    savingIntroVideo: false
+    stagedList: []
   };
   self.verifSubmitting = false;
+  // Profile sub-tab (optional docs) has its own single submit — see submitProfileDocs.
+  self.profileSubmitting = false;
+  self.profileSubmitError = '';
+  self.profileSubmitSuccess = false;
 
   // Shape-only validation (no checksum) — mirrors TutorsController.SaveDocument's
   // server-side patterns. Passport intentionally has no pattern: admin relies on
@@ -2542,12 +2559,14 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // multi-type instead (see removalBlockedReason below, which checks across
   // all four ACADEMIC_LEVEL_TYPES combined, not just the one being removed).
   var SINGLE_SLOT_MANDATORY_TYPES = ['identity_photo', 'profile_photo'];
-  // File-based, non-mandatory types — Remove was already unstaged/immediate
-  // for every type before this; what's new for these two is that a freshly
-  // staged pick can ALSO be committed immediately via a per-item "Confirm"
-  // (see confirmStagedVerifDoc) instead of waiting on the page-wide Submit
-  // button, since neither is required for verification to proceed.
+  // File-based, non-mandatory types. These live on the Profile sub-tab (with
+  // the link-only intro_video) and are committed by its own Submit button
+  // (see submitProfileDocs), never by "Submit for verification", since none
+  // of them is required for verification to proceed.
   var OPTIONAL_FILE_TYPES = ['nie_cert', 'specialist_cert'];
+  function isOptionalStaged(item) { return OPTIONAL_FILE_TYPES.indexOf(item.docType) >= 0; }
+  function mandatoryStaged() { return (self.verif.stagedList || []).filter(function (s) { return !isOptionalStaged(s); }); }
+  function optionalStaged() { return (self.verif.stagedList || []).filter(isOptionalStaged); }
 
   // Null when removing `doc` is fine; otherwise a user-facing reason it's
   // blocked. Only mandatory slots can ever be blocked — non-mandatory docs
@@ -2666,8 +2685,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // that shouldn't drag the profile back into review (see submit-verification
   // backend endpoint, which independently enforces the same no-op).
   self.hasPendingVerificationChanges = function () {
-    if ((self.verif.stagedList || []).length > 0) return true;
-    if (self.canEditIntroVideo() && (self.verif.introVideoLink || '').trim()) return true;
+    if (mandatoryStaged().length > 0) return true;
     if (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged()) return true;
     return false;
   };
@@ -2721,25 +2739,58 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     return !!d && d.status === 'rejected';
   };
 
-  // Intro video is optional and link-only (no file), so unlike a staged
-  // upload there's nothing for the page-wide Submit button to flush later —
-  // this saves it right away instead, the same "non-mandatory fields act
-  // immediately" rule the optional file types follow.
-  self.saveIntroVideoLink = function () {
-    if (!self.canEditIntroVideo() || !(self.verif.introVideoLink || '').trim()) return;
+  // Profile sub-tab: anything to send? Staged optional files, or a typed
+  // intro video link (only while that field is editable).
+  self.hasPendingProfileChanges = function () {
+    if (optionalStaged().length > 0) return true;
+    return self.canEditIntroVideo() && !!(self.verif.introVideoLink || '').trim();
+  };
+
+  // Single Submit for the Profile sub-tab. Uploads+saves every staged
+  // optional file and the intro video link, independently of the mandatory
+  // verification flow. Items that succeed are un-staged; failures stay staged
+  // with their error shown inline so the picked file isn't lost.
+  self.submitProfileDocs = function () {
+    if (!self.hasPendingProfileChanges() || self.profileSubmitting) return;
+    self.profileSubmitError = '';
+    self.profileSubmitting = true;
     self.verif.errorMap.intro_video = null;
-    self.verif.savingIntroVideo = true;
-    TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: self.verif.introVideoLink })
-      .then(function () {
-        self.verif.introVideoLink = '';
-        return self._refreshTutor();
-      })
-      .catch(function (err) {
-        self.verif.errorMap.intro_video = _extractErrorMessage(err, 'Failed to save video link.');
-      })
-      .finally(function () {
-        self.verif.savingIntroVideo = false;
+    var anyFailed = false;
+
+    var fileSaves = optionalStaged().map(function (item) {
+      self.verif.errorMap[item.docType] = null;
+      return _flushOneStagedItem(item).then(function () {
+        self.unstageVerifDoc(item._stagedId);
+      }, function (err) {
+        anyFailed = true;
+        self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
       });
+    });
+
+    var link = (self.verif.introVideoLink || '').trim();
+    var linkSave = (self.canEditIntroVideo() && link)
+      ? TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: link }).then(function () {
+          self.verif.introVideoLink = '';
+        }, function (err) {
+          anyFailed = true;
+          self.verif.errorMap.intro_video = _extractErrorMessage(err, 'Failed to save video link.');
+        })
+      : $q.when();
+
+    $q.all(fileSaves.concat([linkSave])).then(function () {
+      return self._refreshTutor();
+    }).then(function () {
+      if (anyFailed) {
+        self.profileSubmitError = 'Some items could not be saved — see the errors above.';
+        return;
+      }
+      self.profileSubmitSuccess = true;
+      $timeout(function () { self.profileSubmitSuccess = false; }, 3000);
+    }).catch(function (err) {
+      self.profileSubmitError = _extractErrorMessage(err, 'Submission failed. Please try again.');
+    }).finally(function () {
+      self.profileSubmitting = false;
+    });
   };
 
   var _stagedIdSeq = 0;
@@ -2857,8 +2908,8 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     return fallback + (err.status ? ' (server returned status ' + err.status + ')' : '');
   }
 
-  // Uploads then saves one staged item. Shared by the batch Submit flow below
-  // and confirmStagedVerifDoc's immediate per-item path for optional types.
+  // Uploads then saves one staged item. Shared by the verification Submit flow
+  // below and the Profile sub-tab's submitProfileDocs.
   function _flushOneStagedItem(item) {
     return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
       return TutorService.saveDocument(self.tutor.id, {
@@ -2891,30 +2942,12 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     });
   }
 
+  // Clears only mandatory-type staged items — optional ones belong to the
+  // Profile sub-tab and are left for its own Submit.
   function _clearStagedDocs() {
-    (self.verif.stagedList || []).forEach(function (s) { if (s.previewUrl) URL.revokeObjectURL(s.previewUrl); });
-    self.verif.stagedList = [];
+    mandatoryStaged().forEach(function (s) { if (s.previewUrl) URL.revokeObjectURL(s.previewUrl); });
+    self.verif.stagedList = optionalStaged();
   }
-
-  // Commits ONE staged optional-type doc (nie_cert/specialist_cert) right
-  // away instead of waiting for the page-wide Submit — see isOptionalDocType.
-  // A failed upload stays in stagedList (so the picked file isn't lost) with
-  // its error shown inline; a successful one is un-staged and the tutor
-  // record refreshed so it now shows as a real, saved document.
-  self.confirmStagedVerifDoc = function (stagedId) {
-    var item = (self.verif.stagedList || []).find(function (s) { return s._stagedId === stagedId; });
-    if (!item) return;
-    self.verif.errorMap[item.docType] = null;
-    self.verif.confirmingStagedId = stagedId;
-    _flushOneStagedItem(item).then(function () {
-      self.unstageVerifDoc(stagedId);
-      return self._refreshTutor();
-    }).catch(function (err) {
-      self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
-    }).finally(function () {
-      self.verif.confirmingStagedId = null;
-    });
-  };
 
   // Every doc type is staged client-side only (see verif.stagedList) — this is
   // the single point where anything actually reaches the server: upload+save
@@ -2927,11 +2960,11 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     self.verifSubmitError = '';
     self.verifSubmitting = true;
 
-    var staged = (self.verif.stagedList || []).slice();
+    var staged = mandatoryStaged();
 
     _flushStagedDocs(staged).then(function () {
-      // Intro video is no longer part of this flow — it saves immediately via
-      // its own button (saveIntroVideoLink) since it's optional/link-only.
+      // Intro video and optional certs aren't part of this flow — they're
+      // submitted from the Profile sub-tab (see submitProfileDocs).
       return (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged())
         ? TutorService.saveDocument(self.tutor.id, { documentType: 'identity_id', idType: self.verif.idType, idNumber: self.verif.idNumber })
         : $q.when();

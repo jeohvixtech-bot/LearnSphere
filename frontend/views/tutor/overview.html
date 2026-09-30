@@ -247,6 +247,18 @@
         <div class="ls-info" ng-if="vm.tutor.qualifications.length"><i class="ti ti-school" aria-hidden="true"></i>{{ vm.tutor.qualifications.join(', ') }}</div>
         <div class="ls-info" ng-if="vm.tutor.subjects.length"><i class="ti ti-book" aria-hidden="true"></i>{{ vm.tutor.subjects.join(', ') }}</div>
         <div class="ls-info" style="margin-bottom:0;" ng-if="vm.tutor.modes.length"><i class="ti ti-video" aria-hidden="true"></i>{{ vm.tutor.modes.join(' · ') }}</div>
+
+        <!-- TEST MODE — rendered only when Tutors.TestModeEnabled = 1 (on by default; switch off via SQL). -->
+        <div ng-if="vm.tutor.testModeEnabled" style="margin-top:14px;padding-top:12px;border-top:1px dashed #F0B429;">
+          <button type="button" class="ls-btn" style="width:100%;border:1px solid #F0B429;"
+            ng-style="vm.dateBypassOn ? {background:'#F0B429', color:'#fff'} : {background:'#FFF3D6', color:'#92400E'}"
+            ng-click="vm.toggleDateBypass()">
+            ⚡ Bypass date rule: {{ vm.dateBypassOn ? 'ON' : 'OFF' }}
+          </button>
+          <p style="font-size:11.5px;color:#92400E;margin:6px 0 0;">
+            {{ vm.dateBypassOn ? 'Setup Class accepts this month and past dates.' : 'Setup Class only accepts next month onward.' }}
+          </p>
+        </div>
       </div>
 
       <!-- Bulletin board feed — relocated from the old bulletin panel modal (not
@@ -1405,6 +1417,12 @@
           Verification
         </button>
         <button type="button" class="prof-subtab"
+          ng-class="{'prof-subtab--active': vm.profileTab === 'profile'}"
+          ng-click="vm.profileTab = 'profile'">
+          <i class="ti ti-user" aria-hidden="true"></i>
+          Profile
+        </button>
+        <button type="button" class="prof-subtab"
           ng-class="{'prof-subtab--active': vm.profileTab === 'offerings'}"
           ng-click="vm.profileTab = 'offerings'">
           <i class="ti ti-book" aria-hidden="true"></i>
@@ -1726,7 +1744,60 @@
             </div>
           </div>
 
-          <!-- ── 3. Teaching credentials ── -->
+          <!-- Privacy note -->
+          <div class="verif-privacy-note">
+            <i class="ti ti-lock" aria-hidden="true"></i>
+            <p>All documents are stored securely and only reviewed by LearnSphere admin. Subject offerings will be unlocked once all required documents are uploaded and verified. Review takes 1–3 business days.</p>
+          </div>
+
+          <!-- Submit -->
+          <div class="verif-submit-row">
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && (vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal || !vm.hasIdentityNumber())">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              <span ng-if="vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal">{{ vm.mandatoryDocsTotal - vm.mandatoryDocsUploadedCount() }} required document(s) still missing<span ng-if="!vm.hasIdentityNumber()">, identity number not provided</span></span>
+              <span ng-if="vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && !vm.hasIdentityNumber()">Identity number not provided</span>
+            </p>
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'pending'">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              Verification under review — re-upload any rejected document to resubmit
+            </p>
+            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'approved'">
+              <i class="ti ti-circle-check" aria-hidden="true"></i>
+              Your profile is already verified — nothing new to submit
+            </p>
+            <button type="button" class="btn-primary"
+              ng-click="vm.submitVerification()"
+              ng-disabled="!vm.canSubmitVerification() || vm.verifSubmitting">
+              <i class="ti ti-send" style="font-size:14px; margin-right:5px;" aria-hidden="true"></i>
+              {{ vm.verifSubmitting ? 'Submitting...' : 'Submit for verification' }}
+            </button>
+            <div id="verifSubmitErrorBanner" class="verif-banner verif-banner--danger verif-banner--attn" ng-if="vm.verifSubmitError">
+              <i class="ti ti-alert-circle" aria-hidden="true"></i>
+              <div><p>{{ vm.verifSubmitError }}</p></div>
+            </div>
+          </div>
+
+        </div>
+</div><!-- end verification sub-tab -->
+
+<!-- ══ PROFILE SUB-TAB ══ -->
+<!-- Non-mandatory items moved out of Verification. Committed by the single
+     Submit at the bottom (vm.submitProfileDocs), independent of the
+     mandatory "Submit for verification" flow. -->
+        <div ng-if="vm.profileTab === 'profile'">
+        <div class="verif-section">
+
+          <div class="verif-header">
+            <div>
+              <p class="verif-title">
+                <i class="ti ti-user" aria-hidden="true"></i>
+                Profile extras
+              </p>
+              <p class="verif-subtitle bs-text-muted">Optional items that strengthen your profile. None of these are required for verification.</p>
+            </div>
+          </div>
+
+          <!-- ── 1. Teaching credentials ── -->
           <div class="verif-card">
             <p class="verif-card-title"><i class="ti ti-certificate" aria-hidden="true"></i> Teaching credentials</p>
 
@@ -1767,13 +1838,8 @@
                 <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
                 <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
                 <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
-                <button type="button" class="verif-confirm-btn"
-                  ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
-                  ng-click="vm.confirmStagedVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">
-                  {{ vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId ? 'Saving...' : 'Confirm' }}
-                </button>
                 <button type="button" class="verif-remove-btn"
-                  ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
+                  ng-disabled="vm.profileSubmitting"
                   ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
               </div>
 
@@ -1783,13 +1849,8 @@
                 <span class="verif-filename">{{ staged.fileName }}</span>
                 <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
                 <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
-                <button type="button" class="verif-confirm-btn"
-                  ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
-                  ng-click="vm.confirmStagedVerifDoc(staged._stagedId)">
-                  {{ vm.verif.confirmingStagedId === staged._stagedId ? 'Saving...' : 'Confirm' }}
-                </button>
                 <button type="button" class="verif-remove-btn"
-                  ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
+                  ng-disabled="vm.profileSubmitting"
                   ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
               </div>
 
@@ -1823,7 +1884,7 @@
             </div>
           </div>
 
-          <!-- ── 4. Intro video ── -->
+          <!-- ── 2. Intro video ── -->
           <div class="verif-card">
             <p class="verif-card-title"><i class="ti ti-video" aria-hidden="true"></i> Introduction video <span class="verif-card-subtitle">(optional)</span></p>
 
@@ -1854,11 +1915,6 @@
                 <div class="verif-link-row">
                   <input type="url" ng-model="vm.verif.introVideoLink"
                     placeholder="YouTube, Google Drive, or any public video URL" />
-                  <button type="button" class="verif-confirm-btn"
-                    ng-disabled="!vm.verif.introVideoLink || vm.verif.savingIntroVideo"
-                    ng-click="vm.saveIntroVideoLink()">
-                    {{ vm.verif.savingIntroVideo ? 'Saving...' : 'Save' }}
-                  </button>
                 </div>
               </div>
 
@@ -1870,7 +1926,7 @@
             </div>
           </div>
 
-          <!-- ── 5. Specialist certificates ── -->
+          <!-- ── 3. Specialist certificates ── -->
           <div class="verif-card">
             <p class="verif-card-title"><i class="ti ti-award" aria-hidden="true"></i> Specialist certificates <span class="verif-card-subtitle">(optional)</span></p>
             <p class="text-muted" style="font-size:13px; margin-bottom:12px;">IGCSE examiner, TESOL, ACCA, or any specialist cert. Each may unlock a specialist badge.</p>
@@ -1908,13 +1964,8 @@
               <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
               <span class="verif-filename">{{ vm.getStagedReplacement(doc.id).fileName }}</span>
               <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
-              <button type="button" class="verif-confirm-btn"
-                ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
-                ng-click="vm.confirmStagedVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">
-                {{ vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId ? 'Saving...' : 'Confirm' }}
-              </button>
               <button type="button" class="verif-remove-btn"
-                ng-disabled="vm.verif.confirmingStagedId === vm.getStagedReplacement(doc.id)._stagedId"
+                ng-disabled="vm.profileSubmitting"
                 ng-click="vm.unstageVerifDoc(vm.getStagedReplacement(doc.id)._stagedId)">Remove</button>
             </div>
 
@@ -1924,13 +1975,8 @@
               <span class="verif-filename">{{ staged.fileName }}</span>
               <span class="verif-filesize">{{ vm.formatFileSize(staged.fileSizeBytes) }}</span>
               <span class="verif-doc-status-badge badge-staged">Not saved yet</span>
-              <button type="button" class="verif-confirm-btn"
-                ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
-                ng-click="vm.confirmStagedVerifDoc(staged._stagedId)">
-                {{ vm.verif.confirmingStagedId === staged._stagedId ? 'Saving...' : 'Confirm' }}
-              </button>
               <button type="button" class="verif-remove-btn"
-                ng-disabled="vm.verif.confirmingStagedId === staged._stagedId"
+                ng-disabled="vm.profileSubmitting"
                 ng-click="vm.unstageVerifDoc(staged._stagedId)">Remove</button>
             </div>
 
@@ -1965,41 +2011,30 @@
             </div>
           </div>
 
-          <!-- Privacy note -->
-          <div class="verif-privacy-note">
-            <i class="ti ti-lock" aria-hidden="true"></i>
-            <p>All documents are stored securely and only reviewed by LearnSphere admin. Subject offerings will be unlocked once all required documents are uploaded and verified. Review takes 1–3 business days.</p>
-          </div>
-
           <!-- Submit -->
           <div class="verif-submit-row">
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && (vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal || !vm.hasIdentityNumber())">
+            <p class="verif-submit-hint" ng-if="!vm.hasPendingProfileChanges() && !vm.profileSubmitSuccess">
               <i class="ti ti-info-circle" aria-hidden="true"></i>
-              <span ng-if="vm.mandatoryDocsUploadedCount() < vm.mandatoryDocsTotal">{{ vm.mandatoryDocsTotal - vm.mandatoryDocsUploadedCount() }} required document(s) still missing<span ng-if="!vm.hasIdentityNumber()">, identity number not provided</span></span>
-              <span ng-if="vm.mandatoryDocsUploadedCount() >= vm.mandatoryDocsTotal && !vm.hasIdentityNumber()">Identity number not provided</span>
+              Add a certificate or video link above, then submit.
             </p>
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'pending'">
-              <i class="ti ti-clock" aria-hidden="true"></i>
-              Verification under review — re-upload any rejected document to resubmit
-            </p>
-            <p class="verif-submit-hint" ng-if="!vm.canSubmitVerification() && vm.tutor.verificationStatus === 'approved'">
+            <p class="verif-submit-hint" ng-if="vm.profileSubmitSuccess">
               <i class="ti ti-circle-check" aria-hidden="true"></i>
-              Your profile is already verified — nothing new to submit
+              Saved — pending admin review.
             </p>
             <button type="button" class="btn-primary"
-              ng-click="vm.submitVerification()"
-              ng-disabled="!vm.canSubmitVerification() || vm.verifSubmitting">
+              ng-click="vm.submitProfileDocs()"
+              ng-disabled="!vm.hasPendingProfileChanges() || vm.profileSubmitting">
               <i class="ti ti-send" style="font-size:14px; margin-right:5px;" aria-hidden="true"></i>
-              {{ vm.verifSubmitting ? 'Submitting...' : 'Submit for verification' }}
+              {{ vm.profileSubmitting ? 'Submitting...' : 'Submit' }}
             </button>
-            <div id="verifSubmitErrorBanner" class="verif-banner verif-banner--danger verif-banner--attn" ng-if="vm.verifSubmitError">
+            <div class="verif-banner verif-banner--danger" ng-if="vm.profileSubmitError">
               <i class="ti ti-alert-circle" aria-hidden="true"></i>
-              <div><p>{{ vm.verifSubmitError }}</p></div>
+              <div><p>{{ vm.profileSubmitError }}</p></div>
             </div>
           </div>
 
         </div>
-</div><!-- end verification sub-tab -->
+</div><!-- end profile sub-tab -->
 
 <!-- ══ OFFERINGS SUB-TAB ══ -->
 <div ng-if="vm.profileTab === 'offerings'">
