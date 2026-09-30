@@ -1,25 +1,10 @@
-<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
+<div class="dashboard-layout bs-scope ls-scope" style="align-items:flex-start;">
   <div class="sidebar-col">
-    <aside class="sidebar" style="width:220px; flex-shrink:0; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
-      <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
-        <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
-        <div><strong style="font-size:15px;">{{ vm.user.name }}</strong><br/><small class="bs-text-muted" style="font-size:13px;">Tutor Dashboard</small></div>
-      </div>
-      <nav style="display:flex; flex-direction:column; gap:2px;">
-        <a href="#!/tutor/overview" class="bs-sidebar-link active">
-          <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
-        </a>
-      <a href="#!/tutor/wallet" class="bs-sidebar-link">
-        <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; Earnings
-      </a>
-        <a href="#!/tutor/chat" class="bs-sidebar-link">
-          <i class="ti ti-message" aria-hidden="true"></i> Direct messages
-        </a>
-      </nav>
-    </aside>
+    <div ng-include="'views/partials/tutor-shell.html'" ng-init="lsActive='overview'"></div>
 
-    <!-- Calendar Legend -->
-    <div class="bs-card bs-elev-sm" ng-if="vm.activeTab === 'overview'">
+    <!-- Calendar Legend — sits directly under the Pages sidebar, same column,
+         only visible on the Calendar tab. -->
+    <div class="bs-card bs-elev-sm" ng-if="vm.activeTab === 'calendar'">
       <div style="font-size:14px; font-weight:600; color:var(--color-text); margin-bottom:var(--space-2);">
         <i class="ti ti-book-2" aria-hidden="true"></i>
         Calendar legend
@@ -110,91 +95,83 @@
 
   <main class="dashboard-main">
 
-    <!-- Tab Bar -->
-    <div class="bs-seg">
-      <button type="button" class="bs-seg-opt" ng-click="vm.activeTab = 'overview'"
-        ng-style="{background: vm.activeTab === 'overview' ? 'var(--color-accent)' : 'transparent', color: vm.activeTab === 'overview' ? 'var(--color-bg)' : 'inherit'}">
-        <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview and schedules
-      </button>
-      <button type="button" class="bs-seg-opt" ng-click="vm.activeTab = 'profile'"
-        ng-style="{background: vm.activeTab === 'profile' ? 'var(--color-accent)' : 'transparent', color: vm.activeTab === 'profile' ? 'var(--color-bg)' : 'inherit'}">
-        <i class="ti ti-edit" aria-hidden="true"></i> Edit profile
-      </button>
-    </div>
-
-    <!-- ===== OVERVIEW TAB ===== -->
-    <div ng-if="vm.activeTab === 'overview'">
-
-    <!-- Tutor Stats Banner -->
-    <div class="bs-card bs-elev-sm" style="flex-direction:row; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-4);" ng-if="vm.tutor">
-      <div style="display:flex; align-items:center; gap:var(--space-3);">
-        <img ng-if="vm.tutor.imageUrl" ng-src="{{ vm.tutor.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ vm.tutor.name }}" />
-        <div ng-if="!vm.tutor.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:22px; font-family:var(--font-heading); font-weight:600; flex-shrink:0;">{{ vm.tutor.name[0] }}</div>
-        <div>
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <h3 style="margin:0;">{{ vm.tutor.name }}</h3>
-            <button type="button" class="bs-btn" ng-click="vm.toggleOnlineStatus()"
-              ng-style="vm.tutor.isOnline ? {background:'#dcfce7', color:'#15803d', border:'1px solid #bbf7d0'} : {background:'#fee2e2', color:'#b91c1c', border:'1px solid #fecaca'}"
-              title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
-              {{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
-            </button>
-            <span ng-if="vm.tutor.tier === 'Gold'" class="bs-tag" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">
-              <i class="ti ti-trophy" style="font-size:13px;" aria-hidden="true"></i> Gold teacher
-            </span>
-            <span ng-if="vm.tutor.tier === 'Silver'" class="bs-tag" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
-              <i class="ti ti-medal" style="font-size:13px;" aria-hidden="true"></i> Silver teacher
-            </span>
-            <span ng-if="vm.tutor.tier === 'Bronze'" class="bs-tag" style="background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
-              <i class="ti ti-award" style="font-size:13px;" aria-hidden="true"></i> Bronze teacher
-            </span>
-            <span class="bs-tag bs-tag-accent" ng-if="vm.tutor.isVerified" title="Your profile has been verified by our operations team">
-              <i class="ti ti-check" style="font-size:12px;" aria-hidden="true"></i> Verified
-            </span>
-            <span class="bs-tag bs-tag-neutral" ng-if="!vm.tutor.isVerified" title="Your profile is awaiting verification by our operations team">
-              <i class="ti ti-clock" style="font-size:12px;" aria-hidden="true"></i> Pending
-            </span>
-          </div>
-          <p class="bs-text-muted" style="margin:2px 0 0;">{{ vm.tutor.experienceYears }} Years Active MOE Teacher</p>
+    <!-- Breadcrumb card -->
+    <div class="ls-card" style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
+      <span style="font-size:12px;color:#6B7085;">Tutor</span>
+      <i class="ti ti-chevron-right" style="font-size:12px;color:#6B7085;" aria-hidden="true"></i>
+      <span style="font-size:13px;font-weight:600;color:#2B2D42;">{{ vm.activeTab === 'calendar' ? 'Calendar' : (vm.activeTab === 'profile' ? 'Edit profile' : 'Overview') }}</span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+        <div style="position:relative;font-size:17px;color:#4A4D60;cursor:pointer;" ng-click="app.toggleNotifDrawer()">
+          <i class="ti ti-bell" aria-hidden="true"></i>
+          <span ng-if="app.unreadCount > 0" style="position:absolute;top:-1px;right:-2px;width:7px;height:7px;border-radius:50%;background:#F0508C;"></span>
         </div>
-      </div>
-      <div style="display:flex; gap:var(--space-6);">
-        <div style="text-align:center;" title="Full: {{ vm.tutor.scoreMax | number:0 }}">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ vm.tutor.score | number:1 }}</div>
-          <div class="bs-text-muted" style="font-size:12px; text-transform:uppercase;">Score</div>
-        </div>
-        <!-- Real figure from the tutor ledger. Credit is only surfaced once there is any,
-             so the panel doesn't show an always-zero bucket before that feature lands. -->
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;"
-            ng-class="{'text-danger': vm.balance.withdrawable < 0}">
-            <span ng-if="vm.balance">{{ vm.balance.withdrawable | currency:'$' }}</span>
-            <span ng-if="!vm.balance && !vm.balanceError" class="bs-text-muted">…</span>
-            <span ng-if="vm.balanceError" class="bs-text-muted" style="font-size:14px;">—</span>
-          </div>
-          <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Ready balance</div>
-          <div class="bs-text-muted" style="font-size:11px;" ng-if="vm.balance && vm.balance.credit > 0">
-            + {{ vm.balance.credit | currency:'$' }} credit
-          </div>
-        </div>
+        <div style="width:28px;height:28px;border-radius:50%;background:#EEEBFD;color:#5847D6;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">{{ app.currentUser.name[0] }}</div>
       </div>
     </div>
 
-    <!-- Pending Booking Requests -->
-    <div class="bs-card bs-elev-sm" ng-if="vm.pendingRequests().length">
-      <div class="bs-card-title"><i class="ti ti-clock" aria-hidden="true"></i> Parents booking requests ({{ vm.pendingRequests().length }})</div>
-      <div style="display:flex; flex-direction:column; gap:var(--space-2);">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);" ng-repeat="b in vm.pendingRequests()">
-          <div>
-            <span class="bs-tag bs-tag-accent">{{ b.subject }}</span>
-            <span class="bs-text-muted" style="font-size:13px;">#{{ b.bookingNumber }}</span>
-            <div style="font-weight:600; margin-top:2px;">{{ b.studentName }}</div>
-            <p class="bs-text-muted" style="margin:2px 0 0; font-size:14px;" ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} · {{ c.time | hhmma }} ({{ b.durationHours }}h)</p>
-            <em ng-if="b.message" style="font-size:14px;">"{{ b.message }}"</em>
+    <!-- Profile header — shown on every tab (hoisted above the tab blocks below);
+         only the active .ls-tab and the breadcrumb label change with vm.activeTab. -->
+    <div class="ls-card ls-profile-header" ng-if="vm.tutor">
+      <div class="ls-profile-cover">
+        <div class="ls-cover-circle ls-cover-circle--1"></div>
+        <div class="ls-cover-circle ls-cover-circle--2"></div>
+        <div class="ls-cover-circle ls-cover-circle--3"></div>
+      </div>
+      <img ng-if="vm.tutor.imageUrl" ng-src="{{ vm.tutor.imageUrl }}" class="ls-profile-avatar" alt="{{ vm.tutor.name }}" />
+      <div ng-if="!vm.tutor.imageUrl" class="ls-profile-avatar ls-profile-avatar--fallback">{{ vm.tutor.name[0] }}</div>
+
+      <div class="ls-profile-grid">
+        <div class="ls-profile-stats">
+          <div class="ls-stat" title="Full: {{ vm.tutor.scoreMax | number:0 }}"><i class="ti ti-trophy" aria-hidden="true"></i><b>{{ vm.tutor.score | number:1 }}</b><span>Score</span></div>
+          <div class="ls-stat"><i class="ti ti-star" aria-hidden="true"></i><b>{{ vm.tutor.rating | number:1 }}</b><span>Rating</span></div>
+          <div class="ls-stat"><i class="ti ti-message-2" aria-hidden="true"></i><b>{{ vm.tutor.reviewCount }}</b><span>Reviews</span></div>
+        </div>
+        <div class="ls-profile-name">
+          <div class="ls-profile-name-text">{{ vm.tutor.name }}</div>
+          <div class="ls-profile-name-sub">{{ vm.tutor.experienceYears }} Years Active MOE Teacher</div>
+          <div class="ls-profile-badges">
+            <span class="chip" ng-if="vm.tutor.tier === 'Gold'" style="background:#FFF3D6;color:#92400E;"><i class="ti ti-trophy" aria-hidden="true"></i> Gold teacher</span>
+            <span class="chip" ng-if="vm.tutor.tier === 'Silver'" style="background:#EEF0F5;color:#4A4D60;"><i class="ti ti-medal" aria-hidden="true"></i> Silver teacher</span>
+            <span class="chip" ng-if="vm.tutor.tier === 'Bronze'" style="background:#FEF3C7;color:#92400E;"><i class="ti ti-award" aria-hidden="true"></i> Bronze teacher</span>
+            <span class="chip" ng-if="vm.tutor.isVerified" style="background:#EEEBFD;color:#5847D6;" title="Your profile has been verified by our operations team"><i class="ti ti-check" aria-hidden="true"></i> Verified</span>
+            <span class="chip" ng-if="!vm.tutor.isVerified" style="background:#EEF0F5;color:#4A4D60;" title="Your profile is awaiting verification by our operations team"><i class="ti ti-clock" aria-hidden="true"></i> Pending</span>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button class="bs-btn bs-btn-secondary" ng-click="vm.startCounter(b)">Counter Propose Time</button>
-            <button class="bs-btn bs-btn-primary" ng-click="vm.confirmBooking(b)">Confirm Class</button>
+        </div>
+        <div class="ls-profile-actions">
+          <button type="button" class="ls-btn" ng-click="vm.toggleOnlineStatus()"
+            ng-style="vm.tutor.isOnline ? {background:'#DDF6F2', color:'#0F766E'} : {background:'#FDE7EF', color:'#B4235F'}"
+            title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
+            &#9679; {{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="ls-tab-strip">
+        <div class="ls-tab" ng-class="{on: vm.activeTab === 'overview'}" ng-click="vm.activeTab = 'overview'"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview</div>
+        <div class="ls-tab" ng-class="{on: vm.activeTab === 'calendar'}" ng-click="vm.activeTab = 'calendar'"><i class="ti ti-calendar" aria-hidden="true"></i> Calendar</div>
+        <div class="ls-tab" ng-class="{on: vm.activeTab === 'profile'}" ng-click="vm.activeTab = 'profile'"><i class="ti ti-user-edit" aria-hidden="true"></i> Edit profile</div>
+      </div>
+    </div>
+
+    <!-- Pending Booking Requests — hoisted, shown on every tab -->
+    <div class="ls-card" style="padding:12px 14px;" ng-if="vm.pendingRequests().length">
+      <div style="display:flex;align-items:center;margin-bottom:8px;">
+        <span style="font-size:14px;font-weight:600;color:#2B2D42;">Booking requests</span>
+        <span class="chip" style="background:#FDE7EF;color:#B4235F;margin-left:8px;">{{ vm.pendingRequests().length }}</span>
+      </div>
+      <div style="display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 0; border-top:1px solid #ECEDF3;" ng-repeat="b in vm.pendingRequests()">
+          <div style="width:34px;height:34px;border-radius:50%;background:#FDE7EF;color:#B4235F;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ b.studentName[0] }}</div>
+          <div style="flex:1; min-width:200px;">
+            <div><b style="color:#2B2D42;">{{ b.studentName }}</b> <span style="font-size:11px;color:#6B7085;">&middot; #{{ b.bookingNumber }}</span></div>
+            <div style="font-size:13px;">
+              <span class="chip" style="background:#EEEBFD;color:#5847D6;">{{ b.subject }}</span>
+              <span ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} &middot; {{ c.time | hhmma }} ({{ b.durationHours }}h)<span ng-if="!$last">, </span></span>
+            </div>
+            <em ng-if="b.message" style="font-size:13px;color:#6B7085;">"{{ b.message }}"</em>
           </div>
+          <button class="ls-btn" style="background:#6D5BF0;color:#fff;" ng-click="vm.confirmBooking(b)">Confirm class</button>
+          <button class="ls-btn" style="background:#fff;color:#4A4D60;border:1px solid #ECEDF3;" ng-click="vm.startCounter(b)">Counter propose</button>
         </div>
       </div>
     </div>
@@ -259,6 +236,68 @@
         </form>
       </div>
     </div>
+
+    <!-- ===== OVERVIEW TAB ===== -->
+    <div ng-if="vm.activeTab === 'overview'" style="display:grid;grid-template-columns:1fr 2fr;gap:14px;align-items:start;">
+
+      <!-- About -->
+      <div class="ls-card" style="padding:16px;">
+        <div style="font-size:16px;font-weight:600;color:#2B2D42;margin-bottom:6px;">About</div>
+        <p style="font-size:12.5px;line-height:1.55;color:#6B7085;margin:0 0 14px;" ng-if="vm.tutor.bio">{{ vm.tutor.bio }}</p>
+        <div class="ls-info" ng-if="vm.tutor.qualifications.length"><i class="ti ti-school" aria-hidden="true"></i>{{ vm.tutor.qualifications.join(', ') }}</div>
+        <div class="ls-info" ng-if="vm.tutor.subjects.length"><i class="ti ti-book" aria-hidden="true"></i>{{ vm.tutor.subjects.join(', ') }}</div>
+        <div class="ls-info" style="margin-bottom:0;" ng-if="vm.tutor.modes.length"><i class="ti ti-video" aria-hidden="true"></i>{{ vm.tutor.modes.join(' · ') }}</div>
+      </div>
+
+      <!-- Bulletin board feed — relocated from the old bulletin panel modal (not
+           duplicated; that modal's markup below this tab has been removed). -->
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:16px;font-weight:600;color:#2B2D42;">Bulletin board</span>
+          <span class="chip" style="background:#DDF6F2;color:#0F766E;">{{ vm.bulletinPublishedCount() }} published</span>
+          <span class="chip" ng-if="vm.bulletinPendingCount() > 0" style="background:#FEF3C7;color:#92400E;">{{ vm.bulletinPendingCount() }} dispute{{ vm.bulletinPendingCount() === 1 ? '' : 's' }} pending</span>
+        </div>
+
+        <div class="ls-card" style="padding:16px;text-align:center;color:#6B7085;font-size:13px;" ng-if="!vm.bulletinRemarks.length">
+          No remarks yet — they'll show up here once parents leave one on a completed class.
+        </div>
+
+        <div class="ls-card" style="padding:14px;" ng-repeat="r in vm.bulletinRemarks track by r.id" ng-style="r.status === 'hidden' ? {opacity: 0.65} : {}">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:#DDF6F2;color:#0F766E;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ r.parentDisplayName[0] }}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;color:#2B2D42;">{{ r.parentDisplayName }}</div>
+              <div style="font-size:11px;color:#6B7085;">{{ r.classDate | dmy }} &middot; {{ r.subject }}</div>
+            </div>
+            <span class="chip" ng-if="r.status === 'published'" style="background:#DDF6F2;color:#0F766E;">Published</span>
+            <span class="chip" ng-if="r.status === 'dispute_requested'" style="background:#FEF3C7;color:#92400E;">Dispute requested</span>
+            <span class="chip" ng-if="r.status === 'hidden'" style="background:#EEF0F5;color:#4A4D60;">Hidden by admin</span>
+          </div>
+          <p style="margin:10px 0 8px;font-size:13px;">
+            <i class="ti ti-star" ng-repeat="n in [1,2,3,4,5]" ng-style="{'color': n <= r.rating ? '#D97706' : '#B8BBCC', 'font-size': '13px'}" aria-hidden="true"></i>
+            {{ r.text }}
+          </p>
+          <div style="display:flex;align-items:center;" ng-if="r.status === 'published' && vm.bulletinDisputeFormFor !== r">
+            <span style="margin-left:auto;font-size:12px;font-weight:600;color:#B4235F;cursor:pointer;" ng-click="vm.openBulletinDisputeForm(r)">Request hide</span>
+          </div>
+          <p style="font-size:13px;margin:0;color:#6B7085;" ng-if="r.status === 'dispute_requested'">
+            <i class="ti ti-clock" aria-hidden="true"></i> Awaiting admin review
+          </p>
+          <div ng-if="vm.bulletinDisputeFormFor === r" style="background:#F7F8FC; border:1px solid #ECEDF3; border-radius:10px; padding:10px; margin-top:6px;">
+            <label style="font-size:13px;font-weight:600;">Why should this be hidden?</label>
+            <textarea class="bs-input" rows="2" ng-model="vm.bulletinDisputeReason" placeholder="Explain the issue with this remark..." style="margin-top:4px;"></textarea>
+            <p ng-if="vm.bulletinDisputeError" style="color:#B4235F; font-size:13px; margin:4px 0 0;">{{ vm.bulletinDisputeError }}</p>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button type="button" class="ls-btn" style="background:#fff;color:#4A4D60;border:1px solid #ECEDF3;" ng-click="vm.cancelBulletinDisputeForm()">Cancel</button>
+              <button type="button" class="ls-btn" style="background:#6D5BF0;color:#fff;" ng-click="vm.submitBulletinDispute()">Submit request</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end overview tab -->
+
+    <!-- ===== CALENDAR TAB ===== -->
+    <div ng-if="vm.activeTab === 'calendar'">
 
     <!-- Calendar (Monthly View) -->
     <div class="bs-card bs-elev-sm reset-zone" reset-zone ng-if="!vm.counterBooking" ng-click="vm.onCalendarAreaClick($event)">
@@ -420,165 +459,6 @@
             <span>🚫</span>
             <span style="flex:1;">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
             <button class="bs-btn bs-btn-ghost" ng-click="vm.removeBlock($index)">✕ Remove</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Setup Class Modal -->
-    <div class="modal-overlay" ng-if="vm.setupClassOpen">
-      <div class="modal-card setup-class-modal">
-        <div class="modal-header">
-          <div>
-            <h3>Setup class</h3>
-            <p class="bs-text-muted">{{ vm.setupClassSelectedDatesLabel() }}</p>
-          </div>
-          <button type="button" class="modal-close" ng-click="vm.closeSetupClass()">&times;</button>
-        </div>
-
-        <div class="modal-body">
-          <!-- Three distinct states, since "can't publish yet" and "why" differ:
-                 - No offerings/modes yet + not verified ("pending"): profile is
-                   incomplete — blocks the form, asks them to complete it.
-                 - No offerings/modes yet + verified: an edge case (e.g. admin
-                   verified them before/after they cleared their offerings) —
-                   blocks the form, points specifically at adding an offering.
-                 - Has offerings/modes but not verified yet ("under verifying"):
-                   NOT blocking — nothing server-side stops this today, so they
-                   can still prep classes ahead of approval; just an FYI banner
-                   above the still-functional form. -->
-          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && !vm.tutor.isVerified">
-            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Please complete your tutor profile — including at least one teaching offering (subject, level, and mode) — before you can publish a class.</p>
-            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
-              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
-          </div>
-          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && vm.tutor.isVerified">
-            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Add at least one teaching offering (subject + level + mode) under Edit Profile before you can publish a class.</p>
-            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
-              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
-          </div>
-          <p class="bs-text-muted" style="margin:0 0 12px" ng-if="vm.tutorHasOfferings() && !vm.tutor.isVerified">
-            <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
-            Your profile is currently being verified by our operations team. You can still set up classes now — they just won't be visible to parents until verification is complete.
-          </p>
-
-          <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()">
-            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
-              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
-                <span class="setup-legend-swatch setup-legend--confirmed"></span> Confirmed booking
-              </span>
-              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
-                <span class="setup-legend-swatch setup-legend--preset"></span> Published preset slot
-              </span>
-              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
-                <span class="setup-legend-swatch setup-legend--selected"></span> Your new selection
-              </span>
-            </div>
-            <p class="bs-text-muted" style="margin:0 0 8px;font-size:12px;">
-              <i class="ti ti-info-circle" aria-hidden="true"></i>
-              Click a single slot, or click-and-drag to combine slots into one class.
-              Coloured blocks are existing classes and cannot be selected.
-            </p>
-            <table class="setup-grid">
-              <thead>
-                <tr>
-                  <th class="setup-grid-timecol"></th>
-                  <th ng-repeat="dateStr in vm.setupClassSelectedDates()">{{ dateStr | dmy }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr ng-repeat="slot in vm.setupClassGridSlots">
-                  <td class="setup-grid-timecol">{{ vm.setupClassGridSlotLabel(slot) }}</td>
-                  <td ng-repeat="dateStr in vm.setupClassSelectedDates()"
-                    ng-if="!vm.setupSlotInBlock(dateStr, slot) || vm.setupSlotIsBlockStart(dateStr, slot)"
-                    ng-attr-rowspan="{{ vm.setupSlotIsBlockStart(dateStr, slot) ? vm.setupBlockRowspan(dateStr, slot) : undefined }}"
-                    ng-class="{
-                      'setup-grid-cell':    !vm.setupSlotInBlock(dateStr, slot) && !vm.isSetupSlotSelected(dateStr, slot),
-                      'setup-cell-selected': vm.isSetupSlotSelected(dateStr, slot),
-                      'setup-cell-dragging': !vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotDragPreview(dateStr, slot),
-                      'setup-cell-block':   !!vm.setupSlotInBlock(dateStr, slot)
-                    }"
-                    ng-mousedown="!vm.isSetupSlotBooked(dateStr, slot) && !vm.setupSlotInBlock(dateStr, slot) && vm.startSlotDrag(dateStr, slot, $event)"
-                    ng-mouseenter="vm.dragOverSlot(dateStr, slot)">
-
-                    <span ng-if="!vm.setupSlotInBlock(dateStr, slot) && vm.isSetupSlotSelected(dateStr, slot)">
-                      <i class="ti ti-check" aria-hidden="true"></i>
-                      <span ng-if="vm.setupSlotRangeLabel(dateStr, slot)">{{ vm.setupSlotRangeLabel(dateStr, slot) }}</span>
-                    </span>
-
-                    <div class="setup-block setup-block--confirmed"
-                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'confirmed'">
-                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
-                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
-                    </div>
-
-                    <div class="setup-block setup-block--preset"
-                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'preset'">
-                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
-                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
-                    </div>
-
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="setup-inputs-panel" ng-if="vm.tutorHasOfferings()">
-            <div class="setup-inputs-row-4">
-              <div class="bs-field">
-                <label>Teaching Mode</label>
-                <select class="bs-input" ng-model="vm.setupClassForm.mode" ng-change="vm.onModeChange()">
-                  <option value="">— Mode —</option>
-                  <option ng-repeat="m in vm.setupClassModesList" value="{{ m }}">{{ m }}</option>
-                </select>
-              </div>
-              <div class="bs-field">
-                <label>Subject</label>
-                <select class="bs-input" ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()" ng-disabled="!vm.setupClassForm.mode">
-                  <option value="">{{ vm.setupClassForm.mode ? '— Subject —' : 'Select mode first' }}</option>
-                  <option ng-repeat="o in vm.setupClassUniqueSubjectsList" value="{{ o.subject }}">{{ o.key }}</option>
-                </select>
-              </div>
-              <div class="bs-field">
-                <label>Class Size</label>
-                <div class="segmented-toggle">
-                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-one'}"
-                    ng-click="vm.setupClassForm.classSize = 'one-to-one'; vm.onClassSizeChange()">Personal Class</button>
-                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-many'}"
-                    ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">Group Class</button>
-                </div>
-              </div>
-              <div class="bs-field">
-                <label>Max Students</label>
-                <input class="bs-input" type="number" ng-model="vm.setupClassForm.maxStudents"
-                  ng-disabled="vm.setupClassForm.classSize === 'one-to-one'"
-                  min="2" max="30" />
-                <span class="bs-text-muted" style="font-size:12px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for Personal Class</span>
-              </div>
-            </div>
-
-            <div class="bs-field">
-              <label>Price per lesson (RM / SGD based on country)</label>
-              <input class="bs-input" type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
-            </div>
-
-            <p ng-if="vm.setupClassError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.setupClassError }}</p>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <div style="display:flex; align-items:center; gap:14px; font-size:13px; flex-wrap:wrap;">
-            <span><span class="legend-dot selected"></span> Selected</span>
-            <span><span class="legend-dot booked"></span> Booked</span>
-            <span class="bs-text-muted">{{ vm.setupClassTotalSlots() }} class(es) selected across {{ vm.setupClassSelectedDates().length }} date(s)</span>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeSetupClass()">Cancel</button>
-            <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.submitSetupClass()"
-              ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings() || !vm.setupClassFormValid()">
-              {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
-            </button>
           </div>
         </div>
       </div>
@@ -775,21 +655,6 @@
         <div class="ov-panel-hd">
           <i class="ti ti-dots ov-panel-icon" style="color:var(--color-text-muted);" aria-hidden="true"></i>
           <span class="ov-panel-title" style="color:var(--color-text-muted);">Coming soon</span>
-        </div>
-      </div>
-
-      <!-- Panel 5: Bulletin board -->
-      <div class="ov-panel" ng-click="vm.openPanel('bulletin')">
-        <div class="ov-panel-hd" ng-class="{'ov-panel-hd--active': vm.activePanel === 'bulletin'}">
-          <i class="ti ti-message-2 ov-panel-icon" aria-hidden="true"></i>
-          <span class="ov-panel-title">Bulletin board</span>
-          <span class="ov-panel-badge ov-panel-badge--warn" ng-if="vm.bulletinPendingCount() > 0">
-            {{ vm.bulletinPendingCount() }} dispute{{ vm.bulletinPendingCount() === 1 ? '' : 's' }} pending
-          </span>
-          <span class="ov-panel-badge ov-panel-badge--ok" ng-if="vm.bulletinPendingCount() === 0">
-            {{ vm.bulletinPublishedCount() }} published
-          </span>
-          <i class="ti ti-chevron-right ov-panel-chevron" aria-hidden="true"></i>
         </div>
       </div>
 
@@ -1358,73 +1223,176 @@
       </div>
     </div>
 
-    <!-- ── MODAL 4: Bulletin Board ───────────────────────────────────── -->
-    <div class="ov-modal" ng-if="vm.activePanel === 'bulletin'" ng-click="$event.stopPropagation()">
-      <div class="ov-modal-hd">
-        <i class="ti ti-message-2" aria-hidden="true"></i>
-        <div style="flex:1;">
-          <strong>Bulletin board</strong>
-          <div class="ov-modal-sub">{{ vm.bulletinRemarks.length }} remark{{ vm.bulletinRemarks.length === 1 ? '' : 's' }} total</div>
-        </div>
-        <button class="ov-modal-close" ng-click="vm.closePanel()" aria-label="Close">
-          <i class="ti ti-x" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="ov-modal-body">
+    </div><!-- end calendar tab -->
 
-        <div class="ov-modal-empty" ng-if="!vm.bulletinRemarks.length">
-          <i class="ti ti-message-2" style="font-size:26px;color:var(--color-divider);" aria-hidden="true"></i>
-          <p>No remarks yet — they'll show up here once parents leave one on a completed class.</p>
-        </div>
-
-        <div class="ov-ds-group" ng-repeat="r in vm.bulletinRemarks track by r.id"
-          ng-style="r.status === 'hidden' ? {opacity: 0.55} : {}">
-          <div class="ov-ds-group-hd">
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <i class="ti ti-star" ng-repeat="n in [1,2,3,4,5]"
-                ng-style="{'color': n <= r.rating ? 'var(--color-accent)' : 'var(--color-neutral-300)', 'font-size': '14px'}"
-                aria-hidden="true"></i>
-              <span class="ov-chip-muted">{{ r.parentDisplayName }}</span>
-              <span class="bs-tag bs-tag-accent" ng-if="r.status === 'published'" style="font-size:11px;">Published</span>
-              <span class="bs-tag bs-tag-accent-2" ng-if="r.status === 'dispute_requested'" style="font-size:11px;">Dispute requested</span>
-              <span class="bs-tag bs-tag-neutral" ng-if="r.status === 'hidden'" style="font-size:11px;">Hidden by admin</span>
-            </div>
-            <span class="ov-ds-meta">{{ r.subject }} · {{ r.classDate | dmy }}</span>
+    <!-- Setup Class Modal — hoisted OUTSIDE the Calendar tab's ng-if (was
+         nested inside it before). Its own "Go to Edit Profile" buttons set
+         vm.activeTab = 'profile', which made the surrounding
+         ng-if="vm.activeTab === 'calendar'" wrapper evaluate false and tear
+         down this whole subtree — including the button mid-click and the
+         modal itself — in the same digest, so the tab strip never visibly
+         caught up to the new tab. Gated purely by vm.setupClassOpen now, so
+         it works regardless of which tab is selected underneath it. -->
+    <div class="modal-overlay" ng-if="vm.setupClassOpen">
+      <div class="modal-card setup-class-modal">
+        <div class="modal-header">
+          <div>
+            <h3>Setup class</h3>
+            <p class="bs-text-muted">{{ vm.setupClassSelectedDatesLabel() }}</p>
           </div>
-          <div class="ov-ds-group-body">
-            <p style="margin:0 0 8px;font-size:14px;">{{ r.text }}</p>
+          <button type="button" class="modal-close" ng-click="vm.closeSetupClass()">&times;</button>
+        </div>
 
-            <button type="button" class="bs-btn bs-btn-secondary" style="font-size:13px;"
-              ng-if="r.status === 'published' && vm.bulletinDisputeFormFor !== r"
-              ng-click="vm.openBulletinDisputeForm(r)">
-              <i class="ti ti-flag" aria-hidden="true"></i> Request hide
-            </button>
-            <p class="bs-text-muted" style="font-size:13px;margin:0;" ng-if="r.status === 'dispute_requested'">
-              <i class="ti ti-clock" aria-hidden="true"></i> Awaiting admin review
+        <div class="modal-body">
+          <!-- Three distinct states, since "can't publish yet" and "why" differ:
+                 - No offerings/modes yet + not verified ("pending"): profile is
+                   incomplete — blocks the form, asks them to complete it.
+                 - No offerings/modes yet + verified: an edge case (e.g. admin
+                   verified them before/after they cleared their offerings) —
+                   blocks the form, points specifically at adding an offering.
+                 - Has offerings/modes but not verified yet ("under verifying"):
+                   NOT blocking — nothing server-side stops this today, so they
+                   can still prep classes ahead of approval; just an FYI banner
+                   above the still-functional form. -->
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Please complete your tutor profile — including at least one teaching offering (subject, level, and mode) — before you can publish a class.</p>
+            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
+              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
+          </div>
+          <div style="background:var(--color-surface); border-radius:var(--radius-md); padding:var(--space-4); text-align:center;" ng-if="!vm.tutorHasOfferings() && vm.tutor.isVerified">
+            <p style="margin:0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Add at least one teaching offering (subject + level + mode) under Edit Profile before you can publish a class.</p>
+            <button type="button" class="bs-btn bs-btn-primary" style="margin-top:var(--space-2);"
+              ng-click="vm.closeSetupClass(); vm.activeTab = 'profile'">Go to Edit Profile</button>
+          </div>
+          <p class="bs-text-muted" style="margin:0 0 12px" ng-if="vm.tutorHasOfferings() && !vm.tutor.isVerified">
+            <i class="ti ti-clock-hour-4" aria-hidden="true"></i>
+            Your profile is currently being verified by our operations team. You can still set up classes now — they just won't be visible to parents until verification is complete.
+          </p>
+
+          <div class="setup-grid-wrap" ng-if="vm.tutorHasOfferings()" ng-mouseup="vm.endSlotDrag()">
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--confirmed"></span> Confirmed booking
+              </span>
+              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--preset"></span> Published preset slot
+              </span>
+              <span style="font-size:12px;display:flex;align-items:center;gap:5px;">
+                <span class="setup-legend-swatch setup-legend--selected"></span> Your new selection
+              </span>
+            </div>
+            <p class="bs-text-muted" style="margin:0 0 8px;font-size:12px;">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              Click a single slot, or click-and-drag to combine slots into one class.
+              Coloured blocks are existing classes and cannot be selected.
             </p>
+            <table class="setup-grid">
+              <thead>
+                <tr>
+                  <th class="setup-grid-timecol"></th>
+                  <th ng-repeat="dateStr in vm.setupClassSelectedDates()">{{ dateStr | dmy }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="slot in vm.setupClassGridSlots">
+                  <td class="setup-grid-timecol">{{ vm.setupClassGridSlotLabel(slot) }}</td>
+                  <td ng-repeat="dateStr in vm.setupClassSelectedDates()"
+                    ng-if="!vm.setupSlotInBlock(dateStr, slot) || vm.setupSlotIsBlockStart(dateStr, slot)"
+                    ng-attr-rowspan="{{ vm.setupSlotIsBlockStart(dateStr, slot) ? vm.setupBlockRowspan(dateStr, slot) : undefined }}"
+                    ng-class="{
+                      'setup-grid-cell':    !vm.setupSlotInBlock(dateStr, slot) && !vm.isSetupSlotSelected(dateStr, slot),
+                      'setup-cell-selected': vm.isSetupSlotSelected(dateStr, slot),
+                      'setup-cell-dragging': !vm.isSetupSlotBooked(dateStr, slot) && vm.isSetupSlotDragPreview(dateStr, slot),
+                      'setup-cell-block':   !!vm.setupSlotInBlock(dateStr, slot)
+                    }"
+                    ng-mousedown="!vm.isSetupSlotBooked(dateStr, slot) && !vm.setupSlotInBlock(dateStr, slot) && vm.startSlotDrag(dateStr, slot, $event)"
+                    ng-mouseenter="vm.dragOverSlot(dateStr, slot)">
 
-            <div ng-if="vm.bulletinDisputeFormFor === r" style="background:var(--color-surface-alt); border:0.5px solid var(--color-divider); border-radius:var(--radius); padding:10px; margin-top:6px;">
-              <label style="font-size:13px;font-weight:600;">Why should this be hidden?</label>
-              <textarea class="bs-input" rows="2" ng-model="vm.bulletinDisputeReason" placeholder="Explain the issue with this remark..." style="margin-top:4px;"></textarea>
-              <p ng-if="vm.bulletinDisputeError" style="color:var(--color-accent-2-700); font-size:13px; margin:4px 0 0;">{{ vm.bulletinDisputeError }}</p>
-              <div style="display:flex; gap:6px; margin-top:6px;">
-                <button type="button" class="bs-btn bs-btn-secondary" style="font-size:13px;" ng-click="vm.cancelBulletinDisputeForm()">Cancel</button>
-                <button type="button" class="bs-btn bs-btn-primary" style="font-size:13px;" ng-click="vm.submitBulletinDispute()">Submit request</button>
+                    <span ng-if="!vm.setupSlotInBlock(dateStr, slot) && vm.isSetupSlotSelected(dateStr, slot)">
+                      <i class="ti ti-check" aria-hidden="true"></i>
+                      <span ng-if="vm.setupSlotRangeLabel(dateStr, slot)">{{ vm.setupSlotRangeLabel(dateStr, slot) }}</span>
+                    </span>
+
+                    <div class="setup-block setup-block--confirmed"
+                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'confirmed'">
+                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
+                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
+                    </div>
+
+                    <div class="setup-block setup-block--preset"
+                      ng-if="vm.setupSlotIsBlockStart(dateStr, slot) && vm.setupBlockAt(dateStr, slot).type === 'preset'">
+                      <div class="setup-block-subject">{{ vm.setupBlockAt(dateStr, slot).subject }}</div>
+                      <div class="setup-block-meta">{{ vm.setupBlockAt(dateStr, slot).mode }}</div>
+                    </div>
+
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="setup-inputs-panel" ng-if="vm.tutorHasOfferings()">
+            <div class="setup-inputs-row-4">
+              <div class="bs-field">
+                <label>Teaching Mode</label>
+                <select class="bs-input" ng-model="vm.setupClassForm.mode" ng-change="vm.onModeChange()">
+                  <option value="">— Mode —</option>
+                  <option ng-repeat="m in vm.setupClassModesList" value="{{ m }}">{{ m }}</option>
+                </select>
+              </div>
+              <div class="bs-field">
+                <label>Subject</label>
+                <select class="bs-input" ng-model="vm.setupClassForm.subject" ng-change="vm.onSubjectChange()" ng-disabled="!vm.setupClassForm.mode">
+                  <option value="">{{ vm.setupClassForm.mode ? '— Subject —' : 'Select mode first' }}</option>
+                  <option ng-repeat="o in vm.setupClassUniqueSubjectsList" value="{{ o.subject }}">{{ o.key }}</option>
+                </select>
+              </div>
+              <div class="bs-field">
+                <label>Class Size</label>
+                <div class="segmented-toggle">
+                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-one'}"
+                    ng-click="vm.setupClassForm.classSize = 'one-to-one'; vm.onClassSizeChange()">Personal Class</button>
+                  <button type="button" ng-class="{active: vm.setupClassForm.classSize === 'one-to-many'}"
+                    ng-click="vm.setupClassForm.classSize = 'one-to-many'; vm.onClassSizeChange()">Group Class</button>
+                </div>
+              </div>
+              <div class="bs-field">
+                <label>Max Students</label>
+                <input class="bs-input" type="number" ng-model="vm.setupClassForm.maxStudents"
+                  ng-disabled="vm.setupClassForm.classSize === 'one-to-one'"
+                  min="2" max="30" />
+                <span class="bs-text-muted" style="font-size:12px" ng-if="vm.setupClassForm.classSize === 'one-to-one'">Fixed at 1 for Personal Class</span>
               </div>
             </div>
+
+            <div class="bs-field">
+              <label>Price per lesson (RM / SGD based on country)</label>
+              <input class="bs-input" type="number" ng-model="vm.setupClassForm.pricePerLesson" min="0" step="0.50" />
+            </div>
+
+            <p ng-if="vm.setupClassError" style="color:var(--color-accent-2-700); font-size:14px;">{{ vm.setupClassError }}</p>
           </div>
         </div>
 
-      </div>
-      <div class="ov-modal-footer">
-        <button class="bs-btn" ng-click="vm.closePanel()">Close</button>
+        <div class="modal-footer">
+          <div style="display:flex; align-items:center; gap:14px; font-size:13px; flex-wrap:wrap;">
+            <span><span class="legend-dot selected"></span> Selected</span>
+            <span><span class="legend-dot booked"></span> Booked</span>
+            <span class="bs-text-muted">{{ vm.setupClassTotalSlots() }} class(es) selected across {{ vm.setupClassSelectedDates().length }} date(s)</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.closeSetupClass()">Cancel</button>
+            <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.submitSetupClass()"
+              ng-disabled="vm.setupClassSaving || !vm.tutorHasOfferings() || !vm.setupClassFormValid()">
+              {{ vm.setupClassSaving ? 'Saving...' : 'Confirm class' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    </div><!-- end overview tab -->
-
     <!-- ===== EDIT PROFILE TAB ===== -->
-    <div ng-if="vm.activeTab === 'profile'" class="bs-card bs-elev-sm" style="max-width:640px;">
+    <div ng-if="vm.activeTab === 'profile'" class="bs-card bs-elev-sm">
       <span class="bs-tag bs-tag-accent">TUTOR PROFILE MANAGEMENT</span>
       <h3 style="margin:0 0 16px;">Edit Profile Details</h3>
 

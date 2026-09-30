@@ -1,0 +1,24 @@
+<!-- LS shell — shared sidebar for all three tutor pages (overview.html, chat.html,
+     wallet.html; see docs/ls-design-reference.html section 1 for the original mockup).
+     Rendered via ng-include with ng-init="lsActive='<page>'" on the include element, so this
+     partial inherits that scope var to mark the active nav item, plus the normal vm./app.
+     scope from whichever controller included it. Use lsActive values 'overview' | 'chat' |
+     'wallet' to match the page including it.
+
+     Icon rail removed and the sidebar's Account section (Edit profile / Sign out) removed
+     per explicit user request — both actions are reachable elsewhere (overview.html's own
+     profile header, and the global header's "Sign Out" button in index.html), so duplicating
+     them in every page's sidebar was redundant. Sidebar now holds only the Pages list. -->
+<aside class="sidebar ls-sidebar">
+  <div class="ls-sidebar-brand">LearnSphere</div>
+  <div class="ls-lbl">Pages</div>
+  <a href="#!/tutor/overview" class="ls-nav" ng-class="{on: lsActive === 'overview'}">
+    <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Overview
+  </a>
+  <a href="#!/tutor/chat" class="ls-nav" ng-class="{on: lsActive === 'chat'}">
+    <i class="ti ti-message" aria-hidden="true"></i> Direct messages
+  </a>
+  <a href="#!/tutor/wallet" class="ls-nav" ng-class="{on: lsActive === 'wallet'}">
+    <i class="ti ti-wallet" aria-hidden="true"></i> Wallet &amp; earnings
+  </a>
+</aside>

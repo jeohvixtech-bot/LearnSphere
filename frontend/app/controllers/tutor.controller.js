@@ -2599,18 +2599,36 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // Backs both the "N of 3 documents uploaded" count and its hover checklist
   // (see mandatoryDocsChecklist) — one source of truth for what "done" means
   // for each of the 3 mandatory slots, so the two can't drift apart.
+  //
+  // Memoized: the checklist is rendered via ng-repeat (see the verification
+  // hover tooltip in overview.html), and this function used to build a
+  // brand-new array of brand-new objects on every call — a well-known
+  // AngularJS trap (this file already avoids it elsewhere via pre-built
+  // constants like SubjectCatalog) that trips the $rootScope:infdig guard
+  // once enough other watchers are competing in the same digest. Returning
+  // the SAME array/object references when nothing actually changed fixes it
+  // without changing the function's return shape or call sites.
+  var _mandatoryDocsChecklistCache = null;
   self.mandatoryDocsChecklist = function () {
     var docs = self.tutor.documents || [];
     function hasType(type) {
       return docs.some(function (d) { return d.documentType === type && d.fileUrl; }) || self.getStagedNew(type).length > 0;
     }
+    var idDone = hasType('identity_photo');
+    var profileDone = hasType('profile_photo');
     var academicDone = docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })
       || ACADEMIC_LEVEL_TYPES.some(function (t) { return self.getStagedNew(t).length > 0; });
-    return [
-      { label: 'Identity photo', done: hasType('identity_photo') },
-      { label: 'Profile photo', done: hasType('profile_photo') },
+
+    var c = _mandatoryDocsChecklistCache;
+    if (c && c[0].done === idDone && c[1].done === profileDone && c[2].done === academicDone) {
+      return c;
+    }
+    _mandatoryDocsChecklistCache = [
+      { label: 'Identity photo', done: idDone },
+      { label: 'Profile photo', done: profileDone },
       { label: 'Academic qualification', done: academicDone }
     ];
+    return _mandatoryDocsChecklistCache;
   };
 
   self.mandatoryDocsUploadedCount = function () {

@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LS design reference (tutor) - source of truth</title>
+<!-- Icons: Tabler webfont, same "ti ti-*" classes the app uses. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+/* ===== LS tokens and components. Port these rules VERBATIM into main.css under .ls-scope ===== */
+:root{--ls-font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.ls{font-family:var(--ls-font);color:#4A4D60;font-size:13px}
+.ls-card{background:#fff;border:1px solid #ECEDF3;border-radius:14px;box-shadow:0 2px 10px rgba(30,30,60,.05)}
+.ls-btn{font-size:12px;font-weight:600;padding:7px 13px;border-radius:9px;border:none;cursor:pointer;font-family:inherit}
+.chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
+.ls-stat{text-align:center}.ls-stat i{font-size:17px;color:#5847D6}
+.ls-stat b{display:block;font-size:18px;color:#2B2D42;margin-top:2px}.ls-stat span{font-size:11px;color:#6B7085}
+.ls-tab{display:flex;align-items:center;gap:6px;padding:13px 12px 11px;font-size:13px;color:#4A4D60;border-bottom:2px solid transparent}
+.ls-tab.on{color:#5847D6;font-weight:600;border-bottom-color:#5847D6}
+.ls-info{display:flex;align-items:flex-start;gap:9px;font-size:13px;margin-bottom:10px}.ls-info i{font-size:16px;color:#6D5BF0;margin-top:1px}
+.ls-nav{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:12px;font-size:13px;color:#4A4D60;margin-bottom:2px}
+.ls-nav.on{background:#6D5BF0;color:#fff;font-weight:600;box-shadow:0 6px 16px rgba(109,91,240,.35)}
+.ls-lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6B7085;font-weight:600;padding:0 10px;margin:14px 0 6px}
+.ls-rail{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#2B2D42}
+/* calendar tab */
+.sc{padding:12px}.sc .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:8px}
+.sc b{display:block;font-size:20px;color:#2B2D42}.sc span{font-size:12px;color:#6B7085}
+.arr{position:absolute;top:0;bottom:0;width:26px;border:none;border-radius:10px;background:rgba(109,91,240,.14);color:#5847D6;cursor:pointer;font-size:16px;transition:background .12s,color .12s}
+.arr:hover{background:#6D5BF0;color:#fff}
+.cell{height:44px;border-radius:10px;background:#F7F8FC;border:1px solid #ECEDF3;padding:5px 6px;position:relative;font-size:12px;color:#4A4D60}
+.cell .bar{position:absolute;left:6px;right:6px;bottom:5px;height:3px;border-radius:3px}
+.tile{display:flex;align-items:center;gap:10px;padding:14px}
+.tile .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+/* edit profile tab */
+.fld label{font-size:11px;font-weight:600;color:#6B7085;display:block;margin-bottom:3px}
+.fld div{border:1px solid #ECEDF3;border-radius:10px;padding:8px 11px;font-size:13px;background:#fff;color:#2B2D42}
+.sec{border:1px solid #ECEDF3;border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.sec p.t{margin:0 0 10px;font-size:13px;font-weight:600;color:#2B2D42}
+/* responsive preview only */
+.ph{position:relative;width:290px;height:430px;border:1px solid #ECEDF3;border-radius:22px;overflow:hidden;background:#F4F5FA;flex-shrink:0}
+.stat{padding:10px}.stat b{display:block;font-size:18px;color:#2B2D42}.stat span{font-size:11px;color:#6B7085}
+/* reference page chrome (not part of the design) */
+body{margin:0;padding:24px;background:#E9EAF2}
+.ref{max-width:680px;margin:0 auto 36px}
+.refh{font:600 12px var(--ls-font);color:#4A4D60;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}
+.refnote{font:12px var(--ls-font);color:#6B7085;max-width:680px;margin:0 auto 24px}
+</style>
+</head>
+<body>
+<p class="refnote"><b>LS design reference.</b> Authored in a 680px preview, so rail (52), sidebar (172) and cover (110) are scaled: use 64 / 220 / 200 on the real page. Every other size, color, weight, gap and radius here is exact. The header block (section 2) is the same on all three tabs; only the active tab changes.</p>
+
+<!-- ============ 1. SHELL ============ -->
+<section class="ref"><h2 class="refh">1 - App shell: icon rail + sidebar + breadcrumb card</h2>
+<div class="ls" style="display:flex;background:#F4F5FA;border-radius:14px;overflow:hidden;min-height:420px;">
+  <div style="width:52px;flex-shrink:0;background:linear-gradient(180deg,#BDEFE8 0%,#CFE3F8 50%,#D5C8F5 100%);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:8px;">
+    <div class="ls-rail" style="background:#fff;color:#5847D6;margin-bottom:10px;"><i class="ti ti-school" aria-hidden="true"></i></div>
+    <div class="ls-rail" style="background:#fff;color:#5847D6;"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></div>
+    <div class="ls-rail"><i class="ti ti-message" aria-hidden="true"></i></div>
+    <div class="ls-rail"><i class="ti ti-wallet" aria-hidden="true"></i></div>
+    <div class="ls-rail"><i class="ti ti-user" aria-hidden="true"></i></div>
+  </div>
+  <div style="width:172px;flex-shrink:0;background:#fff;padding:16px 10px;border-right:1px solid #ECEDF3;">
+    <div style="padding:0 10px 2px;font-size:16px;font-weight:700;color:#2B2D42;">LearnSphere</div>
+    <div class="ls-lbl">Pages</div>
+    <div class="ls-nav on"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Overview</div>
+    <div class="ls-nav"><i class="ti ti-message" aria-hidden="true"></i>Direct messages<!-- badge only if a real unread binding exists today; otherwise omit --><span style="margin-left:auto;background:#D6336C;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;">2</span></div>
+    <div class="ls-nav"><i class="ti ti-wallet" aria-hidden="true"></i>Wallet &amp; earnings</div>
+    <div class="ls-lbl">Account</div>
+    <div class="ls-nav"><i class="ti ti-user-edit" aria-hidden="true"></i>Edit profile</div>
+    <div class="ls-nav"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</div>
+  </div>
+  <div style="flex:1;min-width:0;padding:16px;display:flex;flex-direction:column;gap:14px;">
+    <div class="ls-card" style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
+      <span style="font-size:12px;color:#6B7085;">Tutor</span>
+      <i class="ti ti-chevron-right" style="font-size:12px;color:#6B7085;" aria-hidden="true"></i>
+      <span style="font-size:13px;font-weight:600;color:#2B2D42;">Overview</span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+        <div style="position:relative;font-size:17px;color:#4A4D60;"><i class="ti ti-bell" aria-hidden="true"></i><span style="position:absolute;top:-1px;right:-2px;width:7px;height:7px;border-radius:50%;background:#F0508C;"></span></div>
+        <div style="width:28px;height:28px;border-radius:50%;background:#EEEBFD;color:#5847D6;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">T</div>
+      </div>
+    </div>
+    <div style="border:1.5px dashed #C9C4F5;border-radius:14px;padding:30px;text-align:center;color:#6B7085;font-size:12px;">Page content renders here (sections 2 to 4)</div>
+  </div>
+</div></section>
+
+<!-- ============ 2. OVERVIEW TAB ============ -->
+<section class="ref"><h2 class="refh">2 - Overview tab (default landing view) = header + booking requests + About + bulletin board</h2>
+<div class="ls" style="background:#F4F5FA;padding:16px;border-radius:14px;">
+
+  <!-- PROFILE HEADER: identical on every tab, only .ls-tab.on moves -->
+  <div id="hdr" class="ls-card" style="position:relative;overflow:hidden;">
+    <div style="position:relative;height:110px;background:linear-gradient(120deg,#5847D6,#6D5BF0 50%,#8F7DFF);overflow:hidden;">
+      <div style="position:absolute;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,.10);top:-70px;left:40px;"></div>
+      <div style="position:absolute;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.14);top:20px;right:80px;"></div>
+      <div style="position:absolute;width:120px;height:120px;border-radius:50%;border:16px solid rgba(255,255,255,.10);bottom:-70px;left:310px;"></div>
+    </div>
+    <!-- avatar sits OUTSIDE the cover so overflow:hidden does not clip it -->
+    <div style="position:absolute;top:70px;left:50%;transform:translateX(-50%);width:80px;height:80px;box-sizing:border-box;border-radius:50%;border:4px solid #fff;background:#EEEBFD;color:#5847D6;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;">T</div>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:12px;padding:14px 18px 12px;">
+      <div style="display:flex;gap:18px;padding-top:2px;">
+        <div class="ls-stat" title="Full: 100"><i class="ti ti-trophy" aria-hidden="true"></i><b>72.5</b><span>Score</span></div>
+        <div class="ls-stat"><i class="ti ti-star" aria-hidden="true"></i><b>4.6</b><span>Rating</span></div>
+        <div class="ls-stat"><i class="ti ti-message-2" aria-hidden="true"></i><b>32</b><span>Reviews</span></div>
+      </div>
+      <div style="text-align:center;padding-top:44px;min-width:200px;">
+        <div style="font-size:18px;font-weight:700;color:#2B2D42;">Mr Tan Wei Ming</div>
+        <div style="font-size:12px;color:#6B7085;margin:2px 0 6px;">6 Years Active MOE Teacher</div>
+        <div style="display:flex;justify-content:center;gap:6px;">
+          <span class="chip" style="background:#FFF3D6;color:#92400E;"><i class="ti ti-trophy" aria-hidden="true"></i> Gold teacher</span>
+          <span class="chip" style="background:#EEEBFD;color:#5847D6;"><i class="ti ti-check" aria-hidden="true"></i> Verified</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;padding-top:2px;">
+        <button class="ls-btn" style="background:#DDF6F2;color:#0F766E;">&#9679; Online</button>
+        <button class="ls-btn" style="background:#6D5BF0;color:#fff;">Edit profile</button>
+      </div>
+    </div>
+    <div style="background:#DEDAF8;display:flex;justify-content:flex-end;gap:6px;padding:0 14px;">
+      <div class="ls-tab on"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Overview</div>
+      <div class="ls-tab"><i class="ti ti-calendar" aria-hidden="true"></i>Calendar</div>
+      <div class="ls-tab"><i class="ti ti-user-edit" aria-hidden="true"></i>Edit profile</div>
+    </div>
+  </div>
+
+  <!-- BOOKING REQUESTS: hoisted above the tab content, shown on every tab -->
+  <div style="display:flex;align-items:center;margin:14px 0 6px;">
+    <span style="font-size:14px;font-weight:600;color:#2B2D42;">Booking requests</span>
+    <span class="chip" style="background:#FDE7EF;color:#B4235F;margin-left:8px;">2</span>
+    <span style="margin-left:auto;font-size:11px;color:#6B7085;">Visible on every tab</span>
+  </div>
+  <div id="req" class="ls-card" style="padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div style="width:34px;height:34px;border-radius:50%;background:#FDE7EF;color:#B4235F;font-weight:700;display:flex;align-items:center;justify-content:center;">L</div>
+    <div style="flex:1;min-width:200px;"><div><b style="color:#2B2D42;">Lim Family</b> <span style="font-size:11px;color:#6B7085;">&middot; #BK1042 &middot; 12 min ago</span></div><div style="font-size:13px;">2 Math sessions &middot; Secondary 3</div></div>
+    <button class="ls-btn" style="background:#6D5BF0;color:#fff;">Confirm class</button>
+    <button class="ls-btn" style="background:#fff;color:#4A4D60;border:1px solid #ECEDF3;">Counter propose</button>
+  </div>
+
+  <!-- OVERVIEW CONTENT: About (1fr) + bulletin board feed (2fr) -->
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-top:14px;align-items:start;">
+    <div class="ls-card" style="padding:16px;">
+      <div style="font-size:16px;font-weight:600;color:#2B2D42;margin-bottom:6px;">About</div>
+      <p style="font-size:12.5px;line-height:1.55;color:#6B7085;margin:0 0 14px;">I make math approachable, one step at a time.</p>
+      <div class="ls-info"><i class="ti ti-school" aria-hidden="true"></i>B.Sc. Mathematics, NUS</div>
+      <div class="ls-info"><i class="ti ti-book" aria-hidden="true"></i>O-Level Math, A-Level Math, Add Math</div>
+      <div class="ls-info" style="margin-bottom:0;"><i class="ti ti-video" aria-hidden="true"></i>Online &middot; Tutor place</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;font-weight:600;color:#2B2D42;">Bulletin board</span>
+        <span class="chip" style="background:#DDF6F2;color:#0F766E;">5 published</span>
+        <span class="chip" style="background:#FEF3C7;color:#92400E;">1 dispute pending</span>
+      </div>
+      <!-- published remark -->
+      <div class="ls-card" style="padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:#DDF6F2;color:#0F766E;font-weight:700;display:flex;align-items:center;justify-content:center;">n</div>
+          <div style="flex:1;"><div style="font-weight:600;color:#2B2D42;">**n **i **ng</div><div style="font-size:11px;color:#6B7085;">2 Sep 2026 &middot; Math</div></div>
+          <i class="ti ti-dots-vertical" style="color:#6B7085;font-size:17px;" aria-hidden="true"></i>
+        </div>
+        <p style="margin:10px 0 8px;font-size:13px;"><span style="color:#D97706;">&#9733;&#9733;&#9733;&#9733;&#9733;</span> Very patient with my daughter, explained algebra clearly.</p>
+        <div style="display:flex;align-items:center;"><span style="font-size:12px;color:#6B7085;"><i class="ti ti-thumb-up" aria-hidden="true"></i> 5</span><span style="margin-left:auto;font-size:12px;font-weight:600;color:#B4235F;">Request hide</span></div>
+      </div>
+      <!-- dispute requested -->
+      <div class="ls-card" style="padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:#FDE7EF;color:#B4235F;font-weight:700;display:flex;align-items:center;justify-content:center;">h</div>
+          <div style="flex:1;"><div style="font-weight:600;color:#2B2D42;">**m **h Wo**g</div><div style="font-size:11px;color:#6B7085;">30 Aug 2026 &middot; Science</div></div>
+          <span class="chip" style="background:#FEF3C7;color:#92400E;">Dispute requested</span>
+        </div>
+        <p style="margin:10px 0 0;font-size:13px;"><span style="color:#D97706;">&#9733;&#9733;&#9733;</span><span style="color:#B8BBCC;">&#9733;&#9733;</span> Session started 10 minutes late, no notice given.</p>
+      </div>
+      <!-- hidden by admin (dimmed) -->
+      <div class="ls-card" style="padding:14px;opacity:.65;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:#EEF0F5;color:#4A4D60;font-weight:700;display:flex;align-items:center;justify-content:center;">h</div>
+          <div style="flex:1;"><div style="font-weight:600;color:#2B2D42;">**h **n Le**</div><div style="font-size:11px;color:#6B7085;">12 Aug 2026 &middot; English</div></div>
+          <span class="chip" style="background:#EEF0F5;color:#4A4D60;">Hidden by admin</span>
+        </div>
+        <p style="margin:10px 0 0;font-size:13px;"><span style="color:#D97706;">&#9733;&#9733;</span><span style="color:#B8BBCC;">&#9733;&#9733;&#9733;</span> Not what I expected for the price.</p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ 3. CALENDAR TAB ============ -->
+<section class="ref"><h2 class="refh">3 - Calendar tab = stat cards + calendar + 4 panel tiles (Bulletin board tile removed)</h2>
+<div class="ls" style="background:#F4F5FA;padding:16px;border-radius:14px;">
+  <div data-clone="hdr" data-active="1"></div>
+  <div data-clone="req-compact"></div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;">
+    <div class="ls-card sc"><div class="ic" style="background:#FDE7EF;color:#B4235F;"><i class="ti ti-clock" aria-hidden="true"></i></div><b>2</b><span>Pending confirmation</span></div>
+    <div class="ls-card sc"><div class="ic" style="background:#DDF6F2;color:#0F766E;"><i class="ti ti-calendar-event" aria-hidden="true"></i></div><b>3</b><span>Sessions on Sep 11</span></div>
+    <div class="ls-card sc"><div class="ic" style="background:#EEEBFD;color:#5847D6;"><i class="ti ti-wallet" aria-hidden="true"></i></div><b>$1,240</b><span>Ready balance</span></div>
+  </div>
+
+  <div class="ls-card" style="padding:16px;margin-top:14px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="font-size:16px;font-weight:600;color:#2B2D42;"><i class="ti ti-calendar" aria-hidden="true"></i> September 2026</span>
+      <span style="font-size:11px;color:#6B7085;">1 of 5 dates selected</span>
+      <button class="ls-btn" style="margin-left:auto;background:#6D5BF0;color:#fff;"><i class="ti ti-calendar-plus" aria-hidden="true"></i> Setup class</button>
+    </div>
+    <div style="position:relative;padding:0 34px;">
+      <button class="arr" style="left:0;" aria-label="Previous month"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+      <button class="arr" style="right:0;" aria-label="Next month"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:11px;color:#6B7085;text-align:center;font-weight:600;margin-bottom:5px;"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+      <div id="cal" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;"></div>
+    </div>
+    <!-- cell rules: default #F7F8FC; past days opacity .5; selected = 2px #6D5BF0 border + #EEEBFD bg + bold #5847D6;
+         blocked = #FDE7EF bg + ti-ban #B4235F; status bar (3px): paid #14B8A6, unpaid #F5A524, published #B9B0F7 -->
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+    <div class="ls-card tile"><div class="ic" style="background:#DDF6F2;color:#0F766E;"><i class="ti ti-checkbox" aria-hidden="true"></i></div><span style="font-weight:600;color:#2B2D42;flex:1;">Confirmed classes</span><span class="chip" style="background:#DDF6F2;color:#0F766E;">4 this month</span><i class="ti ti-chevron-right" style="color:#6B7085;" aria-hidden="true"></i></div>
+    <div class="ls-card tile"><div class="ic" style="background:#EEEBFD;color:#5847D6;"><i class="ti ti-calendar-event" aria-hidden="true"></i></div><span style="font-weight:600;color:#2B2D42;flex:1;">Daily summary</span><span class="chip" style="background:#EEEBFD;color:#5847D6;">1 date selected</span><i class="ti ti-chevron-right" style="color:#6B7085;" aria-hidden="true"></i></div>
+    <div class="ls-card tile"><div class="ic" style="background:#FEF3C7;color:#92400E;"><i class="ti ti-file-text" aria-hidden="true"></i></div><span style="font-weight:600;color:#2B2D42;flex:1;">Class reports</span><span class="chip" style="background:#FEF3C7;color:#92400E;">1 pending</span><i class="ti ti-chevron-right" style="color:#6B7085;" aria-hidden="true"></i></div>
+    <div class="ls-card tile" style="border-style:dashed;box-shadow:none;background:transparent;"><div class="ic" style="background:#EEF0F5;color:#4A4D60;"><i class="ti ti-dots" aria-hidden="true"></i></div><span style="font-weight:600;color:#4A4D60;flex:1;">Coming soon</span></div>
+  </div>
+</div></section>
+
+<!-- ============ 4. EDIT PROFILE TAB ============ -->
+<section class="ref"><h2 class="refh">4 - Edit profile tab = same Verification / Offerings screen, restyled</h2>
+<div class="ls" style="background:#F4F5FA;padding:16px;border-radius:14px;">
+  <div data-clone="hdr" data-active="2"></div>
+  <div data-clone="req-compact"></div>
+
+  <div class="ls-card" style="padding:18px 20px;margin-top:14px;max-width:640px;">
+    <span class="chip" style="background:#EEEBFD;color:#5847D6;letter-spacing:.04em;">TUTOR PROFILE MANAGEMENT</span>
+    <div style="font-size:18px;font-weight:600;color:#2B2D42;margin:8px 0 12px;">Edit Profile Details</div>
+
+    <div style="display:inline-flex;background:#EEEBFD;border-radius:12px;padding:4px;gap:4px;margin-bottom:16px;">
+      <span style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:9px;background:#fff;color:#5847D6;font-weight:600;box-shadow:0 1px 4px rgba(30,30,60,.10);"><i class="ti ti-shield-check" aria-hidden="true"></i>Verification</span>
+      <span style="display:flex;align-items:center;gap:6px;padding:6px 14px;color:#4A4D60;"><i class="ti ti-book" aria-hidden="true"></i>Offerings</span>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px;">
+      <div><div style="font-size:15px;font-weight:600;color:#2B2D42;"><i class="ti ti-shield-check" aria-hidden="true"></i> Profile verification</div><div style="font-size:12px;color:#6B7085;margin-top:2px;">Complete all required documents to unlock subject offerings.</div></div>
+      <div style="text-align:right;min-width:170px;">
+        <div style="font-size:12px;color:#4A4D60;">2 of 3 documents uploaded</div>
+        <div style="font-size:12px;color:#4A4D60;">Identity number: Provided</div>
+        <div style="height:6px;border-radius:100px;background:#EEEBFD;margin-top:6px;overflow:hidden;"><div style="width:75%;height:100%;background:#6D5BF0;border-radius:100px;"></div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:flex-start;gap:10px;background:#FFF8E1;border:1px solid #FDE68A;border-radius:12px;padding:10px 12px;margin-bottom:14px;">
+      <i class="ti ti-clock" style="color:#92400E;font-size:17px;margin-top:1px;" aria-hidden="true"></i>
+      <div><div style="font-size:13px;font-weight:600;color:#92400E;">Under review</div><div style="font-size:12px;color:#92400E;">Admin will review your documents within 1&ndash;3 business days.</div></div>
+    </div>
+
+    <div class="sec">
+      <p class="t"><i class="ti ti-id" aria-hidden="true"></i> Identity verification</p>
+      <div style="display:flex;gap:12px;margin-bottom:10px;">
+        <div class="fld" style="flex:1;"><label>ID type *</label><div>NRIC (Singapore)</div></div>
+        <div class="fld" style="flex:1;"><label>ID number *</label><div>S1234567D</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#F7F8FC;border-radius:10px;font-size:12px;"><i class="ti ti-file-check" style="color:#5847D6;" aria-hidden="true"></i><span style="flex:1;color:#2B2D42;">id_photo_tan.jpg</span><span class="chip" style="background:#FEF3C7;color:#92400E;">pending</span></div>
+    </div>
+
+    <div class="sec">
+      <p class="t"><i class="ti ti-certificate" aria-hidden="true"></i> Academic certificate</p>
+      <div style="border:1.5px dashed #C9C4F5;background:#F8F7FF;border-radius:12px;padding:18px;text-align:center;font-size:12px;color:#4A4D60;"><i class="ti ti-upload" style="font-size:20px;display:block;margin-bottom:4px;color:#6D5BF0;" aria-hidden="true"></i>Drag a file here or click to upload</div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;"><button class="ls-btn" style="background:#E5E7F0;color:#6B7085;cursor:not-allowed;padding:9px 16px;">Submit for verification</button></div>
+  </div>
+</div></section>
+
+<!-- ============ 5. RESPONSIVE (below ~900px) ============ -->
+<section class="ref"><h2 class="refh">5 - Below ~900px: rail hidden, stats wrap to 2 columns, sidebar becomes a slide-in drawer</h2>
+<div class="ls" style="display:flex;gap:20px;justify-content:center;padding:6px 0;flex-wrap:wrap;">
+  <div>
+    <div class="ph">
+      <div style="padding:12px;">
+        <div class="ls-card" style="display:flex;align-items:center;gap:10px;padding:9px 12px;">
+          <i class="ti ti-menu-2" style="font-size:19px;color:#2B2D42;" aria-hidden="true"></i>
+          <span style="font-weight:700;color:#2B2D42;">LearnSphere</span>
+          <i class="ti ti-bell" style="margin-left:auto;font-size:17px;" aria-hidden="true"></i>
+          <div style="width:26px;height:26px;border-radius:50%;background:#EEEBFD;color:#5847D6;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;">T</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+          <div class="ls-card stat"><b>2</b><span>Pending requests</span></div>
+          <div class="ls-card stat"><b>3</b><span>Sessions today</span></div>
+          <div class="ls-card stat"><b>$1,240</b><span>Ready balance</span></div>
+          <div class="ls-card stat"><b>4.6</b><span>Rating</span></div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:12px;color:#6B7085;margin:8px 0 0;">Rail hidden, stats wrap to 2 columns</p>
+  </div>
+  <div>
+    <div class="ph">
+      <div style="padding:12px;">
+        <div class="ls-card" style="height:40px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+          <div class="ls-card" style="height:64px;"></div><div class="ls-card" style="height:64px;"></div>
+          <div class="ls-card" style="height:64px;"></div><div class="ls-card" style="height:64px;"></div>
+        </div>
+      </div>
+      <div style="position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(43,45,66,.45);"></div>
+      <div style="position:absolute;top:0;bottom:0;left:0;width:205px;background:#fff;padding:16px 10px;box-shadow:6px 0 24px rgba(30,30,60,.25);">
+        <div style="padding:0 10px 10px;font-size:16px;font-weight:700;color:#2B2D42;">LearnSphere</div>
+        <div class="ls-lbl" style="margin:4px 0 6px;">Pages</div>
+        <div class="ls-nav on"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Overview</div>
+        <div class="ls-nav"><i class="ti ti-message" aria-hidden="true"></i>Direct messages</div>
+        <div class="ls-nav"><i class="ti ti-wallet" aria-hidden="true"></i>Wallet &amp; earnings</div>
+        <div class="ls-lbl">Account</div>
+        <div class="ls-nav"><i class="ti ti-user-edit" aria-hidden="true"></i>Edit profile</div>
+        <div class="ls-nav"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:12px;color:#6B7085;margin:8px 0 0;">Sidebar as a slide-in drawer</p>
+  </div>
+</div></section>
+
+<script>
+/* Reference-page helpers only. In the app these are plain Angular markup, not JS. */
+document.querySelectorAll('[data-clone="hdr"]').forEach(function(ph){
+  var c=document.getElementById('hdr').cloneNode(true);c.removeAttribute('id');
+  c.querySelectorAll('.ls-tab').forEach(function(t,i){t.classList.toggle('on',i===+ph.getAttribute('data-active'));});
+  ph.parentNode.replaceChild(c,ph);
+});
+document.querySelectorAll('[data-clone="req-compact"]').forEach(function(ph){
+  var c=document.createElement('div');c.className='ls-card';
+  c.style.cssText='padding:10px 14px;margin-top:14px;display:flex;align-items:center;gap:10px;';
+  c.innerHTML='<div style="width:28px;height:28px;border-radius:50%;background:#FDE7EF;color:#B4235F;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">L</div>'
+   +'<span style="font-size:13px;flex:1;"><b style="color:#2B2D42;">Lim Family</b> &middot; 2 Math sessions &middot; Secondary 3</span>'
+   +'<button class="ls-btn" style="background:#6D5BF0;color:#fff;">Confirm class</button>'
+   +'<button class="ls-btn" style="background:#fff;color:#4A4D60;border:1px solid #ECEDF3;">Counter propose</button>';
+  ph.parentNode.replaceChild(c,ph);
+});
+var st={4:'blocked',7:'paid',9:'paid',11:'paid',12:'unpaid',14:'pub',16:'paid',18:'pub',21:'unpaid',23:'paid',25:'pub',28:'pub'};
+var col={paid:'#14B8A6',unpaid:'#F5A524',pub:'#B9B0F7'};
+var h='';for(var i=0;i<35;i++){var d=i-1;if(d<1||d>30){h+='<div></div>';continue;}
+var s=st[d],past=d<11,sel=d===11,style='',inner='<span>'+d+'</span>';
+if(s==='blocked'){style='background:#FDE7EF;border-color:#F7C5D6;';inner+='<i class="ti ti-ban" style="position:absolute;right:6px;top:5px;font-size:12px;color:#B4235F;"></i>';}
+else if(s){inner+='<div class="bar" style="background:'+col[s]+'"></div>';}
+if(sel){style='background:#EEEBFD;border:2px solid #6D5BF0;color:#5847D6;font-weight:700;';}
+h+='<div class="cell" style="'+style+(past&&!sel?'opacity:.5;':'')+'">'+inner+'</div>';}
+document.getElementById('cal').innerHTML=h;
+</script>
+</body>
+</html>
