@@ -350,6 +350,19 @@ using (var scope = app.Services.CreateScope())
             UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
+    // On databases where EF created this table first, `Key` is LONGTEXT with no
+    // unique index, so the INSERT IGNORE below re-inserted all six rows on every
+    // startup (dozens of duplicate sets). Collapse to one row per Key — keeping
+    // the lowest Id, which is the row UpdateScoringWeightages and the score
+    // calculators have always read/written (FirstOrDefault by Key) — then add
+    // the unique index so INSERT IGNORE actually ignores from now on.
+    await context.Database.ExecuteSqlRawAsync(@"
+        DELETE w FROM `ScoringWeightages` w
+        JOIN `ScoringWeightages` k ON k.`Key` = w.`Key` AND k.`Id` < w.`Id`");
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ScoringWeightages` MODIFY `Key` VARCHAR(20) NOT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ScoringWeightages` ADD UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)"); } catch { }
     await context.Database.ExecuteSqlRawAsync(@"
         INSERT IGNORE INTO `ScoringWeightages` (`Key`, `Label`, `Percent`, `SortOrder`) VALUES
             ('rating', 'Tutor Rating', 0, 0),
