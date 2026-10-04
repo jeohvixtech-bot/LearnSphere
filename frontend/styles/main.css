@@ -4702,3 +4702,119 @@ a.bs-sidebar-link.active { color: var(--color-bg); }
   .ls-scope .sc-grid, .ls-scope [style*="grid-template-columns:repeat(3,1fr)"] { grid-template-columns:1fr 1fr !important; }
 }
 
+/* ============================================================
+   Profile dock menu — the avatar+name block at the top of every
+   parent/tutor/admin sidebar now expands a vertical, icon-only
+   dock of rounded-square chips (Contact / Email / About), each
+   its own chip with spacing between them, hover/focus highlights
+   solid in the page's accent color. Hover opens it on desktop
+   (CSS-only); the .open class (toggled via ng-click in the
+   partial) opens it on touch devices where hover doesn't fire.
+   Token-based, so it adapts to any skin automatically.
+   ============================================================ */
+.profile-menu-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.profile-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+.profile-menu-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-accent-100);
+  color: var(--color-accent-800);
+  font-weight: 600;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.profile-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 48px;
+}
+.profile-menu-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--color-bg);
+  text-decoration: none;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+/* .bs-scope a { color: var(--color-accent) } elsewhere in this file beats a
+   flat single-class rule on specificity — same fix already used for
+   a.bs-btn above. Without this, these links render link-blue. */
+a.profile-menu-icon-btn { color: var(--color-neutral-600); }
+.profile-menu-icon-btn:hover,
+.profile-menu-icon-btn:focus-visible {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  outline: none;
+}
+@media (hover: hover) {
+  .profile-menu-wrap:hover .profile-menu-dropdown { display: flex; }
+}
+.profile-menu-wrap.open .profile-menu-dropdown { display: flex; }
+/* Invisible bridge over the gap between trigger and dropdown, so moving the
+   pointer down onto the chips doesn't drop :hover and close the menu. */
+.profile-menu-dropdown::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px;
+}
+
+/* Header variant — avatar-only trigger in the top nav, dropdown centred under
+   it. .bs-nav a / a:hover (color inherit / accent) outrank the plain chip
+   rules above, so the chip colors are restated at .bs-nav specificity. */
+.header-profile-menu { padding: 0; margin: 0; border: 0; }
+.header-profile-menu .profile-menu-avatar { width: 32px; height: 32px; font-size: 12px; cursor: pointer; }
+.header-profile-menu .profile-menu-dropdown { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+.header-profile-menu:focus-within .profile-menu-dropdown { display: flex; }
+.bs-nav a.profile-menu-icon-btn { color: var(--color-neutral-600); }
+.bs-nav a.profile-menu-icon-btn:hover,
+.bs-nav a.profile-menu-icon-btn:focus-visible { background: var(--color-accent); color: var(--color-bg); }
+
+/* Dark admin sidebar (.sidebar-dark) gets its own chip coloring — the
+   default light chips/avatar would be invisible against it. */
+.sidebar-dark .profile-menu-avatar { background: #334155; color: #e2e8f0; }
+.sidebar-dark .profile-menu-trigger strong { color: #fff; }
+.sidebar-dark .profile-menu-trigger small { color: rgba(255,255,255,0.68); }
+.sidebar-dark .profile-menu-wrap { border-bottom-color: #1e293b; }
+.sidebar-dark .profile-menu-dropdown { background: #1e293b; border-color: #334155; }
+.sidebar-dark .profile-menu-icon-btn { background: #334155; }
+.sidebar-dark a.profile-menu-icon-btn { color: #94a3b8; }
+.sidebar-dark .profile-menu-icon-btn:hover,
+.sidebar-dark .profile-menu-icon-btn:focus-visible { background: var(--color-accent); color: #fff; }
+
+/* Tutor breadcrumb — current page/tab name doubles as a reload link
+   (vm.reloadCurrentView). .ls-scope a would otherwise recolor it. */
+.ls-scope a.ls-crumb-link { font-size: 13px; font-weight: 600; color: #2B2D42; text-decoration: none; cursor: pointer; }
+.ls-scope a.ls-crumb-link:hover { color: #5847D6; text-decoration: underline; }

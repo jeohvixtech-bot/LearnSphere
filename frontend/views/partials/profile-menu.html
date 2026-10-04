@@ -1,0 +1,28 @@
+<!-- Shared profile hover/tap menu — included via ng-include from every
+     parent/tutor/admin sidebar. Expects three locals set via ng-init right
+     before the include: profileName, profileInitial, profileRole.
+     Icon-only dock-style chips (no text labels) — title attribute on each
+     link covers accessibility/hover tooltip. Purely informational — no
+     account actions live here; those stay on each page's own account menu. -->
+<div class="profile-menu-wrap" ng-class="{open: vm.showProfileMenu}">
+  <div class="profile-menu-trigger"
+       ng-click="vm.showProfileMenu = !vm.showProfileMenu"
+       tabindex="0">
+    <div class="profile-menu-avatar">{{ profileInitial }}</div>
+    <div>
+      <strong style="font-size:15px;">{{ profileName }}</strong><br/>
+      <small class="bs-text-muted" style="font-size:13px;">{{ profileRole }}</small>
+    </div>
+  </div>
+  <div class="profile-menu-dropdown">
+    <a href="#!/contact" class="profile-menu-icon-btn" ng-click="vm.showProfileMenu = false" title="Contact Info">
+      <i class="ti ti-address-book" aria-hidden="true"></i>
+    </a>
+    <a href="mailto:support@learnsphere.sg" class="profile-menu-icon-btn" title="Email Us">
+      <i class="ti ti-mail" aria-hidden="true"></i>
+    </a>
+    <a href="#!/about" class="profile-menu-icon-btn" ng-click="vm.showProfileMenu = false" title="About LearnSphere">
+      <i class="ti ti-info-circle" aria-hidden="true"></i>
+    </a>
+  </div>
+</div>

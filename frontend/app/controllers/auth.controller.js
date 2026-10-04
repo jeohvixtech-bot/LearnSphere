@@ -70,6 +70,14 @@ angular.module('learnSphereApp')
   };
 
   self.login = function () {
+    // Enter in either field calls this directly (see login.html ng-keydown) as
+    // well as the form's ng-submit — ignore repeats while a request is in flight
+    // and don't send an obviously incomplete form.
+    if (self.loading) return;
+    if (!self.loginData.email || !self.loginData.password) {
+      self.errorMsg = 'Please enter your email and password.';
+      return;
+    }
     self.errorMsg = '';
     self.loading = true;
     AuthService.login(self.loginData.email, self.loginData.password)

@@ -33,11 +33,11 @@
     <form ng-if="auth.mode === 'login'" ng-submit="auth.login()" style="display:flex; flex-direction:column; gap:var(--space-3);">
       <div class="bs-field">
         <label>Email Address</label>
-        <input class="bs-input" type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" />
+        <input class="bs-input" type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" ng-keydown="$event.keyCode === 13 && ($event.preventDefault() || auth.login())" />
       </div>
       <div class="bs-field">
         <label>Password</label>
-        <input class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" />
+        <input class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" ng-keydown="$event.keyCode === 13 && ($event.preventDefault() || auth.login())" />
       </div>
       <p style="text-align:right; margin:0;">
         <a href="" class="bs-btn bs-btn-ghost" style="font-size:13px; padding:0;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>

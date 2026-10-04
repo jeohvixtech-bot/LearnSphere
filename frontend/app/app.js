@@ -15,6 +15,16 @@ angular.module('learnSphereApp', ['ngRoute'])
       controller: 'WelcomeCtrl',
       controllerAs: 'vm'
     })
+    .when('/contact', {
+      templateUrl: 'views/contact.html',
+      controller: 'StaticPageCtrl',
+      controllerAs: 'vm'
+    })
+    .when('/about', {
+      templateUrl: 'views/about.html',
+      controller: 'StaticPageCtrl',
+      controllerAs: 'vm'
+    })
     .when('/login', {
       templateUrl: function () { return 'views/login.html?_=' + Date.now(); },
       controller: 'AuthCtrl',

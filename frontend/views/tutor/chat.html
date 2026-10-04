@@ -9,14 +9,9 @@
     <div class="ls-card" style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
       <span style="font-size:12px;color:#6B7085;">Tutor</span>
       <i class="ti ti-chevron-right" style="font-size:12px;color:#6B7085;" aria-hidden="true"></i>
-      <span style="font-size:13px;font-weight:600;color:#2B2D42;">Direct messages</span>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-        <div style="position:relative;font-size:17px;color:#4A4D60;cursor:pointer;" ng-click="app.toggleNotifDrawer()">
-          <i class="ti ti-bell" aria-hidden="true"></i>
-          <span ng-if="app.unreadCount > 0" style="position:absolute;top:-1px;right:-2px;width:7px;height:7px;border-radius:50%;background:#F0508C;"></span>
-        </div>
-        <div style="width:28px;height:28px;border-radius:50%;background:#EEEBFD;color:#5847D6;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">{{ app.currentUser.name[0] }}</div>
-      </div>
+      <a href="" class="ls-crumb-link" ng-click="vm.reloadCurrentView()" title="Reload">Direct messages</a>
+      <!-- Bell/avatar removed — the global header already has both. -->
+      <span ls-clock style="margin-left:auto;font-size:12px;color:#6B7085;white-space:nowrap;"></span>
     </div>
 
     <div class="ls-card" style="display:flex; gap:14px; height:calc(100vh - 220px); min-height:480px; padding:14px; margin-top:14px;">

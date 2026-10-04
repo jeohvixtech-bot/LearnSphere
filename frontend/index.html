@@ -42,7 +42,24 @@
           <span ng-if="app.unreadCount > 0" style="position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:var(--color-accent-2);"></span>
         </button>
 
-        <div style="width:32px; height:32px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ app.currentUser.name[0] }}</div>
+        <!-- Info dock (Contact / Email / About) on the header avatar — every logged-in
+             page. Hover opens on desktop, tap toggles on touch (app.showProfileMenu),
+             keyboard focus opens via :focus-within. Same chips as profile-menu.html. -->
+        <div class="profile-menu-wrap header-profile-menu" ng-class="{open: app.showProfileMenu}">
+          <div class="profile-menu-avatar" role="button" tabindex="0" title="Info &amp; support"
+               ng-click="app.showProfileMenu = !app.showProfileMenu">{{ app.currentUser.name[0] }}</div>
+          <div class="profile-menu-dropdown">
+            <a href="#!/contact" class="profile-menu-icon-btn" ng-click="app.showProfileMenu = false" title="Contact Info">
+              <i class="ti ti-address-book" aria-hidden="true"></i>
+            </a>
+            <a href="mailto:support@learnsphere.sg" class="profile-menu-icon-btn" title="Email Us">
+              <i class="ti ti-mail" aria-hidden="true"></i>
+            </a>
+            <a href="#!/about" class="profile-menu-icon-btn" ng-click="app.showProfileMenu = false" title="About LearnSphere">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+            </a>
+          </div>
+        </div>
 
         <button type="button" class="bs-btn bs-btn-secondary bs-nav-signout" ng-click="app.logout()">Sign Out</button>
       </div>
@@ -111,8 +128,10 @@
   <script src="app/directives/drag-drop.directives.js"></script>
   <script src="app/directives/nav-refresh.directives.js"></script>
   <script src="app/directives/filter-picker.directives.js"></script>
+  <script src="app/directives/clock.directive.js"></script>
   <script src="app/controllers/app.controller.js"></script>
   <script src="app/controllers/welcome.controller.js"></script>
+  <script src="app/controllers/static.controller.js"></script>
   <script src="app/controllers/auth.controller.js"></script>
   <script src="app/controllers/change-password.controller.js"></script>
   <script src="app/controllers/parent.controller.js"></script>
