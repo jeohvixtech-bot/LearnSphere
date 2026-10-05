@@ -78,8 +78,10 @@ LearnSphere/
 │   │   ├── parent/                # Parent dashboard views
 │   │   ├── tutor/                 # Tutor dashboard views
 │   │   └── admin/                 # Admin dashboard views
+│   ├── assets/                    # Logo variants (logo-*.png) + landing photos
 │   └── styles/
-│       └── main.css               # Full custom stylesheet
+│       ├── main.css               # Base stylesheet (Broadsheet / LS / legacy rules)
+│       └── bright.css             # "Bright" design system — tokens + skin for every role, loaded after main.css
 └── database/
     └── schema.sql                 # Manual MySQL schema reference
 ```

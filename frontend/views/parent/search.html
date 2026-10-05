@@ -44,7 +44,7 @@
 
       <!-- ── Search Hero ─────────────────────────── -->
       <div>
-        <h2>Find Your Perfect Tutor</h2>
+        <h1>Find Your Perfect Tutor</h1>
         <p class="bs-text-muted">Browse verified tutors across Singapore &amp; Malaysia</p>
         <div style="position:relative; max-width:420px; margin-top:var(--space-2);">
           <i class="ti ti-search" aria-hidden="true" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:0.5; font-size:17px;"></i>
@@ -53,7 +53,7 @@
       </div>
 
       <!-- ── Filter Bar (always visible) ─────────── -->
-      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-4); margin-top:var(--space-4); padding:var(--space-3) 0; border-top:1px solid var(--color-divider); border-bottom:1px solid var(--color-divider);">
+      <div class="br-filters" style="display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--space-4); margin-top:var(--space-4);">
 
         <div>
           <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text); opacity:0.6; margin-bottom:4px;">Country</div>
@@ -95,7 +95,7 @@
 
       <!-- ── Tutor Rows ───────────────────────────── -->
       <div style="display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-4);">
-        <div class="bs-card bs-elev-sm" ng-repeat="t in vm.filteredTutors()"
+        <div class="bs-card bs-elev-sm br-trow" ng-repeat="t in vm.filteredTutors()"
           ng-style="vm.isPinnedTutor(t) ? {outline: '2px solid var(--color-accent)', outlineOffset: '-1px'} : {}"
           style="position:relative; display:flex; flex-direction:row; align-items:flex-start; gap:var(--space-4);">
 
@@ -107,15 +107,15 @@
           </button>
 
           <!-- Column 1: avatar + name/badges/experience/quals -->
-          <div style="flex:0 0 190px; min-width:0;">
+          <div class="br-t1" style="flex:0 0 190px; min-width:0;">
             <div class="bs-tag bs-tag-accent" ng-if="vm.isPinnedTutor(t)" style="margin-bottom:var(--space-2); font-size:11px;">
-              <i class="ti ti-eye" aria-hidden="true"></i>&nbsp;Recently viewed
+              Recently viewed
             </div>
             <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover;" alt="{{ t.name }}" />
             <div ng-if="!t.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:24px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px;">
               <span class="bs-card-title">{{ t.name }}</span>
-              <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:11px;">✓ Verified</span>
+              <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:11px;">Verified</span>
             </div>
             <p class="bs-card-meta" style="margin-top:2px;">{{ t.experienceYears }} yrs experience</p>
             <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
@@ -136,7 +136,7 @@
           </div>
 
           <!-- Column 3: rating, bulletin board, available classes -->
-          <div style="flex:0 0 220px; min-width:0; border-left:0.5px solid var(--color-divider); padding-left:var(--space-3); display:flex; flex-direction:column; gap:8px;">
+          <div class="br-t3" style="flex:0 0 220px; min-width:0; border-left:0.5px solid var(--color-divider); padding-left:var(--space-3); display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-size:14px;">★ {{ t.rating }} <span class="bs-text-muted">({{ t.reviewCount }})</span></span>
               <span class="bs-tag bs-tag-neutral" ng-repeat="m in t.modes">{{ m }}</span>
@@ -144,7 +144,7 @@
 
             <button type="button" class="btn-outline sm" style="border:none; background:none; color:var(--color-accent); padding:0; align-self:flex-start; display:inline-flex; align-items:center; gap:4px;"
               ng-click="vm.openBulletinBoard(t)">
-              <i class="ti ti-message-2" aria-hidden="true"></i> Bulletin board
+              Bulletin board
             </button>
 
             <!-- Preset class list — every card here is guaranteed at least one
@@ -290,7 +290,7 @@
 
       <!-- Booking Success (Flow A — request dispatched, awaiting tutor approval) -->
       <div ng-if="vm.bookingSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-4); border-radius:var(--radius-md); margin-top:var(--space-3);">
-        ✓ Booking Request Dispatched!<br/>
+        Booking Request Dispatched!<br/>
         <small style="font-weight:400">Connecting you with {{ vm.selectedTutor.name }}. Redirecting to your sessions...</small>
       </div>
 
@@ -304,7 +304,7 @@
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Subject</span><strong>{{ vm.presetBookingReceipt.subject }}<span ng-if="vm.presetBookingReceipt.level"> · {{ vm.presetBookingReceipt.level }}</span></strong></div>
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Mode</span><strong>{{ vm.presetBookingReceipt.mode }}</strong></div>
           <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Booking</span><strong>#{{ vm.presetBookingReceipt.booking.bookingNumber }} · {{ vm.presetBookingReceipt.booking.classes.length }} class(es)</strong></div>
-          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Payment</span><strong style="color:var(--color-accent-700);">✓ Paid</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span class="bs-text-muted">Payment</span><strong style="color:var(--color-accent-700);">Paid</strong></div>
           <div style="display:flex; justify-content:space-between; border-top:1px solid var(--color-divider); padding-top:6px;"><span class="bs-text-muted">Total</span><strong>{{ vm.billedTotal(vm.presetBookingReceipt.total) | currency:'$' }}</strong></div>
         </div>
         <p class="bs-text-muted" style="margin:0;">Redirecting to your sessions...</p>
@@ -319,7 +319,7 @@
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px;">
               <h3 style="margin:0;">{{ vm.selectedTutor.name }}</h3>
-              <span ng-if="vm.selectedTutor.isVerified" class="bs-tag bs-tag-accent">✓ Verified</span>
+              <span ng-if="vm.selectedTutor.isVerified" class="bs-tag bs-tag-accent">Verified</span>
               <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-style="{color: vm.isFavorited(vm.selectedTutor.id) ? 'var(--color-accent-2)' : 'inherit'}"
                 ng-click="vm.toggleFavorite(vm.selectedTutor, $event)" title="Like this tutor">
                 {{ vm.isFavorited(vm.selectedTutor.id) ? '♥' : '♡' }}
@@ -347,7 +347,7 @@
           <div>
             <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6;">Credentials &amp; Qualifications</div>
             <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
-              <span class="bs-tag bs-tag-neutral" ng-repeat="q in vm.selectedTutor.qualifications">✓ {{ q }}</span>
+              <span class="bs-tag bs-tag-neutral" ng-repeat="q in vm.selectedTutor.qualifications">{{ q }}</span>
             </div>
           </div>
         </div>
@@ -393,10 +393,10 @@
 
         <div class="day-detail" ng-if="vm.tutorCal.selectedDay">
           <h4>{{ vm.tutorCalMonthName() }} {{ vm.tutorCal.selectedDay }}, {{ vm.tutorCal.year }}</h4>
-          <p ng-if="!vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length" class="empty-state">✓ Fully available this day.</p>
+          <p ng-if="!vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length" class="empty-state">Fully available this day.</p>
           <div class="chip-list" ng-if="vm.getBusyTimesForDay(vm.tutorCal.selectedDay).length">
             <span class="chip" ng-repeat="b in vm.getBusyTimesForDay(vm.tutorCal.selectedDay)" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">
-              🚫 {{ b.time | hhmma }}
+              {{ b.time | hhmma }}
             </span>
           </div>
         </div>
@@ -414,10 +414,9 @@
           </div>
           <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
             <span style="display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; padding:2px 8px; border-radius:100px; background:var(--color-accent-50); color:var(--color-accent-700); border:0.5px solid var(--color-accent-200); white-space:nowrap;">
-              <i class="ti ti-bolt" style="font-size:11px;" aria-hidden="true"></i>
               Instant confirm
             </span>
-            <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="vm.clearSelectedTutor()" title="Back to tutor catalog">
+            <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="vm.clearSelectedTutor()" title="Back to tutor catalog" aria-label="Back to tutor catalog">
               ✕
             </button>
           </div>
@@ -470,8 +469,7 @@
         </div>
 
         <!-- Notice -->
-        <p style="font-size:12px; color:var(--color-text-muted); display:flex; align-items:flex-start; gap:5px; line-height:1.5; margin-top:10px;">
-          <i class="ti ti-info-circle" style="font-size:14px; flex-shrink:0; margin-top:1px;" aria-hidden="true"></i>
+        <p style="font-size:14px; color:var(--color-text-muted); display:flex; align-items:flex-start; gap:5px; line-height:1.5; margin-top:12px;">
           Clicking "Proceed to payment" will open HiPay's secure payment portal in a new tab. Your booking will only be confirmed upon successful payment.
         </p>
 
@@ -482,15 +480,13 @@
           style="margin-top:12px;"
           ng-click="vm.confirmPresetGroupBooking()"
           ng-disabled="vm.presetBookingBusy || !vm.bookingForm.studentId">
-          <i class="ti ti-lock" style="font-size:14px; vertical-align:-2px; margin-right:5px;" aria-hidden="true"></i>
           {{ vm.presetBookingBusy ? 'Processing…' : 'Proceed to payment' }}
         </button>
 
 
         <!-- Security note -->
         <div style="display:flex; align-items:center; justify-content:center; gap:5px; margin-top:10px;">
-          <i class="ti ti-shield-check" style="font-size:14px; color:var(--color-text-muted);" aria-hidden="true"></i>
-          <span style="font-size:12px; color:var(--color-text-muted);">Secured by HiPay · SSL encrypted</span>
+          <span style="font-size:13px; color:var(--color-text-muted);">Secured by HiPay · SSL encrypted</span>
         </div>
 
       </div><!-- end invoice summary -->
@@ -551,7 +547,7 @@
                   placeholder="DD-MM-YYYY" fp-date
                   ng-style="session.date && vm.isSessionDateBlocked(session.date) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
                 <span ng-if="session.date && vm.isSessionDateBlocked(session.date)" style="color:var(--color-accent-2-700); font-size:13px;">
-                  ⚠️ Tutor unavailable on this date — blocked period
+                  Tutor unavailable on this date — blocked period
                 </span>
               </div>
               <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
@@ -564,7 +560,7 @@
               </div>
             </div>
             <span ng-if="session.date && vm.isTooSoon(session.date, session.startTime)" style="color:var(--color-accent-2-700); font-size:13px;">
-              ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
+              This time is less than 6 hours away — please choose a later slot to avoid urgent changes
             </span>
             <label ng-if="$index === 0 && vm.bookingForm.sessions.length > 1" style="display:flex; align-items:center; gap:6px; font-size:14px; margin-top:6px;">
               <input type="checkbox" ng-model="session.recurring" ng-change="vm.applyRecurring()" />
@@ -584,27 +580,27 @@
           <p class="bs-text-muted" style="font-size:13px; margin:0;">Price will be confirmed by the tutor once they review this request.</p>
 
           <div ng-if="vm.hasBlockedSessionDate()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
-            <strong>⚠️ Tutor unavailable on selected dates</strong>
+            <strong>Tutor unavailable on selected dates</strong>
             <p style="margin:2px 0 0;">One or more class dates fall within the tutor's blocked period. Please change the highlighted dates.</p>
           </div>
 
           <div ng-if="vm.hasTooSoonSession()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
-            <strong>⚠️ Session too soon</strong>
+            <strong>Session too soon</strong>
             <p style="margin:2px 0 0;">One or more class times are less than 6 hours from now. Please choose a later time to avoid urgent changes.</p>
           </div>
 
           <div ng-if="vm.hasDuplicateSessions()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
-            <strong>⚠️ Overlapping class times</strong>
+            <strong>Overlapping class times</strong>
             <p style="margin:2px 0 0;">Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.</p>
           </div>
 
           <div ng-if="vm.hasInvalidTimeRangeSession()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
-            <strong>⚠️ Invalid date or time</strong>
+            <strong>Invalid date or time</strong>
             <p style="margin:2px 0 0;">Every class needs a valid date and time (e.g. "04:00 PM"), and end time must be later than start time.</p>
           </div>
 
           <div ng-if="vm.hasDurationMismatchSession()" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
-            <strong>⚠️ Inconsistent class length</strong>
+            <strong>Inconsistent class length</strong>
             <p style="margin:2px 0 0;">All classes in one booking must be the same length. Please make each class's start/end time span match the others.</p>
           </div>
 

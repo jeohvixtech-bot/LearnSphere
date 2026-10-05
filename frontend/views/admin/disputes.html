@@ -5,16 +5,16 @@
       <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
-      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
-      <a href="#!/admin/disputes" class="nav-item active">⚠️ Resolution Disputes</a>
-      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
-      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
-      <a href="#!/admin/archive" class="nav-item">🗄️ Archive</a>
-      <a href="#!/admin/payment-gateway" class="nav-item">💳 Payment Gateway</a>
-      <a href="#!/admin/commission" class="nav-item">💰 Platform Fees</a>
-      <a href="#!/admin/promotional-credit" class="nav-item">🎁 Promotional Credit</a>
-      <a href="#!/admin/payouts" class="nav-item">🏦 Payout Batches</a>
+      <a href="#!/admin/overview" class="nav-item">Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item active">Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item">Archive</a>
+      <a href="#!/admin/payment-gateway" class="nav-item">Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">Platform Fees</a>
+      <a href="#!/admin/promotional-credit" class="nav-item">Promotional Credit</a>
+      <a href="#!/admin/payouts" class="nav-item">Payout Batches</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -47,7 +47,7 @@
         <div class="dispute-actions">
           <button class="btn-outline">Contact Parent</button>
           <button class="btn-danger" ng-click="vm.resolveDispute(d)">
-            ✓ Verify Dispute & Resolve Case
+            Verify Dispute & Resolve Case
           </button>
         </div>
       </div>
@@ -81,7 +81,7 @@
             Reject Dispute
           </button>
           <button class="btn-danger" ng-click="vm.resolveRemarkDispute(d, true)">
-            ✓ Approve Hide
+            Approve Hide
           </button>
         </div>
       </div>

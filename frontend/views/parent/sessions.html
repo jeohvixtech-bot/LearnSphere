@@ -43,21 +43,21 @@
         <h1>Sessions &amp; Activity</h1>
         <p class="bs-text-muted" style="margin:0;">Track your tutorial bookings, schedules, and lesson reports</p>
       </div>
-      <div style="display:flex; gap:var(--space-6);">
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.bookings.length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Total Bookings</div>
+      <div class="br-stats">
+        <div class="br-stat">
+          <div class="br-stat-n">{{ vm.bookings.length }}</div>
+          <div class="br-stat-l">Total Bookings</div>
         </div>
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.confirmedAndCounteredBookings().length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Upcoming</div>
+        <div class="br-stat">
+          <div class="br-stat-n">{{ vm.confirmedAndCounteredBookings().length }}</div>
+          <div class="br-stat-l">Upcoming</div>
         </div>
       </div>
     </div>
 
     <!-- ── Issue Report Success ────────────────────── -->
     <div ng-if="vm.issueSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
-      ✓ Incident dispatch logged. Administration is now investigating.
+      Incident dispatch logged. Administration is now investigating.
       <button class="bs-btn bs-btn-ghost" style="margin-left:8px;" ng-click="vm.issueSuccess = false; vm.issueForm.bookingId = null">Dismiss</button>
     </div>
 
@@ -68,7 +68,7 @@
           <div class="bs-card-title">{{ vm.issueForm.isEdit ? 'Edit Reported Issue' : 'Report Class Conflict' }}</div>
           <p class="bs-text-muted" style="margin:0;">Booking ID: #{{ vm.issueForm.bookingId }}</p>
         </div>
-        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.issueForm.bookingId = null">✕ Cancel</button>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.issueForm.bookingId = null">Cancel</button>
       </div>
       <form ng-submit="vm.submitIssue()" style="display:flex; flex-direction:column; gap:var(--space-3);">
         <div class="bs-field" style="margin:0;">
@@ -94,17 +94,17 @@
 
     <!-- ── Reschedule Success ───────────────────────── -->
     <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
-      ✓ Reschedule request submitted. New class dates have been updated.
+      Reschedule request submitted. New class dates have been updated.
     </div>
 
     <!-- ── Counter Accept Success ────────────────────── -->
     <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
-      ✓ Counter proposal accepted. Booking is now confirmed.
+      Counter proposal accepted. Booking is now confirmed.
     </div>
 
     <!-- ── Pay Success ───────────────────────────── -->
     <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
-      ✓ Payment successful. Invoice has been marked as paid.
+      Payment successful. Invoice has been marked as paid.
     </div>
 
     <!-- ── Returned from the payment gateway ──────────────────────
@@ -114,8 +114,8 @@
       ng-style="{'border-left-color': vm.paymentResult.state === 'success' ? 'var(--color-accent)' : (vm.paymentResult.state === 'pending' ? '#f59e0b' : '#dc2626')}">
       <div style="display:flex; align-items:flex-start; gap:var(--space-3);">
         <div style="flex:1;">
-          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'success'">✓ Payment received</div>
-          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'pending'">⏳ Payment not confirmed yet</div>
+          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'success'">Payment received</div>
+          <div class="bs-card-title" ng-if="vm.paymentResult.state === 'pending'">Payment not confirmed yet</div>
           <div class="bs-card-title" ng-if="vm.paymentResult.state === 'failed'">✕ Payment did not go through</div>
           <div class="bs-card-title" ng-if="vm.paymentResult.state === 'cancelled'">Payment cancelled</div>
 
@@ -133,7 +133,7 @@
             {{ vm.paymentResult.message }}
           </p>
         </div>
-        <button class="bs-btn bs-btn-ghost" ng-click="vm.dismissPaymentResult()">✕</button>
+        <button class="bs-btn bs-btn-ghost bs-btn-icon" aria-label="Dismiss" ng-click="vm.dismissPaymentResult()">✕</button>
       </div>
       <div style="display:flex; gap:var(--space-2);" ng-if="vm.paymentResult.state === 'pending' && vm.paymentResult.invoiceId">
         <button class="bs-btn bs-btn-secondary" ng-disabled="vm.paymentResultChecking"
@@ -155,7 +155,7 @@
           <div class="bs-card-title">Payment Summary</div>
           <p class="bs-text-muted" style="margin:0;">Booking #{{ vm.payingBooking.bookingNumber }}</p>
         </div>
-        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.payingBooking = null">✕ Cancel</button>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.payingBooking = null">Cancel</button>
       </div>
 
       <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3); display:flex; flex-direction:column; gap:6px; font-size:14px;">
@@ -202,7 +202,7 @@
 
     <!-- ── Cancel Success ───────────────────────────── -->
     <div ng-if="vm.cancelSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
-      ✓ Booking cancelled.
+      Booking cancelled.
     </div>
 
     <!-- ── Reschedule Form ───────────────────────────── -->
@@ -212,10 +212,10 @@
           <div class="bs-card-title">Reschedule Class</div>
           <p class="bs-text-muted" style="margin:0;">{{ vm.rescheduleBooking.subject }} · {{ vm.rescheduleBooking.tutorName }}</p>
         </div>
-        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelReschedule()">✕ Cancel</button>
+        <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelReschedule()">Cancel</button>
       </div>
       <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isBookingConflicted(vm.rescheduleBooking)">
-        ⚠️ The tutor has blocked some of the original class dates. Please select new available dates below.
+        The tutor has blocked some of the original class dates. Please select new available dates below.
       </p>
       <p style="font-size:14px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isBookingConflicted(vm.rescheduleBooking)">
         Enter new preferred dates for this booking below.
@@ -225,7 +225,7 @@
           ng-style="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate) ? {outline:'1px solid var(--color-accent-2)'} : {}">
           <div style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:6px;">
             Class {{ $index + 1 }}
-            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">🚫 Blocked</span>
+            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.originalDate)">Blocked</span>
           </div>
           <div class="bs-text-muted" style="font-size:13px; margin-bottom:6px;">
             Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
@@ -236,7 +236,7 @@
               <input class="bs-input" type="text" ng-model="c.date" required placeholder="DD-MM-YYYY" fp-date
                 ng-style="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
               <span ng-if="c.date && vm.isDateBlockedForTutor(vm.rescheduleBooking.tutorId, c.date)" style="color:var(--color-accent-2-700); font-size:13px;">
-                ⚠️ This date is also blocked by the tutor
+                This date is also blocked by the tutor
               </span>
             </div>
             <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
@@ -251,14 +251,14 @@
             </div>
           </div>
           <span ng-if="c.date && vm.isTooSoon(c.date, c.time)" style="color:var(--color-accent-2-700); font-size:13px;">
-            ⚠️ This time is less than 6 hours away — please choose a later slot to avoid urgent changes
+            This time is less than 6 hours away — please choose a later slot to avoid urgent changes
           </span>
         </div>
         <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateReschedule()">
-          ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+          Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
         <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidReschedule()">
-          ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+          Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
         </p>
         <div style="display:flex; gap:var(--space-2);">
           <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelReschedule()">Cancel</button>
@@ -312,7 +312,7 @@
               <span>{{ b.studentName }}</span>
             </div>
           </div>
-          <span class="bs-tag" ng-class="vm.isBookingConflicted(b) ? 'bs-tag-accent-2' : (b.status === 'confirmed' ? 'bs-tag-accent' : 'bs-tag-neutral')">
+          <span class="bs-tag" ng-class="vm.isBookingConflicted(b) ? 'bs-tag-accent-2' : (b.status === 'confirmed' ? 'bs-tag-success' : 'bs-tag-neutral')">
             {{ vm.isBookingConflicted(b) ? 'SCHEDULE CONFLICT' : (b.status | uppercase) }}
           </span>
         </div>
@@ -393,7 +393,7 @@
             <button class="bs-btn bs-btn-secondary"
               ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor'"
               ng-click="vm.acceptCounterProposal(b)">
-              ✓ Accept Counter
+              Accept Counter
             </button>
             <button class="bs-btn bs-btn-secondary"
               ng-if="b.status === 'countered' && b.counterProposal.proposedBy === 'tutor' && b.bookingType !== 'tutor-preset'"
@@ -404,20 +404,20 @@
               class="bs-btn" ng-class="vm.isBookingConflicted(b) ? '' : 'bs-btn-secondary'"
               ng-style="vm.isBookingConflicted(b) ? {background:'var(--color-accent-2)', color:'var(--color-bg)'} : {}"
               ng-click="vm.startReschedule(b)">
-              <span ng-if="vm.isBookingConflicted(b)">⚠️ Reschedule Required</span>
+              <span ng-if="vm.isBookingConflicted(b)">Reschedule Required</span>
               <span ng-if="!vm.isBookingConflicted(b)">Reschedule</span>
             </button>
             <button class="bs-btn" style="background:var(--color-accent-2); color:var(--color-bg);"
               ng-if="b.status === 'confirmed' && (!b.issueReport || b.issueReport.resolved)"
               ng-click="vm.startReportIssue(b.id)">
-              ⚠️ Report Issue
+              Report Issue
             </button>
             <button class="bs-btn bs-btn-secondary"
               ng-if="b.status === 'pending' || b.status === 'countered' || b.status === 'confirmed'"
               ng-click="vm.cancelBooking(b)"
               ng-disabled="vm.bookingHasPaidInvoice(b.id)"
               title="{{ vm.bookingHasPaidInvoice(b.id) ? 'Cannot cancel: this booking has already been paid for' : '' }}">
-              ✕ Cancel Booking
+              Cancel Booking
             </button>
           </div>
         </div>
@@ -426,10 +426,10 @@
         <div style="background:var(--color-accent-2-100); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.issueReport">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-2);">
             <div>
-              <div style="font-weight:600; font-size:13px; color:var(--color-accent-2-800);">⚠️ Your reported issue — {{ b.issueReport.issueType }}</div>
+              <div style="font-weight:600; font-size:13px; color:var(--color-accent-2-800);">Your reported issue — {{ b.issueReport.issueType }}</div>
               <p style="margin:4px 0 0; font-size:13px;">{{ b.issueReport.details }}</p>
               <small class="bs-text-muted">Reported at {{ b.issueReport.timestamp }}</small>
-              <div ng-if="b.issueReport.resolved" class="bs-tag bs-tag-accent-2" style="margin-top:6px; font-size:11px;">✓ Resolved by admin</div>
+              <div ng-if="b.issueReport.resolved" class="bs-tag bs-tag-accent-2" style="margin-top:6px; font-size:11px;">Resolved by admin</div>
             </div>
             <div style="display:flex; gap:4px; flex-shrink:0;" ng-if="!b.issueReport.resolved">
               <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" title="Edit" ng-click="vm.startEditIssue(b)">
@@ -445,8 +445,8 @@
         <!-- Counter proposal panel -->
         <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.counterProposal && b.status === 'countered'">
           <div style="font-weight:600; font-size:14px; margin-bottom:6px;">
-            <span ng-if="b.counterProposal.proposedBy === 'tutor'">🔄 Tutor's Counter Proposal</span>
-            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">🔄 Your Reschedule Proposal <span class="bs-tag bs-tag-accent-2" style="font-size:11px;">⏳ Awaiting tutor's acceptance</span></span>
+            <span ng-if="b.counterProposal.proposedBy === 'tutor'">Tutor's Counter Proposal</span>
+            <span ng-if="b.counterProposal.proposedBy !== 'tutor'">Your Reschedule Proposal <span class="bs-tag bs-tag-accent-2" style="font-size:11px;">Awaiting tutor's acceptance</span></span>
           </div>
           <div style="display:flex; align-items:center; gap:8px; font-size:14px; margin-top:4px;" ng-repeat="c in b.counterProposal.classes track by $index">
             <span class="bs-text-muted">Class {{ $index + 1 }}:</span>
@@ -459,7 +459,7 @@
 
         <!-- Lesson report panel — one entry per session date -->
         <div style="background:var(--color-bg); border-radius:var(--radius-md); padding:var(--space-3);" ng-if="b.lessonReports.length">
-          <div class="bs-card-title" style="font-size:15px;">📋 Lesson Reports</div>
+          <div class="bs-card-title" style="font-size:15px;">Lesson Reports</div>
           <div style="border-top:1px solid var(--color-divider); padding-top:var(--space-2); margin-top:var(--space-2);" ng-repeat="r in b.lessonReports track by r.id">
             <div style="display:flex; align-items:center; gap:6px;">
               <strong>{{ r.sessionDate | dmy }}</strong>

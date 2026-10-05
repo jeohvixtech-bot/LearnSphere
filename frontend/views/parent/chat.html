@@ -36,10 +36,10 @@
   </aside>
 
   <main class="dashboard-main">
-    <div style="display:flex; gap:var(--space-4); height:calc(100vh - 140px); min-height:480px;">
+    <div class="br-chat" style="display:flex; gap:var(--space-4); height:calc(100vh - 140px); min-height:480px;">
 
       <!-- Thread list -->
-      <div class="bs-card bs-elev-sm" style="width:240px; flex-shrink:0; padding:var(--space-2); overflow-y:auto;">
+      <div class="bs-card bs-elev-sm br-chat-list" style="width:240px; flex-shrink:0; padding:var(--space-2); overflow-y:auto;">
         <div class="bs-card-title" style="padding:var(--space-2);">Your Tutors</div>
         <div ng-repeat="t in vm.contactableTutors"
           ng-click="vm.loadChat(t.id)"
@@ -70,7 +70,7 @@
             style="display:flex;"
             ng-style="{'justify-content': msg.sender === 'parent' ? 'flex-end' : (msg.sender === 'system' ? 'center' : 'flex-start')}">
             <div ng-if="msg.sender === 'system'" class="bs-text-muted" style="font-size:13px; text-align:center;">
-              ⚠️ LearnSphere: {{ msg.text }}
+              LearnSphere: {{ msg.text }}
             </div>
             <div ng-if="msg.sender !== 'system'"
               style="max-width:70%; padding:8px 12px; border-radius:var(--radius-lg);"

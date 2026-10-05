@@ -16,7 +16,7 @@
         <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch holiday"></span> MY Public Holiday</div>
         <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch holiday-sg"></span> SG Public Holiday</div>
         <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch holiday-both"></span> Public Holiday (MY &amp; SG)</div>
-        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch blocked">🚫</span> Blocked by You</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch blocked"></span> Blocked by You</div>
         <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch past"></span> Past Date</div>
         <div style="display:flex; align-items:center; gap:8px; font-size:14px;"><span class="bs-legend-swatch published"></span> Your Published Slots</div>
       </div>
@@ -97,15 +97,15 @@
 
     <!-- Breadcrumb card -->
     <div class="ls-card" style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
-      <span style="font-size:12px;color:#6B7085;">Tutor</span>
-      <i class="ti ti-chevron-right" style="font-size:12px;color:#6B7085;" aria-hidden="true"></i>
-      <span style="font-size:13px;font-weight:600;color:#2B2D42;">{{ vm.activeTab === 'calendar' ? 'Calendar' : (vm.activeTab === 'profile' ? 'Edit profile' : 'Overview') }}</span>
+      <span style="font-size:12px;color:var(--color-text-muted);">Tutor</span>
+      <i class="ti ti-chevron-right" style="font-size:12px;color:var(--color-text-muted);" aria-hidden="true"></i>
+      <span style="font-size:13px;font-weight:600;color:var(--color-text);">{{ vm.activeTab === 'calendar' ? 'Calendar' : (vm.activeTab === 'profile' ? 'Edit profile' : 'Overview') }}</span>
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-        <div style="position:relative;font-size:17px;color:#4A4D60;cursor:pointer;" ng-click="app.toggleNotifDrawer()">
+        <div style="position:relative;font-size:17px;color:var(--color-text-secondary);cursor:pointer;" ng-click="app.toggleNotifDrawer()">
           <i class="ti ti-bell" aria-hidden="true"></i>
-          <span ng-if="app.unreadCount > 0" style="position:absolute;top:-1px;right:-2px;width:7px;height:7px;border-radius:50%;background:#F0508C;"></span>
+          <span ng-if="app.unreadCount > 0" style="position:absolute;top:-1px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--color-accent-2-500);"></span>
         </div>
-        <div style="width:28px;height:28px;border-radius:50%;background:#EEEBFD;color:#5847D6;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">{{ app.currentUser.name[0] }}</div>
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--color-accent-100);color:var(--color-accent-600);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">{{ app.currentUser.name[0] }}</div>
       </div>
     </div>
 
@@ -130,16 +130,16 @@
           <div class="ls-profile-name-text">{{ vm.tutor.name }}</div>
           <div class="ls-profile-name-sub">{{ vm.tutor.experienceYears }} Years Active MOE Teacher</div>
           <div class="ls-profile-badges">
-            <span class="chip" ng-if="vm.tutor.tier === 'Gold'" style="background:#FFF3D6;color:#92400E;"><i class="ti ti-trophy" aria-hidden="true"></i> Gold teacher</span>
-            <span class="chip" ng-if="vm.tutor.tier === 'Silver'" style="background:#EEF0F5;color:#4A4D60;"><i class="ti ti-medal" aria-hidden="true"></i> Silver teacher</span>
-            <span class="chip" ng-if="vm.tutor.tier === 'Bronze'" style="background:#FEF3C7;color:#92400E;"><i class="ti ti-award" aria-hidden="true"></i> Bronze teacher</span>
-            <span class="chip" ng-if="vm.tutor.isVerified" style="background:#EEEBFD;color:#5847D6;" title="Your profile has been verified by our operations team"><i class="ti ti-check" aria-hidden="true"></i> Verified</span>
-            <span class="chip" ng-if="!vm.tutor.isVerified" style="background:#EEF0F5;color:#4A4D60;" title="Your profile is awaiting verification by our operations team"><i class="ti ti-clock" aria-hidden="true"></i> Pending</span>
+            <span class="chip" ng-if="vm.tutor.tier === 'Gold'" style="background:#FFF3D6;color:var(--color-warning-800);"><i class="ti ti-trophy" aria-hidden="true"></i> Gold teacher</span>
+            <span class="chip" ng-if="vm.tutor.tier === 'Silver'" style="background:var(--color-neutral-200);color:var(--color-text-secondary);"><i class="ti ti-medal" aria-hidden="true"></i> Silver teacher</span>
+            <span class="chip" ng-if="vm.tutor.tier === 'Bronze'" style="background:var(--color-warning-100);color:var(--color-warning-800);"><i class="ti ti-award" aria-hidden="true"></i> Bronze teacher</span>
+            <span class="chip" ng-if="vm.tutor.isVerified" style="background:var(--color-accent-100);color:var(--color-accent-600);" title="Your profile has been verified by our operations team"><i class="ti ti-check" aria-hidden="true"></i> Verified</span>
+            <span class="chip" ng-if="!vm.tutor.isVerified" style="background:var(--color-neutral-200);color:var(--color-text-secondary);" title="Your profile is awaiting verification by our operations team"><i class="ti ti-clock" aria-hidden="true"></i> Pending</span>
           </div>
         </div>
         <div class="ls-profile-actions">
           <button type="button" class="ls-btn" ng-click="vm.toggleOnlineStatus()"
-            ng-style="vm.tutor.isOnline ? {background:'#DDF6F2', color:'#0F766E'} : {background:'#FDE7EF', color:'#B4235F'}"
+            ng-style="vm.tutor.isOnline ? {background:'var(--color-success-100)', color:'var(--color-success-700)'} : {background:'var(--color-accent-2-100)', color:'var(--color-accent-2-700)'}"
             title="{{ vm.tutor.isOnline ? 'Visible to parents in search results' : 'Hidden from parent search and booking' }}">
             &#9679; {{ vm.tutor.isOnline ? 'Online' : 'Offline' }}
           </button>
@@ -156,22 +156,22 @@
     <!-- Pending Booking Requests — hoisted, shown on every tab -->
     <div class="ls-card" style="padding:12px 14px;" ng-if="vm.pendingRequests().length">
       <div style="display:flex;align-items:center;margin-bottom:8px;">
-        <span style="font-size:14px;font-weight:600;color:#2B2D42;">Booking requests</span>
-        <span class="chip" style="background:#FDE7EF;color:#B4235F;margin-left:8px;">{{ vm.pendingRequests().length }}</span>
+        <span style="font-size:14px;font-weight:600;color:var(--color-text);">Booking requests</span>
+        <span class="chip" style="background:var(--color-accent-2-100);color:var(--color-accent-2-700);margin-left:8px;">{{ vm.pendingRequests().length }}</span>
       </div>
       <div style="display:flex; flex-direction:column;">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 0; border-top:1px solid #ECEDF3;" ng-repeat="b in vm.pendingRequests()">
-          <div style="width:34px;height:34px;border-radius:50%;background:#FDE7EF;color:#B4235F;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ b.studentName[0] }}</div>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 0; border-top:1px solid var(--color-divider);" ng-repeat="b in vm.pendingRequests()">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--color-accent-2-100);color:var(--color-accent-2-700);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ b.studentName[0] }}</div>
           <div style="flex:1; min-width:200px;">
-            <div><b style="color:#2B2D42;">{{ b.studentName }}</b> <span style="font-size:11px;color:#6B7085;">&middot; #{{ b.bookingNumber }}</span></div>
+            <div><b style="color:var(--color-text);">{{ b.studentName }}</b> <span style="font-size:11px;color:var(--color-text-muted);">&middot; #{{ b.bookingNumber }}</span></div>
             <div style="font-size:13px;">
-              <span class="chip" style="background:#EEEBFD;color:#5847D6;">{{ b.subject }}</span>
+              <span class="chip" style="background:var(--color-accent-100);color:var(--color-accent-600);">{{ b.subject }}</span>
               <span ng-repeat="c in b.classes track by $index">{{ c.date | dmy }} &middot; {{ c.time | hhmma }} ({{ b.durationHours }}h)<span ng-if="!$last">, </span></span>
             </div>
-            <em ng-if="b.message" style="font-size:13px;color:#6B7085;">"{{ b.message }}"</em>
+            <em ng-if="b.message" style="font-size:13px;color:var(--color-text-muted);">"{{ b.message }}"</em>
           </div>
-          <button class="ls-btn" style="background:#6D5BF0;color:#fff;" ng-click="vm.confirmBooking(b)">Confirm class</button>
-          <button class="ls-btn" style="background:#fff;color:#4A4D60;border:1px solid #ECEDF3;" ng-click="vm.startCounter(b)">Counter propose</button>
+          <button class="ls-btn" style="background:var(--yellow);color:var(--navy);" ng-click="vm.confirmBooking(b)">Confirm class</button>
+          <button class="ls-btn" style="background:#fff;color:var(--color-text-secondary);border:1px solid var(--color-divider);" ng-click="vm.startCounter(b)">Counter propose</button>
         </div>
       </div>
     </div>
@@ -180,7 +180,7 @@
     <div class="bs-card bs-elev-sm" ng-if="vm.counterBooking">
       <button class="bs-btn bs-btn-ghost" style="align-self:flex-start;" ng-click="vm.cancelCounter()">← Cancel</button>
       <div ng-if="vm.counterSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
-        ✓ Counter-proposal dispatched. Waiting for parent approval.
+        Counter-proposal dispatched. Waiting for parent approval.
       </div>
       <div ng-if="!vm.counterSuccess">
         <span class="bs-tag bs-tag-accent">Time Rescheduling</span>
@@ -200,14 +200,14 @@
               <span class="bs-text-muted">{{ $index + 1 }}</span>
               <span>
                 <strong>{{ c.originalDate | dmy }}</strong>
-                <span class="bs-tag bs-tag-accent-2" ng-if="vm.isProposedDateBlocked(c.originalDate)">🚫 Blocked</span><br/>
+                <span class="bs-tag bs-tag-accent-2" ng-if="vm.isProposedDateBlocked(c.originalDate)">Blocked</span><br/>
                 <small class="bs-text-muted">{{ c.originalTime | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
               </span>
               <div class="bs-field" style="margin:0;">
                 <input class="bs-input" type="text" ng-model="c.proposedDate" placeholder="DD-MM-YYYY" required fp-date
                   ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
                 <span ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)" style="color:var(--color-accent-2-700); font-size:13px;">
-                  ⚠️ This date is in a blocked period
+                  This date is in a blocked period
                 </span>
               </div>
               <div class="bs-field" style="margin:0;">
@@ -217,15 +217,15 @@
                 <small class="bs-text-muted" style="font-size:12px;display:block">→ {{ (vm.counterEndTime(c) || '—') | hhmma }} ({{ vm.counterBooking.durationHours }}h)</small>
               </div>
               <span ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)" style="grid-column:1/-1; color:var(--color-accent-2-700); font-size:13px;">
-                ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
+                Less than 6 hours away — please choose a later slot to avoid urgent changes
               </span>
             </div>
           </div>
           <p ng-if="vm.hasDuplicateCounter()" style="color:var(--color-accent-2-700); font-size:14px; margin:0;">
-            ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+            Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
           </p>
           <p ng-if="vm.hasInvalidCounter()" style="color:var(--color-accent-2-700); font-size:14px; margin:0;">
-            ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+            Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
           </p>
           <div class="bs-field" style="margin:0;">
             <label>Explanation to Parent</label>
@@ -242,20 +242,20 @@
 
       <!-- About -->
       <div class="ls-card" style="padding:16px;">
-        <div style="font-size:16px;font-weight:600;color:#2B2D42;margin-bottom:6px;">About</div>
-        <p style="font-size:12.5px;line-height:1.55;color:#6B7085;margin:0 0 14px;" ng-if="vm.tutor.bio">{{ vm.tutor.bio }}</p>
+        <div style="font-size:16px;font-weight:600;color:var(--color-text);margin-bottom:6px;">About</div>
+        <p style="font-size:12.5px;line-height:1.55;color:var(--color-text-muted);margin:0 0 14px;" ng-if="vm.tutor.bio">{{ vm.tutor.bio }}</p>
         <div class="ls-info" ng-if="vm.tutor.qualifications.length"><i class="ti ti-school" aria-hidden="true"></i>{{ vm.tutor.qualifications.join(', ') }}</div>
         <div class="ls-info" ng-if="vm.tutor.subjects.length"><i class="ti ti-book" aria-hidden="true"></i>{{ vm.tutor.subjects.join(', ') }}</div>
         <div class="ls-info" style="margin-bottom:0;" ng-if="vm.tutor.modes.length"><i class="ti ti-video" aria-hidden="true"></i>{{ vm.tutor.modes.join(' · ') }}</div>
 
         <!-- TEST MODE — rendered only when Tutors.TestModeEnabled = 1 (on by default; switch off via SQL). -->
-        <div ng-if="vm.tutor.testModeEnabled" style="margin-top:14px;padding-top:12px;border-top:1px dashed #F0B429;">
-          <button type="button" class="ls-btn" style="width:100%;border:1px solid #F0B429;"
-            ng-style="vm.dateBypassOn ? {background:'#F0B429', color:'#fff'} : {background:'#FFF3D6', color:'#92400E'}"
+        <div ng-if="vm.tutor.testModeEnabled" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--yellow);">
+          <button type="button" class="ls-btn" style="width:100%;border:1px solid var(--yellow);"
+            ng-style="vm.dateBypassOn ? {background:'var(--yellow)', color:'#fff'} : {background:'#FFF3D6', color:'var(--color-warning-800)'}"
             ng-click="vm.toggleDateBypass()">
-            ⚡ Bypass date rule: {{ vm.dateBypassOn ? 'ON' : 'OFF' }}
+            Bypass date rule: {{ vm.dateBypassOn ? 'ON' : 'OFF' }}
           </button>
-          <p style="font-size:11.5px;color:#92400E;margin:6px 0 0;">
+          <p style="font-size:11.5px;color:var(--color-warning-800);margin:6px 0 0;">
             {{ vm.dateBypassOn ? 'Setup Class accepts this month and past dates.' : 'Setup Class only accepts next month onward.' }}
           </p>
         </div>
@@ -265,43 +265,43 @@
            duplicated; that modal's markup below this tab has been removed). -->
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-size:16px;font-weight:600;color:#2B2D42;">Bulletin board</span>
-          <span class="chip" style="background:#DDF6F2;color:#0F766E;">{{ vm.bulletinPublishedCount() }} published</span>
-          <span class="chip" ng-if="vm.bulletinPendingCount() > 0" style="background:#FEF3C7;color:#92400E;">{{ vm.bulletinPendingCount() }} dispute{{ vm.bulletinPendingCount() === 1 ? '' : 's' }} pending</span>
+          <span style="font-size:16px;font-weight:600;color:var(--color-text);">Bulletin board</span>
+          <span class="chip" style="background:var(--color-success-100);color:var(--color-success-700);">{{ vm.bulletinPublishedCount() }} published</span>
+          <span class="chip" ng-if="vm.bulletinPendingCount() > 0" style="background:var(--color-warning-100);color:var(--color-warning-800);">{{ vm.bulletinPendingCount() }} dispute{{ vm.bulletinPendingCount() === 1 ? '' : 's' }} pending</span>
         </div>
 
-        <div class="ls-card" style="padding:16px;text-align:center;color:#6B7085;font-size:13px;" ng-if="!vm.bulletinRemarks.length">
+        <div class="ls-card" style="padding:16px;text-align:center;color:var(--color-text-muted);font-size:13px;" ng-if="!vm.bulletinRemarks.length">
           No remarks yet — they'll show up here once parents leave one on a completed class.
         </div>
 
         <div class="ls-card" style="padding:14px;" ng-repeat="r in vm.bulletinRemarks track by r.id" ng-style="r.status === 'hidden' ? {opacity: 0.65} : {}">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:32px;height:32px;border-radius:50%;background:#DDF6F2;color:#0F766E;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ r.parentDisplayName[0] }}</div>
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--color-success-100);color:var(--color-success-700);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{ r.parentDisplayName[0] }}</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-weight:600;color:#2B2D42;">{{ r.parentDisplayName }}</div>
-              <div style="font-size:11px;color:#6B7085;">{{ r.classDate | dmy }} &middot; {{ r.subject }}</div>
+              <div style="font-weight:600;color:var(--color-text);">{{ r.parentDisplayName }}</div>
+              <div style="font-size:11px;color:var(--color-text-muted);">{{ r.classDate | dmy }} &middot; {{ r.subject }}</div>
             </div>
-            <span class="chip" ng-if="r.status === 'published'" style="background:#DDF6F2;color:#0F766E;">Published</span>
-            <span class="chip" ng-if="r.status === 'dispute_requested'" style="background:#FEF3C7;color:#92400E;">Dispute requested</span>
-            <span class="chip" ng-if="r.status === 'hidden'" style="background:#EEF0F5;color:#4A4D60;">Hidden by admin</span>
+            <span class="chip" ng-if="r.status === 'published'" style="background:var(--color-success-100);color:var(--color-success-700);">Published</span>
+            <span class="chip" ng-if="r.status === 'dispute_requested'" style="background:var(--color-warning-100);color:var(--color-warning-800);">Dispute requested</span>
+            <span class="chip" ng-if="r.status === 'hidden'" style="background:var(--color-neutral-200);color:var(--color-text-secondary);">Hidden by admin</span>
           </div>
           <p style="margin:10px 0 8px;font-size:13px;">
             <i class="ti ti-star" ng-repeat="n in [1,2,3,4,5]" ng-style="{'color': n <= r.rating ? '#D97706' : '#B8BBCC', 'font-size': '13px'}" aria-hidden="true"></i>
             {{ r.text }}
           </p>
           <div style="display:flex;align-items:center;" ng-if="r.status === 'published' && vm.bulletinDisputeFormFor !== r">
-            <span style="margin-left:auto;font-size:12px;font-weight:600;color:#B4235F;cursor:pointer;" ng-click="vm.openBulletinDisputeForm(r)">Request hide</span>
+            <span style="margin-left:auto;font-size:12px;font-weight:600;color:var(--color-accent-2-700);cursor:pointer;" ng-click="vm.openBulletinDisputeForm(r)">Request hide</span>
           </div>
-          <p style="font-size:13px;margin:0;color:#6B7085;" ng-if="r.status === 'dispute_requested'">
+          <p style="font-size:13px;margin:0;color:var(--color-text-muted);" ng-if="r.status === 'dispute_requested'">
             <i class="ti ti-clock" aria-hidden="true"></i> Awaiting admin review
           </p>
-          <div ng-if="vm.bulletinDisputeFormFor === r" style="background:#F7F8FC; border:1px solid #ECEDF3; border-radius:10px; padding:10px; margin-top:6px;">
+          <div ng-if="vm.bulletinDisputeFormFor === r" style="background:var(--color-surface-alt); border:1px solid var(--color-divider); border-radius:10px; padding:10px; margin-top:6px;">
             <label style="font-size:13px;font-weight:600;">Why should this be hidden?</label>
             <textarea class="bs-input" rows="2" ng-model="vm.bulletinDisputeReason" placeholder="Explain the issue with this remark..." style="margin-top:4px;"></textarea>
-            <p ng-if="vm.bulletinDisputeError" style="color:#B4235F; font-size:13px; margin:4px 0 0;">{{ vm.bulletinDisputeError }}</p>
+            <p ng-if="vm.bulletinDisputeError" style="color:var(--color-accent-2-700); font-size:13px; margin:4px 0 0;">{{ vm.bulletinDisputeError }}</p>
             <div style="display:flex; gap:6px; margin-top:6px;">
-              <button type="button" class="ls-btn" style="background:#fff;color:#4A4D60;border:1px solid #ECEDF3;" ng-click="vm.cancelBulletinDisputeForm()">Cancel</button>
-              <button type="button" class="ls-btn" style="background:#6D5BF0;color:#fff;" ng-click="vm.submitBulletinDispute()">Submit request</button>
+              <button type="button" class="ls-btn" style="background:#fff;color:var(--color-text-secondary);border:1px solid var(--color-divider);" ng-click="vm.cancelBulletinDisputeForm()">Cancel</button>
+              <button type="button" class="ls-btn" style="background:var(--yellow);color:var(--navy);" ng-click="vm.submitBulletinDispute()">Submit request</button>
             </div>
           </div>
         </div>
@@ -424,19 +424,19 @@
 
         <!-- Overlap with an existing blocked range -->
         <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockOverlapError">
-          <strong>⚠️ Already Blocked</strong>
+          <strong>Already Blocked</strong>
           <p style="margin:2px 0 0;">{{ vm.blockOverlapError }}</p>
         </div>
 
         <!-- Active preset (Flow B) class bookings in the newly-blocked range -->
         <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockPresetWarning">
-          <strong>⚠️ Active class bookings in this range</strong>
+          <strong>Active class bookings in this range</strong>
           <p style="margin:2px 0 0;">{{ vm.blockPresetWarning }}</p>
         </div>
 
         <!-- Conflict alert -->
         <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockConflicts.length">
-          <strong>⚠️ Change of class date required</strong>
+          <strong>Change of class date required</strong>
           <p style="margin:2px 0 0;">The selected period overlaps with {{ vm.blockConflicts.length }} confirmed class{{ vm.blockConflicts.length !== 1 ? 'es' : '' }}. Please reschedule before blocking.</p>
           <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="c in vm.blockConflicts">
@@ -453,7 +453,7 @@
         <!-- Published-but-unbooked preset slots inside the range — nobody's enrolled,
              so the tutor moves or cancels the slot themselves, no parent involved. -->
         <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.blockSlotConflicts.length">
-          <strong>⚠️ Published class{{ vm.blockSlotConflicts.length !== 1 ? 'es' : '' }} in this range</strong>
+          <strong>Published class{{ vm.blockSlotConflicts.length !== 1 ? 'es' : '' }} in this range</strong>
           <p style="margin:2px 0 0;">{{ vm.blockSlotConflicts.length }} published slot{{ vm.blockSlotConflicts.length !== 1 ? 's' : '' }} nobody's booked yet {{ vm.blockSlotConflicts.length !== 1 ? 'are' : 'is' }} sitting in this range. Reschedule or cancel {{ vm.blockSlotConflicts.length !== 1 ? 'them' : 'it' }} before blocking.</p>
           <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="slot in vm.blockSlotConflicts">
@@ -468,7 +468,7 @@
 
         <div style="display:flex; flex-direction:column; gap:6px; margin-top:var(--space-2);" ng-if="vm.blockedRanges.length">
           <div style="display:flex; align-items:center; gap:8px; background:var(--color-bg); border-radius:var(--radius-md); padding:6px 10px;" ng-repeat="r in vm.blockedRanges track by $index">
-            <span>🚫</span>
+            <span></span>
             <span style="flex:1;">{{ r.start | dmy }} — {{ r.end | dmy }}</span>
             <button class="bs-btn bs-btn-ghost" ng-click="vm.removeBlock($index)">✕ Remove</button>
           </div>
@@ -542,12 +542,12 @@
 
     <!-- Reschedule Success -->
     <div ng-if="vm.rescheduleSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
-      ✓ Reschedule proposal sent. The parent will be notified to confirm the new dates.
+      Reschedule proposal sent. The parent will be notified to confirm the new dates.
     </div>
 
     <!-- Accept Counter Success -->
     <div ng-if="vm.counterAcceptSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md);">
-      ✓ Reschedule accepted. The booking has been updated.
+      Reschedule accepted. The booking has been updated.
     </div>
 
     <!-- Reschedule Form -->
@@ -560,7 +560,7 @@
         <button class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelTutorReschedule()">✕ Cancel</button>
       </div>
       <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.isTutorBookingConflicted(vm.rescheduleBooking)">
-        ⚠️ Some class dates overlap with your blocked period. Propose new dates for the parent to confirm.
+        Some class dates overlap with your blocked period. Propose new dates for the parent to confirm.
       </p>
       <p style="font-size:14px; background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="!vm.isTutorBookingConflicted(vm.rescheduleBooking)">
         Enter the new proposed dates below. The parent will receive a notification to accept.
@@ -570,7 +570,7 @@
           ng-style="vm.isOriginalDateBlocked(c.originalDate) ? {outline:'1px solid var(--color-accent-2)'} : {}">
           <div style="display:flex;align-items:center;gap:8px; font-size:13px; font-weight:600; margin-bottom:6px;">
             Class {{ $index + 1 }}
-            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isOriginalDateBlocked(c.originalDate)">🚫 Blocked</span>
+            <span class="bs-tag bs-tag-accent-2" ng-if="vm.isOriginalDateBlocked(c.originalDate)">Blocked</span>
           </div>
           <div class="bs-text-muted" style="font-size:13px; margin-bottom:6px;">
             Original: <strong>{{ c.originalDate | dmy }}</strong> {{ c.originalTime | hhmma }} ({{ vm.rescheduleBooking.durationHours }}h)
@@ -581,7 +581,7 @@
               <input class="bs-input" type="text" ng-model="c.proposedDate" required placeholder="DD-MM-YYYY" fp-date
                 ng-style="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate) ? {borderColor:'var(--color-accent-2)', background:'var(--color-accent-2-100)'} : {}" />
               <span ng-if="c.proposedDate && vm.isProposedDateBlocked(c.proposedDate)" style="color:var(--color-accent-2-700); font-size:13px;">
-                ⚠️ This date is also in a blocked period
+                This date is also in a blocked period
               </span>
             </div>
             <div class="bs-field" style="flex:1; min-width:120px; margin:0;">
@@ -596,14 +596,14 @@
             </div>
           </div>
           <span ng-if="c.proposedDate && vm.isTooSoon(c.proposedDate, c.proposedTime)" style="color:var(--color-accent-2-700); font-size:13px;">
-            ⚠️ Less than 6 hours away — please choose a later slot to avoid urgent changes
+            Less than 6 hours away — please choose a later slot to avoid urgent changes
           </span>
         </div>
         <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasDuplicateTutorReschedule()">
-          ⚠️ Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
+          Two or more classes overlap on the same date and time. Please give each class a non-overlapping slot.
         </p>
         <p style="font-size:14px; background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md);" ng-if="vm.hasInvalidTutorReschedule()">
-          ⚠️ Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
+          Every class needs a valid date and time (e.g. "04:00 PM"). Please check the highlighted fields.
         </p>
         <div style="display:flex; gap:8px;">
           <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelTutorReschedule()">Cancel</button>
@@ -2161,7 +2161,7 @@
 
         </div><!-- end verificationStatus !== 'not_submitted' -->
 
-        <div ng-if="vm.profileSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">✓ Profile updated successfully.</div>
+        <div ng-if="vm.profileSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">Profile updated successfully.</div>
         <div ng-if="vm.profileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-3);">{{ vm.profileError }}</div>
 </div><!-- end offerings sub-tab -->
       </form>

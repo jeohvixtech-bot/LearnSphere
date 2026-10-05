@@ -5,16 +5,16 @@
       <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
-      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
-      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
-      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
-      <a href="#!/admin/reschedule-queue" class="nav-item active">🔄 Reschedule Rejections</a>
-      <a href="#!/admin/archive" class="nav-item">🗄️ Archive</a>
-      <a href="#!/admin/payment-gateway" class="nav-item">💳 Payment Gateway</a>
-      <a href="#!/admin/commission" class="nav-item">💰 Platform Fees</a>
-      <a href="#!/admin/promotional-credit" class="nav-item">🎁 Promotional Credit</a>
-      <a href="#!/admin/payouts" class="nav-item">🏦 Payout Batches</a>
+      <a href="#!/admin/overview" class="nav-item">Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item active">Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item">Archive</a>
+      <a href="#!/admin/payment-gateway" class="nav-item">Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">Platform Fees</a>
+      <a href="#!/admin/promotional-credit" class="nav-item">Promotional Credit</a>
+      <a href="#!/admin/payouts" class="nav-item">Payout Batches</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -26,7 +26,7 @@
       <p class="text-muted">A tutor proposed a new date for a published class and the parent declined it, asking for a refund instead. Nothing happens automatically — resolving one here issues the credit and charges the tutor's 20% penalty.</p>
 
       <div class="alert-success" ng-if="vm.rescheduleResolveSuccess" style="margin-bottom:12px">
-        ✓ Resolved — credit issued and penalty applied.
+        Resolved — credit issued and penalty applied.
       </div>
 
       <div class="empty-state-box large" ng-if="!vm.rescheduleQueue.length">
@@ -55,7 +55,7 @@
         </div>
         <div class="dispute-actions">
           <button class="btn-danger" ng-disabled="vm.rescheduleActionBusy" ng-click="vm.resolveRescheduleRejection(d)">
-            ✓ Issue Credit &amp; Apply Penalty
+            Issue Credit &amp; Apply Penalty
           </button>
         </div>
       </div>

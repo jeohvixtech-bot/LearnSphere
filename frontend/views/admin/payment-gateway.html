@@ -5,15 +5,15 @@
       <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
-      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
-      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
-      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
-      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
-      <a href="#!/admin/payment-gateway" class="nav-item active">💳 Payment Gateway</a>
-      <a href="#!/admin/commission" class="nav-item">💰 Platform Fees</a>
-      <a href="#!/admin/promotional-credit" class="nav-item">🎁 Promotional Credit</a>
-      <a href="#!/admin/payouts" class="nav-item">🏦 Payout Batches</a>
+      <a href="#!/admin/overview" class="nav-item">Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">Reschedule Rejections</a>
+      <a href="#!/admin/payment-gateway" class="nav-item active">Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">Platform Fees</a>
+      <a href="#!/admin/promotional-credit" class="nav-item">Promotional Credit</a>
+      <a href="#!/admin/payouts" class="nav-item">Payout Batches</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -23,11 +23,11 @@
     <!-- Save confirmation — floats over the page as a toast rather than shifting content -->
     <div class="alert-success" ng-if="vm.gatewaySaveSuccess"
       style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.15)">
-      ✓ Payment gateway settings saved.
+      Payment gateway settings saved.
     </div>
 
     <div class="card">
-      <h3>💳 Payment Gateway — HitPay</h3>
+      <h3>Payment Gateway — HitPay</h3>
       <p class="text-muted">
         Parents are sent to HitPay's own hosted checkout page to pay. No card details ever
         reach LearnSphere.
@@ -157,7 +157,7 @@
           Enter an API key above before enabling.
         </small>
         <small class="text-muted" ng-if="vm.gatewayForm.isEnabled && vm.gatewayForm.mode === 'live'" style="color:#b91c1c">
-          ⚠️ Live mode charges real money.
+          Live mode charges real money.
         </small>
       </div>
 

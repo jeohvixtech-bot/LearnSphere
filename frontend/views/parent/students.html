@@ -1,4 +1,4 @@
-<div class="dashboard-layout bs-scope lf-scope lf-page" style="align-items:flex-start;">
+<div class="dashboard-layout bs-scope" style="align-items:flex-start;">
   <aside class="sidebar" style="width:220px; flex-shrink:0; position:sticky; top:24px; background:var(--color-surface); border-radius:var(--radius-lg); padding:var(--space-4);">
     <div style="display:flex; align-items:center; gap:10px; padding-bottom:var(--space-3); margin-bottom:var(--space-2); border-bottom:1px solid var(--color-divider);">
       <div style="width:36px; height:36px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ vm.user.name[0] }}</div>
@@ -62,7 +62,7 @@
           <strong>Editing Parent Profile</strong>
           <p class="bs-text-muted" style="margin:0;">Update your account details below</p>
         </div>
-        <button type="button" class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelEditParentProfile()">✕ Cancel</button>
+        <button type="button" class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelEditParentProfile()">Cancel</button>
       </div>
       <div ng-if="vm.parentProfileError" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);">{{ vm.parentProfileError }}</div>
       <form ng-submit="vm.saveParentProfile()" style="display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-3);">
@@ -126,7 +126,7 @@
 
         <!-- Success toast -->
         <div ng-if="vm.studentSuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);">
-          ✓ New child profile has been created successfully!
+          New child profile has been created successfully!
         </div>
 
         <!-- Empty state -->
@@ -166,7 +166,7 @@
             </div>
 
             <div style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); margin-top:var(--space-2);" ng-if="vm.deleteBlockedStudentId === s.id" ng-click="$event.stopPropagation()">
-              <strong>⚠️ Cannot delete this profile yet</strong>
+              <strong>Cannot delete this profile yet</strong>
               <p style="margin-top:4px">{{ vm.deleteBlockedInfo.message }}</p>
               <div ng-if="vm.deleteBlockedInfo.activeBookings.length">
                 <p style="margin-top:8px;font-weight:700">Pending classes / tutor agreements:</p>
@@ -245,7 +245,7 @@
                 <strong>Editing: {{ s.name }}</strong>
                 <p class="bs-text-muted" style="margin:0;">Update the details below and save</p>
               </div>
-              <button type="button" class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelEditStudent()">✕ Cancel</button>
+              <button type="button" class="bs-btn bs-btn-ghost" style="margin-left:auto;" ng-click="vm.cancelEditStudent()">Cancel</button>
             </div>
             <form ng-submit="vm.saveEditStudent()" style="display:flex; flex-direction:column; gap:var(--space-3); margin-top:var(--space-3);">
               <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
@@ -360,7 +360,7 @@
       <!-- ── Right: Add Student Form (collapsed behind the Add Child button) ── -->
       <div class="bs-card bs-elev-sm" ng-if="vm.showAddChildForm">
         <div style="display:flex; align-items:center; gap:var(--space-3);">
-          <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">✚</span>
+          <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;"></span>
           <div>
             <h4 style="margin:0;">Add New Child</h4>
             <p class="bs-text-muted" style="margin:0;">Fill in your child's details to find the right tutor match</p>
@@ -409,7 +409,7 @@
                   <button type="button" class="school-option school-option-other"
                     ng-mousedown="$event.preventDefault()"
                     ng-click="vm.selectSchoolOther()">
-                    <span>➕ Others (institution not listed)</span>
+                    <span>Others (institution not listed)</span>
                   </button>
                 </div>
               </div>

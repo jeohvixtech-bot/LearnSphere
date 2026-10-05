@@ -1,46 +1,42 @@
-<div class="bs-scope lf-scope lf-page" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:var(--space-8) var(--space-6);" ng-click="auth.errorMsg = ''">
+<div class="bs-scope lg-page" ng-click="auth.errorMsg = ''">
 
-  <!-- Back to the public landing page — fixed to the viewport corner, not
-       the card, so it stays put regardless of card height/scroll. -->
-  <a href="#!/welcome" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:fixed; top:var(--space-4); left:var(--space-4); z-index:1;" title="Back to Welcome" ng-click="$event.stopPropagation()">
-    <i class="ti ti-arrow-left" aria-hidden="true"></i>
-  </a>
+  <!-- Back to the public landing page — fixed to the viewport corner so it stays put regardless of card height/scroll. -->
+  <a href="#!/welcome" class="bs-btn bs-btn-secondary lg-back" style="position:fixed;" ng-click="$event.stopPropagation()">Back to Welcome</a>
 
-  <!-- bs-elev-md dropped — against .lf-page's own soft gradient wash, a
-       heavy card shadow on top competed with it rather than adding
-       separation; the 1px divider border here is enough on its own. -->
-  <div class="bs-card" style="width:min(460px,100%); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-4); border:1px solid var(--color-divider);">
+  <div class="lg-card">
+
+    <img class="lg-logo" src="assets/logo-stacked.png" alt="LearnSphere: Learn, Grow, Connect" width="640" height="483" />
 
     <div>
-      <h3 style="margin-bottom:var(--space-1);">Welcome back</h3>
-      <p class="bs-text-muted" style="font-size:14px; margin:0;">Sign in to continue your learning journey.</p>
+      <h1>Welcome back</h1>
+      <p class="lg-sub">Sign in to continue your learning journey.</p>
     </div>
 
     <!-- Mode toggle -->
-    <div class="bs-seg" style="width:100%;">
-      <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+    <div class="bs-seg" role="radiogroup" aria-label="Sign in or register">
+      <label class="bs-seg-opt">
         <input type="radio" name="authMode" ng-model="auth.mode" value="login" /> Sign In
       </label>
-      <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+      <label class="bs-seg-opt">
         <input type="radio" name="authMode" ng-model="auth.mode" value="register" /> Register
       </label>
     </div>
 
     <!-- Error -->
-    <div ng-if="auth.errorMsg" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">{{ auth.errorMsg }}</div>
+    <div class="alert-error" role="alert" ng-if="auth.errorMsg">{{ auth.errorMsg }}</div>
 
     <!-- Login Form -->
-    <form ng-if="auth.mode === 'login'" ng-submit="auth.login()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+    <form ng-if="auth.mode === 'login'" ng-submit="auth.login()">
       <div class="bs-field">
-        <label>Email Address</label>
-        <input class="bs-input" type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" />
+        <label for="login-email">Email Address</label>
+        <input id="login-email" class="bs-input" type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" autocomplete="username" />
       </div>
       <div class="bs-field">
-        <label>Password</label>
-        <input class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" />
+        <label for="login-password">Password</label>
+        <input id="login-password" class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" autocomplete="current-password" />
       </div>
       <p style="text-align:right; margin:0;">
-        <a href="" class="bs-btn bs-btn-ghost" style="font-size:13px; padding:0;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>
+        <a href="" class="bs-btn bs-btn-ghost" style="min-height:36px;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>
       </p>
       <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="auth.loading">
         <span ng-if="!auth.loading">Sign In</span>
@@ -50,19 +46,19 @@
 
     <!-- Forgot Password Modal -->
     <div class="bs-dialog-backdrop" ng-if="auth.showForgotPassword" ng-click="auth.closeForgotPassword()">
-      <div class="bs-dialog" ng-click="$event.stopPropagation()">
-        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+      <div class="bs-dialog" ng-click="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Forgot password">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
           <div class="bs-dialog-title">Forgot Password</div>
-          <button class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="auth.closeForgotPassword()">&times;</button>
+          <button class="bs-btn bs-btn-ghost bs-btn-icon" aria-label="Close" ng-click="auth.closeForgotPassword()">&times;</button>
         </div>
         <div class="bs-dialog-body">
           <p style="margin:0 0 var(--space-3);">Enter your account email and we'll send a temporary password to it.</p>
           <div class="bs-field">
-            <label>Email Address</label>
-            <input class="bs-input" type="email" ng-model="auth.forgotEmail" required placeholder="you@example.com" />
+            <label for="forgot-email">Email Address</label>
+            <input id="forgot-email" class="bs-input" type="email" ng-model="auth.forgotEmail" required placeholder="you@example.com" />
           </div>
-          <div ng-if="auth.forgotErrorMsg" style="margin-top:var(--space-2); background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">{{ auth.forgotErrorMsg }}</div>
-          <div ng-if="auth.forgotMsg" style="margin-top:var(--space-2); background:var(--color-success-100); color:var(--color-success-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">{{ auth.forgotMsg }}</div>
+          <div class="alert-error" role="alert" ng-if="auth.forgotErrorMsg" style="margin-top:var(--space-2);">{{ auth.forgotErrorMsg }}</div>
+          <div class="alert-success" role="status" ng-if="auth.forgotMsg" style="margin-top:var(--space-2);">{{ auth.forgotMsg }}</div>
         </div>
         <div class="bs-dialog-actions">
           <button type="button" class="bs-btn bs-btn-primary" ng-disabled="auth.forgotLoading || !auth.forgotEmail" ng-click="auth.submitForgotPassword()">
@@ -74,60 +70,56 @@
     </div>
 
     <!-- Register Form -->
-    <form ng-if="auth.mode === 'register'" ng-submit="auth.register()" style="display:flex; flex-direction:column; gap:var(--space-3);">
+    <form ng-if="auth.mode === 'register'" ng-submit="auth.register()">
       <div class="bs-field">
-        <label>Full Name</label>
-        <input class="bs-input" type="text" ng-model="auth.registerData.name" ng-change="auth.validateName()" required placeholder="e.g. Sarah Tan" />
-        <div ng-if="auth.nameError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ auth.nameError }}</div>
+        <label for="reg-name">Full Name</label>
+        <input id="reg-name" class="bs-input" type="text" ng-model="auth.registerData.name" ng-change="auth.validateName()" required placeholder="e.g. Sarah Tan" autocomplete="name" />
+        <div class="field-error" ng-if="auth.nameError">{{ auth.nameError }}</div>
       </div>
       <div class="bs-field">
-        <label>Email Address</label>
-        <input class="bs-input" type="email" ng-model="auth.registerData.email" required placeholder="you@example.com" />
+        <label for="reg-email">Email Address</label>
+        <input id="reg-email" class="bs-input" type="email" ng-model="auth.registerData.email" required placeholder="you@example.com" autocomplete="email" />
       </div>
       <div class="bs-field">
-        <label>Password</label>
-        <div style="position:relative;">
-          <input class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" style="padding-right:38px;" />
-          <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; right:2px; top:1px;" ng-click="auth.showRegisterPassword = !auth.showRegisterPassword" tabindex="-1">
-            <i class="ti" ng-class="auth.showRegisterPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
-          </button>
+        <label for="reg-password">Password</label>
+        <div class="lg-pw">
+          <input id="reg-password" class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" autocomplete="new-password" />
+          <button type="button" class="bs-btn bs-btn-ghost" ng-click="auth.showRegisterPassword = !auth.showRegisterPassword" aria-label="Show or hide password">{{ auth.showRegisterPassword ? 'Hide' : 'Show' }}</button>
         </div>
       </div>
       <div class="bs-field">
-        <label>Confirm Password</label>
-        <div style="position:relative;">
-          <input class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" style="padding-right:38px;" />
-          <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:absolute; right:2px; top:1px;" ng-click="auth.showRegisterConfirmPassword = !auth.showRegisterConfirmPassword" tabindex="-1">
-            <i class="ti" ng-class="auth.showRegisterConfirmPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
-          </button>
+        <label for="reg-confirm">Confirm Password</label>
+        <div class="lg-pw">
+          <input id="reg-confirm" class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" autocomplete="new-password" />
+          <button type="button" class="bs-btn bs-btn-ghost" ng-click="auth.showRegisterConfirmPassword = !auth.showRegisterConfirmPassword" aria-label="Show or hide password">{{ auth.showRegisterConfirmPassword ? 'Hide' : 'Show' }}</button>
         </div>
-        <div ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">Passwords do not match.</div>
+        <div class="field-error" ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword">Passwords do not match.</div>
       </div>
       <div class="bs-field">
         <label>Account Type</label>
-        <div class="bs-seg" style="width:100%;">
-          <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+        <div class="bs-seg" role="radiogroup" aria-label="Account type">
+          <label class="bs-seg-opt">
             <input type="radio" name="registerRole" ng-model="auth.registerData.role" value="parent" /> Parent / Student
           </label>
-          <label class="bs-seg-opt" style="flex:1; justify-content:center;">
+          <label class="bs-seg-opt">
             <input type="radio" name="registerRole" ng-model="auth.registerData.role" value="tutor" /> Tutor / Teacher
           </label>
         </div>
       </div>
 
-      <div style="display:flex; align-items:flex-start; gap:8px; font-size:14px;">
-        <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" style="margin-top:3px;" />
+      <div style="display:flex; align-items:flex-start; gap:10px; font-size:15px;">
+        <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" style="margin-top:3px; width:20px; height:20px;" />
         <label for="tnc-agree">
           I have read and agree to the
-          <a href="" class="bs-btn bs-btn-ghost" style="padding:0; font-size:14px; display:inline;" ng-click="$event.preventDefault(); auth.showTerms = !auth.showTerms">Terms and Conditions</a>
+          <a href="" class="tnc-link" ng-click="$event.preventDefault(); auth.showTerms = !auth.showTerms">Terms and Conditions</a>
         </label>
       </div>
 
       <div class="bs-dialog-backdrop" ng-if="auth.showTerms" ng-click="auth.showTerms = false">
-        <div class="bs-dialog" ng-click="$event.stopPropagation()">
-          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <div class="bs-dialog" ng-click="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Terms and Conditions">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="bs-dialog-title">Terms and Conditions</div>
-            <button class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="auth.showTerms = false">&times;</button>
+            <button class="bs-btn bs-btn-ghost bs-btn-icon" aria-label="Close" ng-click="auth.showTerms = false">&times;</button>
           </div>
           <div class="bs-dialog-body">
             <p style="margin:0;">Terms and Conditions content will be added here.</p>
@@ -141,12 +133,10 @@
       </button>
     </form>
 
-    <!-- Demo Credentials — a card nested inside the (also white) login card
-         gets LearnFlow's quiet neutral fill so it doesn't blend into its
-         white parent (see .lf-scope's --color-neutral-100 override). -->
-    <div class="bs-card" style="background:var(--color-neutral-100); border:1px solid var(--color-divider);">
-      <div class="bs-card-kicker">Demo Credentials</div>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:var(--space-3); font-size:13px;">
+    <!-- Demo Credentials -->
+    <div class="lg-demo">
+      <span class="bs-card-kicker">Demo Credentials</span>
+      <div class="lg-grid">
         <div>
           <strong>Parent</strong><br/>
           <span class="bs-text-muted">sarah.tan@example.com<br/>Parent@123</span>

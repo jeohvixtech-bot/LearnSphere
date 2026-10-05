@@ -3596,7 +3596,6 @@ a { text-decoration: none; color: inherit; }
    they are for any view that hasn't been rebuilt yet. Once every view
    is migrated, the .bs- prefix and .bs-scope wrapper can be dropped.
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
   --color-bg: #f3f2f2;

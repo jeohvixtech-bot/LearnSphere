@@ -43,41 +43,23 @@
         <h1>Billing &amp; Invoices</h1>
         <p class="bs-text-muted" style="margin:0;">View and manage all your tuition payment invoices</p>
       </div>
-      <div style="display:flex; gap:var(--space-6);">
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.invoices.length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Total Invoices</div>
+      <div class="br-stats">
+        <div class="br-stat">
+          <div class="br-stat-n">{{ vm.invoices.length }}</div>
+          <div class="br-stat-l">Total Invoices</div>
         </div>
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Unpaid</div>
+        <div class="br-stat">
+          <div class="br-stat-n">{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</div>
+          <div class="br-stat-l">Unpaid</div>
         </div>
       </div>
     </div>
 
     <!-- ── Summary Cards ──────────────────────────── -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:var(--space-3); margin-top:var(--space-4);" ng-if="vm.invoices.length">
-      <div class="bs-card" style="flex-direction:row; align-items:center; gap:var(--space-3);">
-        <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">📋</span>
-        <div>
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ vm.invoices.length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Total Invoices</div>
-        </div>
-      </div>
-      <div class="bs-card" style="flex-direction:row; align-items:center; gap:var(--space-3);">
-        <span class="bs-tag bs-tag-accent" style="font-size:17px; padding:8px;">✓</span>
-        <div>
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ (vm.invoices | filter:{status:'Paid'}).length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Paid</div>
-        </div>
-      </div>
-      <div class="bs-card" style="flex-direction:row; align-items:center; gap:var(--space-3);">
-        <span class="bs-tag bs-tag-accent-2" style="font-size:17px; padding:8px;">⏳</span>
-        <div>
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:22px;">{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Outstanding</div>
-        </div>
-      </div>
+    <div class="br-tiles" ng-if="vm.invoices.length">
+      <div class="br-tile blue"><b>{{ vm.invoices.length }}</b><span>Total Invoices</span></div>
+      <div class="br-tile green"><b>{{ (vm.invoices | filter:{status:'Paid'}).length }}</b><span>Paid</span></div>
+      <div class="br-tile pink"><b>{{ (vm.invoices | filter:{status:'Unpaid'}).length }}</b><span>Outstanding</span></div>
     </div>
 
     <!-- ── Empty State ─────────────────────────────── -->
@@ -108,22 +90,22 @@
           <p class="bs-text-muted" style="margin:0;" ng-if="vm.invoicesTab === 'cancelled'">No cancelled invoices.</p>
         </div>
 
-        <div class="bs-card bs-elev-sm" style="padding:0; margin-top:var(--space-2);" ng-if="vm.visibleInvoices().length">
-          <table class="bs-table">
+        <div class="bs-card bs-elev-sm br-flush" style="padding:0; margin-top:var(--space-2);" ng-if="vm.visibleInvoices().length">
+          <table class="bs-table br-stack">
             <thead>
               <tr><th>Invoice</th><th>Subject</th><th>Date</th><th>Amount</th><th>Status</th></tr>
             </thead>
             <tbody>
               <tr ng-repeat="inv in vm.visibleInvoices()">
-                <td>
+                <td data-label="Invoice">
                   <div style="font-weight:600;">{{ inv.invoiceNumber }}</div>
                   <div class="bs-text-muted" style="font-size:12px;">Booking {{ inv.bookingNumber }}</div>
                 </td>
-                <td>{{ inv.subject || '—' }}</td>
-                <td>{{ inv.date | dmy }}</td>
-                <td style="font-family:var(--font-heading); font-weight:600;">{{ inv.amount | currency:'$' }}</td>
-                <td>
-                  <span class="bs-tag" ng-class="inv.status === 'Paid' ? 'bs-tag-accent' : (inv.status === 'Cancelled' ? 'bs-tag-neutral' : 'bs-tag-accent-2')">
+                <td data-label="Subject">{{ inv.subject || '—' }}</td>
+                <td data-label="Date">{{ inv.date | dmy }}</td>
+                <td data-label="Amount" style="font-family:var(--font-heading); font-weight:600;">{{ inv.amount | currency:'$' }}</td>
+                <td data-label="Status">
+                  <span class="bs-tag" ng-class="inv.status === 'Paid' ? 'bs-tag-success' : (inv.status === 'Cancelled' ? 'bs-tag-neutral' : 'bs-tag-accent-2')">
                     {{ inv.status | uppercase }}
                   </span>
                 </td>

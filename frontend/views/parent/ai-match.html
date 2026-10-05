@@ -53,7 +53,7 @@
       <div class="bs-card bs-elev-sm" ng-repeat="s in vm.activeStudents()"
         ng-style="vm.aiMatchSelectedStudentId === s.id ? {outline:'2px solid var(--color-accent)'} : {}"
         ng-click="vm.selectAiMatchStudent(s.id)" style="cursor:pointer; position:relative;">
-        <span class="bs-tag bs-tag-accent" ng-if="vm.aiMatchSelectedStudentId === s.id" style="position:absolute; top:var(--space-2); right:var(--space-2);">✓ SELECTED</span>
+        <span class="bs-tag bs-tag-accent" ng-if="vm.aiMatchSelectedStudentId === s.id" style="position:absolute; top:var(--space-2); right:var(--space-2);">SELECTED</span>
         <div style="display:flex; gap:var(--space-3);">
           <div style="width:48px; height:48px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
           <div>
@@ -87,15 +87,15 @@
       </p>
 
       <div style="display:flex; flex-direction:column; gap:var(--space-3);">
-        <div class="bs-card bs-elev-sm" ng-repeat="t in vm.aiMatchResults" style="display:flex; flex-direction:row; align-items:flex-start; gap:var(--space-4);">
+        <div class="bs-card bs-elev-sm br-trow" ng-repeat="t in vm.aiMatchResults" style="display:flex; flex-direction:row; align-items:flex-start; gap:var(--space-4);">
 
           <!-- Column 1: avatar + name/badges/experience/quals -->
-          <div style="flex:0 0 190px; min-width:0;">
+          <div class="br-t1" style="flex:0 0 190px; min-width:0;">
             <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; object-fit:cover;" alt="{{ t.name }}" />
             <div ng-if="!t.imageUrl" class="bs-halftone" style="width:64px; height:64px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:24px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px;">
               <span class="bs-card-title">{{ t.name }}</span>
-              <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:11px;">✓ Verified</span>
+              <span ng-if="t.isVerified" class="bs-tag bs-tag-accent" style="font-size:11px;">Verified</span>
             </div>
             <!-- Tier derived from the same score matchScore already carries —
                  see parent.controller.js#scoreToTier, kept in sync with the
@@ -110,10 +110,10 @@
               <span ng-if="t.matchScore && vm.scoreToTier(t.matchScore.score) === 'Bronze'" class="bs-tag" style="font-size:11px; background:#fff7ed; color:#9a3412; border:1px solid #fdba74;">
                 <i class="ti ti-award" aria-hidden="true"></i> Bronze
               </span>
-              <span ng-if="$index === 0 && t.matchScore" class="bs-tag bs-tag-accent-2" style="font-size:11px;">🏆 Top Match</span>
+              <span ng-if="$index === 0 && t.matchScore" class="bs-tag bs-tag-accent-2" style="font-size:11px;">Top Match</span>
               <span ng-if="t.matchScore" class="bs-tag bs-tag-outline" style="font-size:11px;"
                 title="Rating {{ t.matchScore.ratingPoints }} pts · Activeness {{ t.matchScore.activenessPoints }} pts · Disputes {{ t.matchScore.disputePoints }} pts · Experience {{ t.matchScore.experiencePoints }} pts">
-                ⚡ {{ t.matchScore.score }}
+                {{ t.matchScore.score }}
               </span>
             </div>
             <p class="bs-card-meta" style="margin-top:6px;">{{ t.experienceYears }} yrs experience</p>
@@ -132,7 +132,7 @@
           </div>
 
           <!-- Column 3: rating, bulletin board, available classes -->
-          <div style="flex:0 0 220px; min-width:0; border-left:0.5px solid var(--color-divider); padding-left:var(--space-3); display:flex; flex-direction:column; gap:8px;">
+          <div class="br-t3" style="flex:0 0 220px; min-width:0; border-left:0.5px solid var(--color-divider); padding-left:var(--space-3); display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-size:14px;">★ {{ t.rating }} <span class="bs-text-muted">({{ t.reviewCount }})</span></span>
               <span class="bs-tag bs-tag-neutral" ng-repeat="m in t.modes">{{ m }}</span>
@@ -140,7 +140,7 @@
 
             <button type="button" class="btn-outline sm" style="border:none; background:none; color:var(--color-accent); padding:0; align-self:flex-start; display:inline-flex; align-items:center; gap:4px;"
               ng-click="vm.openBulletinBoard(t)">
-              <i class="ti ti-message-2" aria-hidden="true"></i> Bulletin board
+              Bulletin board
             </button>
 
           <!-- Available preset classes — tooltip system kept exactly as-is

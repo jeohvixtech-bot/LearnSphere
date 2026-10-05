@@ -5,16 +5,16 @@
       <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
-      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
-      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
-      <a href="#!/admin/scoring" class="nav-item active">📐 Scoring Config</a>
-      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
-      <a href="#!/admin/archive" class="nav-item">🗄️ Archive</a>
-      <a href="#!/admin/payment-gateway" class="nav-item">💳 Payment Gateway</a>
-      <a href="#!/admin/commission" class="nav-item">💰 Platform Fees</a>
-      <a href="#!/admin/promotional-credit" class="nav-item">🎁 Promotional Credit</a>
-      <a href="#!/admin/payouts" class="nav-item">🏦 Payout Batches</a>
+      <a href="#!/admin/overview" class="nav-item">Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item active">Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item">Archive</a>
+      <a href="#!/admin/payment-gateway" class="nav-item">Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">Platform Fees</a>
+      <a href="#!/admin/promotional-credit" class="nav-item">Promotional Credit</a>
+      <a href="#!/admin/payouts" class="nav-item">Payout Batches</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -23,9 +23,9 @@
 
     <!-- Tab Bar -->
     <div class="tab-bar">
-      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'threshold'}" ng-click="vm.activeScoringTab = 'threshold'">🎯 Score Threshold</button>
-      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'weightage'}" ng-click="vm.activeScoringTab = 'weightage'">⚖️ Score Weightage</button>
-      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'scores'}" ng-click="vm.openTutorScoresTab()">📊 Tutor Scores</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'threshold'}" ng-click="vm.activeScoringTab = 'threshold'">Score Threshold</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'weightage'}" ng-click="vm.activeScoringTab = 'weightage'">Score Weightage</button>
+      <button class="tab-btn" ng-class="{'active': vm.activeScoringTab === 'scores'}" ng-click="vm.openTutorScoresTab()">Tutor Scores</button>
     </div>
 
     <!-- ===== SCORE THRESHOLD TAB ===== -->
@@ -43,7 +43,7 @@
          down, so it reads as a toast notification, not an inline status line. -->
     <div class="alert-success" ng-if="vm.weightageSaveSuccess"
       style="position:fixed;top:20px;right:20px;z-index:1001;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.15)">
-      ✓ Weightage percentages saved successfully!
+      Weightage percentages saved successfully!
     </div>
 
     <!-- ===== SCORE WEIGHTAGE TAB ===== -->
@@ -148,7 +148,7 @@
           </div>
         </div>
       </div>
-      <button class="btn-primary" style="margin-top:20px" ng-click="vm.saveWeightages()">💾 Save Weightage</button>
+      <button class="btn-primary" style="margin-top:20px" ng-click="vm.saveWeightages()">Save Weightage</button>
     </div>
 
     <!-- ===== TUTOR SCORES TAB ===== -->

@@ -1,88 +1,139 @@
-<div class="bs-scope" style="min-height:100vh; display:flex; flex-direction:column;">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><clipPath id="lpBlob" clipPathUnits="objectBoundingBox"><path d="M0.26,0 C0.09,0.07 -0.01,0.24 0.03,0.43 C0.07,0.63 0.0,0.83 0.17,1 L1,1 L1,0 Z"/></clipPath></svg>
+
+<div class="bs-scope lp" style="min-height:100vh; display:flex; flex-direction:column;">
 
   <!-- ── Top nav ─────────────────────────────────── -->
-  <div class="bs-nav" style="border-bottom:1px solid var(--color-divider); position:sticky; top:0; background:var(--color-bg); z-index:20;">
-    <div class="bs-nav-brand">LearnSphere</div>
-    <div style="display:flex; gap:var(--space-3); align-items:center; margin-left:auto;">
-      <a href="#!/login" class="bs-btn bs-btn-ghost">Log in</a>
+  <header class="lp-nav">
+    <div class="lp-wrap">
+      <a class="br-brand" href="#!/welcome" aria-label="LearnSphere home"><img src="assets/logo-compact.png" alt="LearnSphere" width="760" height="189" /></a>
+      <a class="lp-link" href="" onclick="document.getElementById('lp-how').scrollIntoView({behavior:'smooth'});return false;">How it works</a>
+      <a class="lp-link" href="" onclick="document.getElementById('lp-tutors').scrollIntoView({behavior:'smooth'});return false;">Tutors</a>
+      <a class="lp-link" href="" onclick="document.getElementById('lp-teach').scrollIntoView({behavior:'smooth'});return false;">For tutors</a>
+      <a href="#!/login" class="bs-btn bs-btn-secondary lp-login">Log in</a>
+      <a href="#!/login?mode=register&amp;role=parent" class="bs-btn bs-btn-primary lp-go">Get started</a>
     </div>
-  </div>
+  </header>
 
-  <div style="flex:1;">
-    <div style="max-width:1180px; margin:0 auto; padding:var(--space-8) var(--space-6);">
+  <main style="flex:1;">
 
-      <!-- ── Hero ────────────────────────────────── -->
-      <div style="display:flex; gap:var(--space-8); align-items:center; flex-wrap:wrap;">
-        <div style="flex:1 1 480px; min-width:320px;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700); margin-bottom:var(--space-2);">Tutor matching, made simple</div>
-          <h1 style="max-width:11ch;">Learning that fits your family's life</h1>
-          <p style="font-size:18px; max-width:46ch; opacity:0.85;">Browse verified NIE-trained tutors across Singapore &amp; Malaysia, book instantly, and keep every lesson, message and invoice in one place.</p>
-          <div style="display:flex; gap:var(--space-3); margin-top:var(--space-4); flex-wrap:wrap;">
-            <a href="#!/login?mode=register&amp;role=parent" class="bs-btn bs-btn-primary">I'm a New Parent</a>
-            <a href="#!/login?mode=register&amp;role=tutor" class="bs-btn bs-btn-secondary">I'm a New Tutor</a>
+    <!-- ── Hero ────────────────────────────────── -->
+    <section class="lp-hero">
+      <div class="lp-wrap">
+        <div class="lp-hero-txt">
+          <h1>Learning that fits your family's life</h1>
+          <p class="lp-lead">Browse verified NIE-trained tutors across Singapore &amp; Malaysia, book instantly, and keep every lesson, message and invoice in one place.</p>
+          <div class="lp-row">
+            <a href="#!/login?mode=register&amp;role=parent" class="bs-btn bs-btn-primary bs-btn-lg lp-go">I'm a New Parent</a>
+            <a href="#!/login?mode=register&amp;role=tutor" class="bs-btn bs-btn-secondary bs-btn-lg lp-go lp-out">I'm a New Tutor</a>
           </div>
         </div>
-        <div style="flex:1 1 360px; min-width:280px;">
-          <img src="assets/bg-study1.jpg" class="bs-halftone" style="width:100%; height:340px; object-fit:cover; border-radius:var(--radius-lg);" alt="Parent and child at a laptop, tutoring session" />
+        <div class="lp-media">
+          <div class="lp-b coral"></div>
+          <div class="lp-photo"><img src="assets/bg-study1.jpg" width="1200" height="847" alt="Apple on a stack of books with alphabet blocks, a tutoring session" /></div>
+          <div class="lp-b green"><i></i><i></i><i></i></div>
+          <div class="lp-b blue"><i></i><i></i></div>
+          <div class="lp-script">Curious learners, great tutors
+            <svg viewBox="0 0 60 56" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M50 4C40 20 24 30 10 36M10 36l1-14M10 36l14 4"/></svg>
+          </div>
         </div>
       </div>
+    </section>
 
-      <!-- ── How it works ────────────────────────── -->
-      <div style="margin-top:var(--space-8);">
-        <h2>How it works</h2>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--space-6); margin-top:var(--space-4);">
+    <!-- ── Why LearnSphere ─────────────────────── -->
+    <section class="lp-sec">
+      <div class="lp-wrap lp-values">
+        <div>
+          <span class="lp-eyebrow">Why families choose us</span>
+          <h2>Tutoring Made Simple for Families</h2>
+          <p>Find a tutor you trust, book a class that fits your week, and see how your child is doing.</p>
+          <a href="#!/login?mode=register&amp;role=parent" class="bs-btn bs-btn-secondary lp-go lp-out">Get started</a>
+        </div>
+        <div class="lp-four">
+          <div class="lp-tile"><div class="lp-blob"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M3 19L24 9l21 10-21 10z"/><path d="M11 25v9c0 3 6 6 13 6s13-3 13-6v-9M45 19v11"/></svg></div><h3>Verified Tutors</h3><p>Every tutor is vetted before they appear in search.</p></div>
+          <div class="lp-tile"><div class="lp-blob"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="32" rx="6"/><path d="M6 20h36M16 6v8M32 6v8M17 31l6 6 10-11"/></svg></div><h3>Instant Booking</h3><p>Pick a published class and book it, with no back-and-forth.</p></div>
+          <div class="lp-tile"><div class="lp-blob"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M4 42h36M10 36V24M20 36V14M30 36V22M40 36V8"/></svg></div><h3>Progress You Can See</h3><p>Lesson reports and a shared calendar for every child.</p></div>
+          <div class="lp-tile"><div class="lp-blob"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5l15 6v11c0 10-6 17-15 21C15 39 9 32 9 22V11z"/><path d="M17 24l5 5 9-10"/></svg></div><h3>Secure Payments</h3><p>Pay safely and keep a clear record of every session.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Subjects & levels ───────────────────── -->
+    <section class="lp-band">
+      <svg class="lp-wave" viewBox="0 0 1440 70" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0h1440v28C1240 66 1040 8 800 30S380 66 180 34 40 24 0 40Z" fill="#fff"/></svg>
+      <div class="lp-wrap lp-stages">
+        <div>
+          <span class="lp-eyebrow">Subjects &amp; levels</span>
+          <h2>Building Strong Foundations at Every Stage</h2>
+          <p>From Primary school basics to A-Level exam preparation, find a tutor who teaches the subject, at the level, your child needs.</p>
+          <div class="lp-chips"><span>Primary</span><span>Secondary</span><span>O-Level</span><span>A-Level</span></div>
+          <a href="#!/login?mode=register&amp;role=parent" class="bs-btn bs-btn-secondary lp-go lp-out">Find a tutor</a>
+        </div>
+        <div class="lp-pics">
+          <i class="lp-pink"></i>
+          <div class="lp-ph a"><img src="assets/bg-study3.jpg" width="1200" height="798" alt="Colourful stack of books" style="object-position:15% 50%" /></div>
+          <div class="lp-ph b"><img src="assets/bg-study2.jpg" width="1200" height="800" alt="A tutor presenting to a classroom" style="object-position:35% 50%" /></div>
+          <i class="lp-green"></i><i class="lp-blue"></i>
+          <svg class="lp-sun" viewBox="0 0 80 80" fill="none" stroke="#F9B934" stroke-width="3.5" stroke-linecap="round" aria-hidden="true"><circle cx="40" cy="40" r="11"/><path d="M40 8v9M40 63v9M8 40h9M63 40h9M17 17l6 6M57 57l6 6M63 17l-6 6M23 57l-6 6"/></svg>
+          <svg class="lp-heart" viewBox="0 0 36 36" fill="none" stroke="#3C9A5C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 31C6 23 4 14 9 9c4-3 8-1 9 3 1-4 5-6 9-3 5 5 3 14-9 22z"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tutor preview grid ──────────────────── -->
+    <section class="lp-sec" id="lp-tutors" ng-if="vm.tutors.length">
+      <div class="lp-wrap">
+        <div class="lp-head">
+          <span class="lp-eyebrow">Our tutors</span>
+          <h2>Meet a Few of Our Tutors</h2>
+          <p>Sign in to see full profiles, availability and classes you can book.</p>
+        </div>
+        <div class="lp-tutors">
+          <button type="button" class="lp-tutor" ng-repeat="t in vm.tutors" ng-click="vm.goToLogin(t)">
+            <span class="lp-av"><img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" alt="" /><span ng-if="!t.imageUrl" aria-hidden="true">{{ t.name[0] }}</span></span>
+            <span class="lp-tutor-name">{{ t.name }} <span ng-if="t.isVerified" class="bs-tag bs-tag-accent">Verified</span></span>
+            <span class="lp-tutor-meta">{{ t.subjects.slice(0,2).join(', ') }}</span>
+            <span class="lp-tutor-meta"><strong>{{ t.rating }}</strong> rating · {{ t.reviewCount }} reviews</span>
+            <span class="lp-quote" ng-if="t.featuredRemark">&ldquo;{{ t.featuredRemark.text | truncate:60 }}&rdquo;<cite>{{ t.featuredRemark.parentDisplayName }}</cite></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── How it works ────────────────────────── -->
+    <section class="lp-sec" id="lp-how" style="padding-top:0">
+      <div class="lp-wrap">
+        <div class="lp-head"><span class="lp-eyebrow">How it works</span><h2>From First Search to First Lesson</h2></div>
+        <div class="lp-steps">
+          <div class="lp-step"><div class="lp-num">1</div><div><h3>Tell us what you need</h3><p>Subject, level, preferred mode and schedule for each child.</p></div></div>
+          <div class="lp-step"><div class="lp-num">2</div><div><h3>Compare matched tutors</h3><p>Ratings, reviews and classes you can book instantly.</p></div></div>
+          <div class="lp-step"><div class="lp-num">3</div><div><h3>Learn, track, pay</h3><p>Lesson reports, a shared calendar, and invoices in one place.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── For tutors ──────────────────────────── -->
+    <section id="lp-teach">
+      <div class="lp-wrap">
+        <div class="lp-cta">
           <div>
-            <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">01</div>
-            <h4 style="margin-top:var(--space-2);">Tell us what you need</h4>
-            <p class="bs-text-muted" style="font-size:15px;">Subject, level, preferred mode and schedule for each child.</p>
+            <span class="lp-eyebrow">For tutors</span>
+            <h2>Teach on Your Own Schedule</h2>
+            <p>Set your own hours, publish classes parents can book instantly, and get paid securely after every confirmed session.</p>
+            <a href="#!/login?mode=register&amp;role=tutor" class="bs-btn bs-btn-primary lp-go">I'm a tutor</a>
           </div>
-          <div>
-            <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">02</div>
-            <h4 style="margin-top:var(--space-2);">Compare matched tutors</h4>
-            <p class="bs-text-muted" style="font-size:15px;">Ratings, reviews and classes you can book instantly.</p>
-          </div>
-          <div>
-            <div style="font-family:var(--font-heading); font-weight:600; font-size:36px; color:var(--color-accent);">03</div>
-            <h4 style="margin-top:var(--space-2);">Learn, track, pay</h4>
-            <p class="bs-text-muted" style="font-size:15px;">Lesson reports, a shared calendar, and invoices in one place.</p>
-          </div>
+          <div class="lp-cta-pic"><div class="lp-ph"><img src="assets/bg-study1.jpg" width="1200" height="847" alt="Apple on a stack of books" /></div></div>
         </div>
       </div>
+    </section>
 
-      <!-- ── Tutor preview grid ──────────────────── -->
-      <div style="margin-top:var(--space-8);">
-        <h2>Meet a few of our tutors</h2>
-        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-4); margin-top:var(--space-4);">
-          <div class="bs-card bs-elev-sm"
-            ng-repeat="t in vm.tutors"
-            ng-click="vm.goToLogin(t)"
-            style="cursor:pointer">
-            <img ng-if="t.imageUrl" ng-src="{{ t.imageUrl }}" class="bs-halftone" style="width:100%; height:120px; object-fit:cover; border-radius:var(--radius-lg);" alt="{{ t.name }}" />
-            <div ng-if="!t.imageUrl" class="bs-halftone" style="width:100%; height:120px; border-radius:var(--radius-lg); background:var(--color-accent-100); color:var(--color-accent-800); display:flex; align-items:center; justify-content:center; font-size:40px; font-family:var(--font-heading); font-weight:600;">{{ t.name[0] }}</div>
-            <div class="bs-card-title">{{ t.name }} <span ng-if="t.isVerified" title="Verified" style="color:var(--color-accent); font-size:14px;">✓</span></div>
-            <div class="bs-card-meta">{{ t.subjects.slice(0,2).join(', ') }} · ★ {{ t.rating }} ({{ t.reviewCount }})</div>
-            <div class="bs-card-meta" style="margin-top:4px; font-style:italic;" ng-if="t.featuredRemark">
-              "{{ t.featuredRemark.text | truncate:60 }}" — {{ t.featuredRemark.parentDisplayName }}
-              <span style="font-style:normal;">({{ t.featuredRemark.rating }}★)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── For tutors callout ──────────────────── -->
-      <div style="margin-top:var(--space-8);">
-        <div style="font-family:var(--font-heading); font-weight:600; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-2-700); margin-bottom:var(--space-2);">For tutors</div>
-        <h2>Teach on your own schedule</h2>
-        <p style="opacity:0.85; max-width:46ch;">Set your own hours, publish classes parents can book instantly, and get paid securely after every confirmed session.</p>
-        <a href="#!/login" class="bs-btn bs-btn-secondary" style="margin-top:var(--space-2);">I'm a tutor</a>
-      </div>
-
-    </div>
-  </div>
+  </main>
 
   <!-- ── Footer ───────────────────────────────────── -->
-  <div style="margin-top:var(--space-8); padding:var(--space-6); border-top:1px solid var(--color-divider);">
-    <div style="max-width:1180px; margin:0 auto; font-size:14px; opacity:0.6;">LearnSphere — tutor matching for families.</div>
-  </div>
+  <footer class="lp-foot">
+    <div class="lp-wrap">
+      <img src="assets/logo-horizontal.png" alt="LearnSphere: Learn, Grow, Connect" width="900" height="224" />
+      <a href="#!/login" style="font-weight:700; color:var(--navy);">Log in</a>
+    </div>
+  </footer>
 
 </div>

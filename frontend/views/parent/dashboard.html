@@ -86,40 +86,22 @@
   <main class="dashboard-main">
 
     <!-- ── Pay Success ───────────────────────────── -->
-    <div ng-if="vm.paySuccess" style="background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-3); border-radius:var(--radius-md); font-size:15px;">
-      ✓ Payment successful. Invoice has been marked as paid.
-    </div>
+    <div class="alert-success" ng-if="vm.paySuccess" role="status">Payment successful. Invoice has been marked as paid.</div>
 
     <!-- ── Welcome Hero ───────────────────────────── -->
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:var(--space-4);">
-      <div>
-        <div style="font-family:var(--font-heading); font-weight:600; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent-700);">Parent Dashboard</div>
-        <h1 style="margin-top:4px;">Welcome back, {{ vm.user.name.split(' ')[0] }}</h1>
-        <p class="bs-text-muted" style="margin:0;">Here's an overview of your children's tutoring activity</p>
-      </div>
-      <div style="display:flex; gap:var(--space-6);">
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.students.length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Children</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.confirmedAndCounteredBookings().length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Upcoming</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-family:var(--font-heading); font-weight:600; font-size:28px;">{{ vm.pendingPayments().length }}</div>
-          <div class="bs-text-muted" style="font-size:13px;">Payments Due</div>
-        </div>
-      </div>
-    </div>
+    <header class="br-hero">
+      <span class="br-eyebrow">Parent Dashboard</span>
+      <h1>Welcome back, {{ vm.user.name.split(' ')[0] }}</h1>
+      <p>Here's an overview of your children's tutoring activity</p>
+    </header>
 
     <!-- ── Payment Alert ─────────────────────────── -->
-    <div class="bs-card" style="background:var(--color-accent-2-100); flex-direction:row; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3);" ng-if="vm.pendingPayments().length > 0">
+    <div class="br-banner" ng-if="vm.pendingPayments().length > 0">
       <div>
-        <span class="bs-tag bs-tag-accent-2">★ Action Required</span>
-        <h4 style="margin-top:var(--space-2);">Session Confirmed — Payment Pending</h4>
-        <p style="margin:0; font-size:14px;">Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
-        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:var(--space-2);">
+        <span class="bs-tag bs-tag-accent-2">Action required</span>
+        <h3>Session Confirmed — Payment Pending</h3>
+        <p>Your tutor has confirmed the appointment. Complete payment to secure your booking.</p>
+        <div class="br-chips">
           <span class="bs-tag bs-tag-neutral" ng-repeat="inv in vm.pendingPayments()">
             {{ inv.subject }} · <strong>{{ inv.amount | currency:'$' }}</strong>
           </span>
@@ -130,59 +112,69 @@
       </button>
     </div>
 
+    <!-- ── At a glance ───────────────────────────── -->
+    <div class="br-tiles">
+      <div class="br-tile blue"><b>{{ vm.students.length }}</b><span>Children</span></div>
+      <div class="br-tile green"><b>{{ vm.confirmedAndCounteredBookings().length }}</b><span>Upcoming</span></div>
+      <div class="br-tile pink"><b>{{ vm.pendingPayments().length }}</b><span>Payments Due</span></div>
+    </div>
+
     <!-- ── Upcoming Tutorials ──────────────────────── -->
-    <div class="bs-card bs-elev-sm">
-      <div style="display:flex; justify-content:space-between; align-items:baseline;">
-        <div class="bs-card-title">Upcoming Tutorials</div>
-        <a href="#!/parent/sessions" class="bs-btn bs-btn-ghost" style="font-size:13px;">View All →</a>
+    <section class="br-panel">
+      <div class="br-panel-hd">
+        <h3>Upcoming Tutorials</h3>
+        <a href="#!/parent/sessions" class="bs-btn bs-btn-ghost">View All →</a>
       </div>
 
-      <div ng-if="!vm.confirmedAndCounteredBookings().length" style="text-align:center; padding:var(--space-4) 0;">
-        <p class="bs-text-muted">No upcoming tutorial sessions scheduled.</p>
+      <div class="br-empty" ng-if="!vm.confirmedAndCounteredBookings().length">
+        <div class="br-empty-art" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="12" width="48" height="44" rx="8"/><path d="M8 26h48M20 6v12M44 6v12M22 40l7 7 13-14"/></svg>
+        </div>
+        <p>No upcoming tutorial sessions scheduled.</p>
         <a href="#!/parent/search" class="bs-btn bs-btn-primary">Find a Tutor</a>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:var(--space-2);" ng-if="vm.confirmedAndCounteredBookings().length">
-        <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--color-divider);" ng-repeat="b in vm.confirmedAndCounteredBookings()">
-          <img ng-src="{{ b.tutorImageUrl }}" class="bs-halftone" style="width:44px; height:44px; border-radius:50%; object-fit:cover; flex-shrink:0;" alt="{{ b.tutorName }}" />
-          <div style="flex:1; min-width:0;">
-            <span class="bs-tag bs-tag-accent" style="margin-bottom:4px;">{{ b.subject }}</span>
-            <div style="font-family:var(--font-heading); font-weight:600;">{{ b.tutorName }}</div>
-            <small class="bs-text-muted">{{ b.classes[0].date | dmy }} · {{ b.classes[0].time | hhmma }} ({{ b.durationHours }}h)
+      <div ng-if="vm.confirmedAndCounteredBookings().length">
+        <div class="br-row" ng-repeat="b in vm.confirmedAndCounteredBookings()">
+          <div class="br-date"><small>{{ b.classes[0].date | date:'MMM' }}</small>{{ b.classes[0].date | date:'d' }}</div>
+          <div class="br-grow">
+            <b>{{ b.subject }}</b>
+            <div class="bs-text-muted">{{ b.tutorName }} · {{ b.classes[0].date | dmy }} · {{ b.classes[0].time | hhmma }} ({{ b.durationHours }}h)
               <span ng-if="b.classes.length > 1"> +{{ b.classes.length - 1 }} more</span>
-            </small>
+            </div>
           </div>
-          <span class="bs-tag" ng-class="b.status === 'confirmed' ? 'bs-tag-accent' : 'bs-tag-neutral'">{{ b.status | uppercase }}</span>
+          <span class="bs-tag" ng-class="b.status === 'confirmed' ? 'bs-tag-success' : 'bs-tag-neutral'">{{ b.status | uppercase }}</span>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- ── Children Overview ──────────────────────── -->
-    <div class="bs-card bs-elev-sm">
-      <div style="display:flex; justify-content:space-between; align-items:baseline;">
-        <div class="bs-card-title">Active Children Profiles</div>
-        <a href="#!/parent/students" class="bs-btn bs-btn-ghost" style="font-size:13px;">+ Add Child</a>
+    <section class="br-panel">
+      <div class="br-panel-hd">
+        <h3>Active Children Profiles</h3>
+        <a href="#!/parent/students" class="bs-btn bs-btn-ghost">+ Add Child</a>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-3);">
-        <div class="bs-card" style="background:var(--color-bg); flex-direction:row; gap:var(--space-3);" ng-repeat="s in vm.activeStudents()">
-          <div style="width:40px; height:40px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ s.name[0] }}</div>
-          <div style="min-width:0;">
-            <strong>{{ s.name }}</strong>
-            <p class="bs-text-muted" style="font-size:13px; margin:2px 0 0;">{{ s.educationLevel }} · {{ s.school }}</p>
-            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
-              <span class="bs-tag bs-tag-neutral" ng-repeat="c in s.subjectCombos | limitTo:3">{{ c.subject }}</span>
+      <div class="br-kids">
+        <div class="br-kid" ng-repeat="s in vm.activeStudents()">
+          <div class="br-kid-av" ng-class="'c' + ($index % 4)">{{ s.name[0] }}</div>
+          <div class="br-grow">
+            <b>{{ s.name }}</b>
+            <p class="bs-text-muted">{{ s.educationLevel }} · {{ s.school }}</p>
+            <div class="br-chips">
+              <span class="bs-tag bs-tag-accent" ng-repeat="c in s.subjectCombos | limitTo:3">{{ c.subject }}</span>
             </div>
           </div>
         </div>
-        <div class="bs-text-muted" style="grid-column:1/-1;" ng-if="!vm.activeStudents().length">
-          No child profiles yet. <a href="#!/parent/students">Add one now →</a>
-        </div>
       </div>
-    </div>
+      <div class="br-empty" ng-if="!vm.activeStudents().length">
+        <p>No child profiles yet.</p>
+        <a href="#!/parent/students" class="bs-btn bs-btn-primary">Add a child</a>
+      </div>
+    </section>
 
     <!-- ── Notice Banner ─────────────────────────── -->
-    <div style="background:var(--color-neutral-100); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">
+    <div class="br-notice">
       <strong>Scheduled Maintenance:</strong>&nbsp; The dashboard will be offline on June 15th, 2:00 AM – 4:00 AM SGT.
     </div>
 

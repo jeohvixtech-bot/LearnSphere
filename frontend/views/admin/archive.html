@@ -5,12 +5,12 @@
       <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
-      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
-      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
-      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
-      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
-      <a href="#!/admin/archive" class="nav-item active">🗄️ Archive</a>
+      <a href="#!/admin/overview" class="nav-item">Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item active">Archive</a>
     </nav>
     <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
   </aside>
@@ -22,7 +22,7 @@
       <p class="text-muted">Parent-reported issues that have already been resolved. Kept here for record-keeping only — no further action is available.</p>
 
       <div class="empty-state-box large" ng-if="!vm.archivedDisputes.length">
-        📭 No resolved disputes yet.
+        No resolved disputes yet.
       </div>
 
       <div class="dispute-card" ng-repeat="d in vm.archivedDisputes">
@@ -49,7 +49,7 @@
       <p class="text-muted">Tutor requests to hide a class remark that admin has already decided on — approved (hidden) or rejected (stayed published).</p>
 
       <div class="empty-state-box large" ng-if="!vm.archivedRemarkDisputes.length">
-        📭 No resolved hide requests yet.
+        No resolved hide requests yet.
       </div>
 
       <div class="dispute-card" ng-repeat="d in vm.archivedRemarkDisputes">

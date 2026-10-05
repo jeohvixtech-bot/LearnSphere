@@ -12,13 +12,15 @@
   <link rel="stylesheet" href="libs/flatpickr.min.css" />
   <link rel="stylesheet" href="libs/tabler-icons/tabler-icons.min.css" />
 
-  <!-- LearnFlow design system fonts — only consumed by views wrapped in .lf-scope
-       (currently just login.html; see the .lf-scope block at the end of main.css) -->
+  <link rel="icon" type="image/png" href="assets/logo-icon.png" />
+
+  <!-- Bright design system fonts: Fraunces (headings), Nunito Sans (body), Caveat (landing accent) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=Caveat:wght@700&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="styles/bright.css" />
 </head>
 <body>
 
@@ -26,25 +28,23 @@
   <div ng-controller="AppCtrl as app" ng-class="{'mobile-nav-open': app.mobileNavOpen}">
 
     <!-- Main Header -->
-    <header class="bs-nav bs-scope" ng-if="app.isLoggedIn()" style="border-bottom:1px solid var(--color-divider); position:sticky; top:0; background:var(--color-bg); z-index:30;">
+    <header class="bs-nav bs-scope" ng-if="app.isLoggedIn()" style="position:sticky; top:0; z-index:30;">
       <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon mobile-nav-toggle" aria-label="Toggle navigation menu" ng-click="app.toggleMobileNav()">
         <i class="ti ti-menu-2" aria-hidden="true"></i>
       </button>
-      <span class="bs-nav-brand">LearnSphere</span>
+      <span class="br-brand"><img src="assets/logo-compact.png" alt="LearnSphere" width="760" height="189" /></span>
       <div style="display:flex; align-items:center; gap:var(--space-3); margin-left:auto;">
-        <span class="bs-nav-user-label" style="font-size:13px;">
+        <span class="bs-nav-user-label">
           <strong>{{ app.currentUser.name }}</strong>
-          <span class="bs-tag bs-tag-neutral" style="margin-left:6px; text-transform:capitalize;">{{ app.currentUser.role }}</span>
+          <span class="bs-tag bs-tag-neutral" style="text-transform:capitalize;">{{ app.currentUser.role }}</span>
         </span>
 
-        <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" style="position:relative;" ng-click="app.toggleNotifDrawer()">
-          <i class="ti ti-bell" aria-hidden="true"></i>
-          <span ng-if="app.unreadCount > 0" style="position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:var(--color-accent-2);"></span>
+        <button type="button" class="bs-btn bs-btn-secondary br-notif" aria-label="Notifications" ng-click="app.toggleNotifDrawer()">
+          <i class="ti ti-bell br-bell" aria-hidden="true"></i><span class="br-lbl">Notifications</span>
+          <em ng-if="app.unreadCount > 0">{{ app.unreadCount }}</em>
         </button>
 
-        <div style="width:32px; height:32px; border-radius:50%; background:var(--color-accent-100); color:var(--color-accent-800); font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ app.currentUser.name[0] }}</div>
-
-        <button type="button" class="bs-btn bs-btn-secondary bs-nav-signout" ng-click="app.logout()">Sign Out</button>
+        <button type="button" class="bs-btn bs-btn-secondary bs-nav-signout" aria-label="Sign out" ng-click="app.logout()">Sign Out</button>
       </div>
     </header>
 
