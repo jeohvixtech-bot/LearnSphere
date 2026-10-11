@@ -87,6 +87,11 @@ angular.module('learnSphereApp')
     });
   };
 
+  self.setSlotVideoLink = function (tutorId, slotId, link) {
+    return $http.patch(API_URL + '/tutors/' + tutorId + '/slots/' + slotId + '/video-link',
+      { videoConferenceLink: link }, { headers: AuthService.authHeader() });
+  };
+
   self.uploadImage = function (file) {
     var fd = new FormData();
     fd.append('file', file);

@@ -38,13 +38,29 @@ public class TutorDto
     public List<string> Qualifications { get; set; } = new();
     public bool IsVerified { get; set; }
     public bool IsOnline { get; set; }
+    // Tier badge (Gold/Silver/Bronze/Normal) shown on the tutor's own profile —
+    // only populated by GetByUser, which is the only endpoint that computes it
+    // (see TutorsController.ComputeTutorTierAsync). Defaults reflect "not computed"
+    // for every other endpoint that maps a Tutor to this DTO.
+    public double Score { get; set; }
+    public string Tier { get; set; } = "Normal";
     public string VerificationStatus { get; set; } = string.Empty;
     public bool OfferingsUnlocked { get; set; }
     public DateTime? LastSubmittedAt { get; set; }
     public List<TutorDocumentDto> Documents { get; set; } = new();
-    public List<ReviewDto> Reviews { get; set; } = new();
     public List<TimeSlotDto> Timetable { get; set; } = new();
     public List<TutorOfferingDto> Offerings { get; set; } = new();
+
+    // Populated only by GetAll (the public catalog listing) — see the
+    // FeaturedRemark selection rule in TutorsController.GetAll.
+    public ClassRemarkSummaryDto? FeaturedRemark { get; set; }
+}
+
+public class ClassRemarkSummaryDto
+{
+    public string Text { get; set; } = string.Empty;
+    public int Rating { get; set; }
+    public string ParentDisplayName { get; set; } = string.Empty;
 }
 
 public class TutorDocumentDto
@@ -90,13 +106,6 @@ public class ApplyVerificationDecisionsDto
     public List<VerificationDecisionDto> Decisions { get; set; } = new();
 }
 
-public class ReviewDto
-{
-    public string Author { get; set; } = string.Empty;
-    public string Text { get; set; } = string.Empty;
-    public int Rating { get; set; }
-}
-
 public class TimeSlotDto
 {
     public int Id { get; set; }
@@ -118,6 +127,7 @@ public class TimeSlotDto
     public decimal PricePerLesson { get; set; }
     public string? PresetGroupId { get; set; }
     public List<string> SyllabusTopics { get; set; } = new();
+    public string? VideoConferenceLink { get; set; }
 }
 
 public class VerifyTutorDto
@@ -209,17 +219,23 @@ public class AddTimeSlotDto
     public string Time { get; set; } = string.Empty;
 }
 
-public class CreateReviewDto
-{
-    public int Rating { get; set; }
-    public string Text { get; set; } = string.Empty;
-    public int? BookingId { get; set; }
-}
-
 // Date/time only — no student, subject or message details — so parents can
 // see when a tutor is already busy without exposing other families' bookings.
 public class BusyTimeDto
 {
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+}
+
+public class TutorBlockedDateDto
+{
+    public int Id { get; set; }
+    public string Start { get; set; } = string.Empty;
+    public string End { get; set; } = string.Empty;
+}
+
+public class CreateTutorBlockedDateDto
+{
+    public string StartDate { get; set; } = string.Empty;
+    public string EndDate { get; set; } = string.Empty;
 }

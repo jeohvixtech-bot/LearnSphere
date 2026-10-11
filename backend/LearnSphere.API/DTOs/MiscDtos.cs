@@ -20,6 +20,16 @@ public class InvoiceDto
     public decimal Amount { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Subject { get; set; }
+
+    // Fee breakdown, so a parent can see what they are paying for rather than one opaque
+    // total: Amount = BaseAmount + MarkupAmount, and CashDue is what is left after any
+    // wallet credit has been applied.
+    public decimal BaseAmount { get; set; }
+    public decimal MarkupAmount { get; set; }
+    public decimal MarkupPercent { get; set; }
+    public decimal WalletCreditApplied { get; set; }
+    public decimal CashDue { get; set; }
+    public bool IsFirstMatch { get; set; }
 }
 
 public class PayoutDto
@@ -33,6 +43,31 @@ public class PayoutDto
 public class RequestPayoutDto
 {
     public decimal Amount { get; set; }
+}
+
+// A tutor's wallet, split by fund. Withdrawable is real money they can be paid out;
+// Credit is promotional credit that offsets eligible LearnSphere commission but is never
+// paid out in cash.
+public class TutorBalanceDto
+{
+    public decimal Withdrawable { get; set; }
+    public decimal Credit { get; set; }
+    public decimal CreditExpiringSoon { get; set; }
+    public DateTime? NextCreditExpiryAt { get; set; }
+    public decimal Total { get; set; }
+}
+
+// One line of the tutor's money statement — see TutorLedgerEntry.
+public class LedgerEntryDto
+{
+    public int Id { get; set; }
+    public string Fund { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public int? InvoiceId { get; set; }
+    public int? BookingId { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class ChatMessageDto

@@ -1,0 +1,50 @@
+# Brings up the MySQL that LearnSphere expects, on a second machine, in one command:
+#
+#     docker compose up -d
+#
+# The image itself is never committed - `mysql:8` is a public image that Docker pulls on
+# first run. Pinning it here is what makes the environment reproducible; a 600 MB tarball
+# in git would not be.
+#
+# On FIRST start only, MySQL runs every .sql in /docker-entrypoint-initdb.d against
+# MYSQL_DATABASE. Mounting database/seed there means a fresh machine comes up with the
+# full dev dataset already loaded - the verified tutor, their published classes, the
+# bookings and the ledger - so the app looks the same as it does here.
+#
+# That also sidesteps a real startup bug: the API runs its raw-SQL migration ladder before
+# EnsureCreatedAsync, and several statements are unguarded, so it cannot boot against a
+# genuinely empty database. Seeding first means the tables already exist.
+#
+# The seed runs only when the data volume is empty. To reload it after changes:
+#     docker compose down -v && docker compose up -d
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: learnsphere-mysql
+    restart: unless-stopped
+    environment:
+      # Set this in a local .env file. It is deliberately not given a real default:
+      # a root password committed to the repo is a root password everyone has.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in a local .env}
+      # These three must match the connection string in
+      # backend/LearnSphere.API/appsettings.json, which is already committed.
+      MYSQL_DATABASE: LearnSphere
+      MYSQL_USER: learnsphere
+      MYSQL_PASSWORD: LearnSphere2026!
+    ports:
+      - "3306:3306"
+    volumes:
+      - learnsphere-data:/var/lib/mysql
+      - ./database/seed:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # The API fails on a half-started database, so wait for real connectivity
+      # rather than for the container to merely be running.
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ulearnsphere", "-pLearnSphere2026!"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  learnsphere-data:

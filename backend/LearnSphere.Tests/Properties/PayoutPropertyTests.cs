@@ -1,10 +1,12 @@
 // Feature: backend-api-completion, Property 6: payout approval state transition
 
+using FakeItEasy;
 using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
 using LearnSphere.API.Controllers;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using LearnSphere.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
@@ -71,7 +73,7 @@ public class PayoutPropertyTests
             db.SaveChanges();
 
             // Build the AdminController (no auth claims needed — controller just uses db)
-            var controller = new AdminController(db);
+            var controller = TestControllerFactory.Admin(db);
 
             // Act — PATCH /api/admin/payouts/{id}/approve
             var result = controller.ApprovePayout(payout.Id)

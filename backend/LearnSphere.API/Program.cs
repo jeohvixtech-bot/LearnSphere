@@ -2,12 +2,34 @@ using System.Text;
 using LearnSphere.API.Data;
 using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── Upload size limits ──────────────────────────────────────────────────
+// UploadController accepts intro videos of 10-100 MB, but Kestrel's default request body
+// cap is ~28.6 MB and the multipart form cap is 128 MB. Without raising the first, a
+// video over ~28.6 MB is rejected with a bare 413 before the controller ever runs, so the
+// caller never sees the friendly "Video must be between 10 MB and 100 MB" message and the
+// upload simply appears to fail. Kept a little above 100 MB to leave room for multipart
+// framing overhead, which is counted against these limits but is not part of the file.
+const long MaxUploadBytes = 110L * 1024 * 1024;
+
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxUploadBytes);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = MaxUploadBytes;
+    o.MultipartHeadersLengthLimit = 32 * 1024;
+});
+
+// Note: a host in front of Kestrel enforces its own cap and ignores these. IIS defaults to
+// ~28.6 MB (maxAllowedContentLength in web.config) and nginx to 1 MB
+// (client_max_body_size) — the nginx default is low enough to reject ordinary documents,
+// not just videos, so it has to be raised there too.
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -16,6 +38,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]!;
+
+// Outside Development the committed appsettings.json values must have been overridden
+// (Jwt__Key, ConnectionStrings__DefaultConnection, AllowedOrigins__0 as environment
+// variables). Refusing to start is deliberate: with the sample key anyone holding the
+// repository can mint an admin token.
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Contains("CHANGE_IN_PRODUCTION") || jwtKey.Length < 32)
+        throw new InvalidOperationException(
+            "Jwt:Key is the sample value from appsettings.json (or shorter than 32 characters). " +
+            "Set the Jwt__Key environment variable to a random secret before running outside Development.");
+
+    var origins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+    if (origins == null || origins.Length == 0 || origins.Contains("*"))
+        Console.Error.WriteLine(
+            "WARNING: AllowedOrigins is \"*\" — any website may call this API with a signed-in user's token. " +
+            "Set AllowedOrigins__0 to the frontend's https origin.");
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -36,6 +76,20 @@ builder.Services.AddAuthorization();
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPresetCancellationService, PresetCancellationService>();
+
+// HitPay payment gateway. Credentials aren't read from configuration — they live in the
+// PaymentGatewaySettings table, managed from Admin → Payment Gateway — so nothing needs
+// registering here beyond the HTTP client. The timeout is deliberately short: a parent is
+// waiting on this call before their browser can be sent to the checkout page.
+builder.Services.AddHttpClient("hitpay", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddScoped<IHitPayService, HitPayService>();
+builder.Services.AddScoped<ITutorLedgerService, TutorLedgerService>();
+builder.Services.AddScoped<IPlatformFeeService, PlatformFeeService>();
+builder.Services.AddScoped<IParentWalletService, ParentWalletService>();
+builder.Services.AddScoped<IPayoutBatchService, PayoutBatchService>();
 // Real SMTP delivery once BOTH "Smtp:Host" and "Smtp:Password" are set (Password
 // is meant to come from user-secrets/environment, never committed to
 // appsettings.json) — falls back to logging emails to the console otherwise, so
@@ -47,6 +101,8 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Host"]) &&
     builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 else
     builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+
+builder.Services.AddHostedService<VideoLinkReminderService>();
 
 // CORS — origins configurable via appsettings.json "AllowedOrigins"
 // Set to ["*"] to allow all, or list specific origins e.g. ["http://localhost:4200","http://myserver:1002"]
@@ -257,6 +313,8 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PricePerLesson` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `TutorTimeSlots` ADD COLUMN `PresetGroupId` VARCHAR(20) NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorTimeSlots` ADD COLUMN `VideoConferenceLink` LONGTEXT NULL"); } catch { }
     // Backfill preset slots published before PresetGroupId existed. We can't recover
     // which original Setup Class submission each row came from, so approximate the
     // catalog's old merge-by-subject behavior — group legacy rows sharing the same
@@ -283,6 +341,11 @@ using (var scope = app.Services.CreateScope())
     // Safe/lossless widen; existing whole-hour values are unaffected.
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Bookings` MODIFY COLUMN `DurationHours` DOUBLE NOT NULL DEFAULT 1"); } catch { }
+    // Video conference link for Online confirmed bookings — see VideoLinkReminderService.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` ADD COLUMN `VideoConferenceLink` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Bookings` ADD COLUMN `VideoLinkReminderStatus` VARCHAR(20) NOT NULL DEFAULT 'none'"); } catch { }
     await context.Database.ExecuteSqlRawAsync(
         "UPDATE `Bookings` SET `BookingNumber` = CONCAT('BOK', LPAD(`Id`, 5, '0')) WHERE `BookingNumber` = ''");
     await context.Database.ExecuteSqlRawAsync(
@@ -2443,24 +2506,372 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
 ('Malaysia','Business Studies','Upper Six','Practice Questions',5),
 ('Malaysia','Business Studies','Upper Six','STPM Examination Preparation',6);
 "); } catch { }
+    // Speeds up the parent-facing tutor catalog query, which filters on both columns together
+    try { await context.Database.ExecuteSqlRawAsync(
+        "CREATE INDEX `IX_Tutors_Verified_Online` ON `Tutors` (`IsVerified`, `IsOnline`)"); } catch { }
+
+    // ── Class Remarks & Tutor Bulletin Board — retires TutorReviews (whole-
+    // booking, never rendered in the frontend) in favour of ClassRemarks,
+    // scoped to one specific completed class instance. ──
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `BookingClasses` ADD COLUMN `Status` VARCHAR(20) NOT NULL DEFAULT 'scheduled'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ClassRemarks` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BookingClassId` INT NOT NULL,
+            `TutorId` INT NOT NULL,
+            `ParentUserId` INT NOT NULL,
+            `ParentDisplayName` VARCHAR(200) NOT NULL DEFAULT '',
+            `Rating` INT NOT NULL DEFAULT 5,
+            `Text` LONGTEXT NOT NULL,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'published',
+            `DisputeReason` LONGTEXT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `EditedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_ClassRemark_BookingClass` (`BookingClassId`),
+            KEY `IX_ClassRemarks_TutorId` (`TutorId`),
+            CONSTRAINT `FK_ClassRemarks_BookingClasses` FOREIGN KEY (`BookingClassId`) REFERENCES `BookingClasses` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_ClassRemarks_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ClassRemarkLikes` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `ClassRemarkId` INT NOT NULL,
+            `ParentUserId` INT NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_ClassRemarkLike_RemarkParent` (`ClassRemarkId`, `ParentUserId`),
+            CONSTRAINT `FK_ClassRemarkLikes_ClassRemarks` FOREIGN KEY (`ClassRemarkId`) REFERENCES `ClassRemarks` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "DROP TABLE IF EXISTS `TutorReviews`"); } catch { }
+
+    // Admin Archive tab — resolved disputes/hide requests are kept (not
+    // deleted) so they can be listed separately from the active queues.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `IssueReports` ADD COLUMN `Resolved` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `IssueReports` ADD COLUMN `ResolvedAt` DATETIME(6) NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ClassRemarks` ADD COLUMN `ResolvedAt` DATETIME(6) NULL"); } catch { }
+
+    // Tutor-declared unavailable date ranges — previously only ever kept in
+    // the AngularJS ScheduleService's in-memory object, so they silently
+    // disappeared on every page refresh.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorBlockedDates` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `StartDate` VARCHAR(10) NOT NULL,
+            `EndDate` VARCHAR(10) NOT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_TutorBlockedDates_TutorId` (`TutorId`),
+            CONSTRAINT `FK_TutorBlockedDates_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // ── HitPay payment gateway ──────────────────────────────────────────
+    // Credentials live in the database rather than appsettings.json so an admin can
+    // rotate the key from the UI without a redeploy. The settings row is a singleton:
+    // the INSERT ... SELECT below seeds exactly one, and is a no-op on every later boot.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PaymentGatewaySettings` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `Provider` VARCHAR(50) NOT NULL DEFAULT 'hitpay',
+            `IsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+            `Mode` VARCHAR(20) NOT NULL DEFAULT 'sandbox',
+            `ApiKey` VARCHAR(500) NOT NULL DEFAULT '',
+            `Salt` VARCHAR(500) NOT NULL DEFAULT '',
+            `Currency` VARCHAR(10) NOT NULL DEFAULT 'SGD',
+            `ReturnUrl` VARCHAR(500) NOT NULL DEFAULT 'http://127.0.0.1:3000',
+            `ApiBaseUrl` VARCHAR(500) NULL,
+            `UpdatedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        INSERT INTO `PaymentGatewaySettings` (`Provider`,`IsEnabled`,`Mode`,`ApiKey`,`Salt`,`Currency`,`ReturnUrl`)
+        SELECT 'hitpay', 0, 'sandbox', '', '', 'SGD', 'http://127.0.0.1:3000'
+        WHERE NOT EXISTS (SELECT 1 FROM `PaymentGatewaySettings`)"); } catch { }
+
+    // One row per checkout attempt. FK cascades from Invoices: a deleted invoice has no
+    // payment history worth keeping, and nothing reads these rows except by invoice.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PaymentTransactions` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `InvoiceId` INT NOT NULL,
+            `Provider` VARCHAR(50) NOT NULL DEFAULT 'hitpay',
+            `PaymentRequestId` VARCHAR(191) NOT NULL DEFAULT '',
+            `ReferenceNumber` VARCHAR(100) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `Currency` VARCHAR(10) NOT NULL DEFAULT 'SGD',
+            `Status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+            `CheckoutUrl` VARCHAR(1000) NULL,
+            `PaymentId` VARCHAR(191) NULL,
+            `ResolvedVia` VARCHAR(30) NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `CompletedAt` DATETIME(6) NULL,
+            PRIMARY KEY (`Id`),
+            KEY `IX_PaymentTransactions_InvoiceId` (`InvoiceId`),
+            KEY `IX_PaymentTransactions_PaymentRequestId` (`PaymentRequestId`),
+            CONSTRAINT `FK_PaymentTransactions_Invoices_InvoiceId`
+                FOREIGN KEY (`InvoiceId`) REFERENCES `Invoices` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // Return the payer to the same origin they started from — localStorage (and therefore
+    // the login session) is per-origin, so bouncing them from localhost to 127.0.0.1 looks
+    // exactly like being logged out.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `PaymentTransactions` ADD COLUMN `ReturnOrigin` VARCHAR(500) NULL"); } catch { }
+
+    // ── Tutor money ledger ──────────────────────────────────────────────
+    // One append-only list of signed entries replaces the three separate sums
+    // PayoutsController used to compute in-line, so a balance can be explained rather
+    // than only recomputed. See TutorLedgerEntry.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorLedgerEntries` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `Fund` VARCHAR(20) NOT NULL DEFAULT 'withdrawable',
+            `Type` VARCHAR(40) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `InvoiceId` INT NULL,
+            `PayoutId` INT NULL,
+            `PenaltyId` INT NULL,
+            `BookingId` INT NULL,
+            `Reason` VARCHAR(500) NOT NULL DEFAULT '',
+            `ExpiresAt` DATETIME(6) NULL,
+            `CreatedByUserId` INT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_TutorLedgerEntries_TutorId` (`TutorId`),
+            KEY `IX_TutorLedgerEntries_InvoiceId` (`InvoiceId`),
+            KEY `IX_TutorLedgerEntries_PayoutId` (`PayoutId`),
+            KEY `IX_TutorLedgerEntries_PenaltyId` (`PenaltyId`),
+            CONSTRAINT `FK_TutorLedgerEntries_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // Records what commission a commission entry was charged at, so a later rate change
+    // never rewrites a deduction that already happened.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorLedgerEntries` ADD COLUMN `RatePercent` DECIMAL(5,2) NULL"); } catch { }
+
+    // ── Platform commission ─────────────────────────────────────────────
+    // Seeded at 0% with no EffectiveFrom, so commission stays inert until an admin sets a
+    // rate. EffectiveFrom is what stops a first-time rate change from retroactively
+    // billing every tutor for their entire earnings history.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `CommissionSettings` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `RatePercent` DECIMAL(5,2) NOT NULL DEFAULT 0,
+            `EffectiveFrom` DATETIME(6) NULL,
+            `UpdatedAt` DATETIME(6) NULL,
+            `UpdatedByUserId` INT NULL,
+            PRIMARY KEY (`Id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        INSERT INTO `CommissionSettings` (`RatePercent`) SELECT 0
+        WHERE NOT EXISTS (SELECT 1 FROM `CommissionSettings`)"); } catch { }
+
+    // ── Operational financial flow ──────────────────────────────────────
+    // Platform markup (charged to the parent, on top of the base price) and the one-time
+    // first-match commission (charged to the tutor, out of the base price). Both default
+    // to the launch model's rates; FirstMatchEffectiveFrom stays NULL so nothing is
+    // charged retroactively until an admin switches it on.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CommissionSettings` ADD COLUMN `MarkupPercent` DECIMAL(5,2) NOT NULL DEFAULT 15"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CommissionSettings` ADD COLUMN `FirstMatchCommissionPercent` DECIMAL(5,2) NOT NULL DEFAULT 100"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `CommissionSettings` ADD COLUMN `FirstMatchEffectiveFrom` DATETIME(6) NULL"); } catch { }
+
+    // Invoices gain a fee breakdown. Amount keeps its meaning ("what the parent is
+    // billed") so nothing that already reads it changes behaviour.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `BaseAmount` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `MarkupAmount` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `MarkupPercent` DECIMAL(5,2) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `IsFirstMatch` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Invoices` ADD COLUMN `WalletCreditApplied` DECIMAL(10,2) NOT NULL DEFAULT 0"); } catch { }
+
+    // Invoices raised before markup existed billed exactly the base price, so that is what
+    // their base is. Guarded on BaseAmount = 0 to stay idempotent across restarts.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "UPDATE `Invoices` SET `BaseAmount` = `Amount` WHERE `BaseAmount` = 0"); } catch { }
+
+    // Mark historical invoices that opened a match, so first-match commission has
+    // something to key on if it is ever switched on for existing data.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        UPDATE `Invoices` i
+        JOIN `StudentTutorFirstClasses` f ON f.`BookingId` = i.`BookingId`
+        SET i.`IsFirstMatch` = 1
+        WHERE i.`IsFirstMatch` = 0"); } catch { }
+
+    // Per-session delivery status — the gate on paying a tutor for a lesson that actually
+    // happened. Sessions already in the past are backfilled as Delivered, which matches
+    // the existing behaviour of auto-completing a booking once all its dates have passed.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `BookingClasses` ADD COLUMN `DeliveryStatus` VARCHAR(20) NOT NULL DEFAULT 'Scheduled'"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `BookingClasses` ADD COLUMN `DeliveredAt` DATETIME(6) NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "UPDATE `BookingClasses` SET `DeliveryStatus` = 'Delivered' " +
+        "WHERE `DeliveryStatus` = 'Scheduled' AND `Date` < DATE_FORMAT(CURDATE(), '%Y-%m-%d')"); } catch { }
+
+    // Links a credit consumption/expiry back to the grant it draws down, so promotional
+    // credit can be spent oldest-first and expire per grant without ever editing a row.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `TutorLedgerEntries` ADD COLUMN `SourceEntryId` INT NULL"); } catch { }
+
+    // ── Parent wallet ───────────────────────────────────────────────────
+    // Non-withdrawable credit that can pay any LearnSphere invoice. Same append-only rules
+    // as the tutor ledger.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `ParentWalletEntries` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `ParentUserId` INT NOT NULL,
+            `Type` VARCHAR(40) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `InvoiceId` INT NULL,
+            `SourceEntryId` INT NULL,
+            `Reason` VARCHAR(500) NOT NULL DEFAULT '',
+            `ExpiresAt` DATETIME(6) NULL,
+            `CreatedByUserId` INT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            KEY `IX_ParentWalletEntries_ParentUserId` (`ParentUserId`),
+            KEY `IX_ParentWalletEntries_InvoiceId` (`InvoiceId`),
+            KEY `IX_ParentWalletEntries_SourceEntryId` (`SourceEntryId`),
+            CONSTRAINT `FK_ParentWalletEntries_Users` FOREIGN KEY (`ParentUserId`)
+                REFERENCES `Users` (`Id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    // ── Payout batches ──────────────────────────────────────────────────
+    // Created before TutorPayables because a payable points at a batch.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `PayoutBatches` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `BatchNumber` VARCHAR(40) NOT NULL DEFAULT '',
+            `Period` VARCHAR(7) NOT NULL DEFAULT '',
+            `TotalAmount` DECIMAL(12,2) NOT NULL DEFAULT 0,
+            `TutorCount` INT NOT NULL DEFAULT 0,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `ApprovedAt` DATETIME(6) NULL,
+            `ApprovedByUserId` INT NULL,
+            `TransferredAt` DATETIME(6) NULL,
+            `TransferredByUserId` INT NULL,
+            `Notes` VARCHAR(1000) NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_PayoutBatch_Period` (`Period`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TutorPayables` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `TutorId` INT NOT NULL,
+            `Period` VARCHAR(7) NOT NULL DEFAULT '',
+            `PeriodStart` VARCHAR(10) NOT NULL DEFAULT '',
+            `PeriodEnd` VARCHAR(10) NOT NULL DEFAULT '',
+            `Amount` DECIMAL(10,2) NOT NULL DEFAULT 0,
+            `SessionCount` INT NOT NULL DEFAULT 0,
+            `Status` VARCHAR(20) NOT NULL DEFAULT 'Pending',
+            `PayoutBatchId` INT NULL,
+            `PayoutId` INT NULL,
+            `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_TutorPayable_Tutor_Period` (`TutorId`, `Period`),
+            KEY `IX_TutorPayables_PayoutBatchId` (`PayoutBatchId`),
+            CONSTRAINT `FK_TutorPayables_Tutors` FOREIGN KEY (`TutorId`)
+                REFERENCES `Tutors` (`Id`) ON DELETE CASCADE,
+            CONSTRAINT `FK_TutorPayables_PayoutBatches` FOREIGN KEY (`PayoutBatchId`)
+                REFERENCES `PayoutBatches` (`Id`) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+
     await DbSeeder.SeedAsync(context);
+
+    // Carries existing paid invoices, payouts and penalties into the ledger on first run,
+    // and repairs any drift on every run after. Idempotent by construction (it appends
+    // only the difference between what the ledger nets to and what the source records
+    // say), so it is safe to execute at every startup.
+    try
+    {
+        var ledger = scope.ServiceProvider.GetRequiredService<ITutorLedgerService>();
+        await ledger.ReconcileAllAsync();
+    }
+    catch (Exception ex)
+    {
+        // A ledger that can't be built must not stop the app from serving: payouts fail
+        // closed on a missing balance, which is the safe direction.
+        app.Logger.LogError(ex, "Tutor ledger reconciliation failed at startup");
+    }
 }
 
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// ── Behind a reverse proxy ──────────────────────────────────────────────
+// UploadController hands back an absolute URL built from Request.Scheme and Request.Host.
+// A proxy that terminates TLS forwards the request to Kestrel over plain HTTP, so without
+// this the URL comes back as http://internal-host/uploads/... — which an HTTPS page
+// refuses to load as mixed content, making a perfectly good upload look like a failure.
+//
+// Opt-in rather than always-on: these headers are client-supplied, so trusting them when
+// the app is NOT behind a proxy would let a caller spoof the scheme and host. The proxy
+// list is cleared because a containerised proxy's IP is rarely known ahead of time, which
+// is safe precisely because this only runs when an operator has declared the deployment
+// proxied.
+if (app.Configuration.GetValue<bool>("BehindReverseProxy"))
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "LearnSphere API v1");
-    c.RoutePrefix = string.Empty; // Swagger at root: http://localhost:5000/
-});
+    var forwarded = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                         | ForwardedHeaders.XForwardedProto
+                         | ForwardedHeaders.XForwardedHost
+    };
+    forwarded.KnownNetworks.Clear();
+    forwarded.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwarded);
+}
+
+// Swagger only in Development (or with EnableSwagger=true) — the full API surface should
+// not be browsable on the production host.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("EnableSwagger"))
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "LearnSphere API v1");
+        c.RoutePrefix = string.Empty; // Swagger at root: http://localhost:5000/
+    });
+}
 
 app.UseCors("AllowFrontend");
 
 var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(wwwrootPath);
+
+// Static file serving runs BEFORE authentication, so anything reachable here is public.
+// Profile photos are meant to be — they are shown to parents browsing the catalogue.
+// Verification documents are NOT: they are identity papers, and they are served instead by
+// DocumentsController, which checks the caller is the owning tutor or an admin.
+var profilesPath = Path.Combine(wwwrootPath, "uploads", "profiles");
+Directory.CreateDirectory(profilesPath);
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(wwwrootPath),
-    RequestPath = ""
+    FileProvider = new PhysicalFileProvider(profilesPath),
+    RequestPath = "/uploads/profiles"
 });
 
 app.UseAuthentication();

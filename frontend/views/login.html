@@ -4,7 +4,7 @@
 
     <div>
       <h3 style="margin-bottom:var(--space-1);">Welcome back</h3>
-      <p class="bs-text-muted" style="font-size:13px; margin:0;">Sign in to continue your learning journey.</p>
+      <p class="bs-text-muted" style="font-size:14px; margin:0;">Sign in to continue your learning journey.</p>
     </div>
 
     <!-- Mode toggle -->
@@ -18,7 +18,7 @@
     </div>
 
     <!-- Error -->
-    <div ng-if="auth.errorMsg" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">{{ auth.errorMsg }}</div>
+    <div ng-if="auth.errorMsg" style="background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">{{ auth.errorMsg }}</div>
 
     <!-- Login Form -->
     <form ng-if="auth.mode === 'login'" ng-submit="auth.login()" style="display:flex; flex-direction:column; gap:var(--space-3);">
@@ -31,7 +31,7 @@
         <input class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" />
       </div>
       <p style="text-align:right; margin:0;">
-        <a href="" class="bs-btn bs-btn-ghost" style="font-size:12px; padding:0;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>
+        <a href="" class="bs-btn bs-btn-ghost" style="font-size:13px; padding:0;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>
       </p>
       <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="auth.loading">
         <span ng-if="!auth.loading">Sign In</span>
@@ -52,8 +52,8 @@
             <label>Email Address</label>
             <input class="bs-input" type="email" ng-model="auth.forgotEmail" required placeholder="you@example.com" />
           </div>
-          <div ng-if="auth.forgotErrorMsg" style="margin-top:var(--space-2); background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">{{ auth.forgotErrorMsg }}</div>
-          <div ng-if="auth.forgotMsg" style="margin-top:var(--space-2); background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:13px;">{{ auth.forgotMsg }}</div>
+          <div ng-if="auth.forgotErrorMsg" style="margin-top:var(--space-2); background:var(--color-accent-2-100); color:var(--color-accent-2-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">{{ auth.forgotErrorMsg }}</div>
+          <div ng-if="auth.forgotMsg" style="margin-top:var(--space-2); background:var(--color-accent-100); color:var(--color-accent-800); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); font-size:14px;">{{ auth.forgotMsg }}</div>
         </div>
         <div class="bs-dialog-actions">
           <button type="button" class="bs-btn bs-btn-primary" ng-disabled="auth.forgotLoading || !auth.forgotEmail" ng-click="auth.submitForgotPassword()">
@@ -69,7 +69,7 @@
       <div class="bs-field">
         <label>Full Name</label>
         <input class="bs-input" type="text" ng-model="auth.registerData.name" ng-change="auth.validateName()" required placeholder="e.g. Sarah Tan" />
-        <div ng-if="auth.nameError" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">{{ auth.nameError }}</div>
+        <div ng-if="auth.nameError" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">{{ auth.nameError }}</div>
       </div>
       <div class="bs-field">
         <label>Email Address</label>
@@ -92,7 +92,7 @@
             <i class="ti" ng-class="auth.showRegisterConfirmPassword ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
           </button>
         </div>
-        <div ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword" style="color:var(--color-accent-2-700); font-size:12px; margin-top:4px;">Passwords do not match.</div>
+        <div ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword" style="color:var(--color-accent-2-700); font-size:13px; margin-top:4px;">Passwords do not match.</div>
       </div>
       <div class="bs-field">
         <label>Account Type</label>
@@ -106,11 +106,11 @@
         </div>
       </div>
 
-      <div style="display:flex; align-items:flex-start; gap:8px; font-size:13px;">
+      <div style="display:flex; align-items:flex-start; gap:8px; font-size:14px;">
         <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" style="margin-top:3px;" />
         <label for="tnc-agree">
           I have read and agree to the
-          <a href="" class="bs-btn bs-btn-ghost" style="padding:0; font-size:13px; display:inline;" ng-click="$event.preventDefault(); auth.showTerms = !auth.showTerms">Terms and Conditions</a>
+          <a href="" class="bs-btn bs-btn-ghost" style="padding:0; font-size:14px; display:inline;" ng-click="$event.preventDefault(); auth.showTerms = !auth.showTerms">Terms and Conditions</a>
         </label>
       </div>
 
@@ -135,7 +135,7 @@
     <!-- Demo Credentials -->
     <div class="bs-card" style="background:var(--color-bg); border:1px solid var(--color-divider);">
       <div class="bs-card-kicker">Demo Credentials</div>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:var(--space-3); font-size:12px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:var(--space-3); font-size:13px;">
         <div>
           <strong>Parent</strong><br/>
           <span class="bs-text-muted">sarah.tan@example.com<br/>Parent@123</span>

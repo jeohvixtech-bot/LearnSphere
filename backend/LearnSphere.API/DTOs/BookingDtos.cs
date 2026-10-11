@@ -1,3 +1,4 @@
+using LearnSphere.API.Models;
 namespace LearnSphere.API.DTOs;
 
 public class BookingDto
@@ -18,7 +19,10 @@ public class BookingDto
     public string Status { get; set; } = string.Empty;
     public string BookingNumber { get; set; } = string.Empty;
     public string BookingType { get; set; } = string.Empty; // parent-offer | tutor-preset
+    public string? PresetGroupId { get; set; }
     public bool IsFirstClass { get; set; } = false;
+    public string? VideoConferenceLink { get; set; }
+    public string VideoLinkReminderStatus { get; set; } = "none";
     public List<BookingClassDto> Classes { get; set; } = new();
     public CounterProposalDto? CounterProposal { get; set; }
     public List<LessonReportSummaryDto> LessonReports { get; set; } = new();
@@ -27,8 +31,31 @@ public class BookingDto
 
 public class BookingClassDto
 {
+    // Ignored on the way in (a new booking's sessions have no id yet); populated on the
+    // way out so a caller can address one specific session — which is what marking a
+    // session delivered needs, and what a class remark hangs off.
+    public int Id { get; set; }
+
     public string Date { get; set; } = string.Empty;
     public string Time { get; set; } = string.Empty;
+
+    // Has the date passed? Unlocks the parent's class remark for this session.
+    public string Status { get; set; } = "scheduled"; // scheduled | completed
+
+    // Did it actually happen? Scheduled | Delivered | Cancelled. Only a delivered session
+    // on a paid invoice ever becomes payable, so this is what the tutor's checklist shows.
+    public string DeliveryStatus { get; set; } = SessionDeliveryStatus.Scheduled;
+
+    // Populated only by BookingsController.GetAll (the parent's own Sessions
+    // list) — the parent's own remark on this class, if they've left one.
+    public BookingClassRemarkDto? Remark { get; set; }
+}
+
+public class BookingClassRemarkDto
+{
+    public int Id { get; set; }
+    public int Rating { get; set; }
+    public string Text { get; set; } = string.Empty;
 }
 
 public class CreateBookingDto
@@ -56,6 +83,11 @@ public class UpdateBookingStatusDto
 {
     public string Status { get; set; } = string.Empty;
     public CounterProposalDto? CounterProposal { get; set; }
+}
+
+public class SetVideoLinkDto
+{
+    public string VideoConferenceLink { get; set; } = string.Empty;
 }
 
 public class CounterProposalDto
@@ -102,6 +134,19 @@ public class IssueReportDto
     public string IssueType { get; set; } = string.Empty;
     public string Details { get; set; } = string.Empty;
     public string Timestamp { get; set; } = string.Empty;
+    public bool Resolved { get; set; }
+}
+
+// GET /admin/disputes and /admin/disputes/archive
+public class AdminDisputeDto
+{
+    public int Id { get; set; }
+    public string Subject { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? TutorName { get; set; }
+    public string? StudentName { get; set; }
+    public IssueReportDto? IssueReport { get; set; }
+    public string? ResolvedAt { get; set; }
 }
 
 public class CreateIssueReportDto

@@ -33,7 +33,6 @@ public class Tutor
     public List<TutorLevel> Levels { get; set; } = new();
     public List<TutorMode> Modes { get; set; } = new();
     public List<TutorQualification> Qualifications { get; set; } = new();
-    public List<TutorReview> Reviews { get; set; } = new();
     public List<TutorTimeSlot> TimeSlots { get; set; } = new();
     public List<Booking> Bookings { get; set; } = new();
     public List<Payout> Payouts { get; set; } = new();
@@ -121,17 +120,6 @@ public class TutorQualification
     public string Qualification { get; set; } = string.Empty;
 }
 
-public class TutorReview
-{
-    public int Id { get; set; }
-    public int TutorId { get; set; }
-    public Tutor Tutor { get; set; } = null!;
-    public string Author { get; set; } = string.Empty;
-    public string Text { get; set; } = string.Empty;
-    public int Rating { get; set; }
-    public int? BookingId { get; set; }
-}
-
 public class TutorTimeSlot
 {
     public int Id { get; set; }
@@ -162,6 +150,15 @@ public class TutorTimeSlot
     // happen to share the same subject. Format: "PRESET" + 6-digit zero-padded
     // id of the first slot in the batch (same convention as Booking/InvoiceNumber).
     public string? PresetGroupId { get; set; }
+
+    // One shared link per recurring series, settable before any student has
+    // enrolled (see TutorsController.SetSlotVideoLink) — propagated onto every
+    // Booking tied to this slot/series at set-time, and copied onto any new
+    // Booking created afterward (see BookPreset), so Booking.VideoConferenceLink
+    // stays the single source of truth other code (VideoLinkReminderService,
+    // the booking-level PATCH endpoint) already reads without needing to know
+    // about slots at all.
+    public string? VideoConferenceLink { get; set; }
 }
 
 // Platform-defined syllabus topics per country + subject + level.
@@ -184,4 +181,17 @@ public class PresetGroupSyllabus
     public string PresetGroupId { get; set; } = string.Empty; // FK to TutorTimeSlot.PresetGroupId
     public int SyllabusTopicId { get; set; }
     public SyllabusTopic SyllabusTopic { get; set; } = null!;
+}
+
+// A tutor-declared "I'm unavailable" date range (e.g. vacation) — previously
+// only ever kept in the AngularJS ScheduleService's in-memory object, so it
+// silently disappeared on every page refresh. Persisted here instead.
+public class TutorBlockedDate
+{
+    public int Id { get; set; }
+    public int TutorId { get; set; }
+    public Tutor Tutor { get; set; } = null!;
+    public string StartDate { get; set; } = string.Empty; // YYYY-MM-DD
+    public string EndDate { get; set; } = string.Empty;   // YYYY-MM-DD
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

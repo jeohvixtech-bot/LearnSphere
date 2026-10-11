@@ -12,4 +12,8 @@ angular.module('learnSphereApp')
   self.markAllRead = function () {
     return $http.patch(API_URL + '/notifications/mark-all-read', {}, h());
   };
+
+  self.markRead = function (id) {
+    return $http.patch(API_URL + '/notifications/' + id + '/mark-read', {}, h());
+  };
 }]);

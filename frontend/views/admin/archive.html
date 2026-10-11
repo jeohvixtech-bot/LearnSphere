@@ -1,0 +1,75 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div class="sidebar-user">
+      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
+      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">📊 Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">🛡️ Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">⚠️ Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">📐 Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">🔄 Reschedule Rejections</a>
+      <a href="#!/admin/archive" class="nav-item active">🗄️ Archive</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="card">
+      <span class="label-tag blue">Resolved Disputes Log</span>
+      <h3>Archived Resolution Disputes</h3>
+      <p class="text-muted">Parent-reported issues that have already been resolved. Kept here for record-keeping only — no further action is available.</p>
+
+      <div class="empty-state-box large" ng-if="!vm.archivedDisputes.length">
+        📭 No resolved disputes yet.
+      </div>
+
+      <div class="dispute-card" ng-repeat="d in vm.archivedDisputes">
+        <div class="dispute-card-header">
+          <div>
+            <strong>CLAIM DISPATCHED #{{ d.id }}</strong>
+            <p>Subject: {{ d.subject }}</p>
+          </div>
+          <span class="status-badge completed">RESOLVED</span>
+        </div>
+        <div class="dispute-details">
+          <p><strong>Tutor:</strong> {{ d.tutorName }}</p>
+          <p><strong>Child:</strong> {{ d.studentName }}</p>
+          <p><strong>Issue Type:</strong> {{ d.issueReport && d.issueReport.issueType }}</p>
+          <p><strong>Details:</strong> "{{ d.issueReport && d.issueReport.details }}"</p>
+          <small class="mono">Reported: {{ d.issueReport && d.issueReport.timestamp }} &middot; Resolved: {{ d.resolvedAt }}</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <span class="label-tag blue">Resolved Hide Requests</span>
+      <h3>Archived Tutor Hide Requests</h3>
+      <p class="text-muted">Tutor requests to hide a class remark that admin has already decided on — approved (hidden) or rejected (stayed published).</p>
+
+      <div class="empty-state-box large" ng-if="!vm.archivedRemarkDisputes.length">
+        📭 No resolved hide requests yet.
+      </div>
+
+      <div class="dispute-card" ng-repeat="d in vm.archivedRemarkDisputes">
+        <div class="dispute-card-header">
+          <div>
+            <strong>REMARK #{{ d.id }}</strong>
+            <p>Tutor: {{ d.tutorName }}</p>
+          </div>
+          <span class="status-badge cancelled" ng-if="d.status === 'hidden'">HIDDEN</span>
+          <span class="status-badge confirmed" ng-if="d.status !== 'hidden'">PUBLISHED</span>
+        </div>
+        <div class="dispute-details">
+          <p><strong>Rating:</strong> {{ d.rating }} / 5</p>
+          <p><strong>Remark:</strong> "{{ d.text }}"</p>
+          <p><strong>From:</strong> {{ d.parentDisplayName }}</p>
+          <p><strong>Tutor's reason for hiding:</strong> "{{ d.disputeReason }}"</p>
+          <p><strong>Decision:</strong> {{ d.status === 'hidden' ? 'Approved — hidden from parents' : 'Rejected — remains published' }}</p>
+          <small class="mono">Resolved: {{ d.resolvedAt | date:'yyyy-MM-dd HH:mm' }}</small>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

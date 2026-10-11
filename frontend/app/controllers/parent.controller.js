@@ -2,8 +2,8 @@
 
 angular.module('learnSphereApp')
 .controller('ParentCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', 'AuthService', 'TutorService',
-  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService',
-function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService) {
+  'StudentService', 'BookingService', 'InvoiceService', 'ChatService', 'AdminService', 'ScheduleService', 'PendingMatchService', 'SubjectCatalog', 'ParentProfileService', 'TeachingModesCatalog', 'PresetCancellationService', 'NameValidationService', 'ProfanityFilterService', 'RemarkService', 'PaymentService', 'WalletService',
+function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService, StudentService, BookingService, InvoiceService, ChatService, AdminService, ScheduleService, PendingMatchService, SubjectCatalog, ParentProfileService, TeachingModesCatalog, PresetCancellationService, NameValidationService, ProfanityFilterService, RemarkService, PaymentService, WalletService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -165,6 +165,53 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // class per occurrence — same as how a parent-offer booking already covers
   // multiple sessions) so it shows up as one entry in Sessions & Activity, not
   // one per occurrence.
+  // ── Payment summary helpers ───────────────────────────────────────────
+  // Tax rate based on tutor's country: SG = 9% GST, MY = 8% SST, default 0
+  self.taxRate = function () {
+    var country = (self.selectedPresetGroup && self.selectedPresetGroup.country) || '';
+    if (country === 'SG' || country === 'Singapore') return 0.09;
+    if (country === 'MY' || country === 'Malaysia')  return 0.08;
+    return 0;
+  };
+
+  self.taxLabel = function () {
+    var country = (self.selectedPresetGroup && self.selectedPresetGroup.country) || '';
+    if (country === 'SG' || country === 'Singapore') return 'GST (9%)';
+    if (country === 'MY' || country === 'Malaysia')  return 'SST (8%)';
+    return 'Tax';
+  };
+
+  var PORTAL_FEE_RATE = 0.02; // 2% HiPay payment portal fee
+
+  self.presetSubtotal = function () {
+    if (!self.selectedPresetGroup) return 0;
+    return self.selectedPresetGroup.pricePerLesson * (self.selectedPresetGroup.slots || []).length;
+  };
+
+  self.presetTaxAmount = function () {
+    return +(self.presetSubtotal() * self.taxRate()).toFixed(2);
+  };
+
+  self.presetPortalFee = function () {
+    return +(self.presetSubtotal() * PORTAL_FEE_RATE).toFixed(2);
+  };
+
+  self.presetTotal = function () {
+    return +(self.presetSubtotal() + self.presetTaxAmount() + self.presetPortalFee()).toFixed(2);
+  };
+
+  self.currencySymbol = function () {
+    var country = (self.selectedPresetGroup && self.selectedPresetGroup.country) || '';
+    if (country === 'MY' || country === 'Malaysia') return 'RM';
+    return '$';
+  };
+
+  self.cancelPresetBooking = function () {
+    self.selectedPresetGroup = null;
+    self.presetBookingError  = '';
+  };
+  // ─────────────────────────────────────────────────────────────────────
+
   self.confirmPresetGroupBooking = function () {
     var group = self.selectedPresetGroup;
     if (!group || !self.bookingForm.studentId || self.presetBookingBusy) return;
@@ -177,20 +224,29 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       studentId: self.bookingForm.studentId
     }).then(function (res) {
       var createdBooking = res.data;
-      // The button says "Confirm Payment" — actually pay the invoice immediately
-      // here rather than just creating it Unpaid, unlike the tutor-approval
-      // request flow (submitBooking) which genuinely can't charge until the
-      // tutor accepts. Otherwise "Pay Invoice" would still show as outstanding
-      // in Sessions & Activity right after a parent thinks they've just paid.
+      // The button says "Confirm Payment", so the invoice has to be settled here rather
+      // than left Unpaid — unlike the tutor-approval request flow (submitBooking), which
+      // genuinely can't charge until the tutor accepts. With a gateway armed that means
+      // handing the parent off to HitPay's checkout; the booking itself is already
+      // confirmed either way, and its invoice simply stays Unpaid until payment clears.
       return InvoiceService.getAll().then(function (r) {
         self.invoices = r.data;
         var inv = self.invoices.find(function (i) { return i.bookingId === createdBooking.id; });
-        return inv ? InvoiceService.pay(inv.id) : $q.when();
-      }).then(function () {
-        return InvoiceService.getAll();
-      }).then(function (r2) {
-        self.invoices = r2.data;
-        return createdBooking;
+        if (!inv) return $q.when(createdBooking);
+
+        return PaymentService.getConfig().then(function (cfg) {
+          if (!cfg.gatewayEnabled) {
+            return InvoiceService.pay(inv.id)
+              .then(function () { return InvoiceService.getAll(); })
+              .then(function (r2) { self.invoices = r2.data; return createdBooking; });
+          }
+          return PaymentService.startCheckout(inv.id).then(function (checkout) {
+            // Navigating away to HitPay — returning a never-resolving promise keeps the
+            // success/receipt branch below from flashing on screen mid-redirect.
+            PaymentService.redirectToCheckout(checkout.checkoutUrl);
+            return $q.defer().promise;
+          });
+        });
       });
     }).then(function (createdBooking) {
       self.presetBookingBusy = false;
@@ -223,6 +279,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     }).catch(function (err) {
       self.presetBookingBusy = false;
       self.presetBookingError = (err.data && err.data.message) || 'Booking failed. Please try again.';
+      // A different parent may have just filled this group out from under this
+      // one — refresh the same way the success path does, so the now-stale,
+      // fully-booked group drops out of this parent's own catalog view right
+      // away instead of leaving them able to hit the same dead end again.
+      TutorService.getAll({ includePresetSlots: true }).then(function (res2) {
+        self.tutors = res2.data;
+        self.tutors.forEach(function (t) { t._presetSummary = computeTutorPresetSummary(t); });
+      });
     });
   };
   self.minExperience = 0;
@@ -380,7 +444,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.countryFilter = 'Singapore';
 
   // Issue report
-  self.issueForm = { bookingId: null, issueType: 'Tutor was absent (No show)', details: '' };
+  self.issueForm = { bookingId: null, issueType: 'Tutor was absent (No show)', details: '', isEdit: false };
   self.issueSuccess = false;
 
   // Chat
@@ -598,7 +662,95 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   };
 
   // Load data
+  // ── Platform markup ─────────────────────────────────────────────────
+  // A tutor's price is not what the parent pays: the platform adds a markup on top, and
+  // the invoice raised at booking time carries the marked-up total. Booking screens quote
+  // the figure below rather than the tutor's price, because a confirmation dialog that
+  // says one number and charges another is how trust in a payment flow is lost.
+  //
+  // Read from the payment config because at quoting time no invoice exists yet to read it
+  // from. Defaults to 0, so if the config never loads the parent sees the tutor's price
+  // rather than a wrong marked-up guess.
+  self.markupPercent = 0;
+
+  self.markupOn = function (base) {
+    var b = parseFloat(base) || 0;
+    return Math.round(b * (self.markupPercent / 100) * 100) / 100;
+  };
+
+  // What the parent will actually be billed for a given tutor-side price.
+  self.billedTotal = function (base) {
+    var b = parseFloat(base) || 0;
+    return Math.round((b + b * (self.markupPercent / 100)) * 100) / 100;
+  };
+
+  // ── Wallet (Parent → Wallet) ────────────────────────────────────────
+  // Non-withdrawable credit that can settle any LearnSphere invoice. Refunds land here by
+  // default, and it expires 6 months after it is granted — which is why the balance card
+  // warns about what is about to lapse rather than only showing a total.
+  self.wallet = null;
+  self.walletStatement = [];
+  self.walletError = '';
+  self.walletBusy = false;
+  self.walletSuccess = '';
+
+  var WALLET_LABELS = {
+    refund_credit: 'Refund credited',
+    adjustment: 'Adjustment',
+    payment_usage: 'Applied to invoice',
+    expiry: 'Credit expired'
+  };
+
+  self.walletLabel = function (type) { return WALLET_LABELS[type] || type; };
+
+  self.loadWallet = function () {
+    return WalletService.getBalance().then(function (res) {
+      self.wallet = res.data;
+    }).catch(function () { self.walletError = 'Wallet unavailable'; });
+  };
+
+  self.loadWalletStatement = function () {
+    return WalletService.getStatement().then(function (res) {
+      self.walletStatement = res.data;
+    }).catch(function () { self.walletStatement = []; });
+  };
+
+  // Invoices this parent could still spend credit on.
+  self.payableInvoices = function () {
+    return (self.invoices || []).filter(function (i) { return i.status === 'Unpaid'; });
+  };
+
+  // Spends credit against one invoice. If credit covers the bill outright the invoice is
+  // settled here and needs no card at all; a partial application just reduces what is left
+  // to pay at checkout.
+  self.applyWalletCredit = function (invoice) {
+    if (self.walletBusy) return;
+    self.walletError = '';
+    self.walletSuccess = '';
+    self.walletBusy = true;
+
+    WalletService.apply(invoice.id, 0).then(function (res) {
+      self.walletBusy = false;
+      self.walletSuccess = res.data.settled
+        ? 'Invoice ' + invoice.invoiceNumber + ' settled in full using ' +
+          res.data.applied.toFixed(2) + ' of credit.'
+        : res.data.applied.toFixed(2) + ' applied. ' + res.data.cashDue.toFixed(2) + ' still to pay by card.';
+
+      self.loadWallet();
+      self.loadWalletStatement();
+      InvoiceService.getAll().then(function (r) { self.invoices = r.data; });
+    }).catch(function (err) {
+      self.walletBusy = false;
+      self.walletError = (err.data && err.data.message) || 'Could not apply your credit. Please try again.';
+    });
+  };
+
   function init() {
+    self.loadWallet();
+    self.loadWalletStatement();
+    PaymentService.getConfig().then(function (cfg) {
+      self.markupPercent = cfg.markupPercent || 0;
+    });
     // Consumed synchronously up front (PendingMatchService is a plain in-memory
     // store, no async needed) so both loads below — which run in parallel with no
     // guaranteed order — can agree on the same values regardless of which
@@ -678,6 +830,9 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }
     });
     InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+    // Runs on every parent route, since HitPay's return lands on Sessions but a parent
+    // may navigate elsewhere before the banner is dismissed.
+    handlePaymentReturn();
     ParentProfileService.getProfile().then(function (res) { self.parentProfile = res.data; });
     TutorService.getFavorites().then(function (res) { self.favoriteTutorIds = res.data; });
 
@@ -865,7 +1020,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
         confirmedCount: s.confirmedCount,
         maxStudents: s.maxStudents,
         presetGroupId: s.presetGroupId,
-        syllabusTopics: s.syllabusTopics || []
+        syllabusTopics: s.syllabusTopics || [],
+        country: s.country || ''
       };
     });
 
@@ -892,6 +1048,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
           endTime: s.endTime,
           recurrenceLabel: '',
           syllabusTopics: s.syllabusTopics || [],
+          country: s.country || '',
           slots: []
         };
       }
@@ -920,6 +1077,15 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }
     });
 
+    // Booking a preset group is all-or-nothing (see BookingsController.cs —
+    // BookPreset rejects the whole request if any slot in the group is full),
+    // so a group with even one full occurrence can never actually be booked.
+    // Dropped entirely rather than shown disabled — every card/row downstream
+    // assumes what it's given is bookable.
+    groupList = groupList.filter(function (g) {
+      return !g.slots.some(function (s) { return s.isFull; });
+    });
+
     var subjectsWithSlots = groupList.map(function (g) { return g.subject; });
     var subjectsWithoutSlots = (t.offerings || []).filter(function (o) {
       return subjectsWithSlots.indexOf(o.subject) < 0;
@@ -930,7 +1096,10 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
 
     return {
       openSlots: slots.filter(function (s) { return !s.isFull; }),
-      hasAny: slots.length > 0,
+      // Only counts groups that survived the full-group filter above — a tutor
+      // whose only preset group(s) are now completely full has nothing left to
+      // actually book, same as having none at all (see filteredTutors()).
+      hasAny: groupList.length > 0,
       groups: groupList,
       subjectsWithoutSlots: subjectsWithoutSlots
     };
@@ -1013,19 +1182,37 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     // (grows upward) rather than computing `top` from an estimated height
     // works regardless of the tooltip's actual rendered height, which varies
     // with how many dates are in the schedule.
+    //
+    // maxTooltipHeight must match .slot-tooltip's max-height in main.css —
+    // used as the flip threshold below (previously 260, which didn't match
+    // the CSS's 340 and let some rows open downward with too little room,
+    // clipping the tooltip against the browser window instead of flipping).
+    var maxTooltipHeight = 340;
+    var viewportMargin = 12;
     var spaceBelow = window.innerHeight - rowRect.bottom;
-    var flipUp = spaceBelow < 260;
+    var spaceAbove = rowRect.top;
+    var flipUp = spaceBelow < maxTooltipHeight;
+
+    // Safety clamp: even after flip logic, cap the tooltip to however much
+    // room is actually available in the chosen direction, so a future change
+    // to .slot-tooltip's max-height (or an unusually short viewport) degrades
+    // to the tooltip's own internal scroll instead of clipping against the
+    // browser window again.
+    var availableSpace = (flipUp ? spaceAbove : spaceBelow) - viewportMargin - 6;
+    var clampedMaxHeight = Math.max(120, Math.min(maxTooltipHeight, availableSpace));
 
     sg._tooltipStyle = flipUp ? {
       display: 'block',
       top: 'auto',
       bottom: (window.innerHeight - rowRect.top + 6) + 'px',
-      left: left + 'px'
+      left: left + 'px',
+      'max-height': clampedMaxHeight + 'px'
     } : {
       display: 'block',
       top: (rowRect.bottom + 6) + 'px',
       bottom: 'auto',
-      left: left + 'px'
+      left: left + 'px',
+      'max-height': clampedMaxHeight + 'px'
     };
   };
 
@@ -1168,6 +1355,40 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     if (!dt || isNaN(dt.getTime())) return false;
     var minAllowed = new Date(Date.now() + MIN_LEAD_HOURS * 60 * 60 * 1000);
     return dt < minAllowed;
+  };
+
+  // ── Video conference link — parent-facing join button ───────────────────
+  // Earliest class on the booking that hasn't ended yet — same approach as
+  // tutor.controller.js's private _nextSessionDate, kept in sync with it and
+  // with the backend's GetNextSessionUtc (VideoLinkReminderService): all three
+  // pull the first "H:MM AM/PM" out of BookingClass.Time via the same regex
+  // shape, so a single-time or "start - end" range string both work.
+  function _nextSessionDate(b) {
+    var durationMs = (b.durationHours || 1) * 3600000;
+    var now = Date.now();
+    var candidates = (b.classes || [])
+      .map(function (c) { return combineDateTime(c.date, c.time); })
+      .filter(function (d) { return d && !isNaN(d.getTime()) && (d.getTime() + durationMs) >= now; })
+      .sort(function (a, c) { return a - c; });
+    return candidates.length ? candidates[0] : null;
+  }
+
+  self.isParentLinkVisible = function (b) {
+    if (!b || !b.videoConferenceLink) return false;
+    var next = _nextSessionDate(b);
+    if (!next) return false;
+    return (next.getTime() - Date.now()) / 60000 <= 60;
+  };
+
+  self.isParentJoinEnabled = function (b) {
+    if (!b || !b.videoConferenceLink) return false;
+    var next = _nextSessionDate(b);
+    if (!next) return false;
+    return (next.getTime() - Date.now()) / 60000 <= 10;
+  };
+
+  self.copyVideoLink = function (link) {
+    if (link && navigator.clipboard) navigator.clipboard.writeText(link);
   };
 
   self.hasTooSoonSession = function () {
@@ -1772,11 +1993,14 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   // Tutors page) rather than charging immediately on click.
   self.openPaySummary = function (b) { self.payingBooking = b; };
 
+  // The summary panel stays open until the payment resolves one way or the other — with a
+  // gateway armed this click leads to a redirect, and closing the panel first would leave
+  // the parent staring at the plain list with no indication anything is happening.
   self.confirmPayInvoice = function () {
     if (!self.payingBooking) return;
     var inv = self.getInvoiceForBooking(self.payingBooking.id);
-    self.payingBooking = null;
-    if (inv) self.payInvoice(inv.id);
+    if (!inv) { self.payingBooking = null; return; }
+    self.payInvoice(inv.id);
   };
 
   self.invoicesTab = 'active';
@@ -1793,23 +2017,119 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
     return self.invoicesTab === 'cancelled' ? self.cancelledInvoices() : self.nonCancelledInvoices();
   };
 
+  // Payment routing. With a gateway armed the parent leaves for HitPay's hosted checkout
+  // and the invoice only becomes Paid once HitPay confirms it (on return, or via the
+  // webhook). With no gateway configured this falls back to the original mark-as-paid
+  // call, which is what keeps local development working before any key is entered — the
+  // backend independently refuses that endpoint whenever a gateway really is armed, so
+  // the fallback can't be used to bypass a live gateway.
+  self.payBusy = false;
+  self.payError = '';
+
   self.payInvoice = function (invoiceId) {
-    InvoiceService.pay(invoiceId).then(function () {
+    if (self.payBusy) return;
+    self.payBusy = true;
+    self.payError = '';
+
+    PaymentService.getConfig().then(function (cfg) {
+      if (!cfg.gatewayEnabled) return legacyPay(invoiceId);
+
+      return PaymentService.startCheckout(invoiceId).then(function (checkout) {
+        // Leaving the app entirely — payBusy intentionally stays true so the button
+        // can't be clicked twice while the browser navigates away.
+        PaymentService.redirectToCheckout(checkout.checkoutUrl);
+      });
+    }).catch(function (err) {
+      self.payBusy = false;
+      self.payingBooking = null;
+      self.payError = (err.data && err.data.message) || 'Could not start this payment. Please try again.';
+      InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+      $timeout(function () { self.payError = ''; }, 6000);
+    });
+  };
+
+  function legacyPay(invoiceId) {
+    return InvoiceService.pay(invoiceId).then(function () {
+      self.payBusy = false;
+      self.payingBooking = null;
       self.paySuccess = true;
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
       $timeout(function () {
         self.paySuccess = false;
       }, 2500);
-    }).catch(function (err) {
-      alert((err.data && err.data.message) || 'Could not process this payment. Please try again.');
+    });
+  }
+
+  // ── Returning from HitPay ───────────────────────────────────────────
+  // The API's return endpoint verifies the payment server-side and then redirects here
+  // with ?payment=success|failed|cancelled|pending. The status is re-confirmed against
+  // the server rather than trusted from the URL, since anyone can type a query string.
+  self.paymentResult = null;
+  self.paymentResultChecking = false;
+
+  function handlePaymentReturn() {
+    var params = $location.search();
+    if (!params || !params.payment) return;
+
+    var invoiceId = parseInt(params.invoiceId, 10);
+    var outcome = params.payment;
+    var invoiceNumber = params.invoice || '';
+
+    // Clear the query string straight away so a refresh doesn't replay this banner.
+    $location.search('payment', null);
+    $location.search('invoice', null);
+    $location.search('invoiceId', null);
+
+    if (outcome === 'unknown' || !invoiceId) {
+      self.paymentResult = {
+        state: 'failed', invoiceNumber: invoiceNumber,
+        message: 'We could not identify that payment. If you were charged, contact support with your invoice number.'
+      };
+      return;
+    }
+
+    self.paymentResult = { state: outcome, invoiceNumber: invoiceNumber, invoiceId: invoiceId, message: null };
+    // Confirm against the server — the redirect only reports what it saw at that moment,
+    // and a webhook may have landed since.
+    self.recheckPayment(invoiceId);
+  }
+
+  self.recheckPayment = function (invoiceId) {
+    self.paymentResultChecking = true;
+    PaymentService.getStatus(invoiceId).then(function (status) {
+      self.paymentResultChecking = false;
+      self.paymentResult = {
+        state: status.paid ? 'success' : (status.paymentStatus === 'pending' ? 'pending' : 'failed'),
+        invoiceNumber: status.invoiceNumber,
+        invoiceId: status.invoiceId,
+        message: status.message
+      };
       InvoiceService.getAll().then(function (res) { self.invoices = res.data; });
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    }).catch(function () {
+      self.paymentResultChecking = false;
     });
   };
+
+  self.dismissPaymentResult = function () { self.paymentResult = null; };
 
   // Report an issue
   self.startReportIssue = function (bookingId) {
     self.issueForm.bookingId = bookingId;
+    self.issueForm.issueType = 'Tutor was absent (No show)';
     self.issueForm.details = '';
+    self.issueForm.isEdit = false;
+    self.issueSuccess = false;
+    self.issueError = '';
+  };
+
+  // Reopens the form pre-filled with the parent's own already-submitted
+  // report, in edit mode — same form/modal as reporting a new one.
+  self.startEditIssue = function (booking) {
+    self.issueForm.bookingId = booking.id;
+    self.issueForm.issueType = booking.issueReport.issueType;
+    self.issueForm.details = booking.issueReport.details;
+    self.issueForm.isEdit = true;
     self.issueSuccess = false;
     self.issueError = '';
   };
@@ -1817,10 +2137,12 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.submitIssue = function () {
     self.issueError = ProfanityFilterService.validate(self.issueForm.details);
     if (self.issueError) return;
-    BookingService.reportIssue(self.issueForm.bookingId, {
-      issueType: self.issueForm.issueType,
-      details: self.issueForm.details
-    }).then(function () {
+    var payload = { issueType: self.issueForm.issueType, details: self.issueForm.details };
+    var request = self.issueForm.isEdit
+      ? BookingService.updateIssue(self.issueForm.bookingId, payload)
+      : BookingService.reportIssue(self.issueForm.bookingId, payload);
+
+    request.then(function () {
       self.issueSuccess = true;
       self.issueForm.bookingId = null;
       BookingService.getAll().then(function (res) { self.bookings = res.data; });
@@ -1829,6 +2151,91 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
       }, 3000);
     }, function (err) {
       self.issueError = (err.data && err.data.message) ? err.data.message : 'Failed to submit. Please try again.';
+    });
+  };
+
+  self.deleteIssue = function (booking) {
+    if (!confirm('Withdraw this reported issue? This cannot be undone.')) return;
+    BookingService.deleteIssue(booking.id).then(function () {
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    });
+  };
+
+  // ── Class remarks — one star rating + text per completed class instance ──
+  self.remarkModalOpen = false;
+  self.remarkForm = { bookingClassId: null, remarkId: null, rating: 5, text: '' };
+  self.remarkError = '';
+  self.remarkSaving = false;
+
+  self.openRemarkForm = function (bookingClassId, existingRemark) {
+    self.remarkForm = {
+      bookingClassId: bookingClassId,
+      remarkId: existingRemark ? existingRemark.id : null,
+      rating: existingRemark ? existingRemark.rating : 5,
+      text: existingRemark ? existingRemark.text : ''
+    };
+    self.remarkError = '';
+    self.remarkModalOpen = true;
+  };
+
+  self.closeRemarkForm = function () {
+    self.remarkModalOpen = false;
+  };
+
+  self.submitRemark = function () {
+    self.remarkError = ProfanityFilterService.validate(self.remarkForm.text);
+    if (self.remarkError) return;
+    if (!self.remarkForm.rating) { self.remarkError = 'Please select a star rating.'; return; }
+
+    self.remarkSaving = true;
+    var payload = { rating: self.remarkForm.rating, text: self.remarkForm.text };
+    var request = self.remarkForm.remarkId
+      ? RemarkService.update(self.remarkForm.remarkId, payload)
+      : RemarkService.create(self.remarkForm.bookingClassId, payload);
+
+    request.then(function () {
+      self.remarkSaving = false;
+      self.remarkModalOpen = false;
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    }).catch(function (err) {
+      self.remarkSaving = false;
+      self.remarkError = (err.data && err.data.message) ? err.data.message : 'Failed to save. Please try again.';
+    });
+  };
+
+  self.deleteRemark = function (remark) {
+    if (!confirm('Delete this remark? This cannot be undone.')) return;
+    RemarkService.remove(remark.id).then(function () {
+      BookingService.getAll().then(function (res) { self.bookings = res.data; });
+    });
+  };
+
+  // Bulletin board — published remark list for a tutor, shown in a popup
+  // modal (only one open at a time). Lazy-loaded once per tutor, cached on
+  // the tutor object so reopening doesn't re-fetch.
+  self.bulletinModalTutor = null;
+
+  self.openBulletinBoard = function (t) {
+    self.bulletinModalTutor = t;
+    if (!t._bulletinRemarks) {
+      RemarkService.getForTutor(t.id).then(function (res) {
+        t._bulletinRemarks = res.data;
+      });
+    }
+  };
+
+  self.closeBulletinBoard = function () {
+    self.bulletinModalTutor = null;
+  };
+
+  self.likeRemark = function (t, remark) {
+    if (remark.likedByMe) return;
+    RemarkService.like(remark.id).then(function (res) {
+      remark.likedByMe = true;
+      remark.likeCount = res.data.likeCount;
+    }).catch(function () {
+      // Already liked (409) or stale state — resync from the server.
+      RemarkService.getForTutor(t.id).then(function (res) { t._bulletinRemarks = res.data; });
     });
   };
 

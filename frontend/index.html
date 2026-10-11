@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LearnSphere – Tutor Matching Platform</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+  <!-- Per-environment settings (API address). Loaded before the app so app.js can read it. -->
+  <script src="config.js"></script>
 
   <!-- AngularJS 1.x + ngRoute -->
   <script src="libs/angular.min.js"></script>
@@ -46,7 +50,8 @@
           <button type="button" class="bs-btn bs-btn-ghost bs-btn-icon" ng-click="app.toggleNotifDrawer()">✕</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:2px;">
-          <div ng-repeat="n in app.notifications" style="display:flex; gap:10px; padding:var(--space-2) 0; border-top:1px solid var(--color-divider);"
+          <div ng-repeat="n in app.notifications" ng-click="app.onNotificationClick(n)"
+            style="display:flex; gap:10px; padding:var(--space-2) 0; border-top:1px solid var(--color-divider); cursor:pointer;"
             ng-style="!n.isRead ? {background:'var(--color-accent-100)'} : {}">
             <span style="width:8px; height:8px; border-radius:50%; background:var(--color-accent); flex-shrink:0; margin-top:6px;" ng-if="!n.isRead"></span>
             <div>
@@ -79,9 +84,13 @@
   <script src="app/services/student.service.js"></script>
   <script src="app/services/parent-profile.service.js"></script>
   <script src="app/services/booking.service.js"></script>
+  <script src="app/services/remark.service.js"></script>
   <script src="app/services/chat.service.js"></script>
   <script src="app/services/notification.service.js"></script>
   <script src="app/services/invoice.service.js"></script>
+  <script src="app/services/payment.service.js"></script>
+  <script src="app/services/payout.service.js"></script>
+  <script src="app/services/wallet.service.js"></script>
   <script src="app/services/admin.service.js"></script>
   <script src="app/services/preset-cancellation.service.js"></script>
   <script src="app/services/schedule.service.js"></script>

@@ -15,8 +15,16 @@ namespace LearnSphere.API.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IPlatformFeeService _fees;
+    private readonly IParentWalletService _wallet;
 
-    public BookingsController(AppDbContext context) => _context = context;
+    public BookingsController(AppDbContext context, IPlatformFeeService fees,
+        IParentWalletService wallet)
+    {
+        _context = context;
+        _fees = fees;
+        _wallet = wallet;
+    }
 
     // Parses "04:00 PM - 05:00 PM" into (startMinutes, endMinutes) since midnight. Returns
     // null if the string doesn't contain two recognizable times.
@@ -111,6 +119,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.CounterProposals).ThenInclude(cp => cp.Classes)
             .Include(b => b.LessonReports).ThenInclude(r => r.Student)
             .Include(b => b.IssueReport)
+            .Include(b => b.PresetSlots).ThenInclude(ps => ps.TutorTimeSlot)
             .AsQueryable();
 
         if (role == "parent")
@@ -125,10 +134,23 @@ public class BookingsController : ControllerBase
 
         // A confirmed booking whose classes have all already happened auto-transitions to
         // completed — this is what unlocks lesson reports and tutor reviews for it.
+        // Independently, each individual BookingClass flips to "completed" once its own
+        // Date is in the past — this is what unlocks a class remark for that specific
+        // session (see ClassRemarksController), regardless of whether the rest of a
+        // multi-session booking has finished yet.
         var today = DateTime.Today.ToString("yyyy-MM-dd");
         var anyAutoCompleted = false;
         foreach (var b in bookings)
         {
+            foreach (var c in b.Classes)
+            {
+                if (c.Status != "completed" && string.Compare(c.Date, today, StringComparison.Ordinal) < 0)
+                {
+                    c.Status = "completed";
+                    anyAutoCompleted = true;
+                }
+            }
+
             if (b.Status == "confirmed" && b.Classes.Count > 0
                 && b.Classes.All(c => string.Compare(c.Date, today, StringComparison.Ordinal) < 0))
             {
@@ -144,9 +166,23 @@ public class BookingsController : ControllerBase
             .Select(f => f.BookingId!.Value)
             .ToHashSetAsync();
 
+        // The parent's own remark (if any) on each completed class instance —
+        // drives the Sessions page's "already reviewed" state and Edit/Delete.
+        var bookingClassIds = bookings.SelectMany(b => b.Classes).Select(c => c.Id).ToList();
+        var remarksByBookingClassId = await _context.ClassRemarks
+            .Where(r => bookingClassIds.Contains(r.BookingClassId))
+            .ToDictionaryAsync(r => r.BookingClassId, r => new BookingClassRemarkDto
+            {
+                Id = r.Id, Rating = r.Rating, Text = r.Text
+            });
+
         return Ok(bookings.Select(b => {
             var dto = MapToDto(b);
             dto.IsFirstClass = firstClassBookingIds.Contains(b.Id);
+            foreach (var c in dto.Classes)
+            {
+                if (remarksByBookingClassId.TryGetValue(c.Id, out var remark)) c.Remark = remark;
+            }
             return dto;
         }));
     }
@@ -248,7 +284,9 @@ public class BookingsController : ControllerBase
         var slots = await _context.TutorTimeSlots.Where(s => slotIds.Contains(s.Id)).ToListAsync();
         if (slots.Count != slotIds.Count)
             return NotFound(new { message = "One or more of these classes no longer exist." });
-        if (slots.Any(s => s.Status != "Available" || s.IsFull))
+        if (slots.Any(s => s.IsFull))
+            return BadRequest(new { message = "This class is now fully occupied." });
+        if (slots.Any(s => s.Status != "Available"))
             return BadRequest(new { message = "One or more of these classes are no longer available." });
         if (slots.Select(s => s.TutorId).Distinct().Count() > 1)
             return BadRequest(new { message = "These classes belong to different tutors." });
@@ -296,7 +334,11 @@ public class BookingsController : ControllerBase
             TotalPrice = slots.Sum(s => s.PricePerLesson),
             Status = "confirmed",
             BookingType = "tutor-preset",
-            PresetSlotId = first.Id
+            PresetSlotId = first.Id,
+            // A late enrollee into a class the tutor already set a shared link for
+            // (see TutorsController.SetSlotVideoLink) inherits it immediately,
+            // rather than the tutor needing to re-set it per student.
+            VideoConferenceLink = first.VideoConferenceLink
         };
         _context.Bookings.Add(booking);
         await _context.SaveChangesAsync();
@@ -310,9 +352,8 @@ public class BookingsController : ControllerBase
             first.Level    ?? string.Empty,
             booking.Id);
 
-        // TODO: apply first-class fee logic when pricing rules are finalised.
-        // isFirstClassPreset == true  → first lesson, charge first-class rate
-        // isFirstClassPreset == false → recurring, charge recurring rate
+        // isFirstClassPreset decides whether this invoice opens a match, and therefore
+        // whether first-match commission applies — it is handed to ApplyPricingAsync below.
 
         foreach (var slot in slots)
         {
@@ -326,10 +367,13 @@ public class BookingsController : ControllerBase
         {
             BookingId = booking.Id,
             Date = first.Day,
-            Amount = booking.TotalPrice,
             Status = "Unpaid",
             Subject = booking.Subject
         };
+
+        // booking.TotalPrice is the TUTOR's price. The parent is billed that plus the
+        // platform markup, which ApplyPricingAsync works out and writes onto the invoice.
+        await _fees.ApplyPricingAsync(newInvoice, booking.TotalPrice, isFirstClassPreset);
         _context.Invoices.Add(newInvoice);
 
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == first.TutorId);
@@ -356,6 +400,75 @@ public class BookingsController : ControllerBase
             .FirstOrDefaultAsync(b => b.Id == booking.Id);
 
         return Ok(MapToDto(created!));
+    }
+
+    // Tutor sets/updates the video conference link for their own confirmed Online
+    // booking — see VideoLinkReminderService for the reminder nudges that lead up
+    // to this. Deliberately no reminder-status reset here: setting the link stops
+    // the reminders outright (VideoLinkReminderService's own query only looks at
+    // bookings with no link), so VideoLinkReminderStatus is left as a pure history
+    // of what's already been sent, not something this endpoint needs to touch.
+    //
+    // For a tutor-preset (Flow B) booking, this is one occurrence of a class other
+    // students may share — same propagation as TutorsController.SetSlotVideoLink
+    // (every slot in the recurring series + every enrolled student's booking gets
+    // the same link), so editing from an already-booked class's card here stays
+    // consistent with setting it from the "published slots" list before anyone
+    // enrolled at all.
+    [HttpPatch("{id}/video-link")]
+    public async Task<IActionResult> SetVideoLink(int id, [FromBody] SetVideoLinkDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var booking = await _context.Bookings
+            .Include(b => b.Tutor)
+            .Include(b => b.PresetSlots)
+            .FirstOrDefaultAsync(b => b.Id == id);
+        if (booking == null) return NotFound();
+        if (booking.Tutor.UserId != userId) return Forbid();
+        if (booking.Status != "confirmed")
+            return BadRequest(new { message = "Video links can only be set on confirmed bookings." });
+        if (booking.Mode != "Online")
+            return BadRequest(new { message = "Video conference links are only applicable to online bookings." });
+        if (string.IsNullOrWhiteSpace(dto.VideoConferenceLink))
+            return BadRequest(new { message = "Please provide a valid video conference link." });
+        if (!Uri.TryCreate(dto.VideoConferenceLink.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != "https" && uri.Scheme != "http"))
+            return BadRequest(new { message = "Please enter a valid URL starting with http:// or https://" });
+
+        var link = dto.VideoConferenceLink.Trim();
+        booking.VideoConferenceLink = link;
+
+        if (booking.BookingType == "tutor-preset")
+        {
+            var slotIds = booking.PresetSlots.Select(ps => ps.TutorTimeSlotId).ToList();
+            if (booking.PresetSlotId.HasValue) slotIds.Add(booking.PresetSlotId.Value);
+            var slots = await _context.TutorTimeSlots.Where(s => slotIds.Contains(s.Id)).ToListAsync();
+            var groupIds = slots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!).Distinct().ToList();
+
+            var groupSlotIds = new List<int>(slotIds);
+            if (groupIds.Count > 0)
+            {
+                var groupSlots = await _context.TutorTimeSlots.Where(s => s.PresetGroupId != null && groupIds.Contains(s.PresetGroupId!)).ToListAsync();
+                foreach (var s in groupSlots) { s.VideoConferenceLink = link; groupSlotIds.Add(s.Id); }
+            }
+            else
+            {
+                foreach (var s in slots) s.VideoConferenceLink = link;
+            }
+
+            var siblingBookingIds = await _context.BookingPresetSlots
+                .Where(bps => groupSlotIds.Contains(bps.TutorTimeSlotId))
+                .Select(bps => bps.BookingId)
+                .ToListAsync();
+            var siblingBookings = await _context.Bookings
+                .Where(b => b.Id != id && b.Status == "confirmed"
+                    && (siblingBookingIds.Contains(b.Id) || (b.PresetSlotId != null && groupSlotIds.Contains(b.PresetSlotId.Value))))
+                .ToListAsync();
+            foreach (var b in siblingBookings) b.VideoConferenceLink = link;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Video conference link saved." });
     }
 
     [HttpPatch("{id}/status")]
@@ -396,22 +509,45 @@ public class BookingsController : ControllerBase
         var previousStatus = booking.Status;
         booking.Status = dto.Status;
 
-        // When the other party accepts a pending counter proposal, apply it to the actual booking classes
+        // When the other party accepts a pending counter proposal, apply it to the actual booking classes.
+        // Merged in place onto the existing rows (matched by original date/time) rather than wiping and
+        // re-inserting every class in the booking — a class not named in the proposal (e.g. an already-
+        // completed session elsewhere in the same multi-session booking) is left completely untouched, so
+        // its Id, Status, and any ClassRemark tied to it via BookingClassId (ON DELETE CASCADE) survive.
+        // The old wipe-and-recreate approach cascade-deleted that class's remark and reset it back to
+        // Status="scheduled" even though it had already happened, on EVERY accepted counter-proposal.
         if (dto.Status == "confirmed" && previousStatus == "countered"
             && pendingProposal?.Classes?.Count > 0)
         {
-            var finalClasses = pendingProposal.Classes.Select(cp => (
-                Date: string.IsNullOrEmpty(cp.ProposedDate) ? cp.OriginalDate : cp.ProposedDate,
-                Time: string.IsNullOrEmpty(cp.ProposedTime) ? cp.OriginalTime : cp.ProposedTime
-            )).ToList();
+            var updatesByClassId = new Dictionary<int, (string? Date, string? Time)>();
+            foreach (var cp in pendingProposal.Classes)
+            {
+                var match = booking.Classes.FirstOrDefault(c =>
+                    c.Date == cp.OriginalDate && c.Time.StartsWith(cp.OriginalTime));
+                if (match != null) updatesByClassId[match.Id] = (cp.ProposedDate, cp.ProposedTime);
+            }
+
+            var finalClasses = booking.Classes.Select(c =>
+            {
+                var date = c.Date; var time = c.Time;
+                if (updatesByClassId.TryGetValue(c.Id, out var u))
+                {
+                    if (!string.IsNullOrEmpty(u.Date)) date = u.Date;
+                    if (!string.IsNullOrEmpty(u.Time)) time = u.Time;
+                }
+                return (Date: date, Time: time);
+            }).ToList();
 
             if (HasOverlappingClasses(finalClasses))
                 return BadRequest(new { message = "Two or more classes in this proposal overlap on the same date and time." });
 
-            _context.BookingClasses.RemoveRange(booking.Classes);
-            foreach (var c in finalClasses)
+            foreach (var c in booking.Classes)
             {
-                _context.BookingClasses.Add(new BookingClass { BookingId = id, Date = c.Date, Time = c.Time });
+                if (updatesByClassId.TryGetValue(c.Id, out var u))
+                {
+                    if (!string.IsNullOrEmpty(u.Date)) c.Date = u.Date;
+                    if (!string.IsNullOrEmpty(u.Time)) c.Time = u.Time;
+                }
             }
 
             pendingProposal.Status = "accepted";
@@ -458,10 +594,12 @@ public class BookingsController : ControllerBase
                 {
                     BookingId = id,
                     Date = booking.Classes.OrderBy(c => c.Date).FirstOrDefault()?.Date ?? DateTime.Now.ToString("yyyy-MM-dd"),
-                    Amount = booking.TotalPrice,
                     Status = "Unpaid",
                     Subject = booking.Subject
                 };
+                // Amount is left unset here on purpose: pricing needs to know whether this
+                // booking opens a new match, which is only established further down once
+                // the subject/level have been resolved. See the ApplyPricingAsync call.
                 _context.Invoices.Add(newInvoice);
             }
 
@@ -526,9 +664,11 @@ public class BookingsController : ControllerBase
                 trackedCountry, trackedSubject, trackedLevel,
                 booking.Id);
 
-            // TODO: apply first-class fee logic when pricing rules are finalised.
-            // isFirstClass == true  → first lesson, charge first-class rate
-            // isFirstClass == false → recurring, charge recurring rate
+            // Now that we know whether this opens a match, the invoice can be priced:
+            // booking.TotalPrice is the tutor's price, the parent is billed that plus the
+            // platform markup, and a first match carries the one-time commission.
+            if (newInvoice != null)
+                await _fees.ApplyPricingAsync(newInvoice, booking.TotalPrice, isFirstClass);
         }
 
         await _context.SaveChangesAsync();
@@ -605,6 +745,13 @@ public class BookingsController : ControllerBase
         if (booking.Invoice != null && booking.Invoice.Status == "Unpaid")
         {
             booking.Invoice.Status = "Cancelled";
+
+            // If the parent had already put wallet credit against this bill, voiding it
+            // would otherwise swallow that credit: the invoice is dead, no cash was ever
+            // taken, and the value they spent would simply be gone.
+            await _wallet.RefundInvoiceToWalletAsync(
+                booking.Invoice,
+                $"Booking {booking.BookingNumber} cancelled - credit returned");
         }
 
         // Tutor already responded (countered) or accepted (confirmed) — let them know it's off.
@@ -791,7 +938,63 @@ public class BookingsController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             };
         }
+        else if (booking.IssueReport.Resolved)
+        {
+            // Previous report was already resolved and archived — this is a
+            // fresh issue, so reopen the report rather than silently no-oping.
+            booking.IssueReport.IssueType = dto.IssueType;
+            booking.IssueReport.Details = dto.Details;
+            booking.IssueReport.Timestamp = DateTime.Now.ToString("h:mm:ss tt");
+            booking.IssueReport.CreatedAt = DateTime.UtcNow;
+            booking.IssueReport.Resolved = false;
+            booking.IssueReport.ResolvedAt = null;
+        }
 
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPut("{id}/issue")]
+    public async Task<IActionResult> UpdateIssue(int id, [FromBody] CreateIssueReportDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var booking = await _context.Bookings
+            .Include(b => b.IssueReport)
+            .Include(b => b.Student)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking == null || booking.IssueReport == null) return NotFound();
+        if (booking.Student.ParentUserId != userId) return Forbid();
+        if (booking.IssueReport.Resolved)
+            return BadRequest(new { message = "This issue has already been resolved by admin and can no longer be edited." });
+
+        var issueProfanityError = ProfanityFilter.Validate(dto.Details);
+        if (issueProfanityError != null) return BadRequest(new { message = issueProfanityError });
+
+        booking.IssueReport.IssueType = dto.IssueType;
+        booking.IssueReport.Details = dto.Details;
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpDelete("{id}/issue")]
+    public async Task<IActionResult> DeleteIssue(int id)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var booking = await _context.Bookings
+            .Include(b => b.IssueReport)
+            .Include(b => b.Student)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking == null || booking.IssueReport == null) return NotFound();
+        if (booking.Student.ParentUserId != userId) return Forbid();
+        if (booking.IssueReport.Resolved)
+            return BadRequest(new { message = "This issue has already been resolved by admin and can no longer be withdrawn." });
+
+        _context.IssueReports.Remove(booking.IssueReport);
         await _context.SaveChangesAsync();
         return Ok();
     }
@@ -817,8 +1020,18 @@ public class BookingsController : ControllerBase
         Status = b.Status,
         BookingNumber = b.BookingNumber,
         BookingType = b.BookingType,
+        PresetGroupId = b.PresetSlots
+            .Select(ps => ps.TutorTimeSlot?.PresetGroupId)
+            .FirstOrDefault(g => g != null),
         IsFirstClass = false, // populated by GET /bookings — see GetAll
-        Classes = b.Classes?.OrderBy(c => c.Date).Select(c => new BookingClassDto { Date = c.Date, Time = c.Time }).ToList() ?? new(),
+        VideoConferenceLink = b.VideoConferenceLink,
+        VideoLinkReminderStatus = b.VideoLinkReminderStatus,
+        Classes = b.Classes?.OrderBy(c => c.Date)
+            .Select(c => new BookingClassDto
+            {
+                Id = c.Id, Date = c.Date, Time = c.Time,
+                Status = c.Status, DeliveryStatus = c.DeliveryStatus
+            }).ToList() ?? new(),
         CounterProposal = pendingProposal == null ? null : new CounterProposalDto
         {
             Message = pendingProposal.Message,
@@ -845,8 +1058,59 @@ public class BookingsController : ControllerBase
         {
             IssueType = b.IssueReport.IssueType,
             Details = b.IssueReport.Details,
-            Timestamp = b.IssueReport.Timestamp
+            Timestamp = b.IssueReport.Timestamp,
+            Resolved = b.IssueReport.Resolved
         }
         };
+    }
+
+    // Marks one session taught, or not. This is the gate on paying a tutor: the monthly
+    // cutoff only counts sessions that are BOTH Delivered and on a paid invoice, so a
+    // lesson that never happened can never turn into a bank transfer.
+    //
+    // The tutor who owns the booking may set it, and so may an admin resolving a dispute.
+    [HttpPut("{bookingId}/sessions/{classId}/delivery")]
+    public async Task<IActionResult> UpdateSessionDelivery(
+        int bookingId, int classId, [FromBody] UpdateSessionDeliveryDto dto)
+    {
+        var allowed = new[]
+        {
+            SessionDeliveryStatus.Scheduled,
+            SessionDeliveryStatus.Delivered,
+            SessionDeliveryStatus.Cancelled
+        };
+
+        if (!allowed.Contains(dto.DeliveryStatus))
+            return BadRequest(new { message = $"Delivery status must be one of: {string.Join(", ", allowed)}." });
+
+        var session = await _context.BookingClasses
+            .Include(c => c.Booking)
+            .FirstOrDefaultAsync(c => c.Id == classId && c.BookingId == bookingId);
+
+        if (session == null) return NotFound(new { message = "Session not found." });
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+
+        if (role == "tutor")
+        {
+            var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.UserId == userId);
+            if (tutor == null || session.Booking.TutorId != tutor.Id) return Forbid();
+        }
+        else if (role != "admin")
+        {
+            // A parent cannot declare their own lesson delivered — that would let the
+            // payment gate be opened by the party who benefits from disputing it.
+            return Forbid();
+        }
+
+        session.DeliveryStatus = dto.DeliveryStatus;
+        session.DeliveredAt = dto.DeliveryStatus == SessionDeliveryStatus.Delivered
+            ? DateTime.UtcNow
+            : null;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { session.Id, session.Date, session.Time, session.DeliveryStatus, session.DeliveredAt });
     }
 }

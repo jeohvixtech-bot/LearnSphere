@@ -17,28 +17,40 @@ public class TutorsController : ControllerBase
     private readonly IPresetCancellationService _cancellationService;
     private readonly IEmailService _emailService;
     private readonly IWebHostEnvironment _env;
+    private readonly ITutorLedgerService _ledger;
 
-    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService, IEmailService emailService, IWebHostEnvironment env)
+    public TutorsController(AppDbContext context, IPresetCancellationService cancellationService,
+        IEmailService emailService, IWebHostEnvironment env, ITutorLedgerService ledger)
     {
         _context = context;
         _cancellationService = cancellationService;
         _emailService = emailService;
         _env = env;
+        _ledger = ledger;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search, [FromQuery] double? rating)
+    public async Task<IActionResult> GetAll([FromQuery] string? subject, [FromQuery] string? mode, [FromQuery] string? search, [FromQuery] double? rating, [FromQuery] int? page, [FromQuery] int? pageSize)
     {
+        // AsSplitQuery avoids a cartesian-product join across the 7 sibling
+        // collections below — without it, EF emits one giant join and a tutor
+        // with e.g. 4 reviews x 3 offerings x 4 qualifications comes back as
+        // 48 duplicate rows to de-dupe client-side, multiplying (not just
+        // adding) with every collection a tutor has. AsNoTracking since this
+        // is a read-only listing. Documents (verification files/admin notes)
+        // are deliberately NOT included — the public catalog has no business
+        // reason to ship them, and Tutor.Documents defaults to an empty list
+        // when un-included, so MapToDto stays safe without changes.
         var query = _context.Tutors
+            .AsNoTracking()
+            .AsSplitQuery()
             .Include(t => t.User)
             .Include(t => t.Subjects)
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
-            .Include(t => t.Documents)
             .Where(t => t.IsVerified && t.IsOnline)
             .AsQueryable();
 
@@ -59,10 +71,39 @@ public class TutorsController : ControllerBase
         if (rating.HasValue)
             query = query.Where(t => t.Rating >= rating.Value);
 
+        // Pagination is opt-in — omit page/pageSize to get the full unpaginated
+        // list, exactly what every existing caller (parent search, AI match,
+        // welcome page) does today. A deterministic order is required for
+        // Skip/Take to page correctly under AsSplitQuery.
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var safePage = Math.Max(page.Value, 1);
+            var safeSize = Math.Max(pageSize.Value, 1);
+            query = query.OrderBy(t => t.Id).Skip((safePage - 1) * safeSize).Take(safeSize);
+        }
+
         var tutors = await query.ToListAsync();
         var syllabusMap = await LoadSyllabusMapAsync(
             tutors.SelectMany(t => t.TimeSlots).Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(tutors.Select(t => MapToDto(t, syllabusMap)));
+
+        // Featured remark per tutor: highest like count wins, ties (including
+        // the common all-zero-likes case) broken by most recent — one ordering
+        // covers both the "most liked" and "fall back to most recent" rules.
+        var tutorIds = tutors.Select(t => t.Id).ToList();
+        var publishedRemarks = await _context.ClassRemarks
+            .Include(r => r.Likes)
+            .Where(r => tutorIds.Contains(r.TutorId) && r.Status == "published")
+            .ToListAsync();
+        var featuredByTutor = publishedRemarks
+            .GroupBy(r => r.TutorId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(r => r.Likes.Count).ThenByDescending(r => r.CreatedAt).First());
+
+        return Ok(tutors.Select(t => MapToDto(t, syllabusMap,
+            featuredByTutor.TryGetValue(t.Id, out var fr)
+                ? new ClassRemarkSummaryDto { Text = fr.Text, Rating = fr.Rating, ParentDisplayName = fr.ParentDisplayName }
+                : null)));
     }
 
     // AI Speed Match score, one row per verified/online tutor. Reads live weightage
@@ -138,6 +179,59 @@ public class TutorsController : ControllerBase
         }).OrderByDescending(r => r.Score);
 
         return Ok(results);
+    }
+
+    // Single-tutor version of the GetMatchScores formula above — same weightages/
+    // point scales, just scoped to one tutor's own activeness/dispute counts
+    // instead of the bulk GroupBy-all-tutors query, so it's cheap to call from a
+    // single-tutor endpoint (GetByUser) without an N+1 query per tutor in a list.
+    private async Task<(double Score, string Tier)> ComputeTutorTierAsync(Tutor t)
+    {
+        var weightages = await _context.ScoringWeightages.ToListAsync();
+        int PctOf(string key) => weightages.FirstOrDefault(w => w.Key == key)?.Percent ?? 0;
+        var ratingPct = PctOf("rating");
+        var activenessPct = PctOf("activeness");
+        var disputesPct = PctOf("disputes");
+        var experiencePct = PctOf("experience");
+
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var monthStartStr = monthStart.ToString("yyyy-MM-dd");
+        var nextMonthStartStr = monthStart.AddMonths(1).ToString("yyyy-MM-dd");
+
+        var classesThisMonth = await _context.Bookings
+            .Where(b => b.TutorId == t.Id && b.Status == "completed")
+            .SelectMany(b => b.Classes)
+            .CountAsync(c => string.Compare(c.Date, monthStartStr) >= 0 && string.Compare(c.Date, nextMonthStartStr) < 0);
+
+        var disputesThisMonth = await _context.IssueReports
+            .Where(ir => ir.Booking.TutorId == t.Id && ir.CreatedAt >= monthStart && ir.CreatedAt < monthStart.AddMonths(1))
+            .CountAsync()
+            + await _context.PresetCancellationDecisions
+            .Where(d => d.Booking.TutorId == t.Id && d.Status == "resolved" && d.ResolvedAt >= monthStart && d.ResolvedAt < monthStart.AddMonths(1))
+            .CountAsync();
+
+        var ratingPoints = RatingToPoints(t.Rating);
+        var activenessPoints = ActivenessToPoints(classesThisMonth);
+        var disputePoints = DisputesToPoints(disputesThisMonth);
+        var experiencePoints = ExperienceToPoints(t.ExperienceYears);
+
+        var score = (ratingPoints * ratingPct + activenessPoints * activenessPct +
+                     disputePoints * disputesPct + experiencePoints * experiencePct) / 100.0;
+
+        return (Math.Round(score, 2), ScoreToTier(score));
+    }
+
+    // Thresholds are calibrated against the formula's real achievable range given
+    // typical weightages (roughly -1.6 to 5.65, NOT 0-100 — points cap at 10/5/2/5
+    // for rating/activeness/disputes/experience, weighted by admin-set percentages
+    // that don't have to sum to 100). Re-tune here if admins change the weightages
+    // enough to shift the practical range.
+    private static string ScoreToTier(double score)
+    {
+        if (score >= 4.5) return "Gold";
+        if (score >= 3.0) return "Silver";
+        if (score >= 1.5) return "Bronze";
+        return "Normal";
     }
 
     // Scale bands mirror the read-only reference tables on the admin Scoring Config
@@ -234,7 +328,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -252,6 +345,7 @@ public class TutorsController : ControllerBase
     {
         var tutor = await _context.Tutors.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == id);
         if (tutor == null) return NotFound();
+        if (!CallerMayManage(tutor)) return Forbid();
 
         _context.Tutors.Remove(tutor);
         await _context.SaveChangesAsync();
@@ -307,7 +401,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -321,13 +414,20 @@ public class TutorsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByUser(int userId)
     {
+        // AsSplitQuery avoids the same cartesian-product join fixed on the
+        // public catalog's GetAll — 7 sibling collections in one query
+        // otherwise multiply a tutor's row count across every combination of
+        // documents/offerings/slots/etc. This isn't the tutor's own read-only
+        // listing (Update() re-fetches for tracked edits elsewhere), but this
+        // call site never mutates what it loads, so AsNoTracking is safe too.
         var tutor = await _context.Tutors
+            .AsNoTracking()
+            .AsSplitQuery()
             .Include(t => t.User)
             .Include(t => t.Subjects)
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -336,7 +436,22 @@ public class TutorsController : ControllerBase
         if (tutor == null) return NotFound();
         var syllabusMap = await LoadSyllabusMapAsync(
             tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(MapToDto(tutor, syllabusMap));
+        var dto = MapToDto(tutor, syllabusMap);
+        (dto.Score, dto.Tier) = await ComputeTutorTierAsync(tutor);
+        return Ok(dto);
+    }
+
+    // Does the caller own this tutor profile, or are they an admin?
+    //
+    // Several {id}-addressed endpoints trusted the id in the URL and never compared it to
+    // the caller, which let any signed-in tutor edit, reprice or delete another tutor's
+    // profile. The check is centralised here so a new endpoint has one obvious thing to
+    // call rather than re-deriving it.
+    private bool CallerMayManage(Tutor tutor)
+    {
+        if (User.IsInRole("admin")) return true;
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return tutor.UserId == userId;
     }
 
     [HttpPut("{id}")]
@@ -352,6 +467,7 @@ public class TutorsController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tutor == null) return NotFound();
+        if (!CallerMayManage(tutor)) return Forbid();
 
         if (dto.Bio != null)
         {
@@ -433,7 +549,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -462,7 +577,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -494,7 +608,6 @@ public class TutorsController : ControllerBase
             .Include(t => t.Levels)
             .Include(t => t.Modes)
             .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
             .Include(t => t.TimeSlots)
             .Include(t => t.Offerings)
             .Include(t => t.Documents)
@@ -860,6 +973,7 @@ public class TutorsController : ControllerBase
     {
         var tutor = await _context.Tutors.FindAsync(id);
         if (tutor == null) return NotFound();
+        if (!CallerMayManage(tutor)) return Forbid();
 
         var slot = new TutorTimeSlot { TutorId = id, Day = dto.Day, Time = dto.Time, Status = "Available" };
         _context.TutorTimeSlots.Add(slot);
@@ -932,22 +1046,31 @@ public class TutorsController : ControllerBase
             if (hasConflict)
                 return BadRequest(new { message = "You already have a confirmed class at that date and time." });
 
-            // Must land later than the earliest OTHER class still active in the same
-            // recurring series (same Setup Class submission) — moving one occurrence
-            // to before the series' current first class would scramble the sequence.
-            // Only applies when there's another slot in the group to compare against.
+            // Must land later than the closest sibling that comes BEFORE this
+            // occurrence's own original date in the same recurring series (same
+            // Setup Class submission) — prevents this reschedule from jumping
+            // backward past an earlier class and scrambling the sequence. A sibling
+            // that was already later than this slot is not a lower bound at all —
+            // e.g. rescheduling the series' first class (1 Oct) to a couple of days
+            // later (2 Oct) is fine even if the next occurrence is 8 Oct, since 2 Oct
+            // is still before it; the old check compared against EVERY other
+            // sibling regardless of direction, so it wrongly rejected exactly this
+            // case ("must be later than 8 Oct" when moving forward from 1 Oct).
             if (!string.IsNullOrEmpty(slot.PresetGroupId))
             {
-                var earliestSiblingDate = await _context.TutorTimeSlots
+                var siblingDays = await _context.TutorTimeSlots
                     .Where(s => s.PresetGroupId == slot.PresetGroupId && s.Id != slot.Id)
-                    .OrderBy(s => s.Day)
                     .Select(s => s.Day)
-                    .FirstOrDefaultAsync();
-                if (!string.IsNullOrEmpty(earliestSiblingDate)
-                    && DateTime.TryParse(earliestSiblingDate, out var earliestDate)
-                    && proposedDateParsed.Date <= earliestDate.Date)
+                    .ToListAsync();
+                var precedingSiblingDate = siblingDays
+                    .Where(d => string.Compare(d, slot.Day, StringComparison.Ordinal) < 0)
+                    .OrderByDescending(d => d, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (precedingSiblingDate != null
+                    && DateTime.TryParse(precedingSiblingDate, out var precedingDate)
+                    && proposedDateParsed.Date <= precedingDate.Date)
                 {
-                    return BadRequest(new { message = $"The new date must be later than {earliestSiblingDate}, the earliest class still in this series." });
+                    return BadRequest(new { message = $"The new date must be later than {precedingSiblingDate}, the previous class still in this series." });
                 }
             }
         }
@@ -976,11 +1099,15 @@ public class TutorsController : ControllerBase
             .Where(b => affectedBookingIds.Contains(b.Id) && (b.Status == "confirmed" || b.Status == "pending"))
             .ToListAsync();
 
-        // Nobody's booked this slot yet — no family to notify or ask for a decision,
-        // so a reschedule just moves it directly instead of going through the
-        // propose/accept dance (which only makes sense once someone has actually
-        // booked it).
-        if (isReschedule && affectedBookings.Count == 0)
+        // Reschedule — with or without existing bookings — moves immediately for
+        // every affected family, no pending PresetCancellationDecision/accept-
+        // reject step. A parent who can't make the new time uses the existing
+        // booking-cancel or issue-report flow instead, same as they would for
+        // any other date conflict; this endpoint only ever informs them after
+        // the fact, never blocks on their response. (Cancel-outright below is
+        // unchanged — that still needs the refund/tutor-penalty resolution
+        // PresetCancellationDecision exists for.)
+        if (isReschedule)
         {
             var movedSlot = new TutorTimeSlot
             {
@@ -996,17 +1123,45 @@ public class TutorsController : ControllerBase
                 Country = slot.Country,
                 ClassSize = slot.ClassSize,
                 MaxStudents = slot.MaxStudents,
-                ConfirmedCount = 0,
-                IsFull = false,
+                ConfirmedCount = slot.ConfirmedCount,
+                IsFull = slot.IsFull,
                 PricePerLesson = slot.PricePerLesson,
                 PresetGroupId = slot.PresetGroupId
             };
             _context.TutorTimeSlots.Add(movedSlot);
+
+            foreach (var booking in affectedBookings)
+            {
+                var classToMove = booking.Classes.FirstOrDefault(c => c.Date == slot.Day && c.Time.StartsWith(slot.Time));
+                if (classToMove != null)
+                {
+                    classToMove.Date = dto.ProposedDate!;
+                    classToMove.Time = $"{dto.ProposedTime} - {dto.ProposedEndTime}";
+                }
+                var presetSlotLink = booking.PresetSlots.FirstOrDefault(ps => ps.TutorTimeSlotId == slotId);
+                if (presetSlotLink != null) presetSlotLink.TutorTimeSlot = movedSlot;
+
+                if (booking.Student?.ParentUser != null)
+                {
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = booking.Student.ParentUser.Id,
+                        Title = "Class Rescheduled by Tutor",
+                        Message = $"{tutor.User.Name} moved your {booking.Subject} class for {booking.Student.Name} from {slot.Day} to {dto.ProposedDate}.",
+                        Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+                        Type = "booking",
+                        IsRead = false
+                    });
+                }
+            }
+
             _context.TutorTimeSlots.Remove(slot);
             await _context.SaveChangesAsync();
-            return Ok(new { resolvedBookings = 0, affectedBookings = 0, pendingDecision = false, moved = true });
+            return Ok(new { resolvedBookings = 0, affectedBookings = affectedBookings.Count, pendingDecision = false, moved = true });
         }
 
+        // Cancel outright, no replacement offered — unchanged: resolves immediately
+        // toward a parent credit and a tutor penalty for every affected booking.
         var resolvedCount = 0;
         foreach (var booking in affectedBookings)
         {
@@ -1015,7 +1170,7 @@ public class TutorsController : ControllerBase
             var presetSlotLink = booking.PresetSlots.FirstOrDefault(ps => ps.TutorTimeSlotId == slotId);
             if (presetSlotLink != null) _context.BookingPresetSlots.Remove(presetSlotLink);
             // Reflect the removal immediately so ResolveTowardCreditAsync's
-            // remaining-session count (for Path B, below) is accurate.
+            // remaining-session count (below) is accurate.
             if (classToRemove != null) booking.Classes.Remove(classToRemove);
 
             var decision = new PresetCancellationDecision
@@ -1025,29 +1180,21 @@ public class TutorsController : ControllerBase
                 OriginalTime = slot.Time,
                 OriginalEndTime = slot.EndTime ?? string.Empty,
                 PricePerLesson = slot.PricePerLesson,
-                ProposedDate = isReschedule ? dto!.ProposedDate : null,
-                ProposedTime = isReschedule ? dto!.ProposedTime : null,
-                ProposedEndTime = isReschedule ? dto!.ProposedEndTime : null,
-                Status = isReschedule ? "pending" : "resolved"
+                Status = "resolved"
             };
             _context.PresetCancellationDecisions.Add(decision);
 
-            if (!isReschedule)
-            {
-                await _cancellationService.ResolveTowardCreditAsync(decision, booking,
-                    $"Tutor cancelled {booking.Subject} on {slot.Day} with no reschedule offered.");
-                resolvedCount++;
-            }
+            await _cancellationService.ResolveTowardCreditAsync(decision, booking,
+                $"Tutor cancelled {booking.Subject} on {slot.Day} with no reschedule offered.");
+            resolvedCount++;
 
             if (booking.Student?.ParentUser != null)
             {
                 _context.Notifications.Add(new Notification
                 {
                     UserId = booking.Student.ParentUser.Id,
-                    Title = isReschedule ? "Class Rescheduled by Tutor — Action Needed" : "Class Cancelled by Tutor",
-                    Message = isReschedule
-                        ? $"{tutor.User.Name} needs to move your {booking.Subject} class on {slot.Day} to a new date. Check your dashboard to accept or decline."
-                        : $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled with no reschedule offered — you'll receive a credit.",
+                    Title = "Class Cancelled by Tutor",
+                    Message = $"{tutor.User.Name}'s {booking.Subject} class for {booking.Student.Name} on {slot.Day} at {slot.Time} was cancelled with no reschedule offered — you'll receive a credit.",
                     Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
                     Type = "booking",
                     IsRead = false
@@ -1057,79 +1204,159 @@ public class TutorsController : ControllerBase
 
         _context.TutorTimeSlots.Remove(slot);
         await _context.SaveChangesAsync();
-        return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = isReschedule });
+
+        // A straight cancel charges the tutor a penalty and may cancel/shrink invoices;
+        // both move their balance, so bring the ledger in line now rather than leaving the
+        // dashboard showing a stale figure.
+        if (resolvedCount > 0)
+            await _ledger.ReconcileTutorAsync(tutor.Id);
+
+        // pendingDecision is always false now: the parent-approval gate on tutor preset
+        // reschedules was removed, so nothing is left awaiting a decision here.
+        return Ok(new { resolvedBookings = resolvedCount, affectedBookings = affectedBookings.Count, pendingDecision = false });
     }
 
-    [HttpPost("{id}/reviews")]
-    [Authorize(Roles = "parent")]
-    public async Task<IActionResult> AddReview(int id, [FromBody] CreateReviewDto dto)
+    // A tutor-declared "I'm unavailable" date range — previously only ever kept
+    // in the AngularJS ScheduleService's in-memory object (see
+    // frontend/app/services/schedule.service.js), so it silently disappeared on
+    // every page refresh. These three endpoints persist it instead.
+    [HttpGet("{id}/blocked-dates")]
+    [Authorize]
+    public async Task<IActionResult> GetBlockedDates(int id)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var userName = User.FindFirstValue(ClaimTypes.Name)!;
-
-        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        var tutor = await _context.Tutors.FindAsync(id);
         if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
 
-        if (dto.Rating < 1 || dto.Rating > 5)
-            return BadRequest(new { message = "Rating must be between 1 and 5." });
+        var blocks = await _context.TutorBlockedDates
+            .Where(b => b.TutorId == id)
+            .OrderBy(b => b.StartDate)
+            .ToListAsync();
 
-        if (string.IsNullOrWhiteSpace(dto.Text))
-            return BadRequest(new { message = "Review text cannot be empty." });
+        return Ok(blocks.Select(b => new TutorBlockedDateDto { Id = b.Id, Start = b.StartDate, End = b.EndDate }));
+    }
 
-        var reviewProfanityError = ProfanityFilter.Validate(dto.Text);
-        if (reviewProfanityError != null) return BadRequest(new { message = reviewProfanityError });
+    [HttpPost("{id}/blocked-dates")]
+    [Authorize]
+    public async Task<IActionResult> AddBlockedDate(int id, [FromBody] CreateTutorBlockedDateDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FindAsync(id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
 
-        if (dto.BookingId.HasValue)
-        {
-            var booking = await _context.Bookings
-                .Include(b => b.Student)
-                .FirstOrDefaultAsync(b => b.Id == dto.BookingId.Value);
+        if (string.IsNullOrWhiteSpace(dto.StartDate) || string.IsNullOrWhiteSpace(dto.EndDate)
+            || string.Compare(dto.EndDate, dto.StartDate, StringComparison.Ordinal) < 0)
+            return BadRequest(new { message = "Invalid date range." });
 
-            if (booking == null
-                || booking.Status != "completed"
-                || booking.TutorId != id
-                || booking.Student.ParentUserId != userId)
-            {
-                return BadRequest(new { message = "No qualifying completed booking found." });
-            }
+        var existing = await _context.TutorBlockedDates.Where(b => b.TutorId == id).ToListAsync();
+        var overlaps = existing.Any(b =>
+            string.Compare(dto.StartDate, b.EndDate, StringComparison.Ordinal) <= 0 &&
+            string.Compare(b.StartDate, dto.EndDate, StringComparison.Ordinal) <= 0);
+        if (overlaps)
+            return BadRequest(new { message = "This date range overlaps with a period you already blocked." });
 
-            var duplicate = await _context.TutorReviews
-                .AnyAsync(r => r.BookingId == dto.BookingId.Value);
+        // Same conflict check the tutor dashboard's confirmBlock() runs client-side —
+        // enforced here too so a block can never land straight over a real, still-
+        // upcoming class no matter how the request is made (stale client, a missed
+        // client-side check, or any future caller besides the current UI). Matches
+        // that check's own logic: any non-cancelled/non-pending booking, any class
+        // that hasn't already happened.
+        var candidateClasses = await _context.BookingClasses
+            .Where(c => c.Booking.TutorId == id
+                && c.Booking.Status != "pending" && c.Booking.Status != "cancelled"
+                && c.Status != "completed")
+            .Select(c => c.Date)
+            .ToListAsync();
+        var hasClassConflict = candidateClasses.Any(date =>
+            string.Compare(date, dto.StartDate, StringComparison.Ordinal) >= 0 &&
+            string.Compare(date, dto.EndDate, StringComparison.Ordinal) <= 0);
+        if (hasClassConflict)
+            return BadRequest(new { message = "This date range overlaps with a scheduled class. Reschedule or cancel it first." });
 
-            if (duplicate)
-                return Conflict(new { message = "A review for this booking has already been submitted." });
-        }
-
-        var review = new TutorReview
-        {
-            TutorId = id,
-            Author = userName,
-            Text = dto.Text,
-            Rating = dto.Rating,
-            BookingId = dto.BookingId
-        };
-        _context.TutorReviews.Add(review);
-
-        tutor.Rating = (tutor.Rating * tutor.ReviewCount + dto.Rating) / (tutor.ReviewCount + 1);
-        tutor.ReviewCount += 1;
-
+        var block = new TutorBlockedDate { TutorId = id, StartDate = dto.StartDate, EndDate = dto.EndDate };
+        _context.TutorBlockedDates.Add(block);
         await _context.SaveChangesAsync();
 
-        var updated = await _context.Tutors
-            .Include(t => t.User)
-            .Include(t => t.Subjects)
-            .Include(t => t.Levels)
-            .Include(t => t.Modes)
-            .Include(t => t.Qualifications)
-            .Include(t => t.Reviews)
-            .Include(t => t.TimeSlots)
-            .Include(t => t.Offerings)
-            .Include(t => t.Documents)
-            .FirstOrDefaultAsync(t => t.Id == id);
+        return Ok(new TutorBlockedDateDto { Id = block.Id, Start = block.StartDate, End = block.EndDate });
+    }
 
-        var syllabusMapReview = await LoadSyllabusMapAsync(
-            updated!.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(MapToDto(updated!, syllabusMapReview));
+    [HttpDelete("{id}/blocked-dates/{blockId}")]
+    [Authorize]
+    public async Task<IActionResult> RemoveBlockedDate(int id, int blockId)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FindAsync(id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        var block = await _context.TutorBlockedDates.FirstOrDefaultAsync(b => b.Id == blockId && b.TutorId == id);
+        if (block == null) return NotFound();
+
+        _context.TutorBlockedDates.Remove(block);
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    // Sets one shared video conference link for a published preset class — works
+    // whether or not any student has enrolled yet, unlike the booking-level
+    // PATCH /bookings/{id}/video-link (which needs a Booking row to exist).
+    // Applies to every occurrence in the same recurring series (same PresetGroupId)
+    // and propagates onto any Booking already riding on those slots, so
+    // Booking.VideoConferenceLink — what VideoLinkReminderService and every other
+    // video-link UI actually reads — stays correct without those call sites needing
+    // to know slots exist at all.
+    [HttpPatch("{id}/slots/{slotId}/video-link")]
+    [Authorize]
+    public async Task<IActionResult> SetSlotVideoLink(int id, int slotId, [FromBody] SetVideoLinkDto dto)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var tutor = await _context.Tutors.FirstOrDefaultAsync(t => t.Id == id);
+        if (tutor == null) return NotFound();
+        if (tutor.UserId != userId) return Forbid();
+
+        var slot = await _context.TutorTimeSlots.FirstOrDefaultAsync(s => s.Id == slotId && s.TutorId == id);
+        if (slot == null) return NotFound();
+        if (string.IsNullOrWhiteSpace(slot.Mode))
+            return BadRequest(new { message = "This slot is not a published class." });
+        if (slot.Mode != "Online")
+            return BadRequest(new { message = "Video conference links are only applicable to online classes." });
+        if (string.IsNullOrWhiteSpace(dto.VideoConferenceLink))
+            return BadRequest(new { message = "Please provide a valid video conference link." });
+        if (!Uri.TryCreate(dto.VideoConferenceLink.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != "https" && uri.Scheme != "http"))
+            return BadRequest(new { message = "Please enter a valid URL starting with http:// or https://" });
+
+        var link = dto.VideoConferenceLink.Trim();
+
+        var groupSlotIds = new List<int> { slot.Id };
+        if (!string.IsNullOrEmpty(slot.PresetGroupId))
+        {
+            var siblingSlots = await _context.TutorTimeSlots
+                .Where(s => s.PresetGroupId == slot.PresetGroupId && s.TutorId == id)
+                .ToListAsync();
+            foreach (var s in siblingSlots) { s.VideoConferenceLink = link; groupSlotIds.Add(s.Id); }
+        }
+        else
+        {
+            slot.VideoConferenceLink = link;
+        }
+
+        // Propagate onto every already-enrolled student's booking for this class —
+        // both the current multi-slot linking table and the legacy single-slot field.
+        var bookingIdsViaPresetSlots = await _context.BookingPresetSlots
+            .Where(bps => groupSlotIds.Contains(bps.TutorTimeSlotId))
+            .Select(bps => bps.BookingId)
+            .ToListAsync();
+        var affectedBookings = await _context.Bookings
+            .Where(b => bookingIdsViaPresetSlots.Contains(b.Id) || (b.PresetSlotId != null && groupSlotIds.Contains(b.PresetSlotId.Value)))
+            .Where(b => b.Status == "confirmed")
+            .ToListAsync();
+        foreach (var b in affectedBookings) b.VideoConferenceLink = link;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Video conference link saved.", updatedBookings = affectedBookings.Count });
     }
 
     // Mandatory documents an offering-unlock decision is based on: identity + at
@@ -1259,11 +1486,15 @@ public class TutorsController : ControllerBase
             if (tutor.VerificationStatus == "pending" && existing != null && existing.Status != "rejected")
                 return BadRequest(new { message = "This document is locked while your verification is under review." });
 
-            if (existing != null && existing.Status == "rejected")
+            if (existing != null && (existing.Status == "rejected" || existing.Status == "approved"))
             {
-                // Dual-row: old rejected row stays exactly as-is (still visible as
-                // "current" until this new one is resolved) — a fresh row carries the
-                // re-upload.
+                // Dual-row: the previously-decided row (rejected OR already approved)
+                // stays exactly as-is for admin's audit trail — a fresh row carries
+                // the edit/re-upload, linked back via ReplacesDocumentId. Editing an
+                // approved doc (e.g. the tutor correcting their ID number after
+                // verification) is just as worth preserving history for as fixing a
+                // rejection — only a doc that's never been decided on yet (still
+                // "pending") has nothing to preserve, see the plain upsert below.
                 _context.TutorDocuments.Add(new TutorDocument
                 {
                     TutorId = id,
@@ -1280,8 +1511,8 @@ public class TutorsController : ControllerBase
             }
             else if (existing != null)
             {
-                // Not yet submitted for review — plain upsert-in-place is fine (no
-                // rejected row to preserve, nothing to replace).
+                // Still "pending" (uploaded but never yet reviewed) — plain upsert-
+                // in-place is fine, nothing decided on this row to preserve.
                 existing.FileUrl = fileUrl;
                 existing.ExternalUrl = dto.ExternalUrl;
                 existing.FileName = fileName;
@@ -1453,6 +1684,16 @@ public class TutorsController : ControllerBase
             return Ok(new { message = "Verification resubmitted. Admin will review within 1-3 business days." });
         }
 
+        // Already verified and nothing is actually awaiting review (no doc was
+        // freshly staged+saved since approval) — a stray extra click on Submit
+        // shouldn't drag an already-approved profile back into a review queue
+        // for no reason. A genuine re-upload after approval creates a new
+        // "pending" row (see SaveDocument), which is what flips this to false.
+        if (tutor.VerificationStatus == "approved" && !docs.Any(d => d.Status == "pending"))
+        {
+            return Ok(new { message = "Nothing new to submit — your profile is already verified." });
+        }
+
         bool hasIdentityPhoto = docs.Any(d => d.DocumentType == "identity_photo" && HasContent(d));
         bool hasIdentityId = docs.Any(d => d.DocumentType == "identity_id" && HasContent(d));
         bool hasProfilePhoto = docs.Any(d => d.DocumentType == "profile_photo" && HasContent(d));
@@ -1585,6 +1826,22 @@ public class TutorsController : ControllerBase
         // Otherwise VerificationStatus stays "pending" — no separate terminal
         // "rejected" status; the tutor loops via re-upload until everything's approved.
 
+        // In-app bell notification alongside the email below — a tutor who doesn't
+        // check email (or whose email lands in spam) otherwise has no indication
+        // their documents were reviewed at all. Kept as a short prompt to check the
+        // app; the email carries the full itemized approve/reject detail.
+        _context.Notifications.Add(new Notification
+        {
+            UserId = tutor.UserId,
+            Title = fullyApproved ? "Profile Verified" : "Document Review Update",
+            Message = fullyApproved
+                ? "Your profile is now fully verified — you can set up subject offerings and start receiving bookings."
+                : "Your document review needs attention — see what's pending.",
+            Timestamp = DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"),
+            Type = "system",
+            IsRead = false
+        });
+
         await _context.SaveChangesAsync();
 
         var sections = new List<string>();
@@ -1610,7 +1867,7 @@ public class TutorsController : ControllerBase
         return Ok(new { message = "Decisions applied and tutor notified.", verified = fullyApproved });
     }
 
-    private static TutorDto MapToDto(Tutor t, Dictionary<string, List<string>>? syllabusMap = null)
+    private static TutorDto MapToDto(Tutor t, Dictionary<string, List<string>>? syllabusMap = null, ClassRemarkSummaryDto? featuredRemark = null)
     {
         var sm = syllabusMap ?? new Dictionary<string, List<string>>();
         return new()
@@ -1641,13 +1898,14 @@ public class TutorsController : ControllerBase
             SortOrder = d.SortOrder, Status = d.Status, AdminNote = d.AdminNote, UploadedAt = d.UploadedAt,
             ReplacesDocumentId = d.ReplacesDocumentId
         }).ToList(),
-        Reviews = t.Reviews.Select(r => new ReviewDto { Author = r.Author, Text = r.Text, Rating = r.Rating }).ToList(),
+        FeaturedRemark = featuredRemark,
         Timetable = t.TimeSlots.Select(s => new TimeSlotDto
         {
             Id = s.Id, Day = s.Day, Time = s.Time, Status = s.Status, BookingId = s.BookingId,
             EndTime = s.EndTime, Mode = s.Mode, Subject = s.Subject, Level = s.Level, Country = s.Country,
             ClassSize = s.ClassSize, MaxStudents = s.MaxStudents, ConfirmedCount = s.ConfirmedCount,
             IsFull = s.IsFull, PricePerLesson = s.PricePerLesson, PresetGroupId = s.PresetGroupId,
+            VideoConferenceLink = s.VideoConferenceLink,
             SyllabusTopics = s.PresetGroupId != null && sm.TryGetValue(s.PresetGroupId, out var topics)
                 ? topics : new List<string>()
         }).ToList(),
