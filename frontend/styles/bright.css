@@ -776,3 +776,16 @@ aside.sidebar > nav { padding: 0 !important; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ── Profile dock (30092026 feature) inside Bright ─────────────────────
+   profile-menu.html is the sidebar's first child, which Bright already gives
+   the dashed divider + padding, so the dock drops its own divider/spacing and
+   wears the Bright blob avatar. The header dock gets the same avatar. */
+.sidebar .profile-menu-wrap { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+.sidebar .profile-menu-trigger { gap: 12px; }
+.sidebar .profile-menu-avatar,
+.header-profile-menu .profile-menu-avatar {
+  background: var(--p-yellow); color: var(--navy);
+  font-family: var(--font-heading); font-weight: 800;
+}
+.sidebar .profile-menu-avatar { width: 44px; height: 42px; border-radius: 52% 48% 58% 42%/46% 56% 44% 54%; font-size: 19px; }

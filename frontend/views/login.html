@@ -29,11 +29,11 @@
     <form ng-if="auth.mode === 'login'" ng-submit="auth.login()">
       <div class="bs-field">
         <label for="login-email">Email Address</label>
-        <input id="login-email" class="bs-input" type="email" ng-model="auth.loginData.email" required placeholder="sarah.tan@example.com" autocomplete="username" />
+        <input id="login-email" class="bs-input" type="email" ng-model="auth.loginData.email" required ng-keydown="$event.keyCode === 13 && ($event.preventDefault() || auth.login())" placeholder="sarah.tan@example.com" autocomplete="username" />
       </div>
       <div class="bs-field">
         <label for="login-password">Password</label>
-        <input id="login-password" class="bs-input" type="password" ng-model="auth.loginData.password" required placeholder="••••••••" autocomplete="current-password" />
+        <input id="login-password" class="bs-input" type="password" ng-model="auth.loginData.password" required ng-keydown="$event.keyCode === 13 && ($event.preventDefault() || auth.login())" placeholder="••••••••" autocomplete="current-password" />
       </div>
       <p style="text-align:right; margin:0;">
         <a href="" class="bs-btn bs-btn-ghost" style="min-height:36px;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>

@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', '$document', 'AuthService', 'TutorService',
+.controller('TutorCtrl', ['$scope', '$location', '$route', '$timeout', '$interval', '$q', '$document', 'AuthService', 'TutorService',
   'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService', 'RemarkService', 'PayoutService',
-function ($scope, $location, $timeout, $interval, $q, $document, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService, PayoutService) {
+function ($scope, $location, $route, $timeout, $interval, $q, $document, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService, PayoutService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -48,6 +48,25 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   self.activeTab = 'overview';
   // Sub-tab inside Edit Profile: 'verification' | 'offerings'
   self.profileTab = 'verification';
+
+  // Breadcrumb "reload" (the current page/tab name in the breadcrumb bar):
+  // re-runs this route so everything re-fetches, but lands back on the same
+  // tab/sub-tab instead of the default Overview tab — the tab only lives in
+  // controller state, so it's handed across the reload via sessionStorage.
+  var RELOAD_TAB_KEY = 'ls.tutorReloadTab';
+  try {
+    var _reloadTab = JSON.parse(sessionStorage.getItem(RELOAD_TAB_KEY) || 'null');
+    sessionStorage.removeItem(RELOAD_TAB_KEY);
+    if (_reloadTab) {
+      if (_reloadTab.tab) self.activeTab = _reloadTab.tab;
+      if (_reloadTab.sub) self.profileTab = _reloadTab.sub;
+    }
+  } catch (e) { /* storage blocked — just use the defaults */ }
+
+  self.reloadCurrentView = function () {
+    try { sessionStorage.setItem(RELOAD_TAB_KEY, JSON.stringify({ tab: self.activeTab, sub: self.profileTab })); } catch (e) { /* ignore */ }
+    $route.reload();
+  };
 
   // Edit profile form
   self.profileForm = {};

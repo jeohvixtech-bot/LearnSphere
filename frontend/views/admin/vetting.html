@@ -1,9 +1,7 @@
 <div class="dashboard-layout">
   <aside class="sidebar sidebar-dark">
-    <div class="sidebar-user">
-      <div class="avatar-circle dark">{{ vm.user.name[0] }}</div>
-      <div><strong>{{ vm.user.name }}</strong><small>Admin Dashboard</small></div>
-    </div>
+    <div ng-init="profileName = vm.user.name; profileInitial = vm.user.name[0]; profileRole = 'Admin Dashboard'"
+         ng-include="'views/partials/profile-menu.html'" class="sidebar-user"></div>
     <nav class="sidebar-nav">
       <a href="#!/admin/overview" class="nav-item"><i class="ti ti-chart-bar" aria-hidden="true"></i> Operations Overview</a>
       <a href="#!/admin/vetting" class="nav-item active">
