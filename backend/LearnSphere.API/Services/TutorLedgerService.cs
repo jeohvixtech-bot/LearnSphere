@@ -144,6 +144,69 @@ public class TutorLedgerService : ITutorLedgerService
     // deliberate human decision.
     public async Task<int> ReconcileTutorAsync(int tutorId)
     {
+        // Serialised per tutor. Reconciliation reads the ledger, works out a delta, then
+        // inserts — and two passes running at once both saw "no earning yet" and both wrote
+        // one. The delta logic later noticed the duplicate earning and reversed it, but the
+        // duplicate COMMISSION was never reversed, leaving the tutor short by a full
+        // commission with their promotional credit spent for nothing. Observed in testing
+        // with two settlements 46 microseconds apart.
+        //
+        // A MySQL named lock rather than a transaction: the work spans several SaveChanges
+        // calls and an isolation level alone would not stop two passes both deciding to
+        // insert. Skipped for non-relational providers so the in-memory test database,
+        // which is single-threaded per test anyway, still works.
+        if (!_context.Database.IsRelational())
+            return await ReconcileTutorCoreAsync(tutorId);
+
+        var conn = _context.Database.GetDbConnection();
+        var openedHere = conn.State != System.Data.ConnectionState.Open;
+        if (openedHere) await conn.OpenAsync();
+
+        var lockName = $"learnsphere:ledger:{tutorId}";
+        try
+        {
+            await using (var acquire = conn.CreateCommand())
+            {
+                // Waits rather than failing: the other pass is about to finish, and the
+                // caller wants a correct balance more than an immediate one.
+                acquire.CommandText = "SELECT GET_LOCK(@n, 10)";
+                var p1 = acquire.CreateParameter();
+                p1.ParameterName = "@n";
+                p1.Value = lockName;
+                acquire.Parameters.Add(p1);
+
+                var got = await acquire.ExecuteScalarAsync();
+                if (got is null || Convert.ToInt64(got) != 1)
+                {
+                    // Ten seconds of contention means something is wrong upstream. Returning
+                    // without writing is the safe direction: a stale balance is recoverable,
+                    // a double-charged commission is not.
+                    _logger.LogWarning(
+                        "Could not acquire the ledger lock for tutor {TutorId}; skipping this pass", tutorId);
+                    return 0;
+                }
+            }
+
+            return await ReconcileTutorCoreAsync(tutorId);
+        }
+        finally
+        {
+            await using (var release = conn.CreateCommand())
+            {
+                release.CommandText = "SELECT RELEASE_LOCK(@n)";
+                var p2 = release.CreateParameter();
+                p2.ParameterName = "@n";
+                p2.Value = lockName;
+                release.Parameters.Add(p2);
+                await release.ExecuteScalarAsync();
+            }
+
+            if (openedHere) await conn.CloseAsync();
+        }
+    }
+
+    private async Task<int> ReconcileTutorCoreAsync(int tutorId)
+    {
         var entries = await _context.TutorLedgerEntries
             .Where(e => e.TutorId == tutorId)
             .ToListAsync();
@@ -272,11 +335,16 @@ public class TutorLedgerService : ITutorLedgerService
             await _context.SaveChangesAsync();
         }
 
+        // Unwind first, then consume. A refunded invoice's offset has to come back before
+        // the freed credit is offered to any commission still outstanding, otherwise the
+        // same credit could look spent twice within one pass.
+        var unwound = await UnwindOffsetsForReversedCommissionsAsync(tutorId);
+
         // Credit is consumed only after commission entries are committed, because it pays
         // off charges that must already exist to be paid off.
         var consumed = await ConsumeCreditAgainstCommissionAsync(tutorId);
 
-        return appended.Count + consumed;
+        return appended.Count + unwound + consumed;
     }
 
     // The platform's one-time finder's fee on a match's first tuition period. At the launch
@@ -380,6 +448,77 @@ public class TutorLedgerService : ITutorLedgerService
                 Reason = $"Commission returned — {invoiceNumber} {status.ToLowerInvariant()}"
             });
         }
+    }
+
+    // Reverses an offset once the invoice behind it has been refunded or cancelled.
+    //
+    // The commission reversal alone is not enough. An offset paid that commission out of
+    // promotional credit, so reversing only the charge leaves the tutor holding withdrawable
+    // money for a booking that no longer exists, while the credit they spent on it stays
+    // gone. Both halves are undone here, as a matched pair, mirroring how they were written.
+    private async Task<int> UnwindOffsetsForReversedCommissionsAsync(int tutorId)
+    {
+        var entries = await _context.TutorLedgerEntries
+            .Where(e => e.TutorId == tutorId)
+            .ToListAsync();
+
+        // Invoices whose first-match commission has been handed back.
+        var reversedInvoices = entries
+            .Where(e => e.Type == LedgerEntryType.FirstMatchCommissionReversal && e.InvoiceId != null)
+            .Select(e => e.InvoiceId!.Value)
+            .ToHashSet();
+
+        if (reversedInvoices.Count == 0) return 0;
+
+        // Already unwound ones are never revisited — this is what keeps the pass idempotent.
+        var alreadyUnwound = entries
+            .Where(e => e.Type == LedgerEntryType.CommissionOffsetReversal && e.InvoiceId != null)
+            .Select(e => e.InvoiceId!.Value)
+            .ToHashSet();
+
+        var written = new List<TutorLedgerEntry>();
+
+        foreach (var invoiceId in reversedInvoices.Where(i => !alreadyUnwound.Contains(i)))
+        {
+            var offset = entries
+                .Where(e => e.Type == LedgerEntryType.CommissionOffset && e.InvoiceId == invoiceId)
+                .Sum(e => e.Amount);
+
+            if (offset <= 0m) continue;   // nothing was ever offset on this invoice
+
+            written.Add(new TutorLedgerEntry
+            {
+                TutorId = tutorId,
+                Fund = LedgerFund.Withdrawable,
+                Type = LedgerEntryType.CommissionOffsetReversal,
+                Amount = -offset,
+                InvoiceId = invoiceId,
+                Reason = "Commission offset reversed — booking refunded"
+            });
+
+            // Return the credit to the grants it was drawn from, so a grant that is still
+            // live becomes spendable again rather than being lost to a cancelled booking.
+            foreach (var consumption in entries.Where(e => e.Type == LedgerEntryType.CreditConsumption
+                                                        && e.InvoiceId == invoiceId))
+            {
+                written.Add(new TutorLedgerEntry
+                {
+                    TutorId = tutorId,
+                    Fund = LedgerFund.Credit,
+                    Type = LedgerEntryType.CreditRestored,
+                    Amount = -consumption.Amount,          // consumption is negative
+                    InvoiceId = invoiceId,
+                    SourceEntryId = consumption.SourceEntryId,
+                    Reason = "Promotional credit returned — booking refunded"
+                });
+            }
+        }
+
+        if (written.Count == 0) return 0;
+
+        _context.TutorLedgerEntries.AddRange(written);
+        await _context.SaveChangesAsync();
+        return written.Count;
     }
 
     // Spends promotional credit against first-match commission that has actually been

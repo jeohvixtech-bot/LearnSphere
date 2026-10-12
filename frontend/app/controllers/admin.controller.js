@@ -391,7 +391,16 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
   self.batchBusy = false;
   self.batchError = '';
   self.cutoffResult = null;
-  self.cutoffPeriod = new Date().toISOString().substring(0, 7);
+  // A Date, not a string: the Period box is <input type="month">, which Angular will only
+  // bind to a Date. Formatted to "yyyy-MM" on send (see runCutoff) — serialising the Date
+  // raw shifted it into UTC and the API rejected it.
+  var now = new Date();
+  self.cutoffPeriod = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  function periodOf(d) {
+    if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+  }
 
   self.loadBatches = function () {
     AdminService.getPayoutBatches().then(function (res) { self.batches = res.data; })
@@ -413,7 +422,7 @@ function ($location, $timeout, $filter, AuthService, AdminService, TutorService,
     self.cutoffResult = null;
     self.batchBusy = true;
 
-    AdminService.runCutoff(self.cutoffPeriod).then(function (res) {
+    AdminService.runCutoff(periodOf(self.cutoffPeriod)).then(function (res) {
       self.batchBusy = false;
       self.cutoffResult = res.data;
       self.loadBatches();

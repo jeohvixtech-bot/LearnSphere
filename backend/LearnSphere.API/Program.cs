@@ -2,12 +2,34 @@ using System.Text;
 using LearnSphere.API.Data;
 using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── Upload size limits ──────────────────────────────────────────────────
+// UploadController accepts intro videos of 10-100 MB, but Kestrel's default request body
+// cap is ~28.6 MB and the multipart form cap is 128 MB. Without raising the first, a
+// video over ~28.6 MB is rejected with a bare 413 before the controller ever runs, so the
+// caller never sees the friendly "Video must be between 10 MB and 100 MB" message and the
+// upload simply appears to fail. Kept a little above 100 MB to leave room for multipart
+// framing overhead, which is counted against these limits but is not part of the file.
+const long MaxUploadBytes = 110L * 1024 * 1024;
+
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxUploadBytes);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = MaxUploadBytes;
+    o.MultipartHeadersLengthLimit = 32 * 1024;
+});
+
+// Note: a host in front of Kestrel enforces its own cap and ignores these. IIS defaults to
+// ~28.6 MB (maxAllowedContentLength in web.config) and nginx to 1 MB
+// (client_max_body_size) — the nginx default is low enough to reject ordinary documents,
+// not just videos, so it has to be raised there too.
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -16,6 +38,24 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]!;
+
+// Outside Development the committed appsettings.json values must have been overridden
+// (Jwt__Key, ConnectionStrings__DefaultConnection, AllowedOrigins__0 as environment
+// variables). Refusing to start is deliberate: with the sample key anyone holding the
+// repository can mint an admin token.
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Contains("CHANGE_IN_PRODUCTION") || jwtKey.Length < 32)
+        throw new InvalidOperationException(
+            "Jwt:Key is the sample value from appsettings.json (or shorter than 32 characters). " +
+            "Set the Jwt__Key environment variable to a random secret before running outside Development.");
+
+    var origins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+    if (origins == null || origins.Length == 0 || origins.Contains("*"))
+        Console.Error.WriteLine(
+            "WARNING: AllowedOrigins is \"*\" — any website may call this API with a signed-in user's token. " +
+            "Set AllowedOrigins__0 to the frontend's https origin.");
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -2802,21 +2842,57 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
     }
 }
 
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// ── Behind a reverse proxy ──────────────────────────────────────────────
+// UploadController hands back an absolute URL built from Request.Scheme and Request.Host.
+// A proxy that terminates TLS forwards the request to Kestrel over plain HTTP, so without
+// this the URL comes back as http://internal-host/uploads/... — which an HTTPS page
+// refuses to load as mixed content, making a perfectly good upload look like a failure.
+//
+// Opt-in rather than always-on: these headers are client-supplied, so trusting them when
+// the app is NOT behind a proxy would let a caller spoof the scheme and host. The proxy
+// list is cleared because a containerised proxy's IP is rarely known ahead of time, which
+// is safe precisely because this only runs when an operator has declared the deployment
+// proxied.
+if (app.Configuration.GetValue<bool>("BehindReverseProxy"))
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "LearnSphere API v1");
-    c.RoutePrefix = string.Empty; // Swagger at root: http://localhost:5000/
-});
+    var forwarded = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                         | ForwardedHeaders.XForwardedProto
+                         | ForwardedHeaders.XForwardedHost
+    };
+    forwarded.KnownNetworks.Clear();
+    forwarded.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwarded);
+}
+
+// Swagger only in Development (or with EnableSwagger=true) — the full API surface should
+// not be browsable on the production host.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("EnableSwagger"))
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "LearnSphere API v1");
+        c.RoutePrefix = string.Empty; // Swagger at root: http://localhost:5000/
+    });
+}
 
 app.UseCors("AllowFrontend");
 
 var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(wwwrootPath);
+
+// Static file serving runs BEFORE authentication, so anything reachable here is public.
+// Profile photos are meant to be — they are shown to parents browsing the catalogue.
+// Verification documents are NOT: they are identity papers, and they are served instead by
+// DocumentsController, which checks the caller is the owning tutor or an admin.
+var profilesPath = Path.Combine(wwwrootPath, "uploads", "profiles");
+Directory.CreateDirectory(profilesPath);
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(wwwrootPath),
-    RequestPath = ""
+    FileProvider = new PhysicalFileProvider(profilesPath),
+    RequestPath = "/uploads/profiles"
 });
 
 app.UseAuthentication();

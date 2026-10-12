@@ -35,6 +35,9 @@ public class AuthController : ControllerBase
         var nameError = NameValidator.Validate(dto.Name);
         if (nameError != null) return BadRequest(new { message = nameError });
 
+        var passwordError = PasswordValidator.Validate(dto.Password);
+        if (passwordError != null) return BadRequest(new { message = passwordError });
+
         var result = await _authService.RegisterAsync(dto);
         if (result == null) return BadRequest(new { message = "Email already in use." });
         return Ok(result);
@@ -63,6 +66,9 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
     {
+        var passwordError = PasswordValidator.Validate(dto.NewPassword);
+        if (passwordError != null) return BadRequest(new { message = passwordError });
+
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var success = await _authService.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
         if (!success) return BadRequest(new { message = "Current password is incorrect." });
