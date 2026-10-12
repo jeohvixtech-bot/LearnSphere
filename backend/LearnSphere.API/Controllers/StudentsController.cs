@@ -38,6 +38,9 @@ public class StudentsController : ControllerBase
         var goalError = ProfanityFilter.Validate(dto.LearningGoal);
         if (goalError != null) return BadRequest(new { message = goalError });
 
+        var schoolError = ProfanityFilter.Validate(dto.School);
+        if (schoolError != null) return BadRequest(new { message = schoolError });
+
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var nameTaken = await _context.Students.AnyAsync(s =>
@@ -82,6 +85,11 @@ public class StudentsController : ControllerBase
         {
             var goalError = ProfanityFilter.Validate(dto.LearningGoal);
             if (goalError != null) return BadRequest(new { message = goalError });
+        }
+        if (dto.School != null)
+        {
+            var schoolError = ProfanityFilter.Validate(dto.School);
+            if (schoolError != null) return BadRequest(new { message = schoolError });
         }
         if (dto.BirthDate != null) student.BirthDate = dto.BirthDate;
         if (dto.School != null) student.School = dto.School;

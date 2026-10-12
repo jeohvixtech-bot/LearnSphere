@@ -4,28 +4,19 @@
 // to bind directly in ng-options/ng-repeat without triggering AngularJS's
 // infinite-digest guard, which fires when a watched collection is a new array
 // of new objects on every check.
-angular.module('learnSphereApp')
-.constant('SubjectCatalog', (function () {
-  function flatten(examDefs) {
-    var out = [];
-    examDefs.forEach(function (def) {
-      var subjects = def.compulsory.concat(def.elective);
-      subjects.forEach(function (subject) {
-        def.levels.forEach(function (level) {
-          out.push({
-            examType: def.examType,
-            subject: subject,
-            level: level,
-            label: subject + '(' + level + ')'
-          });
-        });
-      });
-    });
-    return out;
-  }
-
-  return {
-    Singapore: flatten([
+//
+// Both SubjectCatalog (the flattened {examType, subject, level, label} rows
+// most consumers already use) and SubjectCatalogExamTypes (the exam-type ->
+// ordered-levels metadata the Subject filter picker's 3-step drill-down needs
+// for Step 1's age-range subtitle and Step 3's level list — see
+// parent.controller.js's buildSubjectExamTypeStep/buildSubjectLevelStep) are
+// derived from one shared EXAM_DEFS source below, so the level lists exist in
+// exactly one place. Everything stays inside this IIFE — a plain <script> tag
+// with no module system, so a top-level var/function here would otherwise
+// leak onto window.
+(function () {
+  var EXAM_DEFS = {
+    Singapore: [
       {
         examType: 'PSLE',
         levels: ['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6'],
@@ -44,8 +35,8 @@ angular.module('learnSphereApp')
         compulsory: ['General Paper'],
         elective: ['H2 Mathematics', 'H2 Further Mathematics', 'H2 Physics', 'H2 Chemistry', 'H2 Biology', 'H2 Economics', 'H2 History', 'H2 Geography', 'H2 Literature in English', 'H1 Project Work']
       }
-    ]),
-    Malaysia: flatten([
+    ],
+    Malaysia: [
       {
         examType: 'UPSR',
         levels: ['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6'],
@@ -70,6 +61,40 @@ angular.module('learnSphereApp')
         compulsory: ['General Studies'],
         elective: ['Mathematics (T)', 'Further Mathematics (T)', 'Physics', 'Chemistry', 'Biology', 'Economics', 'History', 'Geography', 'Literature in English', 'Accounting', 'Business Studies']
       }
-    ])
+    ]
   };
-})());
+
+  function flatten(examDefs) {
+    var out = [];
+    examDefs.forEach(function (def) {
+      var subjects = def.compulsory.concat(def.elective);
+      subjects.forEach(function (subject) {
+        def.levels.forEach(function (level) {
+          out.push({
+            examType: def.examType,
+            subject: subject,
+            level: level,
+            label: subject + '(' + level + ')'
+          });
+        });
+      });
+    });
+    return out;
+  }
+
+  function examTypesOf(examDefs) {
+    return examDefs.map(function (def) {
+      return { examType: def.examType, levels: def.levels };
+    });
+  }
+
+  angular.module('learnSphereApp')
+  .constant('SubjectCatalog', {
+    Singapore: flatten(EXAM_DEFS.Singapore),
+    Malaysia: flatten(EXAM_DEFS.Malaysia)
+  })
+  .constant('SubjectCatalogExamTypes', {
+    Singapore: examTypesOf(EXAM_DEFS.Singapore),
+    Malaysia: examTypesOf(EXAM_DEFS.Malaysia)
+  });
+})();

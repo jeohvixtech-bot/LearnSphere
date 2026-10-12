@@ -1,9 +1,9 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('TutorCtrl', ['$scope', '$location', '$timeout', '$interval', '$q', '$document', 'AuthService', 'TutorService',
+.controller('TutorCtrl', ['$scope', '$location', '$route', '$timeout', '$interval', '$q', '$document', 'AuthService', 'TutorService',
   'BookingService', 'ChatService', 'InvoiceService', 'ScheduleService', 'SubjectCatalog', 'TeachingModesCatalog', 'ProfanityFilterService', 'RemarkService', 'PayoutService',
-function ($scope, $location, $timeout, $interval, $q, $document, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService, PayoutService) {
+function ($scope, $location, $route, $timeout, $interval, $q, $document, AuthService, TutorService, BookingService, ChatService, InvoiceService, ScheduleService, SubjectCatalog, TeachingModesCatalog, ProfanityFilterService, RemarkService, PayoutService) {
   var self = this;
   var user = AuthService.getCurrentUser();
   self.user = user;
@@ -48,6 +48,25 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   self.activeTab = 'overview';
   // Sub-tab inside Edit Profile: 'verification' | 'offerings'
   self.profileTab = 'verification';
+
+  // Breadcrumb "reload" (the current page/tab name in the breadcrumb bar):
+  // re-runs this route so everything re-fetches, but lands back on the same
+  // tab/sub-tab instead of the default Overview tab — the tab only lives in
+  // controller state, so it's handed across the reload via sessionStorage.
+  var RELOAD_TAB_KEY = 'ls.tutorReloadTab';
+  try {
+    var _reloadTab = JSON.parse(sessionStorage.getItem(RELOAD_TAB_KEY) || 'null');
+    sessionStorage.removeItem(RELOAD_TAB_KEY);
+    if (_reloadTab) {
+      if (_reloadTab.tab) self.activeTab = _reloadTab.tab;
+      if (_reloadTab.sub) self.profileTab = _reloadTab.sub;
+    }
+  } catch (e) { /* storage blocked — just use the defaults */ }
+
+  self.reloadCurrentView = function () {
+    try { sessionStorage.setItem(RELOAD_TAB_KEY, JSON.stringify({ tab: self.activeTab, sub: self.profileTab })); } catch (e) { /* ignore */ }
+    $route.reload();
+  };
 
   // Edit profile form
   self.profileForm = {};
@@ -334,6 +353,8 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
       self.bulletinDisputeError = 'Please explain why you\'re requesting this remark be hidden.';
       return;
     }
+    self.bulletinDisputeError = ProfanityFilterService.validate(self.bulletinDisputeReason);
+    if (self.bulletinDisputeError) return;
     var remark = self.bulletinDisputeFormFor;
     RemarkService.dispute(remark.id, self.bulletinDisputeReason.trim()).then(function () {
       remark.status = 'dispute_requested';
@@ -732,6 +753,11 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
         self.reportError[key] = 'Please select homework completion.';
         return;
       }
+    }
+    var remarksError = ProfanityFilterService.validate(form.remarks);
+    if (remarksError) {
+      self.reportError[key] = remarksError;
+      return;
     }
 
     self.reportError[key]   = null;
@@ -1721,14 +1747,14 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
 
   self.setupClassSelectedDates = function () {
     return self.selectedCalDays
-      .filter(function (d) { return !self.isPastDay(d); })
+      .filter(function (d) { return self.dateBypassActive() || !self.isPastDay(d); })
       .slice().sort(function (a, b) { return a - b; })
       .map(calDayStr);
   };
 
   self.setupClassSelectedDatesLabel = function () {
     var days = self.selectedCalDays
-      .filter(function (d) { return !self.isPastDay(d); })
+      .filter(function (d) { return self.dateBypassActive() || !self.isPastDay(d); })
       .slice().sort(function (a, b) { return a - b; });
     if (!days.length) return '';
     return days.join(', ') + ' · ' + self.calYear;
@@ -2070,7 +2096,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     var slots = [];
     var earlyDate = null;
     Object.keys(self.setupClassSlots).forEach(function (dateStr) {
-      if (!earlyDate && isBeforeNextMonth(dateStr)) earlyDate = dateStr;
+      if (!earlyDate && !self.dateBypassActive() && isBeforeNextMonth(dateStr)) earlyDate = dateStr;
       (self.setupClassSlots[dateStr] || []).forEach(function (r) {
         slots.push({ date: dateStr, startTime: r.start, endTime: r.end, durationMinutes: r.endMin - r.startMin });
       });
@@ -2108,6 +2134,25 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
       self.setupClassSaving = false;
       self.setupClassError = (err.data && err.data.message) ? err.data.message : 'Failed to save. Please try again.';
     });
+  };
+
+  // ── Test mode: date-rule bypass toggle ─────────────────────────────
+  // Only available when vm.tutor.testModeEnabled (on by default, switched off
+  // via SQL — see Tutor.TestModeEnabled). While ON, Setup Class accepts dates
+  // in the current month and before today; the backend already skips its
+  // "next month onward" check for test-mode tutors. Remembered per browser.
+  var DATE_BYPASS_KEY = 'ls.tutorDateBypass';
+  self.dateBypassOn = false;
+  try { self.dateBypassOn = localStorage.getItem(DATE_BYPASS_KEY) === '1'; } catch (e) { /* storage blocked */ }
+
+  self.dateBypassActive = function () {
+    return !!(self.dateBypassOn && self.tutor && self.tutor.testModeEnabled);
+  };
+
+  self.toggleDateBypass = function () {
+    if (!self.tutor || !self.tutor.testModeEnabled) return;
+    self.dateBypassOn = !self.dateBypassOn;
+    try { localStorage.setItem(DATE_BYPASS_KEY, self.dateBypassOn ? '1' : '0'); } catch (e) { /* storage blocked */ }
   };
 
   self.getInvoice = function (bookingId) {
@@ -2422,6 +2467,10 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     stagedList: []
   };
   self.verifSubmitting = false;
+  // Profile sub-tab (optional docs) has its own single submit — see submitProfileDocs.
+  self.profileSubmitting = false;
+  self.profileSubmitError = '';
+  self.profileSubmitSuccess = false;
 
   // Shape-only validation (no checksum) — mirrors TutorsController.SaveDocument's
   // server-side patterns. Passport intentionally has no pattern: admin relies on
@@ -2523,6 +2572,53 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   };
 
   var ACADEMIC_LEVEL_TYPES = ['o_level', 'a_level', 'degree', 'postgrad'];
+  // identity_photo/profile_photo are single-slot (getDocSingle) — there is
+  // never a second one to fall back on, so removing the only copy always
+  // empties that mandatory requirement. Academic quals are multi-slot and
+  // multi-type instead (see removalBlockedReason below, which checks across
+  // all four ACADEMIC_LEVEL_TYPES combined, not just the one being removed).
+  var SINGLE_SLOT_MANDATORY_TYPES = ['identity_photo', 'profile_photo'];
+  // File-based, non-mandatory types. These live on the Profile sub-tab (with
+  // the link-only intro_video) and are committed by its own Submit button
+  // (see submitProfileDocs), never by "Submit for verification", since none
+  // of them is required for verification to proceed.
+  var OPTIONAL_FILE_TYPES = ['nie_cert', 'specialist_cert'];
+  function isOptionalStaged(item) { return OPTIONAL_FILE_TYPES.indexOf(item.docType) >= 0; }
+  function mandatoryStaged() { return (self.verif.stagedList || []).filter(function (s) { return !isOptionalStaged(s); }); }
+  function optionalStaged() { return (self.verif.stagedList || []).filter(isOptionalStaged); }
+
+  // Null when removing `doc` is fine; otherwise a user-facing reason it's
+  // blocked. Only mandatory slots can ever be blocked — non-mandatory docs
+  // (including intro_video, which isn't in either list below) are never
+  // "required," so this always returns null for them.
+  function removalBlockedReason(doc) {
+    if (SINGLE_SLOT_MANDATORY_TYPES.indexOf(doc.documentType) >= 0) {
+      return 'Required — upload a replacement before removing this.';
+    }
+    if (ACADEMIC_LEVEL_TYPES.indexOf(doc.documentType) >= 0) {
+      // Same "currently live" definition getDocs/getDocSingle use elsewhere
+      // (fileUrl set, not superseded by a later replacement row) — otherwise
+      // an old, already-replaced academic doc could count as "another" one
+      // and wrongly let this removal through.
+      var stillHasAnother = (self.tutor.documents || []).some(function (d) {
+        return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl && d.id !== doc.id && !isSuperseded(d);
+      });
+      if (!stillHasAnother) return 'This is your only academic qualification on file — upload another before removing it.';
+    }
+    return null;
+  }
+
+  self.canRemoveVerifDoc = function (doc) {
+    return !self.isVerifLocked() && !removalBlockedReason(doc);
+  };
+
+  self.removeVerifDocBlockedReason = function (doc) {
+    return removalBlockedReason(doc);
+  };
+
+  self.isOptionalDocType = function (type) {
+    return OPTIONAL_FILE_TYPES.indexOf(type) >= 0;
+  };
 
   // Static, not rebuilt per digest — ng-repeat over a fresh array literal in the
   // template tears down and rebuilds every row each cycle (same trap documented
@@ -2541,26 +2637,37 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // Backs both the "N of 3 documents uploaded" count and its hover checklist
   // (see mandatoryDocsChecklist) — one source of truth for what "done" means
   // for each of the 3 mandatory slots, so the two can't drift apart.
+  //
+  // Memoized: the checklist is rendered via ng-repeat (see the verification
+  // hover tooltip in overview.html), and this function used to build a
+  // brand-new array of brand-new objects on every call — a well-known
+  // AngularJS trap (this file already avoids it elsewhere via pre-built
+  // constants like SubjectCatalog) that trips the $rootScope:infdig guard
+  // once enough other watchers are competing in the same digest. Returning
+  // the SAME array/object references when nothing actually changed fixes it
+  // without changing the function's return shape or call sites.
+  var _mandatoryDocsChecklistCache = null;
   self.mandatoryDocsChecklist = function () {
     var docs = self.tutor.documents || [];
     function hasType(type) {
       return docs.some(function (d) { return d.documentType === type && d.fileUrl; }) || self.getStagedNew(type).length > 0;
     }
+    var idDone = hasType('identity_photo');
+    var profileDone = hasType('profile_photo');
     var academicDone = docs.some(function (d) { return ACADEMIC_LEVEL_TYPES.indexOf(d.documentType) >= 0 && d.fileUrl; })
       || ACADEMIC_LEVEL_TYPES.some(function (t) { return self.getStagedNew(t).length > 0; });
-    var items = [
-      { label: 'Identity photo', done: hasType('identity_photo') },
-      { label: 'Profile photo', done: hasType('profile_photo') },
+
+    var c = _mandatoryDocsChecklistCache;
+    if (c && c[0].done === idDone && c[1].done === profileDone && c[2].done === academicDone) {
+      return c;
+    }
+    _mandatoryDocsChecklistCache = [
+      { label: 'Identity photo', done: idDone },
+      { label: 'Profile photo', done: profileDone },
       { label: 'Academic qualification', done: academicDone }
     ];
-    // Hand back the SAME array while nothing has changed. ng-repeat watches the
-    // collection every digest; a fresh array of fresh objects on each call read as
-    // "3 items changed" forever and Angular gave up with $rootScope:infdig.
-    var sig = items.map(function (i) { return i.label + ':' + i.done; }).join('|');
-    if (sig !== _checklistCache.sig) _checklistCache = { sig: sig, items: items };
-    return _checklistCache.items;
+    return _mandatoryDocsChecklistCache;
   };
-  var _checklistCache = { sig: null, items: [] };
 
   self.mandatoryDocsUploadedCount = function () {
     return self.mandatoryDocsChecklist().filter(function (item) { return item.done; }).length;
@@ -2597,8 +2704,7 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
   // that shouldn't drag the profile back into review (see submit-verification
   // backend endpoint, which independently enforces the same no-op).
   self.hasPendingVerificationChanges = function () {
-    if ((self.verif.stagedList || []).length > 0) return true;
-    if (self.canEditIntroVideo() && (self.verif.introVideoLink || '').trim()) return true;
+    if (mandatoryStaged().length > 0) return true;
     if (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged()) return true;
     return false;
   };
@@ -2650,6 +2756,60 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     if (!self.isVerifLocked()) return true;
     var d = self.getDocSingle('intro_video');
     return !!d && d.status === 'rejected';
+  };
+
+  // Profile sub-tab: anything to send? Staged optional files, or a typed
+  // intro video link (only while that field is editable).
+  self.hasPendingProfileChanges = function () {
+    if (optionalStaged().length > 0) return true;
+    return self.canEditIntroVideo() && !!(self.verif.introVideoLink || '').trim();
+  };
+
+  // Single Submit for the Profile sub-tab. Uploads+saves every staged
+  // optional file and the intro video link, independently of the mandatory
+  // verification flow. Items that succeed are un-staged; failures stay staged
+  // with their error shown inline so the picked file isn't lost.
+  self.submitProfileDocs = function () {
+    if (!self.hasPendingProfileChanges() || self.profileSubmitting) return;
+    self.profileSubmitError = '';
+    self.profileSubmitting = true;
+    self.verif.errorMap.intro_video = null;
+    var anyFailed = false;
+
+    var fileSaves = optionalStaged().map(function (item) {
+      self.verif.errorMap[item.docType] = null;
+      return _flushOneStagedItem(item).then(function () {
+        self.unstageVerifDoc(item._stagedId);
+      }, function (err) {
+        anyFailed = true;
+        self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
+      });
+    });
+
+    var link = (self.verif.introVideoLink || '').trim();
+    var linkSave = (self.canEditIntroVideo() && link)
+      ? TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: link }).then(function () {
+          self.verif.introVideoLink = '';
+        }, function (err) {
+          anyFailed = true;
+          self.verif.errorMap.intro_video = _extractErrorMessage(err, 'Failed to save video link.');
+        })
+      : $q.when();
+
+    $q.all(fileSaves.concat([linkSave])).then(function () {
+      return self._refreshTutor();
+    }).then(function () {
+      if (anyFailed) {
+        self.profileSubmitError = 'Some items could not be saved — see the errors above.';
+        return;
+      }
+      self.profileSubmitSuccess = true;
+      $timeout(function () { self.profileSubmitSuccess = false; }, 3000);
+    }).catch(function (err) {
+      self.profileSubmitError = _extractErrorMessage(err, 'Submission failed. Please try again.');
+    }).finally(function () {
+      self.profileSubmitting = false;
+    });
   };
 
   var _stagedIdSeq = 0;
@@ -2715,9 +2875,9 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     });
   };
 
-  self.removeVerifDoc = function (docId) {
-    if (self.isVerifLocked()) return;
-    TutorService.removeDocument(self.tutor.id, docId)
+  self.removeVerifDoc = function (doc) {
+    if (!self.canRemoveVerifDoc(doc)) return;
+    TutorService.removeDocument(self.tutor.id, doc.id)
       .then(function () { return self._refreshTutor(); })
       .catch(function () { /* Non-fatal */ });
   };
@@ -2743,32 +2903,69 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     });
   };
 
-  // Uploads+saves every staged file in order (not in parallel), so a failure
-  // stops the chain right where it happened and errorMap points at the exact
-  // doc that failed, instead of an ambiguous "something in the batch broke."
-  function _flushStagedDocs(items) {
-    return items.reduce(function (chain, item) {
-      return chain.then(function () {
-        return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
-          return TutorService.saveDocument(self.tutor.id, {
-            documentType: item.docType,
-            fileUrl: res.data.url,
-            fileName: res.data.fileName,
-            fileSizeBytes: res.data.fileSizeBytes,
-            replacesDocumentId: item.replacesDocumentId || undefined
-          });
-        }).catch(function (err) {
-          self.verif.errorMap[item.docType] = err.data && err.data.message
-            ? err.data.message : ('Failed to upload ' + item.fileName + '. Please try again.');
-          return $q.reject(err);
-        });
-      });
-    }, $q.when());
+  // Pulls a real message out of whatever shape the failure came back in — a
+  // JSON {message}, ASP.NET's default ProblemDetails ({title}/{errors}) for
+  // errors that never reach our own BadRequest calls (e.g. an expired-token
+  // 401, or model-binding rejection), or no body at all (network drop,
+  // request-size limit). Falls back to the generic text + status code rather
+  // than silently swallowing the failure like the plain err.data.message
+  // check used to.
+  function _extractErrorMessage(err, fallback) {
+    if (err.status === 0) return 'Could not reach the server. Check your connection and try again.';
+    if (err.status === 401) return 'Your session has expired. Please log in again.';
+    if (err.status === 413) return 'File is too large for the server to accept.';
+    var data = err.data;
+    if (data && typeof data === 'object') {
+      if (data.message) return data.message;
+      if (data.title) return data.title; // ASP.NET Core ProblemDetails
+      if (data.errors) {
+        var firstField = Object.keys(data.errors)[0];
+        var firstMsg = firstField && data.errors[firstField] && data.errors[firstField][0];
+        if (firstMsg) return firstMsg;
+      }
+    }
+    return fallback + (err.status ? ' (server returned status ' + err.status + ')' : '');
   }
 
+  // Uploads then saves one staged item. Shared by the verification Submit flow
+  // below and the Profile sub-tab's submitProfileDocs.
+  function _flushOneStagedItem(item) {
+    return TutorService.uploadDocument(item.file, item.docType).then(function (res) {
+      return TutorService.saveDocument(self.tutor.id, {
+        documentType: item.docType,
+        fileUrl: res.data.url,
+        fileName: res.data.fileName,
+        fileSizeBytes: res.data.fileSizeBytes,
+        replacesDocumentId: item.replacesDocumentId || undefined
+      });
+    });
+  }
+
+  // Uploads+saves every staged file in parallel. Each item's failure is
+  // caught locally (errorMap gets that doc's real message) rather than
+  // rejecting the item's own promise, so one bad file doesn't stop the rest
+  // from being attempted — every staged doc's error shows after a single
+  // Submit click instead of one new failure surfacing per resubmit attempt.
+  // Once all have settled, the batch rejects (with a sentinel, not a real
+  // HTTP error) if anything failed, so the ID/submit-for-review steps
+  // downstream don't run against a partially-uploaded set.
+  function _flushStagedDocs(items) {
+    var anyFailed = false;
+    return $q.all(items.map(function (item) {
+      return _flushOneStagedItem(item).catch(function (err) {
+        anyFailed = true;
+        self.verif.errorMap[item.docType] = _extractErrorMessage(err, 'Failed to upload ' + item.fileName + '.');
+      });
+    })).then(function () {
+      if (anyFailed) return $q.reject({ uploadFailures: true });
+    });
+  }
+
+  // Clears only mandatory-type staged items — optional ones belong to the
+  // Profile sub-tab and are left for its own Submit.
   function _clearStagedDocs() {
-    (self.verif.stagedList || []).forEach(function (s) { if (s.previewUrl) URL.revokeObjectURL(s.previewUrl); });
-    self.verif.stagedList = [];
+    mandatoryStaged().forEach(function (s) { if (s.previewUrl) URL.revokeObjectURL(s.previewUrl); });
+    self.verif.stagedList = optionalStaged();
   }
 
   // Every doc type is staged client-side only (see verif.stagedList) — this is
@@ -2782,27 +2979,38 @@ function ($scope, $location, $timeout, $interval, $q, $document, AuthService, Tu
     self.verifSubmitError = '';
     self.verifSubmitting = true;
 
-    var staged = (self.verif.stagedList || []).slice();
+    var staged = mandatoryStaged();
 
     _flushStagedDocs(staged).then(function () {
-      var idPromise = (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged())
+      // Intro video and optional certs aren't part of this flow — they're
+      // submitted from the Profile sub-tab (see submitProfileDocs).
+      return (self.canEditIdNumber() && (self.verif.idNumber || '').trim() && self._idNumberChanged())
         ? TutorService.saveDocument(self.tutor.id, { documentType: 'identity_id', idType: self.verif.idType, idNumber: self.verif.idNumber })
         : $q.when();
-      var videoPromise = (self.canEditIntroVideo() && (self.verif.introVideoLink || '').trim())
-        ? TutorService.saveDocument(self.tutor.id, { documentType: 'intro_video', externalUrl: self.verif.introVideoLink })
-        : $q.when();
-      return $q.all([idPromise, videoPromise]);
     }).then(function () {
       return TutorService.submitVerification(self.tutor.id);
     }).then(function () {
       _clearStagedDocs();
-      self.verif.introVideoLink = '';
       return self._refreshTutor();
     }).then(function () {
       self.verifSubmitSuccess = true;
       $timeout(function () { self.verifSubmitSuccess = false; }, 3000);
     }).catch(function (err) {
+      if (err && err.uploadFailures) {
+        // Each failing doc already shows its own message inline (verif.errorMap)
+        // — no need for a redundant generic banner. Bring the first one into
+        // view so it isn't missed if it's off-screen on this long form.
+        $timeout(function () {
+          var firstFieldError = document.querySelector('.field-error');
+          if (firstFieldError) firstFieldError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        return;
+      }
       self.verifSubmitError = err && err.data && err.data.message ? err.data.message : 'Submission failed. Please try again.';
+      $timeout(function () {
+        var banner = document.getElementById('verifSubmitErrorBanner');
+        if (banner) banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }).finally(function () {
       self.verifSubmitting = false;
     });

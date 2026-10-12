@@ -1,8 +1,8 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('WelcomeCtrl', ['$scope', '$location', '$interval', '$timeout', '$window', 'AuthService', 'TutorService', 'PendingMatchService',
-function ($scope, $location, $interval, $timeout, $window, AuthService, TutorService, PendingMatchService) {
+.controller('WelcomeCtrl', ['$location', 'AuthService', 'TutorService', 'PendingMatchService',
+function ($location, AuthService, TutorService, PendingMatchService) {
   var self = this;
 
   // Navigating to the landing page while signed in ends the session — this is the
@@ -20,15 +20,6 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
   };
 
   self.tutors = [];
-  self.scrollPaused = false;
-
-  self.pauseScroll = function () {
-    self.scrollPaused = true;
-  };
-
-  self.resumeScroll = function () {
-    self.scrollPaused = false;
-  };
 
   TutorService.getAll().then(function (res) {
     // Same rule as the parent catalog's filteredTutors() (tutorHasAnySlots) — a
@@ -39,22 +30,5 @@ function ($scope, $location, $interval, $timeout, $window, AuthService, TutorSer
     self.tutors = (res.data || []).filter(function (t) {
       return (t.timetable || []).some(function (s) { return !!s.mode; });
     });
-    // Wait for the tutor grid to render/paint before measuring scroll height
-    $timeout(startAutoScroll, 300);
   });
-
-  function startAutoScroll() {
-    var scrollTimer = $interval(function () {
-      if (self.scrollPaused) return;
-      var doc = $window.document.documentElement;
-      var atBottom = $window.innerHeight + $window.scrollY >= doc.scrollHeight - 2;
-      if (atBottom) {
-        $interval.cancel(scrollTimer);
-        return;
-      }
-      $window.scrollBy(0, 1);
-    }, 30);
-
-    $scope.$on('$destroy', function () { $interval.cancel(scrollTimer); });
-  }
 }]);

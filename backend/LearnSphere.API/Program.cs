@@ -76,6 +76,7 @@ builder.Services.AddAuthorization();
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPresetCancellationService, PresetCancellationService>();
+builder.Services.AddScoped<IBookingCancellationService, BookingCancellationService>();
 
 // HitPay payment gateway. Credentials aren't read from configuration — they live in the
 // PaymentGatewaySettings table, managed from Admin → Payment Gateway — so nothing needs
@@ -226,6 +227,13 @@ using (var scope = app.Services.CreateScope())
     // Tutor-controlled online/offline switch — offline hides the profile from parent search/booking entirely
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Tutors` ADD COLUMN `IsOnline` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
+    // Test mode (Setup Class date-rule bypass + quick test class button, see Tutor.TestModeEnabled) —
+    // on by default. SET DEFAULT covers databases where the column was first added with DEFAULT 0;
+    // it only changes the default for new rows, never an existing row's value.
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ADD COLUMN `TestModeEnabled` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 1"); } catch { }
     // CounterProposals becomes a per-booking log (was 1-to-1) so every reschedule proposal —
     // by either party — is kept instead of being overwritten by the next one.
     // The old unique index backs a FK, so a replacement non-unique index must exist
@@ -382,6 +390,19 @@ using (var scope = app.Services.CreateScope())
             UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
+    // On databases where EF created this table first, `Key` is LONGTEXT with no
+    // unique index, so the INSERT IGNORE below re-inserted all six rows on every
+    // startup (dozens of duplicate sets). Collapse to one row per Key — keeping
+    // the lowest Id, which is the row UpdateScoringWeightages and the score
+    // calculators have always read/written (FirstOrDefault by Key) — then add
+    // the unique index so INSERT IGNORE actually ignores from now on.
+    await context.Database.ExecuteSqlRawAsync(@"
+        DELETE w FROM `ScoringWeightages` w
+        JOIN `ScoringWeightages` k ON k.`Key` = w.`Key` AND k.`Id` < w.`Id`");
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ScoringWeightages` MODIFY `Key` VARCHAR(20) NOT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `ScoringWeightages` ADD UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)"); } catch { }
     await context.Database.ExecuteSqlRawAsync(@"
         INSERT IGNORE INTO `ScoringWeightages` (`Key`, `Label`, `Percent`, `SortOrder`) VALUES
             ('rating', 'Tutor Rating', 0, 0),

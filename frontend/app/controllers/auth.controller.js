@@ -14,12 +14,26 @@ angular.module('learnSphereApp')
   self.mode = 'login';  // login | register
   self.loginData  = { email: 'sarah.tan@example.com', password: 'Parent@123' };
   self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
+
+  // Welcome page's "I'm a New Parent" / "I'm a New Tutor" buttons link here with
+  // ?mode=register&role=... so a visitor lands straight on the right tab/role
+  // instead of the default Sign In. Still just pre-filling — both stay editable.
+  var params = $location.search();
+  if (params.mode === 'register') self.mode = 'register';
+  if (params.role === 'parent' || params.role === 'tutor') self.registerData.role = params.role;
   self.showTerms = false;
   self.errorMsg = '';
   self.nameError = '';
   self.loading = false;
   self.showRegisterPassword = false;
   self.showRegisterConfirmPassword = false;
+
+  // Populated by AuthService's cross-tab takeover handler when this tab got
+  // logged out because the same account signed in elsewhere — one-time read.
+  if (AuthService.kickedOutMessage) {
+    self.errorMsg = AuthService.kickedOutMessage;
+    AuthService.kickedOutMessage = '';
+  }
 
   // Forgot password
   self.showForgotPassword = false;
@@ -56,6 +70,14 @@ angular.module('learnSphereApp')
   };
 
   self.login = function () {
+    // Enter in either field calls this directly (see login.html ng-keydown) as
+    // well as the form's ng-submit — ignore repeats while a request is in flight
+    // and don't send an obviously incomplete form.
+    if (self.loading) return;
+    if (!self.loginData.email || !self.loginData.password) {
+      self.errorMsg = 'Please enter your email and password.';
+      return;
+    }
     self.errorMsg = '';
     self.loading = true;
     AuthService.login(self.loginData.email, self.loginData.password)

@@ -48,9 +48,9 @@
     <div class="alert-success" ng-if="vm.walletSuccess">{{ vm.walletSuccess }}</div>
 
     <!-- ── Balance ────────────────────────────────────────────────── -->
-    <div class="bs-card bs-elev-sm">
-      <div class="bs-text-muted" style="font-size:11px; text-transform:uppercase;">Available credit</div>
-      <div style="font-family:var(--font-heading); font-weight:600; font-size:34px; margin-top:4px;">
+    <div class="bs-card bs-elev-sm br-bal">
+      <div class="br-eyebrow">Available credit</div>
+      <div class="br-bal-n">
         <span ng-if="vm.wallet">{{ vm.wallet.available | currency:'$' }}</span>
         <span ng-if="!vm.wallet" class="bs-text-muted">…</span>
       </div>
@@ -62,7 +62,7 @@
 
       <p style="font-size:13px; margin:8px 0 0; color:var(--color-accent-2-800);"
         ng-if="vm.wallet && vm.wallet.expiringSoon > 0">
-        ⚠ {{ vm.wallet.expiringSoon | currency:'$' }} expires on
+        {{ vm.wallet.expiringSoon | currency:'$' }} expires on
         {{ vm.wallet.nextExpiryAt | date:'d MMM yyyy' }}. Credit is spent oldest first, so
         using your wallet now uses this up before it lapses.
       </p>
@@ -105,7 +105,7 @@
         LearnSphere adds credit to your account.
       </p>
 
-      <table style="width:100%; border-collapse:collapse;" ng-if="vm.walletStatement.length">
+      <table class="br-stack" style="width:100%; border-collapse:collapse;" ng-if="vm.walletStatement.length">
         <thead>
           <tr style="text-align:left; border-bottom:1px solid var(--color-divider);">
             <th style="padding:8px 6px; font-size:12px;">Date</th>
@@ -116,17 +116,17 @@
         </thead>
         <tbody>
           <tr ng-repeat="e in vm.walletStatement" style="border-bottom:1px solid var(--color-divider);">
-            <td style="padding:8px 6px; font-size:13px; white-space:nowrap;">
+            <td data-label="Date" style="padding:8px 6px; font-size:13px; white-space:nowrap;">
               {{ e.createdAt | date:'d MMM yyyy' }}
             </td>
-            <td style="padding:8px 6px; font-size:13px;">
+            <td data-label="What happened" style="padding:8px 6px; font-size:13px;">
               <strong>{{ vm.walletLabel(e.type) }}</strong>
               <div class="bs-text-muted" style="font-size:12px;">{{ e.reason }}</div>
             </td>
-            <td style="padding:8px 6px; font-size:13px; white-space:nowrap;" class="bs-text-muted">
+            <td data-label="Expires" style="padding:8px 6px; font-size:13px; white-space:nowrap;" class="bs-text-muted">
               {{ e.expiresAt ? (e.expiresAt | date:'d MMM yyyy') : '—' }}
             </td>
-            <td style="padding:8px 6px; font-size:13px; text-align:right; white-space:nowrap;"
+            <td data-label="Amount" style="padding:8px 6px; font-size:13px; text-align:right; white-space:nowrap;"
               ng-style="{color: e.amount < 0 ? 'var(--color-accent-2-700)' : 'var(--color-accent-700)'}">
               {{ e.amount > 0 ? '+' : '' }}{{ e.amount | currency:'$' }}
             </td>
