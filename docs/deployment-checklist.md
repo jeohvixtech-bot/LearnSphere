@@ -4,7 +4,7 @@ The branch carries ready-to-copy publish output:
 
 | Folder | Deploy to | Notes |
 |---|---|---|
-| `backend/publish/backend/` | the API site (e.g. `C:\inetpub\learnsphere-api`) | .NET 9 Release build, `web.config` runs it in-process as **Production** |
+| `publish/backend/` | the API site (e.g. `C:\inetpub\learnsphere-api`) | .NET 9 Release build, `web.config` runs it in-process as **Production** |
 | `publish/frontend/` | the frontend site (e.g. `C:\inetpub\learnsphere`) | static files + `web.config` (SPA fallback, MIME types) |
 
 ## 1. Backend — environment variables (required)
