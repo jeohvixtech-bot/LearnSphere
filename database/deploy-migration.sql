@@ -1,128 +1,200 @@
 -- ============================================================
 -- LearnSphere — Incremental Deployment Migration SQL
--- Upgrades an existing production database to the current schema.
--- Safe to run multiple times — guarded with IF NOT EXISTS /
--- ADD COLUMN IF NOT EXISTS / INSERT IGNORE throughout.
+-- Target:  MySQL 8.0.44
+-- Safe to run multiple times on an existing production database.
 --
--- All table names use backtick-quoting and match the exact casing
--- used in Program.cs (the authoritative source for this project).
+-- ADD COLUMN IF NOT EXISTS is not reliably supported in all MySQL
+-- 8.0 builds, so every column addition is wrapped in a stored
+-- procedure that checks information_schema first.
+-- DROP INDEX IF EXISTS is also not valid in MySQL 8.0 — index
+-- drops are guarded with dynamic SQL.
 -- ============================================================
 
 USE `LearnSphere`;
 
 -- ============================================================
+-- Helper: stored procedure to add a column only if it is absent
+-- ============================================================
+DROP PROCEDURE IF EXISTS `_AddColumnIfMissing`;
+DELIMITER $$
+CREATE PROCEDURE `_AddColumnIfMissing`(
+    IN tbl   VARCHAR(64),
+    IN col   VARCHAR(64),
+    IN colDef TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = tbl
+          AND COLUMN_NAME  = col
+    ) THEN
+        SET @_sql = CONCAT('ALTER TABLE `', tbl, '` ADD COLUMN `', col, '` ', colDef);
+        PREPARE _stmt FROM @_sql;
+        EXECUTE _stmt;
+        DEALLOCATE PREPARE _stmt;
+    END IF;
+END$$
+DELIMITER ;
+
+-- ============================================================
+-- Helper: stored procedure to add an index only if it is absent
+-- ============================================================
+DROP PROCEDURE IF EXISTS `_AddIndexIfMissing`;
+DELIMITER $$
+CREATE PROCEDURE `_AddIndexIfMissing`(
+    IN tbl      VARCHAR(64),
+    IN idx      VARCHAR(64),
+    IN indexDef TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = tbl
+          AND INDEX_NAME   = idx
+    ) THEN
+        SET @_sql = CONCAT('ALTER TABLE `', tbl, '` ADD ', indexDef);
+        PREPARE _stmt FROM @_sql;
+        EXECUTE _stmt;
+        DEALLOCATE PREPARE _stmt;
+    END IF;
+END$$
+DELIMITER ;
+
+-- ============================================================
+-- Helper: stored procedure to drop an index only if it exists
+-- ============================================================
+DROP PROCEDURE IF EXISTS `_DropIndexIfExists`;
+DELIMITER $$
+CREATE PROCEDURE `_DropIndexIfExists`(
+    IN tbl VARCHAR(64),
+    IN idx VARCHAR(64)
+)
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = tbl
+          AND INDEX_NAME   = idx
+    ) THEN
+        SET @_sql = CONCAT('ALTER TABLE `', tbl, '` DROP INDEX `', idx, '`');
+        PREPARE _stmt FROM @_sql;
+        EXECUTE _stmt;
+        DEALLOCATE PREPARE _stmt;
+    END IF;
+END$$
+DELIMITER ;
+
+-- ============================================================
 -- 1. `Users` — new columns
 -- ============================================================
-ALTER TABLE `Users`
-    ADD COLUMN IF NOT EXISTS `CreatedAt`          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    ADD COLUMN IF NOT EXISTS `MustChangePassword` TINYINT(1)  NOT NULL DEFAULT 0;
+CALL `_AddColumnIfMissing`('Users', 'CreatedAt',          'DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)');
+CALL `_AddColumnIfMissing`('Users', 'MustChangePassword', 'TINYINT(1) NOT NULL DEFAULT 0');
 
 -- ============================================================
 -- 2. `Tutors` — new columns
 -- ============================================================
-ALTER TABLE `Tutors`
-    ADD COLUMN IF NOT EXISTS `IsOnline`           TINYINT(1)  NOT NULL DEFAULT 1,
-    ADD COLUMN IF NOT EXISTS `TestModeEnabled`    TINYINT(1)  NOT NULL DEFAULT 1,
-    ADD COLUMN IF NOT EXISTS `VerificationStatus` VARCHAR(20) NOT NULL DEFAULT 'not_submitted',
-    ADD COLUMN IF NOT EXISTS `OfferingsUnlocked`  TINYINT(1)  NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `LastSubmittedAt`    DATETIME(6) NULL;
+CALL `_AddColumnIfMissing`('Tutors', 'IsOnline',           'TINYINT(1) NOT NULL DEFAULT 1');
+CALL `_AddColumnIfMissing`('Tutors', 'TestModeEnabled',    'TINYINT(1) NOT NULL DEFAULT 1');
+CALL `_AddColumnIfMissing`('Tutors', 'VerificationStatus', 'VARCHAR(20) NOT NULL DEFAULT ''not_submitted''');
+CALL `_AddColumnIfMissing`('Tutors', 'OfferingsUnlocked',  'TINYINT(1) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('Tutors', 'LastSubmittedAt',    'DATETIME(6) NULL');
 
--- Ensure TestModeEnabled default is 1 even if column was added earlier with DEFAULT 0
+-- Ensure TestModeEnabled default is 1 even if added earlier with DEFAULT 0
 ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 1;
 
 -- ============================================================
 -- 3. `TutorSubjects` — new column
 -- ============================================================
-ALTER TABLE `TutorSubjects`
-    ADD COLUMN IF NOT EXISTS `Price` DECIMAL(10,2) NULL;
+CALL `_AddColumnIfMissing`('TutorSubjects', 'Price', 'DECIMAL(10,2) NULL');
 
 -- ============================================================
 -- 4. NEW TABLE: `TutorOfferings`
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `TutorOfferings` (
-    `Id`            INT             NOT NULL AUTO_INCREMENT,
-    `TutorId`       INT             NOT NULL,
-    `Subject`       VARCHAR(200)    NOT NULL DEFAULT '',
-    `Level`         VARCHAR(200)    NOT NULL DEFAULT '',
-    `Mode`          VARCHAR(200)    NOT NULL DEFAULT '',
-    `Qualification` VARCHAR(200)    NOT NULL DEFAULT '',
-    `Price`         DECIMAL(10,2)   NOT NULL DEFAULT 0,
-    `Country`       VARCHAR(50)     NOT NULL DEFAULT 'Singapore',
+    `Id`            INT           NOT NULL AUTO_INCREMENT,
+    `TutorId`       INT           NOT NULL,
+    `Subject`       VARCHAR(200)  NOT NULL DEFAULT '',
+    `Level`         VARCHAR(200)  NOT NULL DEFAULT '',
+    `Mode`          VARCHAR(200)  NOT NULL DEFAULT '',
+    `Qualification` VARCHAR(200)  NOT NULL DEFAULT '',
+    `Price`         DECIMAL(10,2) NOT NULL DEFAULT 0,
+    `Country`       VARCHAR(50)   NOT NULL DEFAULT 'Singapore',
     PRIMARY KEY (`Id`),
-    CONSTRAINT `FK_TutorOfferings_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_TutorOfferings_Tutors`
+        FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- In case TutorOfferings existed without Country column
-ALTER TABLE `TutorOfferings`
-    ADD COLUMN IF NOT EXISTS `Country` VARCHAR(50) NOT NULL DEFAULT 'Singapore';
+CALL `_AddColumnIfMissing`('TutorOfferings', 'Country', 'VARCHAR(50) NOT NULL DEFAULT ''Singapore''');
 
 -- ============================================================
 -- 5. NEW TABLE: `TutorDocuments`
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `TutorDocuments` (
-    `Id`                INT             NOT NULL AUTO_INCREMENT,
-    `TutorId`           INT             NOT NULL,
-    `DocumentType`      VARCHAR(30)     NOT NULL DEFAULT '',
-    `FileUrl`           LONGTEXT        NULL,
-    `ExternalUrl`       LONGTEXT        NULL,
-    `FileName`          LONGTEXT        NULL,
-    `FileSizeBytes`     BIGINT          NULL,
-    `IdType`            VARCHAR(20)     NULL,
-    `IdNumber`          LONGTEXT        NULL,
-    `SortOrder`         INT             NOT NULL DEFAULT 0,
-    `Status`            VARCHAR(20)     NOT NULL DEFAULT 'pending',
-    `AdminNote`         LONGTEXT        NULL,
-    `UploadedAt`        DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    `ReviewedAt`        DATETIME(6)     NULL,
-    `ReplacesDocumentId` INT            NULL,
-    `IsArchived`        TINYINT(1)      NOT NULL DEFAULT 0,
+    `Id`                 INT          NOT NULL AUTO_INCREMENT,
+    `TutorId`            INT          NOT NULL,
+    `DocumentType`       VARCHAR(30)  NOT NULL DEFAULT '',
+    `FileUrl`            LONGTEXT     NULL,
+    `ExternalUrl`        LONGTEXT     NULL,
+    `FileName`           LONGTEXT     NULL,
+    `FileSizeBytes`      BIGINT       NULL,
+    `IdType`             VARCHAR(20)  NULL,
+    `IdNumber`           LONGTEXT     NULL,
+    `SortOrder`          INT          NOT NULL DEFAULT 0,
+    `Status`             VARCHAR(20)  NOT NULL DEFAULT 'pending',
+    `AdminNote`          LONGTEXT     NULL,
+    `UploadedAt`         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `ReviewedAt`         DATETIME(6)  NULL,
+    `ReplacesDocumentId` INT          NULL,
+    `IsArchived`         TINYINT(1)   NOT NULL DEFAULT 0,
     PRIMARY KEY (`Id`),
     KEY `IX_TutorDocuments_TutorId` (`TutorId`),
-    CONSTRAINT `FK_TutorDocuments_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_TutorDocuments_Tutors`
+        FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- In case TutorDocuments existed without these columns
-ALTER TABLE `TutorDocuments`
-    ADD COLUMN IF NOT EXISTS `ReplacesDocumentId` INT       NULL,
-    ADD COLUMN IF NOT EXISTS `IsArchived`          TINYINT(1) NOT NULL DEFAULT 0;
+-- In case TutorDocuments existed before these columns were added
+CALL `_AddColumnIfMissing`('TutorDocuments', 'ReplacesDocumentId', 'INT NULL');
+CALL `_AddColumnIfMissing`('TutorDocuments', 'IsArchived',         'TINYINT(1) NOT NULL DEFAULT 0');
 
 -- ============================================================
 -- 6. `TutorTimeSlots` — new columns (preset class support)
 -- ============================================================
-ALTER TABLE `TutorTimeSlots`
-    ADD COLUMN IF NOT EXISTS `EndTime`              LONGTEXT        NULL,
-    ADD COLUMN IF NOT EXISTS `DurationMinutes`      INT             NOT NULL DEFAULT 60,
-    ADD COLUMN IF NOT EXISTS `Mode`                 LONGTEXT        NULL,
-    ADD COLUMN IF NOT EXISTS `Subject`              LONGTEXT        NULL,
-    ADD COLUMN IF NOT EXISTS `Level`                LONGTEXT        NULL,
-    ADD COLUMN IF NOT EXISTS `Country`              LONGTEXT        NULL,
-    ADD COLUMN IF NOT EXISTS `ClassSize`            VARCHAR(20)     NOT NULL DEFAULT 'one-to-one',
-    ADD COLUMN IF NOT EXISTS `MaxStudents`          INT             NOT NULL DEFAULT 1,
-    ADD COLUMN IF NOT EXISTS `ConfirmedCount`       INT             NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `IsFull`               TINYINT(1)      NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `PricePerLesson`       DECIMAL(10,2)   NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `PresetGroupId`        VARCHAR(20)     NULL,
-    ADD COLUMN IF NOT EXISTS `VideoConferenceLink`  LONGTEXT        NULL;
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'EndTime',             'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'DurationMinutes',     'INT NOT NULL DEFAULT 60');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'Mode',                'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'Subject',             'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'Level',               'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'Country',             'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'ClassSize',           'VARCHAR(20) NOT NULL DEFAULT ''one-to-one''');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'MaxStudents',         'INT NOT NULL DEFAULT 1');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'ConfirmedCount',      'INT NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'IsFull',              'TINYINT(1) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'PricePerLesson',      'DECIMAL(10,2) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'PresetGroupId',       'VARCHAR(20) NULL');
+CALL `_AddColumnIfMissing`('TutorTimeSlots', 'VideoConferenceLink', 'LONGTEXT NULL');
 
 -- ============================================================
 -- 7. NEW TABLE: `TutorBlockedDates`
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `TutorBlockedDates` (
-    `Id`        INT          NOT NULL AUTO_INCREMENT,
-    `TutorId`   INT          NOT NULL,
-    `StartDate` VARCHAR(10)  NOT NULL,
-    `EndDate`   VARCHAR(10)  NOT NULL,
-    `CreatedAt` DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `Id`        INT         NOT NULL AUTO_INCREMENT,
+    `TutorId`   INT         NOT NULL,
+    `StartDate` VARCHAR(10) NOT NULL,
+    `EndDate`   VARCHAR(10) NOT NULL,
+    `CreatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`Id`),
     KEY `IX_TutorBlockedDates_TutorId` (`TutorId`),
-    CONSTRAINT `FK_TutorBlockedDates_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_TutorBlockedDates_Tutors`
+        FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
 -- 8. `Students` — new column
 -- ============================================================
-ALTER TABLE `Students`
-    ADD COLUMN IF NOT EXISTS `IsArchived` TINYINT(1) NOT NULL DEFAULT 0;
+CALL `_AddColumnIfMissing`('Students', 'IsArchived', 'TINYINT(1) NOT NULL DEFAULT 0');
 
 -- ============================================================
 -- 9. NEW TABLE: `StudentPreferredModes`
@@ -134,25 +206,24 @@ CREATE TABLE IF NOT EXISTS `StudentPreferredModes` (
     `Sequence`  INT         NOT NULL DEFAULT 0,
     PRIMARY KEY (`Id`),
     KEY `IX_StudentPreferredModes_StudentId` (`StudentId`),
-    CONSTRAINT `FK_StudentPreferredModes_Students` FOREIGN KEY (`StudentId`) REFERENCES `Students`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_StudentPreferredModes_Students`
+        FOREIGN KEY (`StudentId`) REFERENCES `Students`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 10. `Bookings` — new columns
+-- 10. `Bookings` — new columns + legacy column fixes
 -- ============================================================
-ALTER TABLE `Bookings`
-    ADD COLUMN IF NOT EXISTS `BookingNumber`           VARCHAR(20)  NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS `BookingType`             VARCHAR(20)  NOT NULL DEFAULT 'parent-offer',
-    ADD COLUMN IF NOT EXISTS `PresetSlotId`            INT          NULL,
-    ADD COLUMN IF NOT EXISTS `VideoConferenceLink`     LONGTEXT     NULL,
-    ADD COLUMN IF NOT EXISTS `VideoLinkReminderStatus` VARCHAR(20)  NOT NULL DEFAULT 'none';
+CALL `_AddColumnIfMissing`('Bookings', 'BookingNumber',           'VARCHAR(20) NOT NULL DEFAULT ''''');
+CALL `_AddColumnIfMissing`('Bookings', 'BookingType',             'VARCHAR(20) NOT NULL DEFAULT ''parent-offer''');
+CALL `_AddColumnIfMissing`('Bookings', 'PresetSlotId',            'INT NULL');
+CALL `_AddColumnIfMissing`('Bookings', 'VideoConferenceLink',     'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('Bookings', 'VideoLinkReminderStatus', 'VARCHAR(20) NOT NULL DEFAULT ''none''');
 
--- Legacy columns — make nullable (data moved to BookingClasses)
-ALTER TABLE `Bookings` MODIFY COLUMN `Date`   LONGTEXT NULL;
-ALTER TABLE `Bookings` MODIFY COLUMN `Time`   LONGTEXT NULL;
-ALTER TABLE `Bookings` MODIFY COLUMN `SlotId` INT      NULL;
-
--- Widen DurationHours from INT to DOUBLE (15-min preset classes need e.g. 1.5)
+-- Make legacy columns nullable (data moved to BookingClasses)
+ALTER TABLE `Bookings` MODIFY COLUMN `Date`         LONGTEXT NULL;
+ALTER TABLE `Bookings` MODIFY COLUMN `Time`         LONGTEXT NULL;
+ALTER TABLE `Bookings` MODIFY COLUMN `SlotId`       INT NULL;
+-- Widen from INT to DOUBLE (preset classes can be 90 min = 1.5 hours)
 ALTER TABLE `Bookings` MODIFY COLUMN `DurationHours` DOUBLE NOT NULL DEFAULT 1;
 
 -- Backfill BookingNumber for existing rows
@@ -171,14 +242,14 @@ CREATE TABLE IF NOT EXISTS `BookingClasses` (
     `DeliveredAt`    DATETIME(6) NULL,
     PRIMARY KEY (`Id`),
     KEY `IX_BookingClasses_BookingId` (`BookingId`),
-    CONSTRAINT `FK_BookingClasses_Bookings_BookingId` FOREIGN KEY (`BookingId`) REFERENCES `Bookings`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_BookingClasses_Bookings_BookingId`
+        FOREIGN KEY (`BookingId`) REFERENCES `Bookings`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- In case BookingClasses existed without delivery columns
-ALTER TABLE `BookingClasses`
-    ADD COLUMN IF NOT EXISTS `Status`         VARCHAR(20) NOT NULL DEFAULT 'scheduled',
-    ADD COLUMN IF NOT EXISTS `DeliveryStatus` VARCHAR(20) NOT NULL DEFAULT 'Scheduled',
-    ADD COLUMN IF NOT EXISTS `DeliveredAt`    DATETIME(6) NULL;
+-- In case BookingClasses existed before delivery columns were added
+CALL `_AddColumnIfMissing`('BookingClasses', 'Status',         'VARCHAR(20) NOT NULL DEFAULT ''scheduled''');
+CALL `_AddColumnIfMissing`('BookingClasses', 'DeliveryStatus', 'VARCHAR(20) NOT NULL DEFAULT ''Scheduled''');
+CALL `_AddColumnIfMissing`('BookingClasses', 'DeliveredAt',    'DATETIME(6) NULL');
 
 -- ============================================================
 -- 12. NEW TABLE: `BookingPresetSlots`
@@ -189,26 +260,35 @@ CREATE TABLE IF NOT EXISTS `BookingPresetSlots` (
     `TutorTimeSlotId` INT NOT NULL,
     PRIMARY KEY (`Id`),
     KEY `IX_BookingPresetSlots_BookingId` (`BookingId`),
-    CONSTRAINT `FK_BookingPresetSlots_Bookings`       FOREIGN KEY (`BookingId`)       REFERENCES `Bookings`(`Id`)       ON DELETE CASCADE,
-    CONSTRAINT `FK_BookingPresetSlots_TutorTimeSlots` FOREIGN KEY (`TutorTimeSlotId`) REFERENCES `TutorTimeSlots`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_BookingPresetSlots_Bookings`
+        FOREIGN KEY (`BookingId`)       REFERENCES `Bookings`(`Id`)       ON DELETE CASCADE,
+    CONSTRAINT `FK_BookingPresetSlots_TutorTimeSlots`
+        FOREIGN KEY (`TutorTimeSlotId`) REFERENCES `TutorTimeSlots`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 13. `CounterProposals` — new columns + index fix
+-- 13. `CounterProposals` — new columns + index change
 -- ============================================================
--- Make legacy Date/Time nullable (data moved to CounterProposalClasses)
+-- Make legacy columns nullable
 ALTER TABLE `CounterProposals` MODIFY COLUMN `Date` LONGTEXT NULL;
 ALTER TABLE `CounterProposals` MODIFY COLUMN `Time` LONGTEXT NULL;
 
-ALTER TABLE `CounterProposals`
-    ADD COLUMN IF NOT EXISTS `ProposedBy` VARCHAR(20) NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS `Status`     VARCHAR(20) NOT NULL DEFAULT 'pending',
-    ADD COLUMN IF NOT EXISTS `CreatedAt`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6);
+CALL `_AddColumnIfMissing`('CounterProposals', 'ProposedBy', 'VARCHAR(20) NOT NULL DEFAULT ''''');
+CALL `_AddColumnIfMissing`('CounterProposals', 'Status',     'VARCHAR(20) NOT NULL DEFAULT ''pending''');
+CALL `_AddColumnIfMissing`('CounterProposals', 'CreatedAt',  'DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)');
 
--- Convert old unique index on BookingId to non-unique (a booking can have many proposals)
-ALTER TABLE `CounterProposals` ADD INDEX `IX_CounterProposals_BookingId_nonunique` (`BookingId`);
-ALTER TABLE `CounterProposals` DROP INDEX IF EXISTS `IX_CounterProposals_BookingId`;
-ALTER TABLE `CounterProposals` RENAME INDEX `IX_CounterProposals_BookingId_nonunique` TO `IX_CounterProposals_BookingId`;
+-- Convert unique index on BookingId to non-unique so one booking can have many proposals.
+-- Step 1: add the replacement non-unique index if it doesn't exist yet
+CALL `_AddIndexIfMissing`('CounterProposals', 'IX_CounterProposals_BookingId_nonunique',
+    'INDEX `IX_CounterProposals_BookingId_nonunique` (`BookingId`)');
+
+-- Step 2: drop the old unique index if it exists
+CALL `_DropIndexIfExists`('CounterProposals', 'IX_CounterProposals_BookingId');
+
+-- Step 3: rename the replacement to the canonical name (guarded — only if canonical doesn't exist yet)
+CALL `_AddIndexIfMissing`('CounterProposals', 'IX_CounterProposals_BookingId',
+    'INDEX `IX_CounterProposals_BookingId` (`BookingId`)');
+CALL `_DropIndexIfExists`('CounterProposals', 'IX_CounterProposals_BookingId_nonunique');
 
 -- Backfill Status for existing resolved proposals
 UPDATE `CounterProposals` cp
@@ -238,7 +318,7 @@ CREATE TABLE IF NOT EXISTS `CounterProposalClasses` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 15. NEW TABLE: `ClassRemarks` (replaces TutorReviews per-booking reviews)
+-- 15. NEW TABLE: `ClassRemarks`
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `ClassRemarks` (
     `Id`                INT          NOT NULL AUTO_INCREMENT,
@@ -256,8 +336,10 @@ CREATE TABLE IF NOT EXISTS `ClassRemarks` (
     PRIMARY KEY (`Id`),
     UNIQUE KEY `UQ_ClassRemark_BookingClass` (`BookingClassId`),
     KEY `IX_ClassRemarks_TutorId` (`TutorId`),
-    CONSTRAINT `FK_ClassRemarks_BookingClasses` FOREIGN KEY (`BookingClassId`) REFERENCES `BookingClasses`(`Id`) ON DELETE CASCADE,
-    CONSTRAINT `FK_ClassRemarks_Tutors`         FOREIGN KEY (`TutorId`)        REFERENCES `Tutors`(`Id`)        ON DELETE CASCADE
+    CONSTRAINT `FK_ClassRemarks_BookingClasses`
+        FOREIGN KEY (`BookingClassId`) REFERENCES `BookingClasses`(`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_ClassRemarks_Tutors`
+        FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -270,42 +352,34 @@ CREATE TABLE IF NOT EXISTS `ClassRemarkLikes` (
     `CreatedAt`     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`Id`),
     UNIQUE KEY `UQ_ClassRemarkLike_RemarkParent` (`ClassRemarkId`, `ParentUserId`),
-    CONSTRAINT `FK_ClassRemarkLikes_ClassRemarks` FOREIGN KEY (`ClassRemarkId`) REFERENCES `ClassRemarks`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_ClassRemarkLikes_ClassRemarks`
+        FOREIGN KEY (`ClassRemarkId`) REFERENCES `ClassRemarks`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
 -- 17. `TutorReviews` — BookingId column + unique index
 -- ============================================================
-ALTER TABLE `TutorReviews`
-    ADD COLUMN IF NOT EXISTS `BookingId` INT NULL;
+CALL `_AddColumnIfMissing`('TutorReviews', 'BookingId', 'INT NULL');
 
--- Add unique index if it doesn't already exist
-SET @idx := (SELECT COUNT(1) FROM information_schema.statistics
-    WHERE table_schema = DATABASE() AND table_name = 'TutorReviews'
-    AND index_name = 'UQ_TutorReviews_TutorBooking');
-SET @sql := IF(@idx = 0,
-    'CREATE UNIQUE INDEX `UQ_TutorReviews_TutorBooking` ON `TutorReviews` (`TutorId`, `BookingId`)',
-    'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+CALL `_AddIndexIfMissing`('TutorReviews', 'UQ_TutorReviews_TutorBooking',
+    'UNIQUE INDEX `UQ_TutorReviews_TutorBooking` (`TutorId`, `BookingId`)');
 
 -- ============================================================
 -- 18. `IssueReports` — new columns
 -- ============================================================
-ALTER TABLE `IssueReports`
-    ADD COLUMN IF NOT EXISTS `CreatedAt`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    ADD COLUMN IF NOT EXISTS `Resolved`   TINYINT(1)  NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `ResolvedAt` DATETIME(6) NULL;
+CALL `_AddColumnIfMissing`('IssueReports', 'CreatedAt',  'DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)');
+CALL `_AddColumnIfMissing`('IssueReports', 'Resolved',   'TINYINT(1) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('IssueReports', 'ResolvedAt', 'DATETIME(6) NULL');
 
 -- ============================================================
 -- 19. `Invoices` — new columns
 -- ============================================================
-ALTER TABLE `Invoices`
-    ADD COLUMN IF NOT EXISTS `InvoiceNumber`       VARCHAR(20)   NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS `BaseAmount`          DECIMAL(10,2) NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `MarkupAmount`        DECIMAL(10,2) NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `MarkupPercent`       DECIMAL(5,2)  NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `IsFirstMatch`        TINYINT(1)    NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `WalletCreditApplied` DECIMAL(10,2) NOT NULL DEFAULT 0;
+CALL `_AddColumnIfMissing`('Invoices', 'InvoiceNumber',       'VARCHAR(20) NOT NULL DEFAULT ''''');
+CALL `_AddColumnIfMissing`('Invoices', 'BaseAmount',          'DECIMAL(10,2) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('Invoices', 'MarkupAmount',        'DECIMAL(10,2) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('Invoices', 'MarkupPercent',       'DECIMAL(5,2) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('Invoices', 'IsFirstMatch',        'TINYINT(1) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('Invoices', 'WalletCreditApplied', 'DECIMAL(10,2) NOT NULL DEFAULT 0');
 
 -- Backfill InvoiceNumber for existing rows
 UPDATE `Invoices` SET `InvoiceNumber` = CONCAT('INV', LPAD(`Id`, 5, '0')) WHERE `InvoiceNumber` = '';
@@ -313,9 +387,8 @@ UPDATE `Invoices` SET `InvoiceNumber` = CONCAT('INV', LPAD(`Id`, 5, '0')) WHERE 
 -- ============================================================
 -- 20. `ChatMessages` — new columns
 -- ============================================================
-ALTER TABLE `ChatMessages`
-    ADD COLUMN IF NOT EXISTS `ParentUserId` INT       NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS `IsRead`       TINYINT(1) NOT NULL DEFAULT 0;
+CALL `_AddColumnIfMissing`('ChatMessages', 'ParentUserId', 'INT NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('ChatMessages', 'IsRead',       'TINYINT(1) NOT NULL DEFAULT 0');
 
 -- ============================================================
 -- 21. NEW TABLE: `FavoriteTutors`
@@ -327,8 +400,10 @@ CREATE TABLE IF NOT EXISTS `FavoriteTutors` (
     `CreatedAt`    DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`Id`),
     UNIQUE KEY `UQ_FavoriteTutors_Parent_Tutor` (`ParentUserId`, `TutorId`),
-    CONSTRAINT `FK_FavoriteTutors_Users`  FOREIGN KEY (`ParentUserId`) REFERENCES `Users`(`Id`)  ON DELETE CASCADE,
-    CONSTRAINT `FK_FavoriteTutors_Tutors` FOREIGN KEY (`TutorId`)      REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_FavoriteTutors_Users`
+        FOREIGN KEY (`ParentUserId`) REFERENCES `Users`(`Id`)  ON DELETE CASCADE,
+    CONSTRAINT `FK_FavoriteTutors_Tutors`
+        FOREIGN KEY (`TutorId`)      REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -347,22 +422,28 @@ CREATE TABLE IF NOT EXISTS `StudentTutorFirstClasses` (
     UNIQUE KEY `UQ_StudentTutorFirstClass` (`Country`,`Subject`,`Level`,`TutorId`,`StudentId`),
     KEY `IX_STFC_TutorId`   (`TutorId`),
     KEY `IX_STFC_StudentId` (`StudentId`),
-    CONSTRAINT `FK_STFC_Tutors`    FOREIGN KEY (`TutorId`)   REFERENCES `Tutors`(`Id`)    ON DELETE CASCADE,
-    CONSTRAINT `FK_STFC_Students`  FOREIGN KEY (`StudentId`) REFERENCES `Students`(`Id`)  ON DELETE CASCADE,
-    CONSTRAINT `FK_STFC_Bookings`  FOREIGN KEY (`BookingId`) REFERENCES `Bookings`(`Id`)  ON DELETE SET NULL
+    CONSTRAINT `FK_STFC_Tutors`
+        FOREIGN KEY (`TutorId`)   REFERENCES `Tutors`(`Id`)   ON DELETE CASCADE,
+    CONSTRAINT `FK_STFC_Students`
+        FOREIGN KEY (`StudentId`) REFERENCES `Students`(`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_STFC_Bookings`
+        FOREIGN KEY (`BookingId`) REFERENCES `Bookings`(`Id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 23. `LessonReports` — recreate with new schema if old shape exists
---     (old shape had a `Covered` column; new shape is per-student per-session)
+-- 23. `LessonReports` — drop old shape if Covered column exists,
+--     then create new per-student-per-session shape
 -- ============================================================
 DROP TABLE IF EXISTS `LessonReportEdits`;
 
--- Check if old shape (Covered column) still exists and drop if so
-SET @old := (SELECT COUNT(1) FROM information_schema.columns
-    WHERE table_schema = DATABASE() AND table_name = 'LessonReports' AND column_name = 'Covered');
-SET @sql := IF(@old > 0, 'DROP TABLE IF EXISTS `LessonReports`', 'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @_oldShape = (
+    SELECT COUNT(1) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'LessonReports'
+      AND COLUMN_NAME  = 'Covered'
+);
+SET @_sql = IF(@_oldShape > 0, 'DROP TABLE IF EXISTS `LessonReports`', 'SELECT 1');
+PREPARE _stmt FROM @_sql; EXECUTE _stmt; DEALLOCATE PREPARE _stmt;
 
 CREATE TABLE IF NOT EXISTS `LessonReports` (
     `Id`                 INT          NOT NULL AUTO_INCREMENT,
@@ -379,8 +460,10 @@ CREATE TABLE IF NOT EXISTS `LessonReports` (
     UNIQUE KEY `UQ_LessonReport_BookingStudentDate` (`BookingId`,`StudentId`,`SessionDate`),
     KEY `IX_LessonReports_BookingId` (`BookingId`),
     KEY `IX_LessonReports_StudentId` (`StudentId`),
-    CONSTRAINT `FK_LessonReports_Bookings`  FOREIGN KEY (`BookingId`)  REFERENCES `Bookings`(`Id`)  ON DELETE CASCADE,
-    CONSTRAINT `FK_LessonReports_Students`  FOREIGN KEY (`StudentId`)  REFERENCES `Students`(`Id`)  ON DELETE RESTRICT
+    CONSTRAINT `FK_LessonReports_Bookings`
+        FOREIGN KEY (`BookingId`)  REFERENCES `Bookings`(`Id`)  ON DELETE CASCADE,
+    CONSTRAINT `FK_LessonReports_Students`
+        FOREIGN KEY (`StudentId`)  REFERENCES `Students`(`Id`)  ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -416,40 +499,42 @@ CREATE TABLE IF NOT EXISTS `PresetGroupSyllabuses` (
 -- 26. NEW TABLE: `PresetCancellationDecisions`
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `PresetCancellationDecisions` (
-    `Id`             INT             NOT NULL AUTO_INCREMENT,
-    `BookingId`      INT             NOT NULL,
-    `OriginalDate`   LONGTEXT        NOT NULL,
-    `OriginalTime`   LONGTEXT        NOT NULL,
-    `OriginalEndTime` LONGTEXT       NOT NULL,
-    `PricePerLesson` DECIMAL(10,2)   NOT NULL DEFAULT 0,
-    `ProposedDate`   LONGTEXT        NULL,
-    `ProposedTime`   LONGTEXT        NULL,
-    `ProposedEndTime` LONGTEXT       NULL,
-    `Status`         VARCHAR(20)     NOT NULL DEFAULT 'pending',
-    `AcknowledgedAt` DATETIME(6)     NULL,
-    `CreatedAt`      DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    `DecidedAt`      DATETIME(6)     NULL,
-    `ResolvedAt`     DATETIME(6)     NULL,
-    `AdminNote`      LONGTEXT        NULL,
+    `Id`              INT           NOT NULL AUTO_INCREMENT,
+    `BookingId`       INT           NOT NULL,
+    `OriginalDate`    LONGTEXT      NOT NULL,
+    `OriginalTime`    LONGTEXT      NOT NULL,
+    `OriginalEndTime` LONGTEXT      NOT NULL,
+    `PricePerLesson`  DECIMAL(10,2) NOT NULL DEFAULT 0,
+    `ProposedDate`    LONGTEXT      NULL,
+    `ProposedTime`    LONGTEXT      NULL,
+    `ProposedEndTime` LONGTEXT      NULL,
+    `Status`          VARCHAR(20)   NOT NULL DEFAULT 'pending',
+    `AcknowledgedAt`  DATETIME(6)   NULL,
+    `CreatedAt`       DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `DecidedAt`       DATETIME(6)   NULL,
+    `ResolvedAt`      DATETIME(6)   NULL,
+    `AdminNote`       LONGTEXT      NULL,
     PRIMARY KEY (`Id`),
     KEY `IX_PresetCancellationDecisions_BookingId` (`BookingId`),
     KEY `IX_PresetCancellationDecisions_Status`    (`Status`),
-    CONSTRAINT `FK_PresetCancellationDecisions_Bookings` FOREIGN KEY (`BookingId`) REFERENCES `Bookings`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_PresetCancellationDecisions_Bookings`
+        FOREIGN KEY (`BookingId`) REFERENCES `Bookings`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
 -- 27. NEW TABLE: `TutorPenalties`
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `TutorPenalties` (
-    `Id`        INT             NOT NULL AUTO_INCREMENT,
-    `TutorId`   INT             NOT NULL,
-    `BookingId` INT             NULL,
-    `Amount`    DECIMAL(10,2)   NOT NULL DEFAULT 0,
-    `Reason`    LONGTEXT        NOT NULL,
-    `CreatedAt` DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `Id`        INT           NOT NULL AUTO_INCREMENT,
+    `TutorId`   INT           NOT NULL,
+    `BookingId` INT           NULL,
+    `Amount`    DECIMAL(10,2) NOT NULL DEFAULT 0,
+    `Reason`    LONGTEXT      NOT NULL,
+    `CreatedAt` DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`Id`),
     KEY `IX_TutorPenalties_TutorId` (`TutorId`),
-    CONSTRAINT `FK_TutorPenalties_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_TutorPenalties_Tutors`
+        FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -461,33 +546,28 @@ CREATE TABLE IF NOT EXISTS `ScoringWeightages` (
     `Label`     VARCHAR(100) NOT NULL,
     `Percent`   INT          NOT NULL DEFAULT 0,
     `SortOrder` INT          NOT NULL DEFAULT 0,
-    PRIMARY KEY (`Id`),
-    UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)
+    PRIMARY KEY (`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Deduplicate any rows from before unique index was added
+-- Deduplicate rows created before unique index existed
 DELETE w FROM `ScoringWeightages` w
 JOIN `ScoringWeightages` k ON k.`Key` = w.`Key` AND k.`Id` < w.`Id`;
 
+-- Ensure Key column is VARCHAR(20) (may have been created as LONGTEXT by EF)
 ALTER TABLE `ScoringWeightages` MODIFY `Key` VARCHAR(20) NOT NULL;
 
--- Add unique key if missing
-SET @idx := (SELECT COUNT(1) FROM information_schema.statistics
-    WHERE table_schema = DATABASE() AND table_name = 'ScoringWeightages'
-    AND index_name = 'UQ_ScoringWeightages_Key');
-SET @sql := IF(@idx = 0,
-    'ALTER TABLE `ScoringWeightages` ADD UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)',
-    'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- Add unique index if not already present
+CALL `_AddIndexIfMissing`('ScoringWeightages', 'UQ_ScoringWeightages_Key',
+    'UNIQUE KEY `UQ_ScoringWeightages_Key` (`Key`)');
 
 -- Seed default rows
 INSERT IGNORE INTO `ScoringWeightages` (`Key`, `Label`, `Percent`, `SortOrder`) VALUES
-    ('rating',      'Tutor Rating',                        0, 0),
-    ('activeness',  'Tutor Activeness (Refresh Monthly)',  0, 1),
-    ('disputes',    'Tutor Dispute (Refresh Monthly)',     0, 2),
-    ('experience',  'Tutor Experience',                    0, 3),
-    ('na1',         'NA',                                  0, 4),
-    ('na2',         'NA',                                  0, 5);
+    ('rating',     'Tutor Rating',                       0, 0),
+    ('activeness', 'Tutor Activeness (Refresh Monthly)', 0, 1),
+    ('disputes',   'Tutor Dispute (Refresh Monthly)',    0, 2),
+    ('experience', 'Tutor Experience',                   0, 3),
+    ('na1',        'NA',                                 0, 4),
+    ('na2',        'NA',                                 0, 5);
 
 -- ============================================================
 -- 29. NEW TABLE: `PaymentGatewaySettings`
@@ -520,7 +600,8 @@ CREATE TABLE IF NOT EXISTS `PaymentTransactions` (
     `CreatedAt`        DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`Id`),
     KEY `IX_PaymentTransactions_PaymentRequestId` (`PaymentRequestId`),
-    CONSTRAINT `FK_PaymentTransactions_Invoices` FOREIGN KEY (`InvoiceId`) REFERENCES `Invoices`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_PaymentTransactions_Invoices`
+        FOREIGN KEY (`InvoiceId`) REFERENCES `Invoices`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -562,7 +643,8 @@ CREATE TABLE IF NOT EXISTS `TutorLedgerEntries` (
     KEY `IX_TutorLedgerEntries_InvoiceId` (`InvoiceId`),
     KEY `IX_TutorLedgerEntries_PayoutId`  (`PayoutId`),
     KEY `IX_TutorLedgerEntries_PenaltyId` (`PenaltyId`),
-    CONSTRAINT `FK_TutorLedgerEntries_Tutors` FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_TutorLedgerEntries_Tutors`
+        FOREIGN KEY (`TutorId`) REFERENCES `Tutors`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -583,7 +665,8 @@ CREATE TABLE IF NOT EXISTS `ParentWalletEntries` (
     KEY `IX_ParentWalletEntries_ParentUserId`  (`ParentUserId`),
     KEY `IX_ParentWalletEntries_InvoiceId`     (`InvoiceId`),
     KEY `IX_ParentWalletEntries_SourceEntryId` (`SourceEntryId`),
-    CONSTRAINT `FK_ParentWalletEntries_Users` FOREIGN KEY (`ParentUserId`) REFERENCES `Users`(`Id`) ON DELETE CASCADE
+    CONSTRAINT `FK_ParentWalletEntries_Users`
+        FOREIGN KEY (`ParentUserId`) REFERENCES `Users`(`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
@@ -624,12 +707,14 @@ CREATE TABLE IF NOT EXISTS `TutorPayables` (
     PRIMARY KEY (`Id`),
     UNIQUE KEY `UQ_TutorPayable_Tutor_Period` (`TutorId`,`Period`),
     KEY `IX_TutorPayables_PayoutBatchId` (`PayoutBatchId`),
-    CONSTRAINT `FK_TutorPayables_Tutors`        FOREIGN KEY (`TutorId`)       REFERENCES `Tutors`(`Id`)        ON DELETE CASCADE,
-    CONSTRAINT `FK_TutorPayables_PayoutBatches` FOREIGN KEY (`PayoutBatchId`) REFERENCES `PayoutBatches`(`Id`) ON DELETE SET NULL
+    CONSTRAINT `FK_TutorPayables_Tutors`
+        FOREIGN KEY (`TutorId`)       REFERENCES `Tutors`(`Id`)        ON DELETE CASCADE,
+    CONSTRAINT `FK_TutorPayables_PayoutBatches`
+        FOREIGN KEY (`PayoutBatchId`) REFERENCES `PayoutBatches`(`Id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 36. EF Migrations history table + registration
+-- 36. EF Migrations history + registration
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
     `MigrationId`    VARCHAR(150) NOT NULL,
@@ -639,6 +724,13 @@ CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
 
 INSERT IGNORE INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
 VALUES ('20260630150745_AddReviewBookingId', '9.0.0');
+
+-- ============================================================
+-- Cleanup helper procedures
+-- ============================================================
+DROP PROCEDURE IF EXISTS `_AddColumnIfMissing`;
+DROP PROCEDURE IF EXISTS `_AddIndexIfMissing`;
+DROP PROCEDURE IF EXISTS `_DropIndexIfExists`;
 
 -- ============================================================
 -- END OF MIGRATION
