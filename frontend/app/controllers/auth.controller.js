@@ -1,13 +1,14 @@
 'use strict';
 
 angular.module('learnSphereApp')
-.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', 'API_URL', function ($location, AuthService, PendingMatchService, NameValidationService, API_URL) {
+.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', 'TermsService', 'API_URL', function ($location, AuthService, PendingMatchService, NameValidationService, TermsService, API_URL) {
   var self = this;
 
   // Redirect if already logged in
   if (AuthService.isLoggedIn()) {
     var user = AuthService.getCurrentUser();
     if (user.mustChangePassword) $location.path('/change-password');
+    else if (user.needsTermsAcceptance) $location.path('/accept-terms');
     else redirectByRole(user.role);
   }
 
@@ -22,6 +23,16 @@ angular.module('learnSphereApp')
   if (params.mode === 'register') self.mode = 'register';
   if (params.role === 'parent' || params.role === 'tutor') self.registerData.role = params.role;
   self.showTerms = false;
+
+  // Current Terms and Conditions, loaded from the API. Sign-up sends terms.id so the
+  // server records which version this user agreed to.
+  self.terms = null;
+  self.termsError = '';
+  TermsService.getCurrent().then(function (t) { self.terms = t; })
+    .catch(function (err) {
+      // 404 = nothing published yet (sign-up is not blocked); anything else is a real load failure.
+      if (!err || err.status !== 404) self.termsError = 'Could not load the Terms and Conditions. Please try again.';
+    });
   self.errorMsg = '';
   self.nameError = '';
   self.loading = false;
@@ -87,6 +98,7 @@ angular.module('learnSphereApp')
           return;
         }
         if (user.mustChangePassword) $location.path('/change-password');
+        else if (user.needsTermsAcceptance) $location.path('/accept-terms');
         else redirectByRole(user.role);
       })
       .catch(function (err) {
@@ -126,7 +138,8 @@ angular.module('learnSphereApp')
       self.registerData.email,
       self.registerData.password,
       self.registerData.name,
-      self.registerData.role
+      self.registerData.role,
+      self.terms ? self.terms.id : null
     ).then(function (user) {
       redirectByRole(user.role);
     }).catch(function (err) {

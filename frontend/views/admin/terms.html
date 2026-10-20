@@ -1,0 +1,88 @@
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-dark">
+    <div ng-init="profileName = vm.user.name; profileInitial = vm.user.name[0]; profileRole = 'Admin Dashboard'"
+         ng-include="'views/partials/profile-menu.html'" class="sidebar-user"></div>
+    <nav class="sidebar-nav">
+      <a href="#!/admin/overview" class="nav-item">Operations Overview</a>
+      <a href="#!/admin/vetting" class="nav-item">Tutor Vetting Base</a>
+      <a href="#!/admin/disputes" class="nav-item">Resolution Disputes</a>
+      <a href="#!/admin/scoring" class="nav-item">Scoring Config</a>
+      <a href="#!/admin/reschedule-queue" class="nav-item">Reschedule Rejections</a>
+      <a href="#!/admin/payment-gateway" class="nav-item">Payment Gateway</a>
+      <a href="#!/admin/commission" class="nav-item">Platform Fees</a>
+      <a href="#!/admin/promotional-credit" class="nav-item">Promotional Credit</a>
+      <a href="#!/admin/payouts" class="nav-item">Payout Batches</a>
+      <a href="#!/admin/terms" class="nav-item active">Terms &amp; Conditions</a>
+    </nav>
+    <div class="status-live">Access: <span class="text-danger">SECURE ROOT</span></div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <div class="card">
+      <h3>Terms &amp; Conditions</h3>
+      <p class="text-muted">
+        Current version:
+        <strong ng-if="vm.current()">{{ vm.current().version }}</strong>
+        <span ng-if="!vm.current()">none published</span>
+        <span ng-if="vm.current()"> — published {{ vm.current().publishedAt | date:'d MMM yyyy' }}, accepted by {{ vm.current().acceptedCount }} user(s).</span>
+      </p>
+      <p class="text-muted" style="font-size:13px;">
+        Published versions are never edited. Publishing creates a new version, and every user is
+        asked to read and accept it the next time they sign in.
+      </p>
+    </div>
+
+    <div class="card">
+      <h4>Publish a new version</h4>
+      <div class="alert-error" role="alert" ng-if="vm.errorMsg">{{ vm.errorMsg }}</div>
+      <div class="alert-success" role="status" ng-if="vm.successMsg">{{ vm.successMsg }}</div>
+
+      <div class="form-group">
+        <label for="terms-version">Version label</label>
+        <input id="terms-version" type="text" ng-model="vm.form.version" maxlength="50" placeholder="e.g. 2026-11-01" />
+      </div>
+      <div class="form-group">
+        <label for="terms-content">Terms text</label>
+        <textarea id="terms-content" ng-model="vm.form.content" rows="18" style="width:100%; font-family:monospace; font-size:13px;"></textarea>
+        <p class="text-muted" style="font-size:12px; margin:4px 0 0;">
+          Format: <code>## Heading</code> for a heading, <code>- item</code> for a bullet, a blank line between
+          paragraphs, <code>**bold**</code> for bold. Email addresses become links automatically.
+        </p>
+      </div>
+
+      <button type="button" class="bs-btn bs-btn-primary" ng-click="vm.publish()"
+              ng-disabled="vm.busy || !vm.form.version || !vm.form.content">
+        <span ng-if="!vm.busy">Publish new version</span>
+        <span ng-if="vm.busy">Publishing…</span>
+      </button>
+
+      <h4 style="margin-top:20px;">Preview</h4>
+      <div style="border:1px solid #e5e7eb; border-radius:8px; padding:12px; max-height:50vh; overflow-y:auto;">
+        <terms-text content="vm.form.content"></terms-text>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>Version history</h4>
+      <p class="text-muted" ng-if="!vm.history.length">No versions yet.</p>
+      <div ng-repeat="row in vm.history" style="padding:8px 0; border-top:1px solid #f1f5f9;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div>
+            <strong>{{ row.version }}</strong>
+            <span class="text-muted" style="font-size:13px;">
+              — {{ row.publishedAt | date:'d MMM yyyy HH:mm' }} · accepted by {{ row.acceptedCount }}
+            </span>
+          </div>
+          <button type="button" class="bs-btn bs-btn-ghost" ng-click="vm.toggleView(row)">
+            {{ vm.viewing === row ? 'Hide' : 'View' }}
+          </button>
+        </div>
+        <div ng-if="vm.viewing === row" style="margin-top:8px; max-height:50vh; overflow-y:auto;">
+          <terms-text content="row.content"></terms-text>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>

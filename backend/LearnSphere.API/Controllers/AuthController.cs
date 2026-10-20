@@ -38,9 +38,16 @@ public class AuthController : ControllerBase
         var passwordError = PasswordValidator.Validate(dto.Password);
         if (passwordError != null) return BadRequest(new { message = passwordError });
 
-        var result = await _authService.RegisterAsync(dto);
-        if (result == null) return BadRequest(new { message = "Email already in use." });
-        return Ok(result);
+        try
+        {
+            var result = await _authService.RegisterAsync(dto);
+            if (result == null) return BadRequest(new { message = "Email already in use." });
+            return Ok(result);
+        }
+        catch (TermsNotAcceptedException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("forgot-password")]

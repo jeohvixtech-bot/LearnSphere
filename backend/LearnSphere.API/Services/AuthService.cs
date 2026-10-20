@@ -10,6 +10,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace LearnSphere.API.Services;
 
+// Thrown by RegisterAsync when the sign-up did not accept the current Terms version.
+public class TermsNotAcceptedException : Exception
+{
+    public TermsNotAcceptedException()
+        : base("Please accept the latest Terms and Conditions to create an account.") { }
+}
+
 public class AuthService : IAuthService
 {
     private readonly AppDbContext _context;
@@ -29,13 +36,24 @@ public class AuthService : IAuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return null;
 
-        return new AuthResponseDto(GenerateToken(user), user.Role, user.Name, user.Id, user.MustChangePassword);
+        var currentTermsId = await CurrentTermsIdAsync();
+        var needsTerms = currentTermsId != null && user.TermsVersionId != currentTermsId;
+        return new AuthResponseDto(GenerateToken(user), user.Role, user.Name, user.Id, user.MustChangePassword, needsTerms);
     }
+
+    // Id of the newest published Terms version, or null if none exist yet.
+    private async Task<int?> CurrentTermsIdAsync() =>
+        await _context.TermsVersions.OrderByDescending(t => t.Id).Select(t => (int?)t.Id).FirstOrDefaultAsync();
 
     public async Task<AuthResponseDto?> RegisterAsync(RegisterDto dto)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             return null;
+
+        // Once any Terms version exists, sign-up must carry the id of the current one.
+        var currentTermsId = await CurrentTermsIdAsync();
+        if (currentTermsId != null && dto.TermsVersionId != currentTermsId)
+            throw new TermsNotAcceptedException();
 
         var user = new User
         {
@@ -43,7 +61,9 @@ public class AuthService : IAuthService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = dto.Role,
             Name = dto.Name,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            TermsVersionId = currentTermsId == null ? null : dto.TermsVersionId,
+            TermsAcceptedAt = currentTermsId == null ? null : DateTime.UtcNow
         };
 
         _context.Users.Add(user);

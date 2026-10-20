@@ -714,6 +714,22 @@ CREATE TABLE IF NOT EXISTS `TutorPayables` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
+-- Terms and Conditions versioning
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `TermsVersions` (
+    `Id` INT NOT NULL AUTO_INCREMENT,
+    `Version` VARCHAR(50) NOT NULL,
+    `Content` LONGTEXT NOT NULL,
+    `PublishedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `PublishedByUserId` INT NULL,
+    PRIMARY KEY (`Id`),
+    UNIQUE KEY `UQ_TermsVersions_Version` (`Version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CALL `_AddColumnIfMissing`('Users', 'TermsVersionId', 'INT NULL');
+CALL `_AddColumnIfMissing`('Users', 'TermsAcceptedAt', 'DATETIME(6) NULL');
+
+-- ============================================================
 -- 36. EF Migrations history + registration
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (

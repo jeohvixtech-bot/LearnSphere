@@ -10,6 +10,10 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool MustChangePassword { get; set; } = false;
 
+    // Which Terms and Conditions version this user last accepted (null = never).
+    public int? TermsVersionId { get; set; }
+    public DateTime? TermsAcceptedAt { get; set; }
+
     public Tutor? TutorProfile { get; set; }
     public List<Student> Students { get; set; } = new();
     public List<Notification> Notifications { get; set; } = new();

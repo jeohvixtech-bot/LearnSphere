@@ -47,6 +47,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: loggedInGuard() }
     })
+    .when('/accept-terms', {
+      templateUrl: 'views/accept-terms.html',
+      controller: 'AcceptTermsCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: loggedInGuard() }
+    })
     .when('/parent/dashboard', {
       templateUrl: 'views/parent/dashboard.html',
       controller: 'ParentCtrl',
@@ -173,6 +179,12 @@ angular.module('learnSphereApp', ['ngRoute'])
       controllerAs: 'vm',
       resolve: { auth: authGuard('admin') }
     })
+    .when('/admin/terms', {
+      templateUrl: 'views/admin/terms.html',
+      controller: 'AdminTermsCtrl',
+      controllerAs: 'vm',
+      resolve: { auth: authGuard('admin') }
+    })
     .when('/admin/payouts', {
       templateUrl: 'views/admin/payouts.html',
       controller: 'AdminCtrl',
@@ -205,6 +217,10 @@ angular.module('learnSphereApp', ['ngRoute'])
         if (user.mustChangePassword) {
           $location.path('/change-password');
           deferred.reject('MustChangePassword');
+        } else if (user.needsTermsAcceptance) {
+          // A newer Terms version is waiting: nothing else loads until it is accepted.
+          $location.path('/accept-terms');
+          deferred.reject('TermsNotAccepted');
         } else {
           deferred.resolve(user);
         }
@@ -241,9 +257,10 @@ angular.module('learnSphereApp', ['ngRoute'])
     var target = $location.path();
     var home = !user ? '/welcome'
       : user.mustChangePassword ? '/change-password'
+      : user.needsTermsAcceptance ? '/accept-terms'
       : user.role === 'admin' ? '/admin/overview'
       : user.role === 'tutor' ? '/tutor/overview' : '/parent/dashboard';
-    if (target !== home && target !== '/change-password') $location.path(home);
+    if (target !== home && target !== '/change-password' && target !== '/accept-terms') $location.path(home);
   });
 
   // A scroll position left over from one page (e.g. a long tutor overview)

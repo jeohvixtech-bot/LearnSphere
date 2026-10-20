@@ -1,0 +1,36 @@
+<div class="bs-scope lg-page">
+  <div class="lg-card" style="width:min(720px,100%);">
+
+    <img class="lg-logo" src="assets/logo-stacked.png" alt="LearnSphere: Learn, Grow, Connect" width="640" height="483" />
+
+    <div>
+      <h1>Updated Terms and Conditions</h1>
+      <p class="lg-sub">Hi {{ vm.user.name }}, our Terms and Conditions have changed. Please read the latest version and accept it to continue.</p>
+    </div>
+
+    <div class="alert-error" role="alert" ng-if="vm.errorMsg">{{ vm.errorMsg }}</div>
+    <p ng-if="vm.loading" class="bs-text-muted">Loading…</p>
+
+    <div ng-if="vm.terms">
+      <p class="bs-text-muted" style="margin:0 0 8px; font-size:13px;">Version {{ vm.terms.version }}</p>
+      <div style="max-height:50vh; overflow-y:auto; padding-right:8px; font-size:15px; border:1px solid var(--color-neutral-200, #e5e7eb); border-radius:8px; padding:12px;">
+        <terms-text content="vm.terms.content"></terms-text>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:10px; font-size:15px; margin-top:14px;">
+        <input type="checkbox" id="terms-accept" ng-model="vm.agreed" style="margin-top:3px; width:20px; height:20px;" />
+        <label for="terms-accept">I have read and agree to the updated Terms and Conditions (version {{ vm.terms.version }})</label>
+      </div>
+
+      <button type="button" class="bs-btn bs-btn-primary bs-btn-block" style="margin-top:14px;"
+              ng-click="vm.accept()" ng-disabled="!vm.agreed || vm.saving">
+        <span ng-if="!vm.saving">Accept and continue</span>
+        <span ng-if="vm.saving">Saving…</span>
+      </button>
+    </div>
+
+    <p style="margin:12px 0 0; text-align:center;">
+      <a href="" ng-click="vm.logout()">Sign out instead</a>
+    </p>
+  </div>
+</div>

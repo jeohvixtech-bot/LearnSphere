@@ -1,5 +1,6 @@
 using System.Text;
 using LearnSphere.API.Data;
+using LearnSphere.API.Models;
 using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -2822,6 +2823,39 @@ INSERT IGNORE INTO SyllabusTopics (Country,Subject,Level,Topic,SortOrder) VALUES
                 REFERENCES `PayoutBatches` (`Id`) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "); } catch { }
+
+    // Terms and Conditions versioning: a table of published versions, plus which version
+    // each user last accepted. Existing users get NULL, so they are asked to accept at next sign-in.
+    try { await context.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS `TermsVersions` (
+            `Id` INT NOT NULL AUTO_INCREMENT,
+            `Version` VARCHAR(50) NOT NULL,
+            `Content` LONGTEXT NOT NULL,
+            `PublishedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            `PublishedByUserId` INT NULL,
+            PRIMARY KEY (`Id`),
+            UNIQUE KEY `UQ_TermsVersions_Version` (`Version`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    "); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Users` ADD COLUMN `TermsVersionId` INT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Users` ADD COLUMN `TermsAcceptedAt` DATETIME(6) NULL"); } catch { }
+    // First run only: publish version 1 from the text that used to be hardcoded in login.html.
+    try
+    {
+        if (!await context.TermsVersions.AnyAsync())
+        {
+            context.TermsVersions.Add(new TermsVersion
+            {
+                Version = TermsSeedText.Version,
+                Content = TermsSeedText.Content,
+                PublishedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+    }
+    catch { }
 
     await DbSeeder.SeedAsync(context);
 

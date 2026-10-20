@@ -42,14 +42,23 @@ angular.module('learnSphereApp')
       });
   };
 
-  self.register = function (email, password, name, role) {
-    return $http.post(API_URL + '/auth/register', { email: email, password: password, name: name, role: role })
+  self.register = function (email, password, name, role, termsVersionId) {
+    return $http.post(API_URL + '/auth/register', { email: email, password: password, name: name, role: role, termsVersionId: termsVersionId })
       .then(function (res) {
         sessionStorage.setItem(TOKEN_KEY, res.data.token);
         sessionStorage.setItem(USER_KEY, JSON.stringify(res.data));
         startSession(res.data.userId);
         return res.data;
       });
+  };
+
+  // Called after the user accepts the current Terms, so route guards stop redirecting them.
+  self.markTermsAccepted = function () {
+    var user = self.getCurrentUser();
+    if (user) {
+      user.needsTermsAcceptance = false;
+      sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    }
   };
 
   self.forgotPassword = function (email) {
