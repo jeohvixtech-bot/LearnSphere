@@ -19,7 +19,11 @@ var builder = WebApplication.CreateBuilder(args);
 // framing overhead, which is counted against these limits but is not part of the file.
 const long MaxUploadBytes = 110L * 1024 * 1024;
 
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxUploadBytes);
+builder.WebHost.ConfigureKestrel(o =>
+{
+    o.Limits.MaxRequestBodySize = MaxUploadBytes;
+    o.AddServerHeader = false; // no "Server: Kestrel" fingerprint
+});
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 {
     o.MultipartBodyLengthLimit = MaxUploadBytes;
@@ -107,20 +111,35 @@ builder.Services.AddHostedService<VideoLinkReminderService>();
 
 // CORS — origins configurable via appsettings.json "AllowedOrigins"
 // Set to ["*"] to allow all, or list specific origins e.g. ["http://localhost:4200","http://myserver:1002"]
-var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+// Only real http(s) origins count; placeholders such as the sanitised publish settings'
+// "SET_VIA_ENVIRONMENT …" are ignored, otherwise they would silently block every origin.
+var allowedOrigins = (builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
+    .Where(o => o == "*" || (Uri.TryCreate(o, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)))
+    .Select(o => o.TrimEnd('/'))
+    .ToArray();
+
+var corsUnconfigured = allowedOrigins.Length == 0 || allowedOrigins.Contains("*");
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        if (allowedOrigins == null || allowedOrigins.Length == 0 || allowedOrigins.Contains("*"))
-            policy.SetIsOriginAllowed(_ => true);
+        if (corsUnconfigured)
+            policy.SetIsOriginAllowed(_ => true);   // Development only — see below for Production
         else
-            policy.WithOrigins(allowedOrigins);
+            policy.WithOrigins(allowedOrigins!);
 
         policy.AllowAnyHeader().AllowAnyMethod();
     });
 });
+
+// Not configured outside Development: allow only pages served from the SAME HOST as this API
+// (the frontend on another port of the same server), never an arbitrary third-party site.
+// The policy has to be built per request because it depends on the request's host; a
+// policy provider is the hook that receives the HttpContext. Set AllowedOrigins__0 to pin
+// the frontend origin explicitly instead.
+if (corsUnconfigured && !builder.Environment.IsDevelopment())
+    builder.Services.AddSingleton<Microsoft.AspNetCore.Cors.Infrastructure.ICorsPolicyProvider, SameHostCorsPolicyProvider>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -228,12 +247,18 @@ using (var scope = app.Services.CreateScope())
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Tutors` ADD COLUMN `IsOnline` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
     // Test mode (Setup Class date-rule bypass + quick test class button, see Tutor.TestModeEnabled) —
-    // on by default. SET DEFAULT covers databases where the column was first added with DEFAULT 0;
-    // it only changes the default for new rows, never an existing row's value.
+    // OFF by default: a real tutor must never see the "Bypass date rule" toggle. SET DEFAULT covers
+    // databases where the column was first added with DEFAULT 1; it only changes the default for
+    // new rows. In Production every existing row is forced off too — the flag is a developer aid.
     try { await context.Database.ExecuteSqlRawAsync(
-        "ALTER TABLE `Tutors` ADD COLUMN `TestModeEnabled` TINYINT(1) NOT NULL DEFAULT 1"); } catch { }
+        "ALTER TABLE `Tutors` ADD COLUMN `TestModeEnabled` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
-        "ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 1"); } catch { }
+        "ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 0"); } catch { }
+    if (app.Environment.IsProduction())
+    {
+        try { await context.Database.ExecuteSqlRawAsync(
+            "UPDATE `Tutors` SET `TestModeEnabled` = 0 WHERE `TestModeEnabled` = 1"); } catch { }
+    }
     // CounterProposals becomes a per-booking log (was 1-to-1) so every reschedule proposal —
     // by either party — is kept instead of being overwritten by the next one.
     // The old unique index backs a FK, so a replacement non-unique index must exist
@@ -2901,3 +2926,22 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// CORS fallback for Production when AllowedOrigins is not configured: a page may call this
+// API only if it is served from the same host name (or IP) as the API itself — the frontend
+// on another port of the same server. Anything else gets no Access-Control-Allow-Origin.
+sealed class SameHostCorsPolicyProvider : Microsoft.AspNetCore.Cors.Infrastructure.ICorsPolicyProvider
+{
+    public Task<Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicy?> GetPolicyAsync(HttpContext context, string? policyName)
+    {
+        var requestHost = context.Request.Host.Host;
+        var policy = new Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicyBuilder()
+            .SetIsOriginAllowed(origin =>
+                Uri.TryCreate(origin, UriKind.Absolute, out var o)
+                && string.Equals(o.Host, requestHost, StringComparison.OrdinalIgnoreCase))
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .Build();
+        return Task.FromResult<Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicy?>(policy);
+    }
+}

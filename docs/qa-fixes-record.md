@@ -168,6 +168,75 @@ Added `frontend/favicon.svg` and `<link rel="icon" type="image/svg+xml" href="fa
 All test accounts (`e2e.*`, `rg1.*`) were removed afterwards; the database matches its pre-run
 baseline (7 users, 1 booking, 1 invoice, CSYongTutor's 27 offerings intact).
 
+## Round 5 — live-site QA (20 Oct 2026, 103.233.3.146)
+
+Found by the senior-QA pass on the IIS deployment (full report: `docs/qa/LearnSphere-Live-QA-Report-2026-10-20.xlsx`).
+Five of the thirteen findings are fixed in code here; the rest are server settings and data
+(default admin password, demo accounts, HTTPS, sandbox gateway, SMTP, login prefill) listed in the
+report.
+
+### BUG-L02 — HitPay return URL pointed at 127.0.0.1:3000
+
+**Severity:** Critical · **Where:** `PaymentsController.ResolveReturnOrigin`
+
+`PaymentGatewaySetting.ReturnUrl` keeps its development default until an admin changes it, and the
+return endpoint redirected the payer there — on the customer's own machine. The checkout
+origin is now accepted when the configured value is still a loopback address and the checkout
+came from a page on the **same host as the API** (the frontend on another port of the server),
+so the deployment works even before the admin sets Return URL. Arbitrary third-party origins are
+still refused (open-redirect guard unchanged). Admins should still set Return URL explicitly.
+
+### BUG-L06 — CORS reflected any origin
+
+**Severity:** High · **Where:** `Program.cs`
+
+With `AllowedOrigins` unset the API allowed every origin. Outside Development it now falls back
+to a per-request policy (`SameHostCorsPolicyProvider`) that allows only origins whose host equals
+the API's own host — the frontend on another port — and nothing else. Placeholder values such as
+the sanitised publish settings' `SET_VIA_ENVIRONMENT …` are ignored rather than treated as an
+origin (that would have blocked everything). `AllowedOrigins__0` still pins it explicitly.
+Verified on the published build in Production: `http://127.0.0.1:8088` allowed,
+`https://evil.example` blocked, explicit `AllowedOrigins__0` honoured.
+
+### BUG-L09 — "Bypass date rule" test mode on for every tutor
+
+**Severity:** Medium · **Where:** `Tutor.cs`, `Program.cs` ladder, `database/deploy-migration.sql`
+
+`TestModeEnabled` now defaults to **false** (model, column default, migration script), and in
+Production the start-up ladder switches it off for every existing tutor. A specific test account
+can be re-enabled with `UPDATE Tutors SET TestModeEnabled = 1 WHERE Id = …`.
+
+### BUG-L12 — server fingerprint headers, no HSTS/CSP
+
+**Severity:** Low · **Where:** `frontend/web.config`, `backend/LearnSphere.API/web.config`, Kestrel
+
+`Server` and `X-Powered-By` removed on both sites (`removeServerHeader`, header removal,
+`AddServerHeader = false`); frontend adds `Content-Security-Policy` (scripts only from the site,
+styles/fonts from Google Fonts, API calls to any origin because the API host is per deployment),
+`Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security` (effective once HTTPS is
+on). The backend `web.config` now ships from the project (with the 110 MB request limit) instead
+of being hand-added to the publish folder.
+
+### BUG-L13 — partial credit offset never topped up
+
+**Severity:** Low · **Where:** `TutorLedgerService.ConsumeCreditAgainstCommissionAsync`
+
+A commission that promotional credit could only partly cover was marked "has an offset" and
+never revisited, so a later grant left the remainder charged — while a commission with *no*
+offset was covered retroactively. The pass now compares the **net offset so far** (offsets minus
+reversals) against the charge and consumes credit for the remainder only. Fully covered invoices
+are still never touched again. New unit test `PartialOffset_IsToppedUpByALaterGrant`; the credit
+flow pack went from 33/37 to 37/37.
+
+### Verification
+
+| Suite | Result |
+|---|---|
+| Unit tests | 70/70 |
+| API regression | 54/54 |
+| Promotional credit flow | 37/37 |
+| Published build, Production mode | starts; same-host CORS allowed, third-party blocked; no fingerprint headers; test mode forced off |
+
 ## Still open
 
 - **Extension-only upload validation** (Low) — content is not sniffed; files are served with

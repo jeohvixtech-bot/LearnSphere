@@ -96,13 +96,15 @@ CALL `_AddColumnIfMissing`('Users', 'MustChangePassword', 'TINYINT(1) NOT NULL D
 -- 2. `Tutors` — new columns
 -- ============================================================
 CALL `_AddColumnIfMissing`('Tutors', 'IsOnline',           'TINYINT(1) NOT NULL DEFAULT 1');
-CALL `_AddColumnIfMissing`('Tutors', 'TestModeEnabled',    'TINYINT(1) NOT NULL DEFAULT 1');
+CALL `_AddColumnIfMissing`('Tutors', 'TestModeEnabled',    'TINYINT(1) NOT NULL DEFAULT 0');
 CALL `_AddColumnIfMissing`('Tutors', 'VerificationStatus', 'VARCHAR(20) NOT NULL DEFAULT ''not_submitted''');
 CALL `_AddColumnIfMissing`('Tutors', 'OfferingsUnlocked',  'TINYINT(1) NOT NULL DEFAULT 0');
 CALL `_AddColumnIfMissing`('Tutors', 'LastSubmittedAt',    'DATETIME(6) NULL');
 
--- Ensure TestModeEnabled default is 1 even if added earlier with DEFAULT 0
-ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 1;
+-- Test mode is a developer aid (Setup Class date-rule bypass). Default OFF, and switch it off for
+-- every tutor already on this database — real tutors must never see the "Bypass date rule" toggle.
+ALTER TABLE `Tutors` ALTER COLUMN `TestModeEnabled` SET DEFAULT 0;
+UPDATE `Tutors` SET `TestModeEnabled` = 0 WHERE `TestModeEnabled` = 1;
 
 -- ============================================================
 -- 3. `TutorSubjects` — new column
