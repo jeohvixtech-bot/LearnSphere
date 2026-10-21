@@ -1,0 +1,159 @@
+'use strict';
+
+angular.module('learnSphereApp')
+.controller('AuthCtrl', ['$location', 'AuthService', 'PendingMatchService', 'NameValidationService', 'API_URL', function ($location, AuthService, PendingMatchService, NameValidationService, API_URL) {
+  var self = this;
+
+  // Redirect if already logged in
+  if (AuthService.isLoggedIn()) {
+    var user = AuthService.getCurrentUser();
+    if (user.mustChangePassword) $location.path('/change-password');
+    else redirectByRole(user.role);
+  }
+
+  self.mode = 'login';  // login | register
+  self.loginData  = { email: 'sarah.tan@example.com', password: 'Parent@123' };
+  self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
+
+  // Welcome page's "I'm a New Parent" / "I'm a New Tutor" buttons link here with
+  // ?mode=register&role=... so a visitor lands straight on the right tab/role
+  // instead of the default Sign In. Still just pre-filling — both stay editable.
+  var params = $location.search();
+  if (params.mode === 'register') self.mode = 'register';
+  if (params.role === 'parent' || params.role === 'tutor') self.registerData.role = params.role;
+  self.showTerms = false;
+  self.errorMsg = '';
+  self.nameError = '';
+  self.loading = false;
+  self.showRegisterPassword = false;
+  self.showRegisterConfirmPassword = false;
+
+  // Populated by AuthService's cross-tab takeover handler when this tab got
+  // logged out because the same account signed in elsewhere — one-time read.
+  if (AuthService.kickedOutMessage) {
+    self.errorMsg = AuthService.kickedOutMessage;
+    AuthService.kickedOutMessage = '';
+  }
+
+  // Forgot password
+  self.showForgotPassword = false;
+  self.forgotEmail = '';
+  self.forgotLoading = false;
+  self.forgotMsg = '';
+  self.forgotErrorMsg = '';
+
+  self.openForgotPassword = function () {
+    self.showForgotPassword = true;
+    self.forgotEmail = self.loginData.email || '';
+    self.forgotMsg = '';
+    self.forgotErrorMsg = '';
+  };
+
+  self.closeForgotPassword = function () {
+    self.showForgotPassword = false;
+  };
+
+  self.submitForgotPassword = function () {
+    self.forgotMsg = '';
+    self.forgotErrorMsg = '';
+    self.forgotLoading = true;
+    AuthService.forgotPassword(self.forgotEmail)
+      .then(function (result) {
+        self.forgotMsg = 'A temporary password has been sent to your email. Use it to log in, then you can change your password.';
+      })
+      .catch(function () {
+        self.forgotErrorMsg = 'Something went wrong. Please try again.';
+      })
+      .finally(function () {
+        self.forgotLoading = false;
+      });
+  };
+
+  self.login = function () {
+    // Enter in either field calls this directly (see login.html ng-keydown) as
+    // well as the form's ng-submit — ignore repeats while a request is in flight
+    // and don't send an obviously incomplete form.
+    if (self.loading) return;
+    if (!self.loginData.email || !self.loginData.password) {
+      self.errorMsg = 'Please enter your email and password.';
+      return;
+    }
+    self.errorMsg = '';
+    self.loading = true;
+    AuthService.login(self.loginData.email, self.loginData.password)
+      .then(function (user) {
+        if (!user || !user.role) {
+          self.errorMsg = 'Unexpected response from server. Please try again.';
+          return;
+        }
+        if (user.mustChangePassword) $location.path('/change-password');
+        else redirectByRole(user.role);
+      })
+      .catch(function (err) {
+        if (err && err.status === 401) {
+          self.errorMsg = 'Invalid email or password.';
+        } else if (err && err.status === 0) {
+          self.errorMsg = 'Cannot reach server. Is the backend running?';
+        } else if (err && err.status) {
+          self.errorMsg = 'Server error (' + err.status + '). Please try again.';
+        } else {
+          self.errorMsg = 'Login error: ' + (err && err.message ? err.message : 'unknown');
+        }
+      })
+      .finally(function () {
+        self.loading = false;
+      });
+  };
+
+  // Full-name validation for registration — see NameValidationService for the
+  // actual rule (shared with child-profile name validation in parent.controller.js).
+  // Mirrored server-side in NameValidator.cs so this can't be bypassed by calling
+  // the API directly.
+  self.validateName = function () {
+    self.nameError = NameValidationService.validate(self.registerData.name);
+  };
+
+  self.register = function () {
+    self.errorMsg = '';
+    self.validateName();
+    if (self.nameError) { self.errorMsg = self.nameError; return; }
+    if (self.registerData.password !== self.registerData.confirmPassword) {
+      self.errorMsg = 'Passwords do not match.';
+      return;
+    }
+    self.loading = true;
+    AuthService.register(
+      self.registerData.email,
+      self.registerData.password,
+      self.registerData.name,
+      self.registerData.role
+    ).then(function (user) {
+      redirectByRole(user.role);
+    }).catch(function (err) {
+      if (err && err.status === 400 && err.data && err.data.message) {
+        self.errorMsg = err.data.message;
+      } else if (err && err.status === 0) {
+        self.errorMsg = 'Cannot reach the server at ' + API_URL + '. Please try again in a moment.';
+      } else if (err && err.status) {
+        self.errorMsg = 'Server error ' + err.status + ': ' + (err.data && err.data.message ? err.data.message : JSON.stringify(err.data));
+      } else {
+        self.errorMsg = 'Unknown error: ' + JSON.stringify(err);
+      }
+    }).finally(function () {
+      self.loading = false;
+    });
+  };
+
+  function redirectByRole(role) {
+    // A tutor clicked from the (signed-out) welcome page takes priority over the
+    // usual dashboard landing — send the parent straight to that tutor's booking
+    // page. ParentCtrl.init() consumes it once the tutor catalog has loaded.
+    if ((role === 'parent' || role === 'student') && PendingMatchService.hasPendingTutor()) {
+      $location.path('/parent/search');
+    }
+    else if (role === 'parent' || role === 'student') $location.path('/parent/dashboard');
+    else if (role === 'tutor')                   $location.path('/tutor/overview');
+    else if (role === 'admin')                   $location.path('/admin/overview');
+    else                                         $location.path('/login');
+  }
+}]);

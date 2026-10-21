@@ -79,6 +79,14 @@ public class PaymentsController : ControllerBase
             IsLoopbackHost(originUri.Host) && IsLoopbackHost(configured.Host))
             return normalized;
 
+        // The configured ReturnUrl is still the development default (a loopback address) but
+        // the checkout came from a real frontend served by THIS server (same host as the API,
+        // any port). Sending the payer to 127.0.0.1 would land them on their own machine, so
+        // the frontend they actually used wins. Still never an arbitrary third-party origin.
+        if (IsLoopbackHost(configured.Host) && !IsLoopbackHost(originUri.Host) &&
+            string.Equals(originUri.Host, Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+            return normalized;
+
         return null;
     }
 

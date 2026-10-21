@@ -1,0 +1,66 @@
+'use strict';
+
+angular.module('learnSphereApp')
+.service('BookingService', ['$http', 'API_URL', 'AuthService', function ($http, API_URL, AuthService) {
+  var self = this;
+  var h = function () { return { headers: AuthService.authHeader() }; };
+
+  self.getAll = function () {
+    return $http.get(API_URL + '/bookings', h());
+  };
+
+  self.create = function (data) {
+    return $http.post(API_URL + '/bookings', data, h());
+  };
+
+  self.bookPreset = function (data) {
+    return $http.post(API_URL + '/bookings/preset', data, h());
+  };
+
+  self.updateStatus = function (id, status, counterProposal) {
+    return $http.patch(API_URL + '/bookings/' + id + '/status', {
+      status: status,
+      counterProposal: counterProposal || null
+    }, h());
+  };
+
+  self.submitLessonReport = function (bookingId, data) {
+    return $http.post(API_URL + '/bookings/' + bookingId + '/lesson-reports', data, h());
+  };
+
+  self.getLessonReports = function (bookingId) {
+    return $http.get(API_URL + '/bookings/' + bookingId + '/lesson-reports', h());
+  };
+
+  self.reportIssue = function (id, data) {
+    return $http.post(API_URL + '/bookings/' + id + '/issue', data, h());
+  };
+
+  self.updateIssue = function (id, data) {
+    return $http.put(API_URL + '/bookings/' + id + '/issue', data, h());
+  };
+
+  self.deleteIssue = function (id) {
+    return $http.delete(API_URL + '/bookings/' + id + '/issue', h());
+  };
+
+  self.cancel = function (id) {
+    return $http.post(API_URL + '/bookings/' + id + '/cancel', {}, h());
+  };
+
+  self.setVideoLink = function (bookingId, link) {
+    return $http.patch(API_URL + '/bookings/' + bookingId + '/video-link',
+      { videoConferenceLink: link }, h());
+  };
+
+  // Marks one session taught, or not. Only a Delivered session on a paid invoice counts
+  // toward a tutor's monthly payout, so this is the gate on money leaving the platform.
+  // Tutor (their own booking) or admin only — a parent cannot set it.
+  self.setSessionDelivery = function (bookingId, classId, deliveryStatus) {
+    return $http.put(
+      API_URL + '/bookings/' + bookingId + '/sessions/' + classId + '/delivery',
+      { deliveryStatus: deliveryStatus },
+      h()
+    );
+  };
+}]);

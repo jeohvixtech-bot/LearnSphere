@@ -1,0 +1,156 @@
+<div class="bs-scope lg-page" ng-click="auth.errorMsg = ''">
+
+  <!-- Back to the public landing page — fixed to the viewport corner so it stays put regardless of card height/scroll. -->
+  <a href="#!/welcome" class="bs-btn bs-btn-secondary lg-back" style="position:fixed;" ng-click="$event.stopPropagation()">Back to Welcome</a>
+
+  <div class="lg-card">
+
+    <img class="lg-logo" src="assets/logo-stacked.png" alt="LearnSphere: Learn, Grow, Connect" width="640" height="483" />
+
+    <div>
+      <h1>Welcome back</h1>
+      <p class="lg-sub">Sign in to continue your learning journey.</p>
+    </div>
+
+    <!-- Mode toggle -->
+    <div class="bs-seg" role="radiogroup" aria-label="Sign in or register">
+      <label class="bs-seg-opt">
+        <input type="radio" name="authMode" ng-model="auth.mode" value="login" /> Sign In
+      </label>
+      <label class="bs-seg-opt">
+        <input type="radio" name="authMode" ng-model="auth.mode" value="register" /> Register
+      </label>
+    </div>
+
+    <!-- Error -->
+    <div class="alert-error" role="alert" ng-if="auth.errorMsg">{{ auth.errorMsg }}</div>
+
+    <!-- Login Form -->
+    <form ng-if="auth.mode === 'login'" ng-submit="auth.login()">
+      <div class="bs-field">
+        <label for="login-email">Email Address</label>
+        <input id="login-email" class="bs-input" type="email" ng-model="auth.loginData.email" required ng-keydown="$event.keyCode === 13 && ($event.preventDefault() || auth.login())" placeholder="sarah.tan@example.com" autocomplete="username" />
+      </div>
+      <div class="bs-field">
+        <label for="login-password">Password</label>
+        <input id="login-password" class="bs-input" type="password" ng-model="auth.loginData.password" required ng-keydown="$event.keyCode === 13 && ($event.preventDefault() || auth.login())" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <p style="text-align:right; margin:0;">
+        <a href="" class="bs-btn bs-btn-ghost" style="min-height:36px;" ng-click="$event.stopPropagation(); auth.openForgotPassword()">Forgot password?</a>
+      </p>
+      <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="auth.loading">
+        <span ng-if="!auth.loading">Sign In</span>
+        <span ng-if="auth.loading">Authenticating…</span>
+      </button>
+    </form>
+
+    <!-- Forgot Password Modal -->
+    <div class="bs-dialog-backdrop" ng-if="auth.showForgotPassword" ng-click="auth.closeForgotPassword()">
+      <div class="bs-dialog" ng-click="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Forgot password">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="bs-dialog-title">Forgot Password</div>
+          <button class="bs-btn bs-btn-ghost bs-btn-icon" aria-label="Close" ng-click="auth.closeForgotPassword()">&times;</button>
+        </div>
+        <div class="bs-dialog-body">
+          <p style="margin:0 0 var(--space-3);">Enter your account email and we'll send a temporary password to it.</p>
+          <div class="bs-field">
+            <label for="forgot-email">Email Address</label>
+            <input id="forgot-email" class="bs-input" type="email" ng-model="auth.forgotEmail" required placeholder="you@example.com" />
+          </div>
+          <div class="alert-error" role="alert" ng-if="auth.forgotErrorMsg" style="margin-top:var(--space-2);">{{ auth.forgotErrorMsg }}</div>
+          <div class="alert-success" role="status" ng-if="auth.forgotMsg" style="margin-top:var(--space-2);">{{ auth.forgotMsg }}</div>
+        </div>
+        <div class="bs-dialog-actions">
+          <button type="button" class="bs-btn bs-btn-primary" ng-disabled="auth.forgotLoading || !auth.forgotEmail" ng-click="auth.submitForgotPassword()">
+            <span ng-if="!auth.forgotLoading">Send Temporary Password</span>
+            <span ng-if="auth.forgotLoading">Sending…</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <form ng-if="auth.mode === 'register'" ng-submit="auth.register()">
+      <div class="bs-field">
+        <label for="reg-name">Full Name</label>
+        <input id="reg-name" class="bs-input" type="text" ng-model="auth.registerData.name" ng-change="auth.validateName()" required placeholder="e.g. Sarah Tan" autocomplete="name" />
+        <div class="field-error" ng-if="auth.nameError">{{ auth.nameError }}</div>
+      </div>
+      <div class="bs-field">
+        <label for="reg-email">Email Address</label>
+        <input id="reg-email" class="bs-input" type="email" ng-model="auth.registerData.email" required placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="bs-field">
+        <label for="reg-password">Password</label>
+        <div class="lg-pw">
+          <input id="reg-password" class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterPassword ? 'text' : 'password' }}" ng-model="auth.registerData.password" required placeholder="Min. 8 characters" autocomplete="new-password" />
+          <button type="button" class="bs-btn bs-btn-ghost" ng-click="auth.showRegisterPassword = !auth.showRegisterPassword" aria-label="Show or hide password">{{ auth.showRegisterPassword ? 'Hide' : 'Show' }}</button>
+        </div>
+      </div>
+      <div class="bs-field">
+        <label for="reg-confirm">Confirm Password</label>
+        <div class="lg-pw">
+          <input id="reg-confirm" class="bs-input bs-input-password-toggle" ng-attr-type="{{ auth.showRegisterConfirmPassword ? 'text' : 'password' }}" ng-model="auth.registerData.confirmPassword" required placeholder="Re-enter your password" autocomplete="new-password" />
+          <button type="button" class="bs-btn bs-btn-ghost" ng-click="auth.showRegisterConfirmPassword = !auth.showRegisterConfirmPassword" aria-label="Show or hide password">{{ auth.showRegisterConfirmPassword ? 'Hide' : 'Show' }}</button>
+        </div>
+        <div class="field-error" ng-if="auth.registerData.confirmPassword && auth.registerData.password !== auth.registerData.confirmPassword">Passwords do not match.</div>
+      </div>
+      <div class="bs-field">
+        <label>Account Type</label>
+        <div class="bs-seg" role="radiogroup" aria-label="Account type">
+          <label class="bs-seg-opt">
+            <input type="radio" name="registerRole" ng-model="auth.registerData.role" value="parent" /> Parent / Student
+          </label>
+          <label class="bs-seg-opt">
+            <input type="radio" name="registerRole" ng-model="auth.registerData.role" value="tutor" /> Tutor / Teacher
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:10px; font-size:15px;">
+        <input type="checkbox" id="tnc-agree" ng-model="auth.registerData.agreedToTerms" style="margin-top:3px; width:20px; height:20px;" />
+        <label for="tnc-agree">
+          I have read and agree to the
+          <a href="" class="tnc-link" ng-click="$event.preventDefault(); auth.showTerms = !auth.showTerms">Terms and Conditions</a>
+        </label>
+      </div>
+
+      <div class="bs-dialog-backdrop" ng-if="auth.showTerms" ng-click="auth.showTerms = false">
+        <div class="bs-dialog" ng-click="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Terms and Conditions">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="bs-dialog-title">Terms and Conditions</div>
+            <button class="bs-btn bs-btn-ghost bs-btn-icon" aria-label="Close" ng-click="auth.showTerms = false">&times;</button>
+          </div>
+          <div class="bs-dialog-body">
+            <p style="margin:0;">Terms and Conditions content will be added here.</p>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="bs-btn bs-btn-primary bs-btn-block" ng-disabled="auth.loading || auth.registerData.password !== auth.registerData.confirmPassword || !auth.registerData.agreedToTerms || !!auth.nameError">
+        <span ng-if="!auth.loading">Create Account</span>
+        <span ng-if="auth.loading">Creating…</span>
+      </button>
+    </form>
+
+    <!-- Demo Credentials -->
+    <div class="lg-demo">
+      <span class="bs-card-kicker">Demo Credentials</span>
+      <div class="lg-grid">
+        <div>
+          <strong>Parent</strong><br/>
+          <span class="bs-text-muted">sarah.tan@example.com<br/>Parent@123</span>
+        </div>
+        <div>
+          <strong>Tutor</strong><br/>
+          <span class="bs-text-muted">lim.ws@example.com<br/>Tutor@123</span>
+        </div>
+        <div>
+          <strong>Admin</strong><br/>
+          <span class="bs-text-muted">admin@learnsphere.sg<br/>Admin@123</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

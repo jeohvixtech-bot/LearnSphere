@@ -544,18 +544,21 @@ public class TutorLedgerService : ITutorLedgerService
 
         if (grants.Count == 0) return 0;
 
-        // Commission charges still awaiting an offset. An invoice that already has a
-        // commission_offset row is settled and is never revisited — that check is what
-        // keeps this idempotent across reconciliation passes.
-        var offsetInvoiceIds = entries
-            .Where(e => e.Type == LedgerEntryType.CommissionOffset && e.InvoiceId != null)
-            .Select(e => e.InvoiceId!.Value)
-            .ToHashSet();
+        // How much of each invoice's commission has already been covered. Offsets are
+        // positive, offset reversals (refund unwind) negative, so the sum is the net cover.
+        // Comparing that against the charge — rather than "has any offset row" — is what
+        // lets a later grant top up a commission that an earlier, smaller balance only
+        // partly covered, while an invoice that is fully covered is never revisited.
+        var coveredByInvoice = entries
+            .Where(e => e.InvoiceId != null
+                     && (e.Type == LedgerEntryType.CommissionOffset || e.Type == LedgerEntryType.CommissionOffsetReversal))
+            .GroupBy(e => e.InvoiceId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
 
         var outstanding = entries
             .Where(e => e.Type == LedgerEntryType.FirstMatchCommission
                      && e.InvoiceId != null
-                     && !offsetInvoiceIds.Contains(e.InvoiceId!.Value))
+                     && Math.Abs(e.Amount) - coveredByInvoice.GetValueOrDefault(e.InvoiceId!.Value) > 0.005m)
             .OrderBy(e => e.Id)
             .ToList();
 
@@ -571,7 +574,8 @@ public class TutorLedgerService : ITutorLedgerService
                                          && e.InvoiceId == charge.InvoiceId);
             if (reversed) continue;
 
-            var owed = Math.Abs(charge.Amount);
+            // Only the part not already covered by an earlier pass is still owed.
+            var owed = Math.Abs(charge.Amount) - coveredByInvoice.GetValueOrDefault(charge.InvoiceId!.Value);
             var paid = 0m;
 
             foreach (var grant in grants)
