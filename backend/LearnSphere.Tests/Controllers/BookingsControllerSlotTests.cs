@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using LearnSphere.API.Controllers;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
 using LearnSphere.Tests.Helpers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LearnSphere.Tests.Controllers;
@@ -53,9 +55,25 @@ public class BookingsControllerSlotTests
             }
         };
 
+    /// <summary>Signs the controller in as the given parent (Create now requires a parent caller).</summary>
+    private static void AsParent(BookingsController ctrl, int parentId)
+    {
+        ctrl.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, parentId.ToString()),
+                    new Claim(ClaimTypes.Role, "parent")
+                }, "Test"))
+            }
+        };
+    }
+
     // ── test cases ───────────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Skip = "Parent class requests (BookingsController.Create) are disabled; only preset booking is used.")]
     public async Task Create_SlotNotFound_Returns400WithMessage()
     {
         // Arrange — empty DB so slotId 999 does not exist
@@ -83,6 +101,7 @@ public class BookingsControllerSlotTests
         var dto = MakeDto(tutorId: tutor.Id, studentId: student.Id, slotId: 999);
 
         // Act
+        AsParent(ctrl, parent.Id);
         var result = await ctrl.Create(dto);
 
         // Assert — 400 with the expected error message
@@ -91,7 +110,7 @@ public class BookingsControllerSlotTests
         Assert.Equal("The specified slot does not exist.", bad.Value);
     }
 
-    [Fact]
+    [Fact(Skip = "Parent class requests (BookingsController.Create) are disabled; only preset booking is used.")]
     public async Task Create_SlotBelongsToDifferentTutor_Returns400WithMessage()
     {
         // Arrange — seed two tutors; slot is owned by tutorA but booking targets tutorB
@@ -126,6 +145,7 @@ public class BookingsControllerSlotTests
         var dto = MakeDto(tutorId: tutorB.Id, studentId: student.Id, slotId: slot.Id);
 
         // Act
+        AsParent(ctrl, parent.Id);
         var result = await ctrl.Create(dto);
 
         // Assert — 400 with the expected error message
@@ -134,7 +154,7 @@ public class BookingsControllerSlotTests
         Assert.Equal("The specified slot does not belong to the requested tutor.", bad.Value);
     }
 
-    [Fact]
+    [Fact(Skip = "Parent class requests (BookingsController.Create) are disabled; only preset booking is used.")]
     public async Task Create_NullSlotId_SkipsSlotValidation_AndReturns200()
     {
         // Arrange — slotId is null; slot validation must be skipped entirely
@@ -162,6 +182,7 @@ public class BookingsControllerSlotTests
         var dto = MakeDto(tutorId: tutor.Id, studentId: student.Id, slotId: null);
 
         // Act
+        AsParent(ctrl, parent.Id);
         var result = await ctrl.Create(dto);
 
         // Assert — booking is created successfully

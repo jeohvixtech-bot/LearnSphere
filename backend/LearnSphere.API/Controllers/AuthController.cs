@@ -32,6 +32,12 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
+        // Public sign-up may only create a parent or a tutor. The role arrives in the request
+        // body, so without this check anyone could register straight into "admin". Admin
+        // accounts are created by the seeder or by a database script, never here.
+        if (dto.Role != "parent" && dto.Role != "tutor")
+            return BadRequest(new { message = "Role must be either 'parent' or 'tutor'." });
+
         var nameError = NameValidator.Validate(dto.Name);
         if (nameError != null) return BadRequest(new { message = nameError });
 
@@ -65,7 +71,7 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            message = "If an account exists for that email, a temporary password has been generated."
+            message = "If an account exists for that email, a temporary password has been emailed (valid for 1 hour; your current password still works until you use it)."
         });
     }
 

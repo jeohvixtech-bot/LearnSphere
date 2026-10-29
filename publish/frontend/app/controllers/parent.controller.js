@@ -633,7 +633,7 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.parentProfileError = '';
 
   self.startEditParentProfile = function () {
-    self.parentProfileForm = { name: self.parentProfile.name, email: self.parentProfile.email, password: '' };
+    self.parentProfileForm = { name: self.parentProfile.name, email: self.parentProfile.email, password: '', currentPassword: '' };
     self.parentProfileError = '';
     self.editingParentProfile = true;
   };
@@ -647,6 +647,8 @@ function ($scope, $location, $timeout, $interval, $q, AuthService, TutorService,
   self.saveParentProfile = function () {
     var payload = { name: self.parentProfileForm.name, email: self.parentProfileForm.email };
     if (self.parentProfileForm.password) payload.password = self.parentProfileForm.password;
+    // Backend requires the current password whenever the email or password changes
+    if (self.parentProfileForm.currentPassword) payload.currentPassword = self.parentProfileForm.currentPassword;
 
     ParentProfileService.update(self.parentProfile.id, payload).then(function (res) {
       self.parentProfile = res.data;

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using LearnSphere.API.Data;
 using LearnSphere.API.DTOs;
 using LearnSphere.API.Models;
+using LearnSphere.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,26 +27,6 @@ public class ParentsController : ControllerBase
         return Ok(MapToDto(user));
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateParentDto dto)
-    {
-        if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
-            return BadRequest(new { message = "Email already in use." });
-
-        var user = new User
-        {
-            Name = dto.Name,
-            Email = dto.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Role = "parent",
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-        return Ok(MapToDto(user));
-    }
-
     [HttpPut("{id}")]
     [Authorize]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateParentDto dto)
@@ -58,6 +39,20 @@ public class ParentsController : ControllerBase
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && u.Role == "parent");
         if (user == null) return NotFound();
+
+        // Changing credentials requires the current password (admins are exempt)
+        var changingCredentials = dto.Password != null || (dto.Email != null && dto.Email != user.Email);
+        if (changingCredentials && callerRole != "admin")
+        {
+            if (string.IsNullOrEmpty(dto.CurrentPassword)
+                || !BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+                return BadRequest(new { message = "Current password is required and must be correct." });
+        }
+        if (dto.Password != null)
+        {
+            var pwError = PasswordValidator.Validate(dto.Password);
+            if (pwError != null) return BadRequest(new { message = pwError });
+        }
 
         if (dto.Name != null) user.Name = dto.Name;
         if (dto.Email != null)

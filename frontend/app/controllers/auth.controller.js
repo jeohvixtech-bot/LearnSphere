@@ -13,7 +13,7 @@ angular.module('learnSphereApp')
   }
 
   self.mode = 'login';  // login | register
-  self.loginData  = { email: 'sarah.tan@example.com', password: 'Parent@123' };
+  self.loginData  = { email: '', password: '' };
   self.registerData = { email: '', password: '', confirmPassword: '', name: '', role: 'parent', agreedToTerms: false };
 
   // Welcome page's "I'm a New Parent" / "I'm a New Tutor" buttons link here with

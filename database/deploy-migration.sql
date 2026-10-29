@@ -91,6 +91,8 @@ DELIMITER ;
 -- ============================================================
 CALL `_AddColumnIfMissing`('Users', 'CreatedAt',          'DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)');
 CALL `_AddColumnIfMissing`('Users', 'MustChangePassword', 'TINYINT(1) NOT NULL DEFAULT 0');
+CALL `_AddColumnIfMissing`('Users', 'PendingResetHash', 'LONGTEXT NULL');
+CALL `_AddColumnIfMissing`('Users', 'PendingResetExpiresAt', 'DATETIME(6) NULL');
 
 -- ============================================================
 -- 2. `Tutors` — new columns

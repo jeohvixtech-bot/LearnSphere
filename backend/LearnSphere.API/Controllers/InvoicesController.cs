@@ -126,8 +126,34 @@ public class InvoicesController : ControllerBase
         // Refunding removes the earning from the tutor's balance. Note this can leave the
         // balance negative if they already withdrew against it — the ledger records that
         // honestly rather than clamping it to zero and losing the debt.
+        // Remember whether the booking was already cancelled: a cancellation has already handed its seats back
+        var wasAlreadyCancelled = invoice.Booking.Status == "cancelled";
         invoice.Status = "Refunded";
         invoice.Booking.Status = "cancelled";
+
+        // A refunded preset booking must give its seats back, exactly as a normal cancellation does,
+        // otherwise the class stays "full" for other families forever. Skipped if the booking was already
+        // cancelled (seats already returned, releasing again would take another family's seat).
+        if (invoice.Booking.BookingType == "tutor-preset" && !wasAlreadyCancelled)
+        {
+            var presetSlotIds = await _context.BookingPresetSlots
+                .Where(bps => bps.BookingId == invoice.Booking.Id)
+                .Select(bps => bps.TutorTimeSlotId)
+                .ToListAsync();
+            if (presetSlotIds.Count == 0 && invoice.Booking.PresetSlotId.HasValue)
+                presetSlotIds.Add(invoice.Booking.PresetSlotId.Value);
+
+            // Classes dated before today are skipped: nobody can book a freed seat on a past class
+            var todayText = DateTime.Today.ToString("yyyy-MM-dd");
+            var presetSlots = await _context.TutorTimeSlots
+                .Where(s => presetSlotIds.Contains(s.Id) && string.Compare(s.Day, todayText) >= 0)
+                .ToListAsync();
+            foreach (var presetSlot in presetSlots)
+            {
+                presetSlot.ConfirmedCount = Math.Max(0, presetSlot.ConfirmedCount - 1);
+                if (presetSlot.ConfirmedCount < presetSlot.MaxStudents) presetSlot.IsFull = false;
+            }
+        }
 
         await _context.SaveChangesAsync();
 

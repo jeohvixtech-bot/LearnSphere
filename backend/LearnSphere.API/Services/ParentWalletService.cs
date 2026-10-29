@@ -79,6 +79,27 @@ public class ParentWalletService : IParentWalletService
     {
         if (requested <= 0m) return 0m;
 
+        // Two concurrent applies (double-click, two tabs) used to both read the same balance and
+        // both spend it. Serialise per parent: take a row lock on the parent's user row inside a
+        // transaction, then re-read the invoice so the numbers below are current. The in-memory
+        // test provider has no transactions or locks, so this only runs against a real database.
+        if (_context.Database.IsRelational() && _context.Database.CurrentTransaction == null)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            await _context.Users.FromSqlInterpolated($"SELECT * FROM `Users` WHERE `Id` = {parentUserId} FOR UPDATE")
+                .AsNoTracking().ToListAsync();
+            await _context.Entry(invoice).ReloadAsync();
+            var result = await ApplyCoreAsync(parentUserId, invoice, requested);
+            await tx.CommitAsync();
+            return result;
+        }
+
+        return await ApplyCoreAsync(parentUserId, invoice, requested);
+    }
+
+    private async Task<decimal> ApplyCoreAsync(int parentUserId, Invoice invoice, decimal requested)
+    {
+
         await ExpireAsync(parentUserId);
 
         var entries = await _context.ParentWalletEntries

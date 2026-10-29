@@ -78,6 +78,11 @@
           <label>New Password <span class="bs-text-muted" style="font-weight:400;">(leave blank to keep current)</span></label>
           <input class="bs-input" type="password" ng-model="vm.parentProfileForm.password" placeholder="••••••••" />
         </div>
+        <!-- Proof of identity: only needed when the email or password is being changed -->
+        <div class="bs-field" style="margin:0;" ng-if="vm.parentProfileForm.password || vm.parentProfileForm.email !== vm.parentProfile.email">
+          <label>Current Password <span style="color:var(--color-accent-2);">*</span> <span class="bs-text-muted" style="font-weight:400;">(required to change email or password)</span></label>
+          <input class="bs-input" type="password" ng-model="vm.parentProfileForm.currentPassword" autocomplete="current-password" required />
+        </div>
         <div style="display:flex; gap:8px;">
           <button type="button" class="bs-btn bs-btn-secondary" ng-click="vm.cancelEditParentProfile()">Cancel</button>
           <button type="submit" class="bs-btn bs-btn-primary">Save Changes</button>

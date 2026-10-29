@@ -348,7 +348,9 @@ public class TutorsController : ControllerBase
         if (tutor == null || !tutor.IsVerified || !tutor.IsOnline) return NotFound();
         var syllabusMap = await LoadSyllabusMapAsync(
             tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
-        return Ok(MapToDto(tutor, syllabusMap));
+        var dto = MapToDto(tutor, syllabusMap);
+        HideDocumentsFromOthers(dto, tutor.UserId);
+        return Ok(dto);
     }
 
     [HttpDelete("{id}")]
@@ -449,9 +451,21 @@ public class TutorsController : ControllerBase
         var syllabusMap = await LoadSyllabusMapAsync(
             tutor.TimeSlots.Where(s => s.PresetGroupId != null).Select(s => s.PresetGroupId!));
         var dto = MapToDto(tutor, syllabusMap);
+        HideDocumentsFromOthers(dto, tutor.UserId);
         (dto.Score, dto.Tier, dto.ScoreMax) = await ComputeTutorTierAsync(tutor);
         dto.TestModeEnabled = tutor.TestModeEnabled;
         return Ok(dto);
+    }
+
+    // Verification documents carry ID numbers, file links and admin notes. Only the tutor who
+    // owns them and admins may see them; everyone else (including the public profile, which
+    // needs no login) gets the profile without them.
+    private void HideDocumentsFromOthers(TutorDto dto, int tutorUserId)
+    {
+        if (User.IsInRole("admin")) return;
+        var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (idClaim != null && int.TryParse(idClaim, out var callerId) && callerId == tutorUserId) return;
+        dto.Documents = new();
     }
 
     // Does the caller own this tutor profile, or are they an admin?

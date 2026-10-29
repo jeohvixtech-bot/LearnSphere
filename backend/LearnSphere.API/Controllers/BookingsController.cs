@@ -190,8 +190,22 @@ public class BookingsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBookingDto dto)
     {
+        // Parents can no longer send free-form class requests; classes are only booked from a
+        // tutor's preset slots (POST /api/bookings/preset). Set to true to re-enable this flow.
+        const bool parentRequestsEnabled = false;
+        if (!parentRequestsEnabled)
+            return StatusCode(410, new { message = "Class requests are disabled. Please book one of the tutor's available classes instead." });
+
+        var callerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (!User.IsInRole("parent")) return Forbid();
+
+        if (dto.Classes == null || dto.Classes.Count == 0)
+            return BadRequest(new { message = "Select at least one class." });
+
         var student = await _context.Students.FindAsync(dto.StudentId);
         if (student == null) return BadRequest(new { message = "The specified student does not exist." });
+        // A parent may only book for their own children
+        if (student.ParentUserId != callerId) return Forbid();
         if (student.IsArchived)
             return BadRequest(new { message = "This profile is archived and can't be booked for. Restore it first." });
 
@@ -223,7 +237,8 @@ public class BookingsController : ControllerBase
             Mode = dto.Mode,
             DurationHours = dto.DurationHours,
             Message = dto.Message,
-            TotalPrice = dto.TotalPrice,
+            // Price is always computed server-side; any client-supplied TotalPrice is ignored
+            TotalPrice = bookingTutor.PricePerSession * dto.Classes.Count,
             Status = "pending"
         };
         _context.Bookings.Add(booking);
@@ -492,6 +507,43 @@ public class BookingsController : ControllerBase
 
         var pendingProposal = booking.CounterProposals.FirstOrDefault(cp => cp.Status == "pending");
 
+        // Preset bookings are fixed to the tutor's slot: nobody confirms, counters or reschedules them
+        // here. Tutor-side changes go through the slot endpoints; cancellation through the cancel endpoint.
+        if (booking.BookingType == "tutor-preset")
+            return BadRequest(new { message = "Preset class bookings can't be changed this way." });
+
+        // State machine: this endpoint only handles confirm / counter-propose.
+        // Cancellation and completion have their own endpoints with refund and seat logic.
+        if (dto.Status != "confirmed" && dto.Status != "countered")
+            return BadRequest(new { message = "Invalid status change. Use the dedicated endpoint to cancel a booking." });
+
+        if (dto.Status == "confirmed")
+        {
+            if (booking.Status == "pending")
+            {
+                // Only the tutor can accept a fresh booking request
+                if (!isOwningTutor)
+                    return StatusCode(403, new { message = "Only the tutor can confirm a booking request." });
+            }
+            else if (booking.Status == "countered")
+            {
+                // Only the party who did NOT make the pending proposal can accept it
+                if (pendingProposal == null || pendingProposal.ProposedBy == callerRole)
+                    return StatusCode(403, new { message = "You cannot accept your own proposal." });
+            }
+            else
+            {
+                return BadRequest(new { message = $"A {booking.Status} booking cannot be confirmed." });
+            }
+        }
+        else // countered
+        {
+            if (booking.Status != "pending" && booking.Status != "confirmed" && booking.Status != "countered")
+                return BadRequest(new { message = $"A {booking.Status} booking cannot be rescheduled or counter-proposed." });
+            if (dto.CounterProposal == null || dto.CounterProposal.Classes.Count == 0)
+                return BadRequest(new { message = "A counter proposal must include at least one class." });
+        }
+
         if (dto.Status == "countered" && dto.CounterProposal != null)
         {
             var counterProfanityError = ProfanityFilter.Validate(dto.CounterProposal.Message);
@@ -735,11 +787,23 @@ public class BookingsController : ControllerBase
         var booking = await _context.Bookings
             .Include(b => b.LessonReports)
             .Include(b => b.Student)
+            .Include(b => b.Tutor)
             .Include(b => b.PresetSlots)
                 .ThenInclude(ps => ps.TutorTimeSlot)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
+
+        // Only the tutor who owns this booking (or an admin) may file its lesson reports
+        var reporterId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var isAdminCaller = User.IsInRole("admin");
+        var isOwningTutorCaller = User.IsInRole("tutor") && booking.Tutor?.UserId == reporterId;
+        if (!isAdminCaller && !isOwningTutorCaller) return Forbid();
+
+        // The student in the report must be the student on this booking
+        if (dto.StudentId != booking.StudentId)
+            return BadRequest(new { message = "This student does not belong to this booking." });
+
         if (booking.Status != "completed")
             return BadRequest(new { message = "Reports can only be submitted for completed bookings." });
 
@@ -830,11 +894,12 @@ public class BookingsController : ControllerBase
         var booking = await _context.Bookings
             .Include(b => b.LessonReports)
                 .ThenInclude(r => r.Student)
+            .Include(b => b.Tutor)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
 
-        // Parents only see reports for their own children
+        // Only the owning parent, the owning tutor, or an admin may read these reports
         if (role == "parent")
         {
             var student = await _context.Students
@@ -842,6 +907,14 @@ public class BookingsController : ControllerBase
                     s.Id == booking.StudentId &&
                     s.ParentUserId == userId);
             if (student == null) return Forbid();
+        }
+        else if (role == "tutor")
+        {
+            if (booking.Tutor?.UserId != userId) return Forbid();
+        }
+        else if (role != "admin")
+        {
+            return Forbid();
         }
 
         var reports = booking.LessonReports
@@ -869,11 +942,18 @@ public class BookingsController : ControllerBase
         var issueProfanityError = ProfanityFilter.Validate(dto.Details);
         if (issueProfanityError != null) return BadRequest(new { message = issueProfanityError });
 
+        var issueCallerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
         var booking = await _context.Bookings
             .Include(b => b.IssueReport)
+            .Include(b => b.Student)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null) return NotFound();
+
+        // Only the parent who owns the booking's student may raise an issue
+        if (!User.IsInRole("parent") || booking.Student?.ParentUserId != issueCallerId)
+            return Forbid();
 
         if (booking.IssueReport == null)
         {

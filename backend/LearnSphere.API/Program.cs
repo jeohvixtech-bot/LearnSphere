@@ -222,6 +222,10 @@ using (var scope = app.Services.CreateScope())
     "); } catch { }
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Users` ADD COLUMN `MustChangePassword` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Users` ADD COLUMN `PendingResetHash` LONGTEXT NULL"); } catch { }
+    try { await context.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE `Users` ADD COLUMN `PendingResetExpiresAt` DATETIME(6) NULL"); } catch { }
     // Archiving a student profile is the alternative to deleting one that still has booking history
     try { await context.Database.ExecuteSqlRawAsync(
         "ALTER TABLE `Students` ADD COLUMN `IsArchived` TINYINT(1) NOT NULL DEFAULT 0"); } catch { }

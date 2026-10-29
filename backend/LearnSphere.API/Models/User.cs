@@ -10,6 +10,12 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool MustChangePassword { get; set; } = false;
 
+    // Pending forgot-password credential. The real PasswordHash is untouched until the user
+    // actually signs in with the emailed temporary password, so a stranger who types someone's
+    // email into "Forgot password" can no longer lock that person out.
+    public string? PendingResetHash { get; set; }
+    public DateTime? PendingResetExpiresAt { get; set; }
+
     // Which Terms and Conditions version this user last accepted (null = never).
     public int? TermsVersionId { get; set; }
     public DateTime? TermsAcceptedAt { get; set; }

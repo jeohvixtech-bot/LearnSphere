@@ -33,8 +33,30 @@ public class AuthService : IAuthService
     public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-            return null;
+        if (user == null) return null;
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        {
+            // Not the normal password — maybe the emailed temporary one (valid for 1 hour).
+            var usedTemp = user.PendingResetHash != null
+                && user.PendingResetExpiresAt > DateTime.UtcNow
+                && BCrypt.Net.BCrypt.Verify(dto.Password, user.PendingResetHash);
+            if (!usedTemp) return null;
+
+            // Promote the temporary password and force the user to choose a new one.
+            user.PasswordHash = user.PendingResetHash!;
+            user.MustChangePassword = true;
+            user.PendingResetHash = null;
+            user.PendingResetExpiresAt = null;
+            await _context.SaveChangesAsync();
+        }
+        else if (user.PendingResetHash != null)
+        {
+            // Signed in with the real password, so the reset request was not needed — discard it.
+            user.PendingResetHash = null;
+            user.PendingResetExpiresAt = null;
+            await _context.SaveChangesAsync();
+        }
 
         var currentTermsId = await CurrentTermsIdAsync();
         var needsTerms = currentTermsId != null && user.TermsVersionId != currentTermsId;
@@ -49,6 +71,11 @@ public class AuthService : IAuthService
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             return null;
+
+        // Defence in depth: the controller already rejects other roles, but this service is the
+        // one place accounts are created, so it must never be able to mint an admin by itself.
+        if (dto.Role != "parent" && dto.Role != "tutor")
+            throw new ArgumentException("Role must be either 'parent' or 'tutor'.", nameof(dto));
 
         // Once any Terms version exists, sign-up must carry the id of the current one.
         var currentTermsId = await CurrentTermsIdAsync();
@@ -90,13 +117,15 @@ public class AuthService : IAuthService
         if (user == null) return null;
 
         var tempPassword = GenerateTempPassword();
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
-        user.MustChangePassword = true;
+        // Store as a pending credential only; the current password keeps working until the
+        // temporary one is used (see LoginAsync). Expires after one hour.
+        user.PendingResetHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+        user.PendingResetExpiresAt = DateTime.UtcNow.AddHours(1);
         await _context.SaveChangesAsync();
 
         await _emailService.SendAsync(user.Email, "Your LearnSphere temporary password",
-            $"Your temporary password is: {tempPassword}\nPlease sign in and change it as soon as possible. " +
-            "You will be required to set a new password immediately after logging in.");
+            $"Your temporary password is: {tempPassword}\nIt is valid for 1 hour. Sign in with it and you will be asked to set a new password immediately. " +
+            "If you did not request this, ignore this email — your current password still works and is unchanged.");
 
         return tempPassword;
     }
