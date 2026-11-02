@@ -28,8 +28,12 @@
 </head>
 <body>
 
-  <!-- App Shell: Header + Route View -->
-  <div ng-controller="AppCtrl as app" ng-class="{'mobile-nav-open': app.mobileNavOpen}">
+  <!-- App Shell: Header + Route View.
+       ng-cloak keeps the whole shell hidden until Angular has compiled it. Without it the
+       browser paints this raw markup (the signed-in header with its {{ }} placeholders and
+       the notifications drawer, whose ng-if has not run yet) for as long as the 30-odd
+       scripts below take to load, before the real route view replaces it. -->
+  <div ng-controller="AppCtrl as app" ng-class="{'mobile-nav-open': app.mobileNavOpen}" ng-cloak>
 
     <!-- Main Header -->
     <header class="bs-nav bs-scope" ng-if="app.isLoggedIn()" style="position:sticky; top:0; z-index:30;">

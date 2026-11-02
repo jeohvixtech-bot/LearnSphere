@@ -3,6 +3,14 @@
    AngularJS 1.x Frontend
    ============================ */
 
+/* Hide anything marked ng-cloak until Angular has compiled it (Angular removes the
+   attribute as it compiles). Angular injects this same rule itself, but the AngularJS
+   docs recommend declaring it in your own stylesheet as well, so the app shell in
+   index.html can never be painted raw while the scripts are still downloading. */
+[ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+  display: none !important;
+}
+
 /* Scoped custom properties for the dual-pool drag-and-drop mode selectors — the rest
    of this stylesheet uses hardcoded hex values throughout, so these are intentionally
    local to that one component rather than a site-wide variable migration. */
