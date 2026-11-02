@@ -26,3 +26,7 @@ publish/
 # A second copy of the project lives here on one machine. It carries its own .git, so
 # committing it would create an embedded repository that clones cannot fetch.
 /LearnSphere/
+
+# CI/CD build output (scripts/ci/Build-Release.ps1)
+artifacts/
+TestResults/

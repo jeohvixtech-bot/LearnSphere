@@ -1,0 +1,153 @@
+# Continuous Deployment -> production IIS
+#
+# Trigger: a push to `main` (i.e. a merge), or "Run workflow" from the Actions tab.
+#
+#   build    ubuntu runner: tests + scripts/ci/Build-Release.ps1 -> sanitised zips -> artifact
+#   deploy   self-hosted runner ON the IIS server: download the artifact, run
+#            scripts/ci/Deploy-IIS.ps1 (stop pool -> backup -> copy -> start -> smoke test,
+#            rollback on failure)
+#
+# Nothing in this workflow holds a server credential. The deploy job runs on a runner
+# that already lives on the server, so GitHub never needs RDP/SSH/WinRM access, and the
+# server never needs an inbound port opened. The runner polls GitHub over HTTPS.
+#
+# Repository "Variables" used (Settings -> Secrets and variables -> Actions -> Variables):
+#   API_URL        absolute API URL baked into frontend config.js, e.g. http://103.233.3.146:1000/api
+#   FRONTEND_URL   shown as the environment link, e.g. http://103.233.3.146:1002
+#   SMOKE_URL      anonymous API GET that must return 200, default below
+#   IIS_API_PATH, IIS_FRONTEND_PATH, IIS_API_POOL, IIS_FRONTEND_POOL, IIS_BACKUP_ROOT
+#                  server layout overrides; defaults below match docs/deployment-checklist.md
+#
+# Secrets (connection string, JWT key, allowed origin) live ON THE SERVER as app-pool
+# environment variables or appsettings.Production.json. They are never in GitHub.
+name: CD (production)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Override API_URL baked into frontend config.js (blank = repository variable)'
+        required: false
+        default: ''
+      skip_smoke:
+        description: 'Skip the post-deploy smoke test (not recommended)'
+        type: boolean
+        default: false
+
+# Never run two production deployments at once, and never cancel one that has started.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Test + package
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - id: meta
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # Tests run here too (no -SkipTests): a deployment must never depend on CI having
+      # happened to run on the same commit.
+      - name: Build-Release.ps1 (tests + publish + sanitise + zip)
+        shell: pwsh
+        run: ./scripts/ci/Build-Release.ps1 -ApiUrl '${{ inputs.api_url || vars.API_URL }}'
+
+      # Ship the deploy script inside the artifact so the server-side job needs no git checkout.
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            artifacts/*.zip
+            artifacts/backend/build-info.json
+            scripts/ci/Deploy-IIS.ps1
+          retention-days: 30
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to IIS
+    needs: build
+    # The runner must be registered on the IIS server with the label "learnsphere-prod"
+    # (see docs/ci-cd.md "Server setup"). Its service account needs IIS admin rights.
+    runs-on: [self-hosted, Windows, learnsphere-prod]
+    # GitHub "environment": gives a deployment history, optional required-reviewer gate,
+    # and the URL link on the run page.
+    environment:
+      name: production
+      url: ${{ vars.FRONTEND_URL }}
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+
+      - name: Extract packages
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zips = Get-ChildItem release\artifacts\*.zip
+          if ($zips.Count -ne 2) { throw "Expected 2 zips in the artifact, found $($zips.Count)" }
+          Expand-Archive (Get-ChildItem release\artifacts\learnsphere-backend-*.zip).FullName  -DestinationPath release\backend  -Force
+          Expand-Archive (Get-ChildItem release\artifacts\learnsphere-frontend-*.zip).FullName -DestinationPath release\frontend -Force
+          Get-Content release\backend\build-info.json
+
+      - name: Deploy-IIS.ps1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $smoke = '${{ vars.SMOKE_URL }}'
+          if (-not $smoke) { $smoke = 'http://localhost:1000/api/admin/scoring-weightages' }
+          if ('${{ inputs.skip_smoke }}' -eq 'true') { $smoke = '' }
+
+          .\release\scripts\ci\Deploy-IIS.ps1 `
+            -BackendPackage  release\backend `
+            -FrontendPackage release\frontend `
+            -ApiSitePath      '${{ vars.IIS_API_PATH      || 'C:\inetpub\learnsphere-api' }}' `
+            -FrontendSitePath '${{ vars.IIS_FRONTEND_PATH || 'C:\inetpub\learnsphere' }}' `
+            -ApiAppPool       '${{ vars.IIS_API_POOL      || 'learnsphere-api' }}' `
+            -FrontendAppPool  '${{ vars.IIS_FRONTEND_POOL || 'learnsphere' }}' `
+            -BackupRoot       '${{ vars.IIS_BACKUP_ROOT   || 'C:\inetpub\backups\learnsphere' }}' `
+            -SmokeUrl $smoke
+
+      - name: Summary
+        if: always()
+        shell: powershell
+        run: |
+          $info = Get-Content release\backend\build-info.json -Raw | ConvertFrom-Json
+          @"
+          ## Production deployment
+
+          | | |
+          |---|---|
+          | Commit | ``$($info.commit)`` |
+          | Branch | $($info.branch) |
+          | Built  | $($info.builtAt) |
+          | API URL in frontend | $($info.apiUrl) |
+          | Result | **${{ job.status }}** |
+          "@ | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY

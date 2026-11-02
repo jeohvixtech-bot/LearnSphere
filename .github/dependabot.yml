@@ -1,0 +1,35 @@
+# Weekly dependency PRs. Each one triggers CI, so an upgrade that breaks the build or a
+# test is visible before anyone merges it.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /backend/LearnSphere.API
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      # One PR for all EF Core / ASP.NET Core 9.x patch bumps instead of five.
+      microsoft:
+        patterns: ['Microsoft.*', 'Pomelo.*']
+        update-types: ['minor', 'patch']
+    ignore:
+      # Stay on .NET 9 until the server's hosting bundle is upgraded deliberately.
+      - dependency-name: 'Microsoft.*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'Pomelo.*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: nuget
+    directory: /backend/LearnSphere.Tests
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      test-tooling:
+        patterns: ['xunit*', 'coverlet*', 'Microsoft.NET.Test.Sdk', 'FakeItEasy', 'FsCheck*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

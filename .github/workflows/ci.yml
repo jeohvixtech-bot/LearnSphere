@@ -1,0 +1,183 @@
+# Continuous Integration
+#
+# Runs on every push and on pull requests into the integration branches. Its job is to
+# answer one question fast: "is this commit deployable?"
+#
+#   backend   restore -> build (Release) -> xunit tests, TRX + coverage uploaded as artifacts
+#   frontend  syntax-check every hand-written JS file; make sure config.js stays env-neutral
+#   hygiene   fail if a secrets file is tracked; warn about committed publish/ output
+#   package   (main / Pre-Main only) build the release zips with the same script CD uses,
+#             so there is always a downloadable, sanitised package for a manual deploy
+#
+# No secrets are needed here: tests use EF Core InMemory, not MySQL.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.docx'
+      - 'docs/**'
+  pull_request:
+    branches: [main, Pre-Main]
+
+# A newer push to the same branch cancels the run that is still going for the older one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  backend:
+    name: Backend build + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET (version from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # NuGet packages change only when a .csproj changes, so key the cache on their hash.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore backend/LearnSphere.Tests/LearnSphere.Tests.csproj
+
+      - name: Build (Release)
+        run: dotnet build backend/LearnSphere.Tests/LearnSphere.Tests.csproj -c Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test backend/LearnSphere.Tests/LearnSphere.Tests.csproj
+          -c Release --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults
+
+      # Uploaded even when tests fail (if: always()) so the TRX can be opened in VS/Rider.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+          retention-days: 14
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # The frontend has no bundler or test runner, so the cheapest meaningful gate is
+      # "does every file we wrote at least parse". Vendored libs/ are excluded.
+      - name: Syntax-check application scripts
+        run: |
+          set -euo pipefail
+          # Only our own code: everything under app/ plus the root config.js (libs/ is vendored).
+          files=$(git ls-files -- frontend/app frontend/config.js | grep -E '\.js$')
+          count=0
+          for f in $files; do
+            node --check "$f"
+            count=$((count + 1))
+          done
+          echo "Parsed $count JavaScript files OK"
+
+      # config.js in the repo must stay environment-neutral. The API URL is baked in by
+      # scripts/ci/Build-Release.ps1 at package time, never committed.
+      - name: config.js must not hard-code an API URL
+        run: |
+          if grep -nE '^\s*window\.LEARNSPHERE_API_URL\s*=' frontend/config.js; then
+            echo "::error file=frontend/config.js::Remove the hard-coded API URL; pass -ApiUrl to Build-Release.ps1 (CD uses the API_URL repository variable)."
+            exit 1
+          fi
+          echo "config.js is environment-neutral"
+
+      - name: index.html references only files that exist
+        run: |
+          set -euo pipefail
+          missing=0
+          # local src/href targets only: skip anything with a URL scheme (https:, data:, mailto:…),
+          # protocol-relative URLs and #! route anchors
+          for ref in $(grep -oE '(src|href)="[^"]+"' frontend/index.html | sed -E 's/^(src|href)="//; s/"$//' | grep -vE '^([a-zA-Z][a-zA-Z0-9+.-]*:|#|//)'); do
+            path="frontend/${ref%%\?*}"
+            if [ ! -e "$path" ]; then
+              echo "::error file=frontend/index.html::missing referenced file: $ref"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] && echo "All local references in index.html resolve"
+
+  hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No secrets files tracked
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)(appsettings\.Production\.json|appsettings\.Development\.json|\.env)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::These files must never be committed:"; echo "$bad"; exit 1
+          fi
+          echo "No secrets files tracked"
+
+      # publish/ is git-ignored but a copy was committed before the rule existed. CI
+      # builds the package now, so the tracked copy is redundant. Warn, don't fail.
+      - name: Warn about committed publish output
+        run: |
+          if git ls-files publish | grep -q .; then
+            echo "::warning::publish/ is tracked in git. CI's 'package' job produces it now; consider 'git rm -r --cached publish'."
+          fi
+
+  package:
+    name: Build release package
+    needs: [backend, frontend, hygiene]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Main')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # Same script CD runs. Tests already passed in the 'backend' job, so skip them here.
+      - name: Build-Release.ps1
+        shell: pwsh
+        run: ./scripts/ci/Build-Release.ps1 -SkipTests -ApiUrl '${{ vars.API_URL }}'
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: learnsphere-release-${{ github.sha }}
+          path: |
+            artifacts/*.zip
+            artifacts/backend/build-info.json
+          retention-days: 14
