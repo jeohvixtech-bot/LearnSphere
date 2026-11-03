@@ -149,6 +149,37 @@ public class TutorLedgerServiceTests
     }
 
     [Fact]
+    public async Task PartialOffset_IsToppedUpByALaterGrant()
+    {
+        using var ctx = TestDbContextFactory.Create();
+        var tutorId = SeedTutorAndBooking(ctx, isFirstMatch: true, invoiceStatus: "Paid");
+
+        // Only 150 of the 400 commission can be covered at settlement time.
+        await Ledger(ctx).GrantCreditAsync(tutorId, 150m, "Small grant");
+        await Ledger(ctx).ReconcileTutorAsync(tutorId);
+        var after1 = await Ledger(ctx).GetBalanceAsync(tutorId);
+        Assert.Equal(150m, after1.Withdrawable);   // 400 earned − 400 commission + 150 offset
+        Assert.Equal(0m, after1.Credit);
+
+        // A later grant must cover the remaining 250 — not be ignored because an offset row
+        // already exists for the invoice.
+        await Ledger(ctx).GrantCreditAsync(tutorId, 300m, "Top-up");
+        await Ledger(ctx).ReconcileTutorAsync(tutorId);
+        var after2 = await Ledger(ctx).GetBalanceAsync(tutorId);
+        Assert.Equal(Base, after2.Withdrawable);
+        Assert.Equal(50m, after2.Credit);
+
+        var entries = await Ledger(ctx).GetStatementAsync(tutorId);
+        Assert.Equal(Base, entries.Where(e => e.Type == LedgerEntryType.CommissionOffset).Sum(e => e.Amount));
+        Assert.Equal(-Base, entries.Where(e => e.Type == LedgerEntryType.CreditConsumption).Sum(e => e.Amount));
+
+        // Fully covered now: another pass must not write anything more.
+        await Ledger(ctx).ReconcileTutorAsync(tutorId);
+        var entriesAgain = await Ledger(ctx).GetStatementAsync(tutorId);
+        Assert.Equal(entries.Count, entriesAgain.Count);
+    }
+
+    [Fact]
     public async Task Reconcile_IsIdempotent_RunningItAgainChangesNothing()
     {
         using var ctx = TestDbContextFactory.Create();

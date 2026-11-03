@@ -7,3 +7,6 @@
 //
 // Set it only when the API lives on a different host, e.g.:
 //   window.LEARNSPHERE_API_URL = 'https://api.learnsphere.example/api';
+
+// Deployment: API site on port 1000, frontend on port 1002 (set 2026-10-20).
+window.LEARNSPHERE_API_URL = 'http://103.233.3.146:1000/api';
